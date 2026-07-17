@@ -4,7 +4,7 @@
 
 Taskloom is a self-hosted workbench for drafting internal apps and agents from natural-language prompts. The builder is a full-bleed surface at `/builder` — chat thread, streamed prose, draft, plan, generated files, and a saved local preview. The rest of the workbench (Projects, Runs, and a consolidated Admin) lives behind a four-item sidebar so operators can keep most of their day inside the builder.
 
-Underneath the builder sits a substantial internal-developer-platform: a Hono REST+SSE API (`src/server.ts`), a provider-agnostic LLM router across six backends, a tool-using agent loop with a cost ledger, a Playwright browser runtime, a Docker/native command sandbox, an AES-256-GCM secrets vault, RBAC, inbound/outbound webhooks, a job scheduler with distributed leader election, and a zero-downtime SQLite→Postgres dual-write migration engine. It is hand-built, multi-phase product engineering — roughly 73K LOC of non-test TypeScript source backed by ~1,500 test cases — not a scaffold.
+Underneath the builder sits a substantial internal-developer-platform: a Hono REST+SSE API (`src/server.ts`), a provider-agnostic LLM router across six backends, a tool-using agent loop with a cost ledger, a Playwright browser runtime, a Docker/native command sandbox, an AES-256-GCM secrets vault, RBAC, inbound/outbound webhooks, a job scheduler with distributed leader election, and a zero-downtime SQLite→Postgres dual-write migration engine. It is hand-built, multi-phase product engineering — roughly 59K LOC of non-test TypeScript source backed by ~1,250 test cases — not a scaffold.
 
 The builder routes through `ProviderRouter` and supports **six BYOK providers** end-to-end: Anthropic, OpenAI, Gemini, OpenRouter, MiniMax, and a generic local-LLM provider that can talk to Ollama, vLLM, LM Studio, or llama.cpp — on `localhost` or on a separate GPU box on your LAN. Anthropic stays the default; operators can re-order priority with `TASKLOOM_PROVIDER_PRIORITY` or pick the `local` preset to force the local provider. Without any key configured, the builder falls back to deterministic template-only generation, which is enough to verify the loop but not enough to produce real apps from open-ended prompts.
 
@@ -236,7 +236,7 @@ Provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` / `GEMINI
 
 Taskloom is hand-crafted, senior-level TypeScript (ESM, Node ≥22.5): strict typing, narrow interfaces, dependency injection for testability (clock / spawn / prompt overrides), and consistent error redaction at the API boundary. Structure is feature-sliced (`providers/`, `tools/`, `jobs/`, `sandbox/`, `repositories/`, `activation/`, `codegen/`, `security/`) with near-zero dead code.
 
-Testing is first-class: **~1,500 test cases across ~143 test files** (node:test) — roughly a 0.7:1 test-to-source ratio — including SQLite/Postgres parity suites, async-boundary tests, and managed-Postgres transaction/concurrency tests. Biggest modules by LOC: `taskloom-store` (4,941), `app-routes` (4,176), `app-builder-service` (3,255).
+Testing is first-class: **~1,250 test cases across 140 test files** (node:test) — roughly a 0.7:1 test-to-source ratio — including SQLite/Postgres parity suites, async-boundary tests, and managed-Postgres transaction/concurrency tests. Biggest modules by LOC: `taskloom-store` (4,941), `app-routes` (4,176), `app-builder-service` (3,255).
 
 ## Development
 
