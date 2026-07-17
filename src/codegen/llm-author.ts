@@ -110,7 +110,7 @@ export interface AuthorAndValidateAppResult extends AuthorAppResult {
 }
 
 // =============================================================================
-// Internal placeholders (TODO: replace at merge time)
+// Internal helpers
 // =============================================================================
 
 /**
@@ -132,9 +132,8 @@ export function isSafePath(input: string): boolean {
 }
 
 /**
- * Default prompts. B3 will move these into `./prompts.ts` so the catalog of
- * Builder prompts lives in one place. Until then, the orchestrator carries
- * a usable default that the tests can override via `options.resolvePrompts`.
+ * Default prompts. The orchestrator carries a usable default that the tests
+ * can override via `options.resolvePrompts`.
  */
 function defaultPrompts(): ResolvedPrompts {
   const systemPrompt = [
