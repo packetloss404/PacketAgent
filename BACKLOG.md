@@ -134,3 +134,19 @@ The orchestrator, default-on flip, path validator, derived-draft projection, ite
 - Distributed SQLite or custom database replication.
 - Visual click-to-edit with direct DOM edits that bypass the LLM (Replit Element Editor pattern) — possible Phase 4.
 - Conversation forking / shareable build URLs — overhyped per the 2026-norms review; skipped.
+
+## Portfolio audit backlog — 2026-07-17
+_Findings from a 2026-07-17 code audit, preserved for later._
+
+### Later / deferred
+
+- **[med/M]** server.ts:436 /data/artifacts/* is not tenant-scoped: when serving is enabled, any reachable caller can read any workspace's artifacts
+  - Fix: In the `/data/artifacts/*` middleware in src/server.ts (~L430-440), before serveStatic require a valid session/preview token and resolve the on-disk path against the requesting workspace's artifact subdir (scope root to ./data/artifacts/<workspaceId>), rejecting cross-workspace reads. Route is default-OFF (artifactServingEnabled()), so only bites multi-user deploys that opt in.
+- **[low/L]** tsc+vite-build validation and multi-round auto-repair are gated behind TASKLOOM_SANDBOX_SMOKE_ENABLED=1 (default off), so smoke/validation returns a synthetic 'pass' by default
+  - Fix: Confirmed at src/app-routes/builder-core.ts:3041 (returns synthetic when flag!=1) and src/codegen/validate.ts:97 (SMOKE_ENV_VAR gate). Deliberate opt-in pending a provisioned sandbox driver; blockers already surface the fallback. To close: provision/wire a default sandbox driver so real smoke runs without the flag. Intended behavior, not a defect.
+- **[low/M]** email_send has no default SMTP transport: returns 'SMTP adapter is not configured' unless an adapterFactory is injected
+  - Fix: src/tools/email-sql.ts:165 returns config error when options.adapterFactory is absent; SMTP_* env parsing exists but no default transport. To close, add a default nodemailer-backed adapterFactory built from parsed SMTP_* config. Deliberate BYO-adapter DI design; email just doesn't work out-of-box.
+- **[low/L]** Tool approval tokens are whole-tool-scoped; resource/verb-scoped approvals (e.g. http.fetch:GET:api.github.com) not supported
+  - Fix: src/tools/approval.ts keys tokens purely by uniqueSortedToolNames (L131,190,283) — no resource/verb dimension. Current coarse approval is safe, just not granular. Closing requires designing resource-scoped token keys + matching call-site enforcement. Disclosed future work.
+- **[med/L]** Generated-app previews are not origin-isolated: preview served same-origin, so CSRF/separate-origin hardening for previews remains open
+  - Fix: Same-origin CSRF is solid (src/route-security.ts: origin-host check + token). Gap is defense-in-depth: serve generated-app previews from a distinct origin/subdomain so preview JS can't reach the main app's session cookies. Real architectural work (separate serving origin + cookie scoping). Disclosed roadmap item.
