@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { assertPermission, type WorkspacePermission } from "./rbac.js";
-import { requireAuthenticatedContext } from "./taskloom-services.js";
-import { findWorkspaceMembership, loadStoreAsync } from "./taskloom-store.js";
+import { requireAuthenticatedContext } from "./packetagent-services.js";
+import { findWorkspaceMembership, loadStoreAsync } from "./packetagent-store.js";
 import {
   getWorkflowTemplate,
   listWorkflowTemplates,

@@ -67,7 +67,7 @@ import {
   generateAgentBuilderDraftAsync,
   getIntegrationReadinessAsync,
   requireAuthenticatedContextAsync,
-} from "../taskloom-services.js";
+} from "../packetagent-services.js";
 import {
   loadStoreAsync,
   mutateStoreAsync,
@@ -76,7 +76,7 @@ import {
   type GeneratedAppPublishRecord,
   type GeneratedAppRecord,
   type GeneratedAppStatus,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 import { redactedErrorMessage } from "../security/redaction.js";
 import {
   chatStreamDelay,
@@ -459,7 +459,7 @@ async function runAppIterationCore(
 
   const fileTreeInput = fileTreeForIteration(body, record, previousCheckpoint);
   if (shouldUseFileTreeIteration({
-    flagOn: process.env.TASKLOOM_LEGACY_TEMPLATES !== "1",
+    flagOn: process.env.PACKETAGENT_LEGACY_TEMPLATES !== "1",
     draftSource: fileTreeInput.source,
     files: fileTreeInput.files,
   })) {
@@ -1765,7 +1765,7 @@ async function buildAgentPublishPayload(
       ],
     },
     url: {
-      baseUrl: body.visibility === "public" ? body.publicBaseUrl ?? "https://apps.taskloom.example" : body.privateBaseUrl ?? "http://localhost:8484",
+      baseUrl: body.visibility === "public" ? body.publicBaseUrl ?? "https://apps.packetagent.example" : body.privateBaseUrl ?? "http://localhost:8484",
       path: `/agent/${context.workspace.slug}/${agent.id}`,
       visibility: body.visibility ?? "private",
     },
@@ -2015,8 +2015,8 @@ async function buildPublishPreflight(
     env,
     database: {
       required: draft.app.dataSchema.length > 0,
-      store: env.TASKLOOM_STORE,
-      configured: env.TASKLOOM_STORE !== "memory",
+      store: env.PACKETAGENT_STORE,
+      configured: env.PACKETAGENT_STORE !== "memory",
     },
   });
 
@@ -2060,7 +2060,7 @@ function materializeGeneratedAppPublishWorkspace(
     })),
   });
   writeJsonArtifact(safePublishPath(publishRoot, "runtime-config.json"), {
-    runtime: "taskloom-generated-app-preview",
+    runtime: "packetagent-generated-app-preview",
     workspaceId: record.workspaceId,
     appId: record.id,
     checkpointId: checkpoint.id,
@@ -2113,7 +2113,7 @@ function publishArtifactObservations(
       kind: "source",
       present: true,
       source: "operator",
-      description: "Taskloom Hono server source that serves generated apps.",
+      description: "PacketAgent Hono server source that serves generated apps.",
     },
     {
       path: "web/dist",
@@ -2280,22 +2280,22 @@ function publishRuntimeEnv() {
   const defaults: Record<string, string> = {
     NODE_ENV: "production",
     PORT: "8484",
-    TASKLOOM_STORE: "json",
-    TASKLOOM_PUBLISH_ROOT: "data/published-apps",
+    PACKETAGENT_STORE: "json",
+    PACKETAGENT_PUBLISH_ROOT: "data/published-apps",
   };
   const keys = [
     "NODE_ENV",
     "PORT",
-    "TASKLOOM_STORE",
-    "TASKLOOM_PUBLISH_ROOT",
-    "TASKLOOM_PUBLIC_APP_BASE_URL",
-    "TASKLOOM_PRIVATE_APP_BASE_URL",
+    "PACKETAGENT_STORE",
+    "PACKETAGENT_PUBLISH_ROOT",
+    "PACKETAGENT_PUBLIC_APP_BASE_URL",
+    "PACKETAGENT_PRIVATE_APP_BASE_URL",
     "DATABASE_URL",
-    "TASKLOOM_DATABASE_URL",
-    "TASKLOOM_MANAGED_DATABASE_URL",
+    "PACKETAGENT_DATABASE_URL",
+    "PACKETAGENT_MANAGED_DATABASE_URL",
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
-    "TASKLOOM_WEBHOOK_SIGNING_SECRET",
+    "PACKETAGENT_WEBHOOK_SIGNING_SECRET",
     "RESEND_API_KEY",
     "SENDGRID_API_KEY",
     "POSTMARK_TOKEN",
@@ -2901,7 +2901,7 @@ async function writeGeneratedAppWorkspace(
     checkpointLabel: checkpoint.label,
     checkpointCreatedAt: checkpoint.createdAt,
     artifact,
-    generatedAppsRoot: process.env.TASKLOOM_GENERATED_APP_WORKSPACES_DIR,
+    generatedAppsRoot: process.env.PACKETAGENT_GENERATED_APP_WORKSPACES_DIR,
   });
 
   return generatedAppWorkspaceSummary(context, record, artifact, result);
@@ -3035,10 +3035,10 @@ async function runAppSmokeViaSandbox(
 ) {
   const synthetic = buildAppSmokeStatusFromDraft(draft, context, runSmoke);
   if (!runSmoke) return synthetic;
-  // Sandbox-backed smoke is opt-in: flip TASKLOOM_SANDBOX_SMOKE_ENABLED=1 once
+  // Sandbox-backed smoke is opt-in: flip PACKETAGENT_SANDBOX_SMOKE_ENABLED=1 once
   // a sandbox driver is provisioned in the deployment. Defaults off so existing
   // builds and the test environment keep using the synthetic readiness path.
-  if (process.env.TASKLOOM_SANDBOX_SMOKE_ENABLED !== "1") return synthetic;
+  if (process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED !== "1") return synthetic;
 
   let sandboxService;
   try {

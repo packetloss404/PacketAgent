@@ -9,7 +9,7 @@ import {
   listRequirementsForWorkspace,
   type ShareTokenRecord,
   type ShareTokenScope,
-} from "./taskloom-store.js";
+} from "./packetagent-store.js";
 import { maskSecret, redactSensitiveString } from "./security/redaction.js";
 
 function errorResponse(c: Context, error: unknown) {

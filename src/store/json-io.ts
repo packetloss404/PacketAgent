@@ -1,17 +1,17 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { TaskloomData } from "./types.js";
+import type { PacketAgentData } from "./types.js";
 
 // LEAF module: JSON file I/O + serialization for the json-backed store, plus the
 // in-process mutation serialization chain. Imports only node builtins and types
 // — never a backend or the barrel. The atomic write and chain error handling are
 // data-integrity-critical; behavior here is moved verbatim.
 
-export const DATA_FILE = resolve(process.cwd(), "data", "taskloom.json");
+export const DATA_FILE = resolve(process.cwd(), "data", "packetagent.json");
 
 let jsonTmpFileCounter = 0;
 
-export function persistJsonStore(data: TaskloomData): void {
+export function persistJsonStore(data: PacketAgentData): void {
   mkdirSync(dirname(DATA_FILE), { recursive: true });
   const serialized = JSON.stringify(data, null, 2);
   // Write to a temp file in the same directory, then atomically rename it over

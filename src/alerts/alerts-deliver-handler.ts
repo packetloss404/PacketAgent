@@ -1,5 +1,5 @@
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
-import { loadStoreAsync as defaultLoadStoreAsync } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
+import { loadStoreAsync as defaultLoadStoreAsync } from "../packetagent-store.js";
 import {
   resolveAlertWebhookConfig,
   deliverAlertWebhook,
@@ -11,7 +11,7 @@ import type { AlertEvent } from "./alert-engine.js";
 
 export const ALERTS_DELIVER_JOB_TYPE = "alerts.deliver" as const;
 
-export const ALERT_DELIVER_MAX_ATTEMPTS_ENV = "TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS";
+export const ALERT_DELIVER_MAX_ATTEMPTS_ENV = "PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 
@@ -28,7 +28,7 @@ export interface AlertsDeliverJobResult {
 }
 
 export interface AlertsDeliverHandlerDeps {
-  loadStore?: () => TaskloomData | Promise<TaskloomData>;
+  loadStore?: () => PacketAgentData | Promise<PacketAgentData>;
   webhookConfig?: () => AlertWebhookConfig | null;
   deliver?: typeof deliverAlertWebhook;
   updateStatus?: (input: UpdateAlertDeliveryStatusInput) => AlertEventRecord | null | Promise<AlertEventRecord | null>;

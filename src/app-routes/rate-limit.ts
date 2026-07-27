@@ -1,20 +1,20 @@
 import type { Context } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { createHash } from "node:crypto";
-import { mutateStoreAsync, upsertRateLimit } from "../taskloom-store.js";
+import { mutateStoreAsync, upsertRateLimit } from "../packetagent-store.js";
 import { configuredNonNegativeInteger, configuredPositiveInteger, httpRouteError } from "./shared.js";
 
 export const AUTH_RATE_LIMIT = {
   maxAttempts: 20,
   windowMs: 60_000,
-  maxAttemptsEnv: "TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS",
-  windowMsEnv: "TASKLOOM_AUTH_RATE_LIMIT_WINDOW_MS",
+  maxAttemptsEnv: "PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS",
+  windowMsEnv: "PACKETAGENT_AUTH_RATE_LIMIT_WINDOW_MS",
 };
 export const INVITATION_RATE_LIMIT = {
   maxAttempts: 20,
   windowMs: 60_000,
-  maxAttemptsEnv: "TASKLOOM_INVITATION_RATE_LIMIT_MAX_ATTEMPTS",
-  windowMsEnv: "TASKLOOM_INVITATION_RATE_LIMIT_WINDOW_MS",
+  maxAttemptsEnv: "PACKETAGENT_INVITATION_RATE_LIMIT_MAX_ATTEMPTS",
+  windowMsEnv: "PACKETAGENT_INVITATION_RATE_LIMIT_WINDOW_MS",
 };
 const RATE_LIMIT_MAX_BUCKETS = 5_000;
 
@@ -31,7 +31,7 @@ export async function enforceRateLimit(
     maxAttempts: configuredPositiveInteger(options.maxAttemptsEnv, options.maxAttempts),
     windowMs: configuredPositiveInteger(options.windowMsEnv, options.windowMs),
     timestamp,
-    maxBuckets: configuredPositiveInteger("TASKLOOM_RATE_LIMIT_MAX_BUCKETS", RATE_LIMIT_MAX_BUCKETS),
+    maxBuckets: configuredPositiveInteger("PACKETAGENT_RATE_LIMIT_MAX_BUCKETS", RATE_LIMIT_MAX_BUCKETS),
   };
 
   applyRateLimitDecision(c, timestamp, await distributedRateLimitUpsert(input));
@@ -39,7 +39,7 @@ export async function enforceRateLimit(
 }
 
 async function distributedRateLimitUpsert(input: { bucketId: string; scope: string; maxAttempts: number; windowMs: number; timestamp: number }) {
-  const url = (process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL ?? "").trim();
+  const url = (process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL ?? "").trim();
   if (!url) return null;
 
   try {
@@ -47,7 +47,7 @@ async function distributedRateLimitUpsert(input: { bucketId: string; scope: stri
       accept: "application/json",
       "content-type": "application/json",
     });
-    const secret = (process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_SECRET ?? "").trim();
+    const secret = (process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_SECRET ?? "").trim();
     if (secret) headers.set("authorization", `Bearer ${secret}`);
 
     const response = await fetch(url, {
@@ -60,7 +60,7 @@ async function distributedRateLimitUpsert(input: { bucketId: string; scope: stri
         windowMs: input.windowMs,
         timestamp: new Date(input.timestamp).toISOString(),
       }),
-      signal: AbortSignal.timeout(configuredPositiveInteger("TASKLOOM_DISTRIBUTED_RATE_LIMIT_TIMEOUT_MS", 750)),
+      signal: AbortSignal.timeout(configuredPositiveInteger("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_TIMEOUT_MS", 750)),
     });
     const payload = await readJsonObject(response);
     if (response.status === 429) return limitedUntilFromDistributedResponse(input, response, payload);
@@ -121,7 +121,7 @@ function retryAfterLimitedUntil(headerValue: string | null, timestamp: number) {
 }
 
 function distributedRateLimitFailOpen() {
-  return ["1", "true", "yes"].includes((process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN ?? "").trim().toLowerCase());
+  return ["1", "true", "yes"].includes((process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN ?? "").trim().toLowerCase());
 }
 
 // Derive the rate-limit client identity.
@@ -132,7 +132,7 @@ function distributedRateLimitFailOpen() {
 //     attacker-controlled (a client can send any XFF it likes), so taking it
 //     blindly lets an attacker rotate the header to dodge the limiter. We walk
 //     the list RIGHT-TO-LEFT and skip a configurable number of trusted proxy
-//     hops (TASKLOOM_TRUSTED_PROXY_HOPS) to land on the real client IP. With no
+//     hops (PACKETAGENT_TRUSTED_PROXY_HOPS) to land on the real client IP. With no
 //     hop count configured we take the right-most entry (the address our own
 //     trusted edge proxy observed), which the client cannot forge.
 //   * When a proxy is NOT trusted, XFF is untrustworthy entirely, so we use the
@@ -145,7 +145,7 @@ function clientNetworkIdentity(c: Context): string {
     if (forwarded) {
       const entries = forwarded.split(",").map((entry) => entry.trim()).filter(Boolean);
       if (entries.length > 0) {
-        const hops = configuredNonNegativeInteger("TASKLOOM_TRUSTED_PROXY_HOPS", -1);
+        const hops = configuredNonNegativeInteger("PACKETAGENT_TRUSTED_PROXY_HOPS", -1);
         if (hops >= 0) {
           // Skip `hops` trusted proxies counting from the right; clamp into range.
           const index = Math.max(0, entries.length - 1 - hops);
@@ -184,10 +184,10 @@ function clientKey(c: Context, identifier?: string | null) {
 }
 
 function hashedClientKey(clientIdentity: string) {
-  const salt = process.env.TASKLOOM_RATE_LIMIT_KEY_SALT ?? "taskloom-rate-limit";
+  const salt = process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT ?? "packetagent-rate-limit";
   return `sha256:${createHash("sha256").update(`${salt}:${clientIdentity}`).digest("hex")}`;
 }
 
 function trustedProxyEnabled() {
-  return ["1", "true", "yes"].includes((process.env.TASKLOOM_TRUST_PROXY ?? "").trim().toLowerCase());
+  return ["1", "true", "yes"].includes((process.env.PACKETAGENT_TRUST_PROXY ?? "").trim().toLowerCase());
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { login } from "./taskloom-services";
-import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./taskloom-store";
+import { login } from "./packetagent-services";
+import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./packetagent-store";
 import {
   applyWorkspaceBriefTemplate,
   getWorkflowOverview,
@@ -19,7 +19,7 @@ import {
 
 test("workflow brief updates workspace brief facts and activity", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const brief = updateWorkspaceBrief(auth.context, {
     summary: "Ship the roadmap workflow service.",
@@ -40,7 +40,7 @@ test("workflow brief updates workspace brief facts and activity", () => {
 
 test("workflow surfaces update activation facts and overview", () => {
   resetStoreForTests();
-  const auth = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "beta@packetagent.local", password: "demo12345" });
 
   replaceRequirements(auth.context, [
     { title: "Track workflow requirements", priority: "must", status: "accepted" },
@@ -80,7 +80,7 @@ test("workflow surfaces update activation facts and overview", () => {
 
 test("brief saves snapshot a version with manual source", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   updateWorkspaceBrief(auth.context, {
     summary: "First brief draft.",
@@ -102,7 +102,7 @@ test("brief saves snapshot a version with manual source", () => {
 
 test("brief scope changes emit durable activation signals idempotently by version", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   updateWorkspaceBrief(auth.context, {
     summary: "Ship the roadmap workflow service with a revised scope.",
@@ -127,7 +127,7 @@ test("brief scope changes emit durable activation signals idempotently by versio
 
 test("brief templates populate the brief and snapshot a template version", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const templates = listWorkspaceBriefTemplates();
   assert.ok(templates.length > 0);
 
@@ -148,7 +148,7 @@ test("brief templates populate the brief and snapshot a template version", () =>
 
 test("restoring a brief version updates the brief and adds a restore version", () => {
   resetStoreForTests();
-  const auth = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "beta@packetagent.local", password: "demo12345" });
 
   updateWorkspaceBrief(auth.context, { summary: "Original brief." });
   updateWorkspaceBrief(auth.context, { summary: "Pivoted brief direction." });
@@ -172,7 +172,7 @@ test("restoring a brief version updates the brief and adds a restore version", (
 
 test("workflow validation rejects invalid surface input", () => {
   resetStoreForTests();
-  const auth = login({ email: "gamma@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "gamma@packetagent.local", password: "demo12345" });
 
   assert.throws(
     () => updateWorkspaceBrief(auth.context, { summary: "x" }),
@@ -186,7 +186,7 @@ test("workflow validation rejects invalid surface input", () => {
 
 test("workflow read paths preserve workspace isolation and ordering", () => {
   resetStoreForTests();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const timestamp = new Date().toISOString();
   const store = loadStore();
 

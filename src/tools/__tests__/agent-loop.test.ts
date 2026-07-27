@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resetDefaultRouterForTests, ProviderRouter, getDefaultRouter, setDefaultRouter } from "../../providers/router.js";
-import { resetStoreForTests } from "../../taskloom-store.js";
+import { resetStoreForTests } from "../../packetagent-store.js";
 import { resetDefaultToolRegistryForTests, getDefaultToolRegistry } from "../registry.js";
 import type { LLMProvider, ProviderCallOptions, ProviderCallResult, ProviderStreamChunk } from "../../providers/types.js";
 import { runAgentLoop } from "../agent-loop.js";

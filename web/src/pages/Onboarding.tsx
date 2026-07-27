@@ -73,7 +73,7 @@ export default function OnboardingPage() {
           <section className="card" style={{ padding: 32 }}>
             <span className="pill good"><span className="dot"></span><I.sparkle size={11}/> Guided setup</span>
             <h1 className="h1" style={{ fontSize: 28, marginTop: 16, marginBottom: 10 }}>
-              Complete the remaining Taskloom setup steps.
+              Complete the remaining PacketAgent setup steps.
             </h1>
             <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6 }}>
               The current step and completion state are persisted on the server. Each completion updates the activation

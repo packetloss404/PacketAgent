@@ -28,10 +28,10 @@ import {
   updateAgent,
   updateWorkspace,
   updateWorkspaceEnvVar,
-} from "./taskloom-services";
-import type { RunAgentResult, RunAgentToolApprovalPayload } from "./taskloom-services";
+} from "./packetagent-services";
+import type { RunAgentResult, RunAgentToolApprovalPayload } from "./packetagent-services";
 import { SESSION_COOKIE_NAME } from "./auth-utils";
-import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./taskloom-store";
+import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./packetagent-store";
 import { registerDefaultTools } from "./tools/bootstrap";
 import { getDefaultToolRegistry, resetDefaultToolRegistryForTests } from "./tools/registry";
 
@@ -76,31 +76,31 @@ function installOnlyTestToolRegistry(toolNames: string[]) {
 test("register creates a new user and workspace", async () => {
   resetStoreForTests();
   const result = register({
-    email: "new@taskloom.local",
+    email: "new@packetagent.local",
     password: "supersecret",
     displayName: "New Owner",
   });
 
   assert.ok(result.cookieValue.includes("."));
-  assert.equal(result.context.user.email, "new@taskloom.local");
+  assert.equal(result.context.user.email, "new@packetagent.local");
   assert.match(result.context.workspace.name, /workspace/i);
 
   const store = loadStore();
-  assert.ok(store.users.some((entry) => entry.email === "new@taskloom.local"));
+  assert.ok(store.users.some((entry) => entry.email === "new@packetagent.local"));
   assert.ok(store.workspaces.some((entry) => entry.id === result.context.workspace.id));
 });
 
 test("login rejects invalid credentials", () => {
   resetStoreForTests();
   assert.throws(
-    () => login({ email: "alpha@taskloom.local", password: "wrongpass" }),
+    () => login({ email: "alpha@packetagent.local", password: "wrongpass" }),
     /invalid email or password/,
   );
 });
 
 test("agent playbook is persisted and runs produce a step transcript", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = createAgent(auth.context, {
     name: "Playbook Tester",
@@ -146,7 +146,7 @@ test("agent playbook is persisted and runs produce a step transcript", async () 
 
 test("agent tool runtime settings persist on create and update", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = createAgent(auth.context, {
     name: "Tool Runner",
@@ -171,7 +171,7 @@ test("agent tool runtime settings persist on create and update", () => {
 test("agent runs with enabled tools request launch approval before execution", async () => {
   registerDefaultTools();
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = createAgent(auth.context, {
     name: "Runtime Approval Check",
@@ -193,7 +193,7 @@ test("agent runs with enabled tools request launch approval before execution", a
 test("valid tool launch approval reaches setup-required execution blockers", async () => {
   registerDefaultTools();
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = createAgent(auth.context, {
     name: "Runtime Setup Check",
@@ -219,7 +219,7 @@ test("valid tool launch approval reaches setup-required execution blockers", asy
 test("canceling tool launch approval records a canceled run", async () => {
   registerDefaultTools();
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = createAgent(auth.context, {
     name: "Runtime Cancel Check",
@@ -242,7 +242,7 @@ test("canceling tool launch approval records a canceled run", async () => {
 
 test("integration readiness summarizes generated plan tool and provider setup gaps", () => {
   resetStoreForTests();
-  const auth = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "beta@packetagent.local", password: "demo12345" });
 
   const readiness = getIntegrationReadiness(auth.context);
 
@@ -257,7 +257,7 @@ test("integration readiness summarizes generated plan tool and provider setup ga
 
 test("integration readiness treats external key configuration as provider ready", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const readiness = getIntegrationReadiness(auth.context);
 
@@ -268,7 +268,7 @@ test("integration readiness treats external key configuration as provider ready"
 
 test("agent prompt generation returns a structured builder draft", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const draft = await generateAgentBuilderDraftAsync(auth.context, {
     prompt: "Build an agent that monitors support tickets daily, summarizes urgent escalations, opens blockers for unresolved incidents, and reports outcomes to operators.",
@@ -309,7 +309,7 @@ test("agent builder drafts surface missing tool setup as first-run blockers", as
   const restoreTools = installOnlyTestToolRegistry(["read_workflow_brief"]);
 
   try {
-    const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const draft = await generateAgentBuilderDraftAsync(auth.context, {
       prompt: "Send Slack notifications for GitHub pull requests and email owners when review is needed.",
     });
@@ -335,7 +335,7 @@ test("agent builder drafts surface missing tool setup as first-run blockers", as
 
 test("agent builder drafts carry phase 71 integration flows and env setup references", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const draft = await generateAgentBuilderDraftAsync(auth.context, {
     prompt: "Create a daily agent that reads GitHub issues, sends Slack alerts, emails owners, and updates Stripe billing notes for escalations.",
@@ -381,7 +381,7 @@ test("prompt agent drafts include custom API integration setup", () => {
 
 test("agent prompt generation can create an approved agent", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const result = await approveAgentBuilderDraftAsync(auth.context, {
     prompt: "Create a webhook agent to triage customer incidents, open blockers for critical risks, and log a concise summary.",
@@ -410,7 +410,7 @@ test("agent prompt generation can create an approved agent", async () => {
 
 test("agent prompt generation can attach a first preview run with sample inputs", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const result = await approveAgentBuilderDraftAsync(auth.context, {
     prompt: "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
@@ -434,7 +434,7 @@ test("agent prompt generation can attach a first preview run with sample inputs"
 
 test("agent builder preview respects first-run readiness blockers", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const draft = await generateAgentBuilderDraftAsync(auth.context, {
     prompt: "Create a research assistant agent that reviews a source URL and reports the next action.",
   });
@@ -481,7 +481,7 @@ test("buildAgentSampleInputs returns valid typed defaults for run previews", () 
 
 test("agent lists do not expose webhook tokens", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = createAgent(auth.context, {
     name: "Webhook Agent",
@@ -505,7 +505,7 @@ test("agent lists do not expose webhook tokens", () => {
 
 test("activity detail includes lightweight related domain context", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = loadStore();
   const timestamp = new Date().toISOString();
 
@@ -558,7 +558,7 @@ test("activity detail includes lightweight related domain context", () => {
 
 test("activity and run DTOs redact sensitive values", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = loadStore();
   store.activities.unshift({
     id: "activity_alpha_sensitive",
@@ -594,7 +594,7 @@ test("activity and run DTOs redact sensitive values", async () => {
 
 test("activity detail related context is workspace isolated", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = loadStore();
 
   store.activities.unshift({
@@ -624,7 +624,7 @@ test("activity detail related context is workspace isolated", () => {
 
 test("activity list and detail preserve workspace isolation and neighbor ordering", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = loadStore();
 
   store.activities.unshift(
@@ -668,7 +668,7 @@ test("activity list and detail preserve workspace isolation and neighbor orderin
 
 test("env vars: create masks secrets and sensitive keys, prevents duplicate keys, supports update and delete", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = createWorkspaceEnvVar(auth.context, {
     key: "test_token",
@@ -709,7 +709,7 @@ test("env vars: create masks secrets and sensitive keys, prevents duplicate keys
 
 test("agent runs: list adds duration and capability flags; cancel and retry behave correctly", async () => {
   resetStoreForTests();
-  const auth = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "beta@packetagent.local", password: "demo12345" });
 
   const list = listAgentRuns(auth.context);
   const failed = list.runs.find((entry) => entry.status === "failed");
@@ -740,7 +740,7 @@ test("agent runs: list adds duration and capability flags; cancel and retry beha
 test("agent run retry rejects tool-enabled agents that need fresh approval", async () => {
   resetStoreForTests();
   registerDefaultTools();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const agent = createAgent(auth.context, {
     name: "Approval retry agent",
     description: "Has a registered tool.",
@@ -771,7 +771,7 @@ test("agent run retry rejects tool-enabled agents that need fresh approval", asy
 
 test("record-as-playbook requires admin route access and redacts tool input secrets", async () => {
   resetStoreForTests();
-  const owner = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const owner = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const agent = createAgent(owner.context, {
     name: "Playbook Secret Check",
     description: "Checks redaction.",
@@ -818,7 +818,7 @@ test("record-as-playbook requires admin route access and redacts tool input secr
   const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
   assert.ok(membership);
   membership.role = "member";
-  const member = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const member = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { app } = await import("./server");
   const response = await app.request("/api/app/agent-runs/run_secret_tool_input/record-as-playbook", {
     method: "POST",
@@ -831,7 +831,7 @@ test("record-as-playbook requires admin route access and redacts tool input secr
 
 test("agent run detail is workspace scoped and returns derived trace spans", async () => {
   resetStoreForTests();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const detail = getAgentRunDetail(alpha.context, "run_alpha_support_latest");
   assert.equal(detail.run.id, "run_alpha_support_latest");
@@ -878,14 +878,14 @@ test("agent run detail is workspace scoped and returns derived trace spans", asy
 
 test("release history exposes preflight and prior confirmations", async () => {
   resetStoreForTests();
-  const gamma = login({ email: "gamma@taskloom.local", password: "demo12345" });
+  const gamma = login({ email: "gamma@packetagent.local", password: "demo12345" });
   const history = listReleaseHistory(gamma.context);
   assert.ok(history.releases.length > 0);
   assert.equal(history.preflight.failedEvidence, 0);
   assert.equal(history.preflight.openBlockers, 0);
   assert.equal(history.preflight.ready, true);
 
-  const beta = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const beta = login({ email: "beta@packetagent.local", password: "demo12345" });
   const betaHistory = listReleaseHistory(beta.context);
   assert.equal(betaHistory.preflight.ready, false);
   assert.ok(betaHistory.preflight.openBlockers > 0 || betaHistory.preflight.failedEvidence > 0);
@@ -893,7 +893,7 @@ test("release history exposes preflight and prior confirmations", async () => {
 
 test("workspace update and onboarding completion affect private bootstrap", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   await updateWorkspace(auth.context, {
     name: "Alpha Workspace Updated",

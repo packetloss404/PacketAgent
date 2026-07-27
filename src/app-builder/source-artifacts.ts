@@ -257,7 +257,7 @@ const schemaFingerprint = (() => {
   }
   return hash.toString(16).slice(0, 8);
 })();
-const storageKey = \`taskloom_app_\${appId}_db_\${schemaFingerprint}\`;
+const storageKey = \`packetagent_app_\${appId}_db_\${schemaFingerprint}\`;
 
 function sqlTypeForField(field: FieldDef): string {
   if (field.type === "number") return "REAL";
@@ -859,7 +859,7 @@ function renderGeneratedStylesCss(): string {
   // Legacy template CSS. Mirrors the design vocabulary the LLM-driven
   // generator is instructed to follow (slate neutrals, single indigo accent,
   // generous whitespace on a 8/16/24/40 rhythm, sticky header, max-width
-  // container) so even when `TASKLOOM_LEGACY_TEMPLATES=1` is on the
+  // container) so even when `PACKETAGENT_LEGACY_TEMPLATES=1` is on the
   // generated app reads as a polished product rather than a wireframe.
   return `:root {
   /* Palette - aligned with Tailwind slate + indigo so the legacy template

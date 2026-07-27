@@ -10,9 +10,9 @@ const ALGO = "aes-256-gcm";
 const KEY_LEN = 32;
 const IV_LEN = 12;
 const TAG_LEN = 16;
-const SALT = Buffer.from("taskloom-vault-v1");
+const SALT = Buffer.from("packetagent-vault-v1");
 const ITERATIONS = 100_000;
-const DEV_MASTER_KEY = "taskloom-dev-master";
+const DEV_MASTER_KEY = "packetagent-dev-master";
 
 export function deriveMasterKey(passphrase: string): Buffer {
   return pbkdf2Sync(passphrase, SALT, ITERATIONS, KEY_LEN, "sha256");

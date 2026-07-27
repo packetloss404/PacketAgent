@@ -3,8 +3,8 @@ import test from "node:test";
 import { Hono } from "hono";
 import { SESSION_COOKIE_NAME } from "./auth-utils";
 import { findJob } from "./jobs/store";
-import { login } from "./taskloom-services";
-import { loadStore, mutateStore, resetStoreForTests } from "./taskloom-store";
+import { login } from "./packetagent-services";
+import { loadStore, mutateStore, resetStoreForTests } from "./packetagent-store";
 import { agentWebhookRoutes, publicWebhookRoutes } from "./webhook-routes";
 
 function createTestApp() {
@@ -21,7 +21,7 @@ function authHeaders(cookieValue: string) {
 test("webhook token rotation and deletion are workspace-scoped", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const rotateResponse = await app.request("/api/app/webhooks/agents/agent_alpha_support/rotate", {
     method: "POST",
@@ -56,7 +56,7 @@ test("webhook token rotation and deletion are workspace-scoped", async () => {
 test("webhook token management requires an admin role", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
     assert.ok(membership);

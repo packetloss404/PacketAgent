@@ -20,8 +20,8 @@ import type {
 // openai/..., google/...) rather than a `:free` variant.
 
 export const OPENROUTER_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
-const OPENROUTER_DEFAULT_APP_NAME = "Taskloom";
-const OPENROUTER_DEFAULT_SITE_URL = "Taskloom";
+const OPENROUTER_DEFAULT_APP_NAME = "PacketAgent";
+const OPENROUTER_DEFAULT_SITE_URL = "PacketAgent";
 
 // OpenRouter exposes per-model unit prices via its /models endpoint at runtime;
 // we keep a small static table for the curated preset defaults so the ledger
@@ -156,7 +156,7 @@ export class OpenRouterProvider implements LLMProvider {
 
   private buildHeaders(apiKey: string): Record<string, string> {
     // HTTP-Referer + X-Title are optional OpenRouter attribution headers used
-    // for their public leaderboard. We always send both — Taskloom by default,
+    // for their public leaderboard. We always send both — PacketAgent by default,
     // overridable via OPENROUTER_SITE_URL and OPENROUTER_APP_NAME.
     return {
       "content-type": "application/json",

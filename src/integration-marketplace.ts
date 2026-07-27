@@ -1,4 +1,4 @@
-import type { IntegrationReadinessSummary } from "./taskloom-services.js";
+import type { IntegrationReadinessSummary } from "./packetagent-services.js";
 
 export type IntegrationMarketplaceCardId =
   | "openai"
@@ -185,7 +185,7 @@ const CARDS: CardDefinition[] = [
       urlField("SLACK_WEBHOOK_URL", "Webhook URL", true, "https://hooks.slack.com/services/..."),
       stringField("SLACK_DEFAULT_CHANNEL", "Default channel", false, "#alerts"),
     ],
-    test: webhookTest("slack-webhook", { text: "Taskloom test notification" }),
+    test: webhookTest("slack-webhook", { text: "PacketAgent test notification" }),
     readiness: envReadiness(["SLACK_WEBHOOK_URL"]),
   },
   {
@@ -199,9 +199,9 @@ const CARDS: CardDefinition[] = [
     fields: [
       selectField("EMAIL_PROVIDER", "Provider", true, ["resend", "sendgrid", "postmark", "smtp"]),
       secretField("EMAIL_PROVIDER_SECRET", "Provider secret"),
-      stringField("EMAIL_FROM", "From address", false, "Taskloom <notify@example.test>"),
+      stringField("EMAIL_FROM", "From address", false, "PacketAgent <notify@example.test>"),
     ],
-    test: webhookTest("email", { to: "ops@example.test", subject: "Taskloom email test" }),
+    test: webhookTest("email", { to: "ops@example.test", subject: "PacketAgent email test" }),
     readiness: anyEnvReadiness(["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_TOKEN", "SMTP_URL"]),
   },
   {
@@ -266,10 +266,10 @@ const CARDS: CardDefinition[] = [
     summary: "Back generated apps, workflow state, and durable records with a managed database.",
     useCases: ["CRUD apps", "agent state", "audit logs", "workspace data"],
     mode: "env",
-    requiredEnv: ["DATABASE_URL", "TASKLOOM_DATABASE_URL", "TASKLOOM_MANAGED_DATABASE_URL"],
-    optionalEnv: ["TASKLOOM_STORE"],
+    requiredEnv: ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"],
+    optionalEnv: ["PACKETAGENT_STORE"],
     fields: [
-      selectField("TASKLOOM_STORE", "Store", true, ["postgres", "sqlite", "file", "memory"]),
+      selectField("PACKETAGENT_STORE", "Store", true, ["postgres", "sqlite", "file", "memory"]),
       secretField("DATABASE_URL", "Database URL"),
     ],
     test: {
@@ -365,10 +365,10 @@ function browserReadiness(input: NormalizedMarketplaceInput): IntegrationMarketp
 }
 
 function databaseReadiness(input: NormalizedMarketplaceInput): IntegrationMarketplaceReadiness {
-  const store = String(input.env.TASKLOOM_STORE ?? "").trim().toLowerCase();
-  const hasDatabaseUrl = ["DATABASE_URL", "TASKLOOM_DATABASE_URL", "TASKLOOM_MANAGED_DATABASE_URL"].some((name) => hasValue(input.env[name]));
+  const store = String(input.env.PACKETAGENT_STORE ?? "").trim().toLowerCase();
+  const hasDatabaseUrl = ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"].some((name) => hasValue(input.env[name]));
   const ready = hasDatabaseUrl || (store.length > 0 && store !== "memory");
-  const blockers = ready ? [] : ["Set a database URL or use a non-memory TASKLOOM_STORE."];
+  const blockers = ready ? [] : ["Set a database URL or use a non-memory PACKETAGENT_STORE."];
   const warnings = ready && store === "file" ? ["File-backed storage is local-only; use Postgres for multi-instance deployments."] : [];
   return readinessResult(ready ? "ready" : "needs_config", blockers, warnings);
 }

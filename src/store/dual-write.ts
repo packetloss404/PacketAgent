@@ -17,7 +17,7 @@ import type {
 // dedicated sqlite tables. Imports cache (depth counter), sqlite-db,
 // dedicated-tables, the repositories, and redaction — never a backend or the
 // barrel. Behavior (deferred flush at depth 0, swallow-on-failure) moved
-// verbatim from taskloom-store.ts.
+// verbatim from packetagent-store.ts.
 
 const pendingActivityDualWrites: ActivityRecord[] = [];
 const pendingActivationSignalDualWrites: ActivationSignalRecord[] = [];
@@ -32,7 +32,7 @@ const pendingInvitationEmailDeliveryDualWrites: InvitationEmailDeliveryRecord[] 
 // dedicated tables still flush. Dedicated tables can be reconciled out-of-band
 // (e.g. repair-activation-read-models / reconcile-invitation-emails in jobs.ts).
 function logDualWriteFlushFailure(table: string, error: unknown): void {
-  console.warn(`[taskloom-store] dedicated ${table} dual-write flush failed (primary write already committed): ${redactedErrorMessage(error)}`);
+  console.warn(`[packetagent-store] dedicated ${table} dual-write flush failed (primary write already committed): ${redactedErrorMessage(error)}`);
 }
 
 // Called when a sqlite mutation transaction rolls back: discard everything that
@@ -55,7 +55,7 @@ export function flushPendingDualWrites(): void {
 function flushPendingActivityDualWrites(): void {
   if (pendingActivityDualWrites.length === 0) return;
   const drained = pendingActivityDualWrites.splice(0, pendingActivityDualWrites.length);
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   try {
     const repo = createActivitiesRepository({});
     for (const record of drained) {
@@ -69,9 +69,9 @@ function flushPendingActivityDualWrites(): void {
 function flushPendingActivationSignalDualWrites(): void {
   if (pendingActivationSignalDualWrites.length === 0) return;
   const drained = pendingActivationSignalDualWrites.splice(0, pendingActivationSignalDualWrites.length);
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   try {
-    const db = openStoreDatabase(resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE));
+    const db = openStoreDatabase(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE));
     try {
       db.exec("begin immediate");
       try {
@@ -94,7 +94,7 @@ function flushPendingActivationSignalDualWrites(): void {
 function flushPendingAgentRunDualWrites(): void {
   if (pendingAgentRunDualWrites.length === 0) return;
   const drained = pendingAgentRunDualWrites.splice(0, pendingAgentRunDualWrites.length);
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   try {
     const repo = createAgentRunsRepository({});
     for (const record of drained) {
@@ -108,7 +108,7 @@ function flushPendingAgentRunDualWrites(): void {
 function flushPendingInvitationEmailDeliveryDualWrites(): void {
   if (pendingInvitationEmailDeliveryDualWrites.length === 0) return;
   const drained = pendingInvitationEmailDeliveryDualWrites.splice(0, pendingInvitationEmailDeliveryDualWrites.length);
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   try {
     const repo = createInvitationEmailDeliveriesRepository({});
     for (const record of drained) {
@@ -120,7 +120,7 @@ function flushPendingInvitationEmailDeliveryDualWrites(): void {
 }
 
 export function enqueueActivityDualWrite(record: ActivityRecord): void {
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   const snapshot = cloneActivityRecord(record);
   if (getMutateSqliteDepth() > 0) {
     pendingActivityDualWrites.push(snapshot);
@@ -131,13 +131,13 @@ export function enqueueActivityDualWrite(record: ActivityRecord): void {
 }
 
 export function enqueueActivationSignalDualWrite(record: ActivationSignalRecord): void {
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   const snapshot = cloneActivationSignalRecord(record);
   if (getMutateSqliteDepth() > 0) {
     pendingActivationSignalDualWrites.push(snapshot);
     return;
   }
-  const db = openStoreDatabase(resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE));
+  const db = openStoreDatabase(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE));
   try {
     upsertDedicatedActivationSignal(db, snapshot);
   } finally {
@@ -146,7 +146,7 @@ export function enqueueActivationSignalDualWrite(record: ActivationSignalRecord)
 }
 
 export function enqueueInvitationEmailDeliveryDualWrite(record: InvitationEmailDeliveryRecord): void {
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   if (getMutateSqliteDepth() > 0) {
     pendingInvitationEmailDeliveryDualWrites.push({ ...record });
   } else {
@@ -156,7 +156,7 @@ export function enqueueInvitationEmailDeliveryDualWrite(record: InvitationEmailD
 }
 
 export function enqueueAgentRunDualWrite(record: AgentRunRecord): void {
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   if (getMutateSqliteDepth() > 0) {
     pendingAgentRunDualWrites.push({ ...record });
   } else {

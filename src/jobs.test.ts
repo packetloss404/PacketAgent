@@ -6,7 +6,7 @@ import {
   recomputeActivationReadModels,
   type StoreJobDeps,
 } from "./jobs";
-import { snapshotForWorkspace, type TaskloomData } from "./taskloom-store";
+import { snapshotForWorkspace, type PacketAgentData } from "./packetagent-store";
 
 test("recomputeActivationReadModels refreshes activation read models for every workspace", async () => {
   const data = makeStore();
@@ -200,14 +200,14 @@ test("repairActivationReadModels repairs stale activation read models", async ()
   assert.equal(data.activationReadModels.alpha.stage, "definition");
 });
 
-function makeDeps(data: TaskloomData): StoreJobDeps {
+function makeDeps(data: PacketAgentData): StoreJobDeps {
   return {
     loadStore: () => data,
     mutateStore: (mutator) => mutator(data),
   };
 }
 
-function makeStore(): TaskloomData {
+function makeStore(): PacketAgentData {
   return {
     users: [],
     sessions: [],

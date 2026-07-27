@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrateDatabase } from "../db/cli.js";
 import { recordAlerts, updateAlertDeliveryStatus } from "./alert-store.js";
 import type { AlertEvent } from "./alert-engine.js";
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 import type { AlertEventsRepository } from "../repositories/alert-events-repo.js";
 
 // A dedicated-table repository whose writes always fail, to simulate a
@@ -54,14 +54,14 @@ interface AlertEventRow {
   dead_lettered: number | null;
 }
 
-function makeStore(records: AlertEventRecord[] = []): TaskloomData {
-  return { alertEvents: [...records] } as unknown as TaskloomData;
+function makeStore(records: AlertEventRecord[] = []): PacketAgentData {
+  return { alertEvents: [...records] } as unknown as PacketAgentData;
 }
 
-function makeStoreDeps(data: TaskloomData) {
+function makeStoreDeps(data: PacketAgentData) {
   return {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
 }
 
@@ -137,21 +137,21 @@ function seedDedicated(dbPath: string, record: AlertEventRecord): void {
 }
 
 function withSqliteEnv(dbPath: string) {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   return () => {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
   };
 }
 
 test("recordAlerts dual-writes JSON-side and dedicated alert_events table in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -188,8 +188,8 @@ test("recordAlerts dual-writes JSON-side and dedicated alert_events table in SQL
 });
 
 test("recordAlerts dual-writes deliveryError into the dedicated table when delivery fails", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -216,8 +216,8 @@ test("recordAlerts dual-writes deliveryError into the dedicated table when deliv
 });
 
 test("recordAlerts retention prune deletes from JSON-side and dedicated alert_events in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -253,8 +253,8 @@ test("recordAlerts retention prune deletes from JSON-side and dedicated alert_ev
 });
 
 test("updateAlertDeliveryStatus dual-writes delivery patch to JSON-side and dedicated table in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -295,8 +295,8 @@ test("updateAlertDeliveryStatus dual-writes delivery patch to JSON-side and dedi
 });
 
 test("updateAlertDeliveryStatus dual-writes deadLettered flag to both sides", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -331,11 +331,11 @@ test("updateAlertDeliveryStatus dual-writes deadLettered flag to both sides", ()
 });
 
 test("recordAlerts is a no-op for the dedicated alert_events table in JSON-default mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
-  const previousStore = process.env.TASKLOOM_STORE;
-  delete process.env.TASKLOOM_STORE;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  delete process.env.PACKETAGENT_STORE;
   try {
     const data = makeStore();
     const events: AlertEvent[] = [makeEvent({ id: "evt_a" })];
@@ -352,15 +352,15 @@ test("recordAlerts is a no-op for the dedicated alert_events table in JSON-defau
     const dedicated = readDedicated(dbPath);
     assert.equal(dedicated.length, 0);
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("recordAlerts: a failing dedicated alert_events write does NOT throw and primary JSON store still persists", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   const warn = captureConsoleWarn();
@@ -392,8 +392,8 @@ test("recordAlerts: a failing dedicated alert_events write does NOT throw and pr
 });
 
 test("updateAlertDeliveryStatus: a failing dedicated-table write does NOT throw and primary JSON update still persists", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   const warn = captureConsoleWarn();
@@ -418,8 +418,8 @@ test("updateAlertDeliveryStatus: a failing dedicated-table write does NOT throw 
 });
 
 test("recordAlerts dedups by id on retry: replaying the same event ids does not duplicate JSON-side records", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {

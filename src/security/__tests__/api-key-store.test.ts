@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resetStoreForTests } from "../../taskloom-store.js";
+import { resetStoreForTests } from "../../packetagent-store.js";
 import {
   listApiKeysForWorkspaceAsync,
   listApiKeysForWorkspace,

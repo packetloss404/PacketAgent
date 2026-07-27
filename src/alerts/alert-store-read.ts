@@ -1,5 +1,5 @@
 import { createAlertEventsRepository, type AlertEventsRepository } from "../repositories/alert-events-repo.js";
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 
 export interface ListAlertsOptions {
   severity?: "info" | "warning" | "critical";
@@ -9,8 +9,8 @@ export interface ListAlertsOptions {
 }
 
 export interface ListAlertsDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   repository?: AlertEventsRepository;
 }
 

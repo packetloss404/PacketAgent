@@ -6,14 +6,14 @@ test("app publish readiness package contract is deterministic for the same draft
   const input = {
     appName: "Release Audit Console!",
     workspaceSlug: "Alpha Workspace",
-    localPublishRoot: "exports\\taskloom",
+    localPublishRoot: "exports\\packetagent",
     publicBaseUrl: "https://publish.example.test/apps/",
     privateBaseUrl: "http://localhost:8484/",
     publishId: "Release Publish 42",
     previousPublishId: "Release Publish 41",
     visibility: "public" as const,
     requiredEnv: ["OPENAI_API_KEY", "DATABASE_URL", "OPENAI_API_KEY"],
-    optionalEnv: ["TASKLOOM_ACCESS_LOG_MODE", "SENTRY_DSN"],
+    optionalEnv: ["PACKETAGENT_ACCESS_LOG_MODE", "SENTRY_DSN"],
     runtimeEnv: {
       NODE_ENV: "production",
       PORT: "8484",
@@ -33,7 +33,7 @@ test("app publish readiness package contract is deterministic for the same draft
   assert.equal(first.publishHistory.previousPublishId, "release-publish-41");
   assert.equal(first.workspaceSlug, "alpha-workspace");
   assert.equal(first.draftSlug, "release-audit-console");
-  assert.equal(first.localPublishPath, "exports/taskloom/alpha-workspace/release-audit-console");
+  assert.equal(first.localPublishPath, "exports/packetagent/alpha-workspace/release-audit-console");
   assert.equal(first.urlHandoff.publicUrl, "https://publish.example.test/apps/alpha-workspace/release-audit-console");
   assert.equal(first.urlHandoff.privateUrl, "http://localhost:8484/app/alpha-workspace/release-audit-console");
   assert.equal(first.envChecklist.find((item) => item.name === "NODE_ENV")?.configured, true);
@@ -85,19 +85,19 @@ test("app publish readiness sorts and deduplicates environment checklist entries
   assert.deepEqual(requiredNames, [
     "DATABASE_URL",
     "NODE_ENV",
+    "PACKETAGENT_PUBLISH_ROOT",
+    "PACKETAGENT_STORE",
     "PORT",
-    "TASKLOOM_PUBLISH_ROOT",
-    "TASKLOOM_STORE",
     "Z_REQUIRED",
   ]);
   assert.equal(optionalNames.includes("PORT"), false);
   assert.equal(optionalNames.includes("Z_REQUIRED"), false);
   assert.deepEqual(optionalNames, [
     "A_OPTIONAL",
-    "TASKLOOM_ACCESS_LOG_MODE",
-    "TASKLOOM_PRIVATE_APP_BASE_URL",
-    "TASKLOOM_PUBLIC_APP_BASE_URL",
-    "TASKLOOM_SCHEDULER_LEADER_MODE",
+    "PACKETAGENT_ACCESS_LOG_MODE",
+    "PACKETAGENT_PRIVATE_APP_BASE_URL",
+    "PACKETAGENT_PUBLIC_APP_BASE_URL",
+    "PACKETAGENT_SCHEDULER_LEADER_MODE",
   ]);
 });
 
@@ -113,11 +113,11 @@ test("app publish readiness includes publish artifact manifest and docker compos
   assert.ok(readiness.publishArtifactManifest.entries.some((entry) => entry.path === "data/published-apps/beta/ops-board/bundle" && entry.kind === "generated_bundle"));
   assert.ok(readiness.publishArtifactManifest.entries.some((entry) => entry.path.endsWith("/runtime-config.json")));
   assert.equal(readiness.dockerComposeExport.fileName, "docker-compose.publish.yml");
-  assert.equal(readiness.dockerComposeExport.projectName, "taskloom-beta-ops-board");
-  assert.deepEqual(readiness.dockerComposeExport.networks, ["taskloom-publish"]);
-  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "taskloom-app" && service.healthcheck));
-  assert.equal(readiness.dockerComposeExport.services.find((service) => service.name === "taskloom-app")?.environment?.TASKLOOM_APP_BUNDLE_PATH, "/app/data/published-apps/beta/ops-board/bundle");
-  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "taskloom-db"));
+  assert.equal(readiness.dockerComposeExport.projectName, "packetagent-beta-ops-board");
+  assert.deepEqual(readiness.dockerComposeExport.networks, ["packetagent-publish"]);
+  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-app" && service.healthcheck));
+  assert.equal(readiness.dockerComposeExport.services.find((service) => service.name === "packetagent-app")?.environment?.PACKETAGENT_APP_BUNDLE_PATH, "/app/data/published-apps/beta/ops-board/bundle");
+  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-db"));
   assert.ok(readiness.dockerComposeExport.outline.some((step) => step.includes("data/published-apps/beta/ops-board/bundle")));
 });
 
@@ -130,8 +130,8 @@ test("app publish readiness includes lane 1 checklist assumptions and publish hi
     runtimeEnv: {
       NODE_ENV: "production",
       PORT: "8484",
-      TASKLOOM_STORE: "sqlite",
-      TASKLOOM_PUBLISH_ROOT: "data/published-apps",
+      PACKETAGENT_STORE: "sqlite",
+      PACKETAGENT_PUBLISH_ROOT: "data/published-apps",
     },
   });
 
@@ -151,7 +151,7 @@ test("app publish readiness includes lane 1 checklist assumptions and publish hi
   assert.equal(readiness.publishHistory.previousPublishId, "last-good");
   assert.ok(readiness.publishHistory.semantics.some((semantic) => semantic.includes("rollback target")));
   assert.ok(readiness.rollback.restores.includes("last known-good publish bundle"));
-  assert.match(readiness.rollback.command, /taskloom publish rollback --workspace northwind --app customer-portal --to last-good$/);
+  assert.match(readiness.rollback.command, /packetagent publish rollback --workspace northwind --app customer-portal --to last-good$/);
 });
 
 test("app publish readiness includes feature-scoped connector blockers in the publish checklist", () => {
@@ -183,11 +183,11 @@ test("app publish readiness wires runtime env into integration publish checks wi
     requiredEnv: ["OPENAI_API_KEY"],
     runtimeEnv: {
       OPENAI_API_KEY: "sk-secret-value",
-      TASKLOOM_PUBLIC_APP_BASE_URL: "https://publish.example.test",
-      TASKLOOM_WEBHOOK_SIGNING_SECRET: "webhook-secret-value",
+      PACKETAGENT_PUBLIC_APP_BASE_URL: "https://publish.example.test",
+      PACKETAGENT_WEBHOOK_SIGNING_SECRET: "webhook-secret-value",
       RESEND_API_KEY: "email-secret-value",
-      DATABASE_URL: "postgres://taskloom:secret@db.example.test/taskloom",
-      TASKLOOM_STORE: "postgres",
+      DATABASE_URL: "postgres://packetagent:secret@db.example.test/packetagent",
+      PACKETAGENT_STORE: "postgres",
     },
     draft: {
       summary: "OpenAI assistant that sends email webhook notifications and persists customer records.",
@@ -203,7 +203,7 @@ test("app publish readiness wires runtime env into integration publish checks wi
   assert.equal(readiness.publishIntegrations.checks.find((check) => check.category === "database")?.status, "ready");
   assert.equal(JSON.stringify(readiness.publishIntegrations).includes("sk-secret-value"), false);
   assert.equal(JSON.stringify(readiness.publishIntegrations).includes("webhook-secret-value"), false);
-  assert.equal(JSON.stringify(readiness.publishIntegrations).includes("postgres://taskloom:secret"), false);
+  assert.equal(JSON.stringify(readiness.publishIntegrations).includes("postgres://packetagent:secret"), false);
 });
 
 test("app publish readiness expands app agent bundle contract", () => {
@@ -217,12 +217,12 @@ test("app publish readiness expands app agent bundle contract", () => {
   assert.equal(readiness.packageContract.bundleKind, "app_agent");
   assert.equal(readiness.agentSlug, "incident-helper");
   assert.equal(readiness.runtimeConfig.agentRouteBase, "/agent/ops-team/incident-helper");
-  assert.ok(readiness.envChecklist.some((item) => item.name === "TASKLOOM_AGENT_BUNDLE_PATH" && item.required));
-  assert.ok(readiness.envChecklist.some((item) => item.name === "TASKLOOM_AGENT_TOOL_ALLOWLIST" && !item.required));
+  assert.ok(readiness.envChecklist.some((item) => item.name === "PACKETAGENT_AGENT_BUNDLE_PATH" && item.required));
+  assert.ok(readiness.envChecklist.some((item) => item.name === "PACKETAGENT_AGENT_TOOL_ALLOWLIST" && !item.required));
   assert.ok(readiness.packageContract.buildCommands.some((step) => step.id === "validate-agent-bundle"));
   assert.ok(readiness.publishArtifactManifest.entries.some((entry) => entry.path.endsWith("/agent/agent-manifest.json")));
   assert.ok(readiness.packageContract.smokeChecks.some((check) => check.id === "agent-manifest"));
-  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "taskloom-agent"));
+  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-agent"));
 });
 
 test("app publish readiness defaults to private URL handoff", () => {
@@ -230,7 +230,7 @@ test("app publish readiness defaults to private URL handoff", () => {
 
   assert.equal(readiness.urlHandoff.visibility, "private");
   assert.equal(readiness.localPublishPath, "data/published-apps/workspace/generated-app");
-  assert.equal(readiness.urlHandoff.publicUrl, "https://apps.taskloom.example/workspace/generated-app");
+  assert.equal(readiness.urlHandoff.publicUrl, "https://apps.packetagent.example/workspace/generated-app");
   assert.equal(readiness.urlHandoff.privateUrl, "http://localhost:8484/app/workspace/generated-app");
   assert.ok(readiness.urlHandoff.notes.some((note) => note.includes("Hold the public URL")));
 });

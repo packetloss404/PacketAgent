@@ -9,18 +9,18 @@ import {
   ManagedDatabaseStoreBoundaryError,
   MANAGED_DATABASE_SYNC_ADAPTER_GAP_MESSAGE,
   mutateStore,
-  resolveTaskloomStoreMode,
+  resolvePacketAgentStoreMode,
   resetStoreForTests,
   upsertRequirement,
-} from "./taskloom-store";
+} from "./packetagent-store";
 
 const STORE_ENV_KEYS = [
-  "TASKLOOM_STORE",
-  "TASKLOOM_DB_PATH",
+  "PACKETAGENT_STORE",
+  "PACKETAGENT_DB_PATH",
   "DATABASE_URL",
-  "TASKLOOM_DATABASE_URL",
-  "TASKLOOM_MANAGED_DATABASE_URL",
-  "TASKLOOM_DATABASE_TOPOLOGY",
+  "PACKETAGENT_DATABASE_URL",
+  "PACKETAGENT_MANAGED_DATABASE_URL",
+  "PACKETAGENT_DATABASE_TOPOLOGY",
 ] as const;
 
 type StoreEnvKey = (typeof STORE_ENV_KEYS)[number];
@@ -50,19 +50,19 @@ test("default JSON store remains supported when no managed database hints are pr
   withStoreEnv({}, () => {
     const store = resetStoreForTests();
 
-    assert.equal(resolveTaskloomStoreMode().mode, "json");
+    assert.equal(resolvePacketAgentStoreMode().mode, "json");
     assert.equal(store.workspaces.some((entry) => entry.id === "alpha"), true);
-    assert.equal(loadStore().users.some((entry) => entry.email === "alpha@taskloom.local"), true);
+    assert.equal(loadStore().users.some((entry) => entry.email === "alpha@packetagent.local"), true);
   });
 });
 
 test("sqlite store remains supported and persists through cache reloads", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-managed-boundary-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-managed-boundary-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    withStoreEnv({ TASKLOOM_STORE: "sqlite", TASKLOOM_DB_PATH: dbPath }, () => {
-      assert.equal(resolveTaskloomStoreMode().mode, "sqlite");
+    withStoreEnv({ PACKETAGENT_STORE: "sqlite", PACKETAGENT_DB_PATH: dbPath }, () => {
+      assert.equal(resolvePacketAgentStoreMode().mode, "sqlite");
       resetStoreForTests();
       mutateStore((data) => {
         upsertRequirement(data, {
@@ -85,8 +85,8 @@ test("sqlite store remains supported and persists through cache reloads", () => 
 
 test("managed database store modes fail at the synchronous store boundary", () => {
   for (const storeMode of ["managed", "postgres", "postgresql"]) {
-    withStoreEnv({ TASKLOOM_STORE: storeMode }, () => {
-      const resolution = resolveTaskloomStoreMode();
+    withStoreEnv({ PACKETAGENT_STORE: storeMode }, () => {
+      const resolution = resolvePacketAgentStoreMode();
       assert.equal(resolution.mode, storeMode === "managed" ? "managed" : "postgres");
 
       assert.throws(
@@ -95,7 +95,7 @@ test("managed database store modes fail at the synchronous store boundary", () =
           assert.ok(error instanceof ManagedDatabaseStoreBoundaryError);
           assert.equal(error.storeMode, storeMode);
           assert.deepEqual(error.managedDatabaseUrlKeys, []);
-          assert.match(error.message, /TASKLOOM_STORE=/);
+          assert.match(error.message, /PACKETAGENT_STORE=/);
           assert.ok(error.message.startsWith(MANAGED_DATABASE_SYNC_ADAPTER_GAP_MESSAGE));
           return true;
         },
@@ -111,7 +111,7 @@ test("managed database store modes fail at the synchronous store boundary", () =
           assert.ok(error instanceof ManagedDatabaseStoreBoundaryError);
           assert.equal(error.storeMode, storeMode);
           assert.deepEqual(error.managedDatabaseUrlKeys, []);
-          assert.match(error.message, /TASKLOOM_STORE=/);
+          assert.match(error.message, /PACKETAGENT_STORE=/);
           return true;
         },
       );
@@ -121,12 +121,12 @@ test("managed database store modes fail at the synchronous store boundary", () =
 });
 
 test("managed database URL hints guard synchronous load and mutate instead of falling back to JSON or SQLite", () => {
-  const url = "postgres://taskloom:secret@db.example.com/taskloom";
+  const url = "postgres://packetagent:secret@db.example.com/packetagent";
   const cases: Array<Partial<Record<StoreEnvKey, string>>> = [
     { DATABASE_URL: url },
-    { TASKLOOM_DATABASE_URL: url },
-    { TASKLOOM_MANAGED_DATABASE_URL: url },
-    { TASKLOOM_STORE: "sqlite", TASKLOOM_DB_PATH: join(tmpdir(), "taskloom-boundary.sqlite"), DATABASE_URL: url },
+    { PACKETAGENT_DATABASE_URL: url },
+    { PACKETAGENT_MANAGED_DATABASE_URL: url },
+    { PACKETAGENT_STORE: "sqlite", PACKETAGENT_DB_PATH: join(tmpdir(), "packetagent-boundary.sqlite"), DATABASE_URL: url },
   ];
 
   for (const env of cases) {

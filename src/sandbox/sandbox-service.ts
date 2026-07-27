@@ -5,11 +5,11 @@
  * buffering, timeout enforcement, persistence, and SSE event emission.
  *
  * Environment variables:
- *   TASKLOOM_SANDBOX_DRIVER          docker | native | auto (default: auto)
- *   TASKLOOM_SANDBOX_DEFAULT_RUNTIME default runtime id (default: node-20)
- *   TASKLOOM_SANDBOX_DEFAULT_TIMEOUT_MS default exec timeout (default: 120000)
- *   TASKLOOM_SANDBOX_MEMORY_MB       per-exec memory limit (default: 512)
- *   TASKLOOM_SANDBOX_CPUS            per-exec cpu count (default: 1)
+ *   PACKETAGENT_SANDBOX_DRIVER          docker | native | auto (default: auto)
+ *   PACKETAGENT_SANDBOX_DEFAULT_RUNTIME default runtime id (default: node-20)
+ *   PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS default exec timeout (default: 120000)
+ *   PACKETAGENT_SANDBOX_MEMORY_MB       per-exec memory limit (default: 512)
+ *   PACKETAGENT_SANDBOX_CPUS            per-exec cpu count (default: 1)
  *
  * Future hook for the app builder integration:
  *   `runBuildInSandbox(appId, checkpointId)` — the eventual entry point that
@@ -46,9 +46,9 @@ const DEFAULT_RUNTIME = "node-20";
 const NATIVE_INSECURE_NOTE =
   "Native driver is active. Commands run on the host with no isolation; use only on trusted dev hosts.";
 const NATIVE_PRODUCTION_BLOCK_MESSAGE =
-  "sandbox: native driver is blocked; it runs untrusted code on the host with no isolation. Use TASKLOOM_SANDBOX_DRIVER=docker, or set TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX=true only for a trusted development host";
+  "sandbox: native driver is blocked; it runs untrusted code on the host with no isolation. Use PACKETAGENT_SANDBOX_DRIVER=docker, or set PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX=true only for a trusted development host";
 const DOCKER_UNAVAILABLE_BLOCK_MESSAGE =
-  "sandbox: Docker is unavailable and the native fallback is disabled. Start Docker (TASKLOOM_SANDBOX_DRIVER=docker), or set TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX=true only for a trusted development host to allow the insecure native fallback";
+  "sandbox: Docker is unavailable and the native fallback is disabled. Start Docker (PACKETAGENT_SANDBOX_DRIVER=docker), or set PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX=true only for a trusted development host to allow the insecure native fallback";
 
 export interface SandboxExecRequest {
   workspaceId: string;
@@ -246,8 +246,8 @@ export class SandboxService {
     const id = randomUUID();
     const runtime = request.runtime ?? this.defaultRuntime();
     const timeoutMs = clampPositive(request.timeoutMs, this.defaultTimeoutMs(), 1, 24 * 60 * 60 * 1000);
-    const memoryMb = clampPositive(this.numberFromEnv("TASKLOOM_SANDBOX_MEMORY_MB"), 512, 64, 8192);
-    const cpus = clampPositive(this.numberFromEnv("TASKLOOM_SANDBOX_CPUS"), 1, 1, 32);
+    const memoryMb = clampPositive(this.numberFromEnv("PACKETAGENT_SANDBOX_MEMORY_MB"), 512, 64, 8192);
+    const cpus = clampPositive(this.numberFromEnv("PACKETAGENT_SANDBOX_CPUS"), 1, 1, 32);
 
     const baseRecord: SandboxExecRecord = {
       id,
@@ -439,7 +439,7 @@ export class SandboxService {
     if (this.cachedDriver === this.dockerDriver && this.cachedDriverAvailable) {
       return this.dockerDriver;
     }
-    const requested = (this.forcedDriver ?? this.env.TASKLOOM_SANDBOX_DRIVER ?? "auto").toLowerCase();
+    const requested = (this.forcedDriver ?? this.env.PACKETAGENT_SANDBOX_DRIVER ?? "auto").toLowerCase();
     if (requested === "native") {
       // Explicit native: refused unless the operator opted into the insecure flag.
       this.assertNativeAllowed();
@@ -587,12 +587,12 @@ export class SandboxService {
   }
 
   private defaultRuntime(): string {
-    const value = this.env.TASKLOOM_SANDBOX_DEFAULT_RUNTIME;
+    const value = this.env.PACKETAGENT_SANDBOX_DEFAULT_RUNTIME;
     return value && value.length > 0 ? value : DEFAULT_RUNTIME;
   }
 
   private defaultTimeoutMs(): number {
-    return clampPositive(this.numberFromEnv("TASKLOOM_SANDBOX_DEFAULT_TIMEOUT_MS"), DEFAULT_TIMEOUT_MS, 1, 24 * 60 * 60 * 1000);
+    return clampPositive(this.numberFromEnv("PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS"), DEFAULT_TIMEOUT_MS, 1, 24 * 60 * 60 * 1000);
   }
 
   private numberFromEnv(key: string): number | undefined {
@@ -603,12 +603,12 @@ export class SandboxService {
   }
 
   private nativeOptIn(): boolean {
-    return isTruthy(this.env.TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX);
+    return isTruthy(this.env.PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX);
   }
 
   /**
    * Refuses the native (no-isolation) driver in ALL environments unless the
-   * operator explicitly opts in via TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX.
+   * operator explicitly opts in via PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX.
    * This is independent of NODE_ENV — the native driver runs untrusted code
    * directly on the host, so it must always be opt-in (fail closed).
    */

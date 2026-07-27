@@ -9,7 +9,7 @@ import {
   upsertWorkspaceInvitation,
   upsertWorkspaceMembership,
   type JobRecord,
-} from "../taskloom-store";
+} from "../packetagent-store";
 import {
   generateId,
   normalizeEmail,

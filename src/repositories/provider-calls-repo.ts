@@ -2,10 +2,10 @@ import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import type { ProviderCallRecord, TaskloomData } from "../taskloom-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../taskloom-store.js";
+import type { ProviderCallRecord, PacketAgentData } from "../packetagent-store.js";
+import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
 
-const DEFAULT_DB_FILE = "data/taskloom.sqlite";
+const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 
 export interface ListProviderCallsFilter {
@@ -23,8 +23,8 @@ export interface ProviderCallsRepository {
 }
 
 export interface ProviderCallsRepositoryDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   dbPath?: string;
 }
 
@@ -39,8 +39,8 @@ export interface AsyncProviderCallsRepository {
 }
 
 export interface AsyncProviderCallsRepositoryDeps {
-  loadStore?: () => MaybePromise<TaskloomData>;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => MaybePromise<T>) => MaybePromise<T>;
+  loadStore?: () => MaybePromise<PacketAgentData>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => MaybePromise<T>) => MaybePromise<T>;
   repository?: ProviderCallsRepository;
   dbPath?: string;
 }
@@ -48,7 +48,7 @@ export interface AsyncProviderCallsRepositoryDeps {
 export function createProviderCallsRepository(
   deps: ProviderCallsRepositoryDeps = {},
 ): ProviderCallsRepository {
-  if (process.env.TASKLOOM_STORE === "sqlite") return sqliteProviderCallsRepository(deps);
+  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteProviderCallsRepository(deps);
   return jsonProviderCallsRepository(deps);
 }
 
@@ -56,7 +56,7 @@ export function createAsyncProviderCallsRepository(
   deps: AsyncProviderCallsRepositoryDeps = {},
 ): AsyncProviderCallsRepository {
   if (deps.repository) return asyncProviderCallsRepositoryFromSync(deps.repository);
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     return asyncProviderCallsRepositoryFromSync(sqliteProviderCallsRepository({ dbPath: deps.dbPath }));
   }
   return asyncJsonProviderCallsRepository(deps);
@@ -383,7 +383,7 @@ function normalizeMaxRows(maxRows: number): number {
 
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
-  return resolve(process.cwd(), process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
 }
 
 function openDatabase(dbPath: string): DatabaseSync {

@@ -9,14 +9,14 @@ export type ManagedDatabaseRuntimeGuardClassification =
 
 export interface ManagedDatabaseRuntimeGuardEnv {
   NODE_ENV?: string;
-  TASKLOOM_STORE?: string;
-  TASKLOOM_DB_PATH?: string;
-  TASKLOOM_MANAGED_DATABASE_URL?: string;
+  PACKETAGENT_STORE?: string;
+  PACKETAGENT_DB_PATH?: string;
+  PACKETAGENT_MANAGED_DATABASE_URL?: string;
   DATABASE_URL?: string;
-  TASKLOOM_DATABASE_URL?: string;
-  TASKLOOM_MANAGED_DATABASE_ADAPTER?: string;
-  TASKLOOM_DATABASE_TOPOLOGY?: string;
-  TASKLOOM_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS?: string;
+  PACKETAGENT_DATABASE_URL?: string;
+  PACKETAGENT_MANAGED_DATABASE_ADAPTER?: string;
+  PACKETAGENT_DATABASE_TOPOLOGY?: string;
+  PACKETAGENT_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS?: string;
 }
 
 export interface ManagedDatabaseRuntimeGuardObservedEnvValue {
@@ -33,7 +33,7 @@ export interface ManagedDatabaseRuntimeGuardObservedConfig {
   bypassEnabled: boolean;
   managedDatabaseUrl: string | null;
   databaseUrl: string | null;
-  taskloomDatabaseUrl: string | null;
+  packetagentDatabaseUrl: string | null;
   managedDatabaseAdapter?: string | null;
   env: Record<string, ManagedDatabaseRuntimeGuardObservedEnvValue>;
 }
@@ -72,17 +72,17 @@ export class ManagedDatabaseRuntimeGuardError extends Error {
   }
 }
 
-const DEFAULT_SQLITE_PATH = "data/taskloom.sqlite";
-const BYPASS_ENV_KEY = "TASKLOOM_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS";
+const DEFAULT_SQLITE_PATH = "data/packetagent.sqlite";
+const BYPASS_ENV_KEY = "PACKETAGENT_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS";
 const OBSERVED_ENV_KEYS = [
   "NODE_ENV",
-  "TASKLOOM_STORE",
-  "TASKLOOM_DB_PATH",
-  "TASKLOOM_MANAGED_DATABASE_URL",
+  "PACKETAGENT_STORE",
+  "PACKETAGENT_DB_PATH",
+  "PACKETAGENT_MANAGED_DATABASE_URL",
   "DATABASE_URL",
-  "TASKLOOM_DATABASE_URL",
-  "TASKLOOM_MANAGED_DATABASE_ADAPTER",
-  "TASKLOOM_DATABASE_TOPOLOGY",
+  "PACKETAGENT_DATABASE_URL",
+  "PACKETAGENT_MANAGED_DATABASE_ADAPTER",
+  "PACKETAGENT_DATABASE_TOPOLOGY",
   BYPASS_ENV_KEY,
 ] as const;
 const MANAGED_TOPOLOGY_HINTS = new Set([
@@ -123,9 +123,9 @@ function redactedValue(
   const normalized = clean(value);
   if (!normalized) return { value: null, redacted: false };
   if (
-    key === "TASKLOOM_MANAGED_DATABASE_URL" ||
+    key === "PACKETAGENT_MANAGED_DATABASE_URL" ||
     key === "DATABASE_URL" ||
-    key === "TASKLOOM_DATABASE_URL" ||
+    key === "PACKETAGENT_DATABASE_URL" ||
     URL_LIKE_PATTERN.test(normalized)
   ) {
     return { value: "[redacted]", redacted: true };
@@ -171,9 +171,9 @@ function statusFromChecks(
 
 function managedDatabaseUrlConfigured(env: ManagedDatabaseRuntimeGuardEnv): boolean {
   return (
-    configured(env.TASKLOOM_MANAGED_DATABASE_URL) ||
+    configured(env.PACKETAGENT_MANAGED_DATABASE_URL) ||
     configured(env.DATABASE_URL) ||
-    configured(env.TASKLOOM_DATABASE_URL)
+    configured(env.PACKETAGENT_DATABASE_URL)
   );
 }
 
@@ -195,12 +195,12 @@ function buildNextSteps(
     if (check.status === "pass") continue;
     if (check.id === "supported-runtime-store") {
       steps.add(
-        "Set TASKLOOM_STORE=json for local JSON storage or TASKLOOM_STORE=sqlite for single-node SQLite storage.",
+        "Set PACKETAGENT_STORE=json for local JSON storage or PACKETAGENT_STORE=sqlite for single-node SQLite storage.",
       );
     }
     if (check.id === "managed-database-runtime") {
       steps.add(
-        "Configure TASKLOOM_MANAGED_DATABASE_ADAPTER=postgres with a managed database URL before enabling managed Postgres startup.",
+        "Configure PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres with a managed database URL before enabling managed Postgres startup.",
       );
     }
   }
@@ -219,11 +219,11 @@ export function assessManagedDatabaseRuntimeGuard(
 ): ManagedDatabaseRuntimeGuardReport {
   const env = input.env ?? {};
   const supportedLocalModes = input.supportedLocalModes ?? ["json", "sqlite"];
-  const store = normalize(env.TASKLOOM_STORE) || "json";
+  const store = normalize(env.PACKETAGENT_STORE) || "json";
   const nodeEnv = normalize(env.NODE_ENV) || "development";
-  const databaseTopology = normalize(env.TASKLOOM_DATABASE_TOPOLOGY);
-  const bypassEnabled = truthy(env.TASKLOOM_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS);
-  const adapter = normalize(env.TASKLOOM_MANAGED_DATABASE_ADAPTER);
+  const databaseTopology = normalize(env.PACKETAGENT_DATABASE_TOPOLOGY);
+  const bypassEnabled = truthy(env.PACKETAGENT_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS);
+  const adapter = normalize(env.PACKETAGENT_MANAGED_DATABASE_ADAPTER);
   const hasManagedDatabaseUrl = managedDatabaseUrlConfigured(env);
   const recognizedAdapter = SUPPORTED_MANAGED_DATABASE_ADAPTERS.has(adapter);
   const managedPostgresSupported = recognizedAdapter && hasManagedDatabaseUrl;
@@ -241,10 +241,10 @@ export function assessManagedDatabaseRuntimeGuard(
       "supported-runtime-store",
       "pass",
       managedStoreRequested(store)
-        ? `TASKLOOM_STORE=${store} is allowed by a recognized managed Postgres adapter and managed database URL.`
+        ? `PACKETAGENT_STORE=${store} is allowed by a recognized managed Postgres adapter and managed database URL.`
         : store === "sqlite"
-        ? "TASKLOOM_STORE=sqlite is supported only for single-node SQLite runtime."
-        : "TASKLOOM_STORE is using the supported local JSON runtime.",
+        ? "PACKETAGENT_STORE=sqlite is supported only for single-node SQLite runtime."
+        : "PACKETAGENT_STORE is using the supported local JSON runtime.",
     );
   } else {
     pushCheck(
@@ -252,8 +252,8 @@ export function assessManagedDatabaseRuntimeGuard(
       "supported-runtime-store",
       "fail",
       MANAGED_TOPOLOGY_HINTS.has(store)
-        ? `TASKLOOM_STORE=${store} crosses the managed database runtime boundary; a recognized managed Postgres adapter and managed database URL are required for the app startup path to be supported.`
-        : `TASKLOOM_STORE=${store} is not a supported runtime storage mode.`,
+        ? `PACKETAGENT_STORE=${store} crosses the managed database runtime boundary; a recognized managed Postgres adapter and managed database URL are required for the app startup path to be supported.`
+        : `PACKETAGENT_STORE=${store} is not a supported runtime storage mode.`,
     );
   }
 
@@ -264,12 +264,12 @@ export function assessManagedDatabaseRuntimeGuard(
     hasManagedIntent
       ? managedPostgresSupported
         ? "Managed database runtime intent is allowed; a recognized managed Postgres adapter and managed database URL are configured."
-        : "Managed database runtime intent requires a recognized managed Postgres adapter (TASKLOOM_MANAGED_DATABASE_ADAPTER) and a managed database URL."
+        : "Managed database runtime intent requires a recognized managed Postgres adapter (PACKETAGENT_MANAGED_DATABASE_ADAPTER) and a managed database URL."
       : "No managed database URL or managed database runtime hint was detected.",
   );
 
-  if (store === "sqlite" && !configured(env.TASKLOOM_DB_PATH)) {
-    warnings.push(`TASKLOOM_DB_PATH is not set; SQLite will use the default local path ${DEFAULT_SQLITE_PATH}.`);
+  if (store === "sqlite" && !configured(env.PACKETAGENT_DB_PATH)) {
+    warnings.push(`PACKETAGENT_DB_PATH is not set; SQLite will use the default local path ${DEFAULT_SQLITE_PATH}.`);
   }
   if (hasManagedDatabaseUrl) {
     warnings.push(
@@ -280,7 +280,7 @@ export function assessManagedDatabaseRuntimeGuard(
   }
   if (adapter.length > 0 && !managedPostgresSupported) {
     warnings.push(
-      "TASKLOOM_MANAGED_DATABASE_ADAPTER is configured, but managed Postgres support also requires a recognized postgres adapter value and a managed database URL.",
+      "PACKETAGENT_MANAGED_DATABASE_ADAPTER is configured, but managed Postgres support also requires a recognized postgres adapter value and a managed database URL.",
     );
   }
   if (bypassEnabled) {
@@ -332,12 +332,12 @@ export function assessManagedDatabaseRuntimeGuard(
     observed: {
       nodeEnv,
       store,
-      dbPath: store === "sqlite" ? clean(env.TASKLOOM_DB_PATH) || DEFAULT_SQLITE_PATH : null,
+      dbPath: store === "sqlite" ? clean(env.PACKETAGENT_DB_PATH) || DEFAULT_SQLITE_PATH : null,
       databaseTopology: databaseTopology || null,
       bypassEnabled,
-      managedDatabaseUrl: observedEnv.TASKLOOM_MANAGED_DATABASE_URL.value,
+      managedDatabaseUrl: observedEnv.PACKETAGENT_MANAGED_DATABASE_URL.value,
       databaseUrl: observedEnv.DATABASE_URL.value,
-      taskloomDatabaseUrl: observedEnv.TASKLOOM_DATABASE_URL.value,
+      packetagentDatabaseUrl: observedEnv.PACKETAGENT_DATABASE_URL.value,
       managedDatabaseAdapter: adapter || null,
       env: observedEnv,
     },

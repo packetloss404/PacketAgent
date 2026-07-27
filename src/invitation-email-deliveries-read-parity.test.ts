@@ -3,16 +3,16 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { listInvitationEmailDeliveriesIndexed, mutateStore } from "./taskloom-store.js";
+import { listInvitationEmailDeliveriesIndexed, mutateStore } from "./packetagent-store.js";
 import {
   createInvitationEmailDeliveriesRepository,
   jsonInvitationEmailDeliveriesRepository,
 } from "./repositories/invitation-email-deliveries-repo.js";
 import { listInvitationEmailDeliveriesViaRepository } from "./invitation-email-deliveries-read.js";
-import type { InvitationEmailDeliveryRecord, TaskloomData } from "./taskloom-store.js";
+import type { InvitationEmailDeliveryRecord, PacketAgentData } from "./packetagent-store.js";
 
-function makeStore(records: InvitationEmailDeliveryRecord[] = []): TaskloomData {
-  return { invitationEmailDeliveries: [...records] } as unknown as TaskloomData;
+function makeStore(records: InvitationEmailDeliveryRecord[] = []): PacketAgentData {
+  return { invitationEmailDeliveries: [...records] } as unknown as PacketAgentData;
 }
 
 function makeRecord(
@@ -44,19 +44,19 @@ function makeRecord(
 }
 
 function withTempSqlite<T>(fn: (dbPath: string) => T): T {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-invitation-email-deliveries-read-parity-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-invitation-email-deliveries-read-parity-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     return fn(dbPath);
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 }
@@ -104,7 +104,7 @@ test("listInvitationEmailDeliveriesIndexed returns [] when the workspace has no 
   assert.deepEqual(result, []);
 });
 
-test("listInvitationEmailDeliveriesIndexed reads from the SQLite repository when TASKLOOM_STORE=sqlite", () => {
+test("listInvitationEmailDeliveriesIndexed reads from the SQLite repository when PACKETAGENT_STORE=sqlite", () => {
   withTempSqlite((dbPath) => {
     const seedRecords: InvitationEmailDeliveryRecord[] = [
       makeRecord({ id: "sqlite_a", workspaceId: "ws_target", invitationId: "inv_1", createdAt: "2026-04-26T01:00:00.000Z" }),

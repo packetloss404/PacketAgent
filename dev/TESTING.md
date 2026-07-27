@@ -2,6 +2,20 @@
 
 End-to-end test plan run before cutting a release. Covers the builder loop, agent loop, workspace setup, providers, sandbox, operations, self-host publish handoff, and the backup round-trip.
 
+This plan verifies the inherited workbench. Durable Worker deployment,
+checkpoint recovery, and PacketADE handoff cases must be added as W1-W9 ship;
+they are not current product claims.
+
+Last automated foundation baseline (2026-07-27):
+
+- API: 1,240 passed, 1 skipped, 0 failed
+- Web: 25 passed, 0 failed
+- Typecheck: passed
+- Production web build: passed
+- ESLint: 0 errors, 146 inherited warnings
+
+See [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md) for the full repository state.
+
 Estimated time: 25-35 minutes for a full pass; about 10 minutes for the golden path.
 
 ## Prerequisites
@@ -15,21 +29,21 @@ npm install
 npm run store:seed    # default JSON store; creates seed accounts and workspaces
 ```
 
-When testing SQLite specifically, set `TASKLOOM_STORE=sqlite`, then run `npm run db:migrate` and `npm run db:seed` before booting the app.
+When testing SQLite specifically, set `PACKETAGENT_STORE=sqlite`, then run `npm run db:migrate` and `npm run db:seed` before booting the app.
 
 Seed accounts (all password `demo12345`):
 
-| Email | Workspace | Role |
-| --- | --- | --- |
-| `alpha@taskloom.local` | alpha | owner |
-| `beta@taskloom.local` | beta | owner |
-| `gamma@taskloom.local` | gamma | owner |
+| Email                     | Workspace | Role  |
+| ------------------------- | --------- | ----- |
+| `alpha@packetagent.local` | alpha     | owner |
+| `beta@packetagent.local`  | beta      | owner |
+| `gamma@packetagent.local` | gamma     | owner |
 
 To wipe state between full passes:
 
 ```bash
-npm run store:reset    # JSON store at data/taskloom.json
-TASKLOOM_STORE=sqlite npm run db:reset
+npm run store:reset    # JSON store at data/packetagent.json
+PACKETAGENT_STORE=sqlite npm run db:reset
 ```
 
 Boot the app:
@@ -45,7 +59,7 @@ Open `http://localhost:7341/` in development, or `http://localhost:8484/` after 
 Use this as the short confidence pass when time is tight.
 
 1. Run `npm install && npm run dev`.
-2. Sign in at `http://localhost:7341` with `alpha@taskloom.local` / `demo12345`.
+2. Sign in at `http://localhost:7341` with `alpha@packetagent.local` / `demo12345`.
 3. Open `/builder`, choose **Build an app**, and submit `Build a lightweight CRM for renewal tracking`.
 4. Confirm the draft shows generated source: page routes, API routes, data model, acceptance checks, and open questions.
 5. Approve the draft. Confirm the **Generated source** tab lists source files and a workspace path under `data/generated-apps/<workspace>/<app>/workspace`.
@@ -57,7 +71,7 @@ Use this as the short confidence pass when time is tight.
 
 Sign in -> `/builder` -> describe an app -> saved local preview -> iterate -> publish handoff.
 
-1. From the unauthenticated sign-in entry, submit `alpha@taskloom.local` / `demo12345`.
+1. From the unauthenticated sign-in entry, submit `alpha@packetagent.local` / `demo12345`.
 2. Confirm you land on `/builder`. The Build mode toggle should show **Build an app** selected.
 3. Type a prompt such as `Build a lightweight CRM for renewal tracking`, then click the primary generate action.
 4. Confirm a draft renders before any mutation. It should show app name, summary, plan steps, page map, data model, acceptance checks, and warnings/open questions when relevant.
@@ -99,27 +113,27 @@ Expected results:
 
 Onboarding stages live in `onboardingStates` and progress through:
 
-| Step | Effect on activation facts |
-| --- | --- |
-| `create_workspace_profile` | sets `briefCapturedAt` |
-| `define_requirements` | sets `requirementsDefinedAt` |
-| `define_plan` | sets `planDefinedAt` |
-| `start_implementation` | sets `implementationStartedAt`, `startedAt` |
-| `validate` | sets `testsPassedAt`, `validationPassedAt`, `completedAt` |
-| `confirm_release` | sets `releaseConfirmedAt`, `releasedAt` |
+| Step                       | Effect on activation facts                                |
+| -------------------------- | --------------------------------------------------------- |
+| `create_workspace_profile` | sets `briefCapturedAt`                                    |
+| `define_requirements`      | sets `requirementsDefinedAt`                              |
+| `define_plan`              | sets `planDefinedAt`                                      |
+| `start_implementation`     | sets `implementationStartedAt`, `startedAt`               |
+| `validate`                 | sets `testsPassedAt`, `validationPassedAt`, `completedAt` |
+| `confirm_release`          | sets `releaseConfirmedAt`, `releasedAt`                   |
 
 In a private window, sign up a fresh account at `/sign-up`. Walk through each onboarding step from the dashboard or activation view and confirm:
 
 1. The dashboard "activation steps complete" counter increments.
-2. The `/activation` view stage label moves through Discovery → Definition → Implementation → Validation → Complete as expected.
+2. The `/activation` view stage label moves through Discovery -> Definition -> Implementation -> Validation -> Complete as expected.
 3. `GET /api/app/activation` and `GET /api/activation/:workspaceId` reflect the same status.
 4. Sign-out returns to the unauthenticated sign-in entry.
 
-Reset between passes by deleting `data/taskloom.json` or running `npm run store:reset` for the JSON store. For SQLite, run `TASKLOOM_STORE=sqlite npm run db:reset`.
+Reset between passes by deleting `data/packetagent.json` or running `npm run store:reset` for the JSON store. For SQLite, run `PACKETAGENT_STORE=sqlite npm run db:reset`.
 
 ## Provider Configuration
 
-1. Sign in as `alpha@taskloom.local` and visit `/integrations`. The breadcrumb reads "Providers".
+1. Sign in as `alpha@packetagent.local` and visit `/integrations`. The breadcrumb reads "Providers".
 2. Confirm the page lists configured model providers with one of: `connected`, `missing_key`, or another status pill.
 3. Click **Add provider**. Add an Anthropic, OpenAI, or Ollama key.
 4. Save and refresh. The new provider should now show `connected`. The status counter at the top of the page should update.
@@ -140,7 +154,7 @@ Optional: open `/builder` and re-run an app draft. The provider readiness sectio
 Optional smoke integration:
 
 1. Stop the dev server.
-2. Set `TASKLOOM_SANDBOX_SMOKE_ENABLED=1` and restart.
+2. Set `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1` and restart.
 3. Sign in and apply an app draft from `/builder` with smoke checks enabled.
 4. Verify the smoke section names the sandbox driver. If the sandbox is unavailable, confirm fallback smoke status is explicit and actionable.
 
@@ -151,26 +165,26 @@ Optional smoke integration:
 3. Confirm the alert list. Active alerts should be zero unless the release is deliberately introducing one.
 4. Confirm job metrics render with last duration, average, p95, and 24h counts. Look for stuck queues (`count24h > 0` but `lastMs` older than expected).
 5. Visit `/storage`, `/backups`, and `/releases`. Confirm each renders without errors.
-6. Visit `/settings` → **Audit** tab. Confirm recent activity entries are present.
+6. Visit `/settings` -> **Audit** tab. Confirm recent activity entries are present.
 
 Run from the command line:
 
 ```bash
 npm run jobs:recompute-activation         # refreshes activation read models
 npm run jobs:repair-activation            # refreshes stale read models
-TASKLOOM_STORE=sqlite npm run db:status   # inspects pending SQLite migrations
+PACKETAGENT_STORE=sqlite npm run db:status   # inspects pending SQLite migrations
 ```
 
 Each should exit `0` with no warnings.
 
 ## Self-Host Sanity
 
-SQLite backup → restart → restore → confirm data round-trips. Use this section when `TASKLOOM_STORE=sqlite`.
+SQLite backup -> restart -> restore -> confirm data round-trips. Use this section when `PACKETAGENT_STORE=sqlite`.
 
 1. With seed data loaded, run:
 
    ```bash
-   TASKLOOM_STORE=sqlite npm run db:backup -- --backup-path=data/taskloom.sqlite.bak
+   PACKETAGENT_STORE=sqlite npm run db:backup -- --backup-path=data/packetagent.sqlite.bak
    ```
 
 2. Confirm a backup file is written.
@@ -178,11 +192,11 @@ SQLite backup → restart → restore → confirm data round-trips. Use this sec
 4. Run the restore:
 
    ```bash
-   TASKLOOM_STORE=sqlite npm run db:restore -- --backup-path=data/taskloom.sqlite.bak
+   PACKETAGENT_STORE=sqlite npm run db:restore -- --backup-path=data/packetagent.sqlite.bak
    ```
 
 5. Restart the server and sign in. Confirm the app draft created in step 3 is gone and the seed data is restored exactly.
-6. For the JSON store path, repeat with `npm run store:reset` to confirm `data/taskloom.json` resets to the built-in seed state on next start.
+6. For the JSON store path, repeat with `npm run store:reset` to confirm `data/packetagent.json` resets to the built-in seed state on next start.
 
 ## Build And Tests
 
@@ -203,7 +217,7 @@ Acceptance:
 
 ## Public Share And 404
 
-1. Generate a share token from `/settings` → **Share tokens**.
+1. Generate a share token from `/settings` -> **Share tokens**.
 2. Open `/share/<token>` in a private window. Confirm it renders without auth, hides the workbench sidebar, and exposes a sign-in link.
 3. Visit an unknown route such as `/this-does-not-exist`. Confirm a styled 404 renders and the primary recovery action returns signed-in users to `/builder` and signed-out users to `/`.
 

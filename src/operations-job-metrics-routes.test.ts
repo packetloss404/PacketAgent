@@ -3,8 +3,8 @@ import test from "node:test";
 import { Hono } from "hono";
 import { SESSION_COOKIE_NAME } from "./auth-utils.js";
 import { operationsJobMetricsRoutes } from "./operations-job-metrics-routes.js";
-import { login } from "./taskloom-services.js";
-import { mutateStore, resetStoreForTests } from "./taskloom-store.js";
+import { login } from "./packetagent-services.js";
+import { mutateStore, resetStoreForTests } from "./packetagent-store.js";
 
 function createApp() {
   const app = new Hono();
@@ -66,7 +66,7 @@ test("operations job-metrics history rejects unauthenticated requests", async ()
 
 test("operations job-metrics history rejects members below admin role", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find(
       (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
@@ -86,7 +86,7 @@ test("operations job-metrics history rejects members below admin role", async ()
 
 test("operations job-metrics history returns empty snapshots array when none exist", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createApp();
 
   const response = await app.request("/api/app/operations/job-metrics/history", {
@@ -101,7 +101,7 @@ test("operations job-metrics history returns empty snapshots array when none exi
 
 test("operations job-metrics history returns snapshots ordered ascending by capturedAt", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   seedSnapshots([
     { id: "snap_2", capturedAt: "2026-04-20T10:00:00.000Z", type: "agent.run" },
     { id: "snap_1", capturedAt: "2026-04-19T10:00:00.000Z", type: "agent.run" },
@@ -123,7 +123,7 @@ test("operations job-metrics history returns snapshots ordered ascending by capt
 
 test("operations job-metrics history filters by type", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   seedSnapshots([
     { id: "snap_a", capturedAt: "2026-04-19T10:00:00.000Z", type: "agent.run" },
     { id: "snap_b", capturedAt: "2026-04-20T10:00:00.000Z", type: "foo" },
@@ -145,7 +145,7 @@ test("operations job-metrics history filters by type", async () => {
 
 test("operations job-metrics history filters by since timestamp", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   seedSnapshots([
     { id: "snap_old", capturedAt: "2026-04-10T00:00:00.000Z", type: "agent.run" },
     { id: "snap_mid", capturedAt: "2026-04-20T00:00:00.000Z", type: "agent.run" },
@@ -169,7 +169,7 @@ test("operations job-metrics history filters by since timestamp", async () => {
 
 test("operations job-metrics history caps response with limit", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   seedSnapshots([
     { id: "snap_1", capturedAt: "2026-04-18T00:00:00.000Z", type: "agent.run" },
     { id: "snap_2", capturedAt: "2026-04-19T00:00:00.000Z", type: "agent.run" },
@@ -189,7 +189,7 @@ test("operations job-metrics history caps response with limit", async () => {
 
 test("operations job-metrics history rejects invalid since with 400", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createApp();
 
   const response = await app.request(

@@ -5,7 +5,7 @@ import type {
   AgentRunStatus,
   AgentRunStepStatus,
   AgentRunToolCall,
-} from "./taskloom-store.js";
+} from "./packetagent-store.js";
 
 const REDACTED = "[redacted]";
 const CIRCULAR = "[circular]";

@@ -8,7 +8,7 @@ import {
   mutateStore,
   mutateStoreAsync,
   recordActivity,
-} from "../taskloom-store";
+} from "../packetagent-store";
 import {
   generateId,
   hashPassword,
@@ -45,7 +45,7 @@ export function register(input: { email: string; password: string; displayName: 
     const userId = generateId();
     const workspaceId = generateId();
     const displayName = input.displayName.trim();
-    const workspaceName = `${displayName.split(" ")[0] || "Taskloom"} workspace`;
+    const workspaceName = `${displayName.split(" ")[0] || "PacketAgent"} workspace`;
 
     data.users.push({
       id: userId,
@@ -110,7 +110,7 @@ export async function registerAsync(input: { email: string; password: string; di
     const userId = generateId();
     const workspaceId = generateId();
     const displayName = input.displayName.trim();
-    const workspaceName = `${displayName.split(" ")[0] || "Taskloom"} workspace`;
+    const workspaceName = `${displayName.split(" ")[0] || "PacketAgent"} workspace`;
 
     data.users.push({
       id: userId,

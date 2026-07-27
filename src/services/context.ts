@@ -18,9 +18,9 @@ import {
   type WorkspaceRecord,
   type WorkspaceRole,
   type JobRecord,
-  type TaskloomData,
+  type PacketAgentData,
   snapshotForWorkspace,
-} from "../taskloom-store";
+} from "../packetagent-store";
 import { maskSecret as maskBearerSecret, redactSensitiveValue } from "../security/redaction.js";
 import { LOCAL_INVITATION_EMAIL_PROVIDER, invitationEmailSubject, resolveInvitationEmailMode, resolveInvitationEmailRetryMaxAttempts, resolveInvitationEmailWebhookConfig } from "../invitation-email.js";
 import { deliverInvitationEmail, type InvitationEmailDeliveryAction } from "../invitation-email-delivery.js";
@@ -35,9 +35,9 @@ import {
 } from "../auth-utils";
 
 export type AuthenticatedContext = {
-  user: import("../taskloom-store").UserRecord;
-  workspace: import("../taskloom-store").WorkspaceRecord;
-  role: import("../taskloom-store").WorkspaceRole;
+  user: import("../packetagent-store").UserRecord;
+  workspace: import("../packetagent-store").WorkspaceRecord;
+  role: import("../packetagent-store").WorkspaceRole;
 };
 
 export const INVITATION_EMAIL_JOB_TYPE = "invitation.email";
@@ -430,7 +430,7 @@ export function stableIdPart(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]+/g, "_");
 }
 
-export function upsertActivationActivity(data: TaskloomData, activity: ActivityRecord): ActivityRecord {
+export function upsertActivationActivity(data: PacketAgentData, activity: ActivityRecord): ActivityRecord {
   return recordActivity(data, activity, { dedupe: true });
 }
 

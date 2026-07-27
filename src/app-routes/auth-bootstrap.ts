@@ -28,8 +28,8 @@ import {
   updateWorkspaceMemberRole,
   updateProfile,
   updateWorkspace,
-} from "../taskloom-services.js";
-import { loadStoreAsync } from "../taskloom-store.js";
+} from "../packetagent-services.js";
+import { loadStoreAsync } from "../packetagent-store.js";
 import { errorResponse, requireWorkspacePermission } from "./shared.js";
 import { AUTH_RATE_LIMIT, INVITATION_RATE_LIMIT, enforceRateLimit } from "./rate-limit.js";
 
@@ -106,7 +106,7 @@ async function builderProviderStatus(c: Context) {
     return c.json({
       presets: snapshot,
       availableProviders: available,
-      priority: process.env.TASKLOOM_PROVIDER_PRIORITY ?? null,
+      priority: process.env.PACKETAGENT_PROVIDER_PRIORITY ?? null,
     });
   } catch (error) {
     return errorResponse(c, error);

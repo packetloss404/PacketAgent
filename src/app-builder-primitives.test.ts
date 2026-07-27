@@ -13,8 +13,8 @@ test("app builder primitive catalog exposes deterministic generated-app referenc
     readiness: {
       env: {
         OPENAI_API_KEY: "sk-test",
-        TASKLOOM_PUBLIC_BASE_URL: "https://apps.example.test",
-        TASKLOOM_WEBHOOK_SIGNING_SECRET: "whsec_local",
+        PACKETAGENT_PUBLIC_BASE_URL: "https://apps.example.test",
+        PACKETAGENT_WEBHOOK_SIGNING_SECRET: "whsec_local",
         STRIPE_SECRET_KEY: "sk_test_stripe",
         STRIPE_WEBHOOK_SECRET: "whsec_stripe",
       },

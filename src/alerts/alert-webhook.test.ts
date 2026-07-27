@@ -22,13 +22,13 @@ function makeEvent(overrides: Partial<AlertEvent> = {}): AlertEvent {
 
 test("resolveAlertWebhookConfig returns null when URL is unset", () => {
   assert.equal(resolveAlertWebhookConfig({}), null);
-  assert.equal(resolveAlertWebhookConfig({ TASKLOOM_ALERT_WEBHOOK_URL: "" }), null);
-  assert.equal(resolveAlertWebhookConfig({ TASKLOOM_ALERT_WEBHOOK_URL: "   " }), null);
+  assert.equal(resolveAlertWebhookConfig({ PACKETAGENT_ALERT_WEBHOOK_URL: "" }), null);
+  assert.equal(resolveAlertWebhookConfig({ PACKETAGENT_ALERT_WEBHOOK_URL: "   " }), null);
 });
 
 test("resolveAlertWebhookConfig returns config with defaults when only URL is set", () => {
   const config = resolveAlertWebhookConfig({
-    TASKLOOM_ALERT_WEBHOOK_URL: "https://example.com/alerts",
+    PACKETAGENT_ALERT_WEBHOOK_URL: "https://example.com/alerts",
   });
   assert.deepEqual(config, {
     url: "https://example.com/alerts",
@@ -39,10 +39,10 @@ test("resolveAlertWebhookConfig returns config with defaults when only URL is se
 
 test("resolveAlertWebhookConfig honors custom secret, secretHeader, and timeoutMs", () => {
   const config = resolveAlertWebhookConfig({
-    TASKLOOM_ALERT_WEBHOOK_URL: "https://example.com/alerts",
-    TASKLOOM_ALERT_WEBHOOK_SECRET: "shhh",
-    TASKLOOM_ALERT_WEBHOOK_SECRET_HEADER: "x-custom-header",
-    TASKLOOM_ALERT_WEBHOOK_TIMEOUT_MS: "1500",
+    PACKETAGENT_ALERT_WEBHOOK_URL: "https://example.com/alerts",
+    PACKETAGENT_ALERT_WEBHOOK_SECRET: "shhh",
+    PACKETAGENT_ALERT_WEBHOOK_SECRET_HEADER: "x-custom-header",
+    PACKETAGENT_ALERT_WEBHOOK_TIMEOUT_MS: "1500",
   });
   assert.deepEqual(config, {
     url: "https://example.com/alerts",
@@ -54,8 +54,8 @@ test("resolveAlertWebhookConfig honors custom secret, secretHeader, and timeoutM
 
 test("resolveAlertWebhookConfig falls back to default timeoutMs for invalid values", () => {
   const config = resolveAlertWebhookConfig({
-    TASKLOOM_ALERT_WEBHOOK_URL: "https://example.com/alerts",
-    TASKLOOM_ALERT_WEBHOOK_TIMEOUT_MS: "not-a-number",
+    PACKETAGENT_ALERT_WEBHOOK_URL: "https://example.com/alerts",
+    PACKETAGENT_ALERT_WEBHOOK_TIMEOUT_MS: "not-a-number",
   });
   assert.equal(config?.timeoutMs, DEFAULT_ALERT_WEBHOOK_TIMEOUT_MS);
 });
@@ -72,7 +72,7 @@ test("deliverAlertWebhook posts JSON body and returns ok on 2xx", async () => {
     {
       url: "https://example.com/alerts",
       secret: "shhh",
-      secretHeader: "x-taskloom-alert-secret",
+      secretHeader: "x-packetagent-alert-secret",
       timeoutMs: 5000,
     },
     events,
@@ -86,7 +86,7 @@ test("deliverAlertWebhook posts JSON body and returns ok on 2xx", async () => {
   assert.equal(call.init?.method, "POST");
   const headers = new Headers(call.init?.headers);
   assert.equal(headers.get("content-type"), "application/json");
-  assert.equal(headers.get("x-taskloom-alert-secret"), "shhh");
+  assert.equal(headers.get("x-packetagent-alert-secret"), "shhh");
   const parsed = JSON.parse(String(call.init?.body)) as { alerts: AlertEvent[]; deliveredAt: string };
   assert.deepEqual(parsed.alerts, events);
   assert.equal(typeof parsed.deliveredAt, "string");
@@ -103,7 +103,7 @@ test("deliverAlertWebhook omits secret header when no secret is configured", asy
   const result = await deliverAlertWebhook(
     {
       url: "https://example.com/alerts",
-      secretHeader: "x-taskloom-alert-secret",
+      secretHeader: "x-packetagent-alert-secret",
       timeoutMs: 5000,
     },
     [makeEvent()],
@@ -112,13 +112,13 @@ test("deliverAlertWebhook omits secret header when no secret is configured", asy
 
   assert.deepEqual(result, { ok: true, status: 204 });
   assert.ok(capturedHeaders);
-  assert.equal((capturedHeaders as Headers).get("x-taskloom-alert-secret"), null);
+  assert.equal((capturedHeaders as Headers).get("x-packetagent-alert-secret"), null);
 });
 
 test("deliverAlertWebhook returns http error for non-2xx", async () => {
   const fetchImpl = (async () => new Response("oops", { status: 502 })) as unknown as typeof fetch;
   const result = await deliverAlertWebhook(
-    { url: "https://example.com/alerts", secretHeader: "x-taskloom-alert-secret", timeoutMs: 5000 },
+    { url: "https://example.com/alerts", secretHeader: "x-packetagent-alert-secret", timeoutMs: 5000 },
     [makeEvent()],
     { fetchImpl },
   );
@@ -130,7 +130,7 @@ test("deliverAlertWebhook returns network error and never throws", async () => {
     throw new Error("ECONNREFUSED");
   }) as unknown as typeof fetch;
   const result = await deliverAlertWebhook(
-    { url: "https://example.com/alerts", secretHeader: "x-taskloom-alert-secret", timeoutMs: 5000 },
+    { url: "https://example.com/alerts", secretHeader: "x-packetagent-alert-secret", timeoutMs: 5000 },
     [makeEvent()],
     { fetchImpl },
   );
@@ -147,7 +147,7 @@ test("deliverAlertWebhook redacts the configured secret from error messages", as
     {
       url: "https://example.com/alerts",
       secret: "super-secret-token",
-      secretHeader: "x-taskloom-alert-secret",
+      secretHeader: "x-packetagent-alert-secret",
       timeoutMs: 5000,
     },
     [makeEvent()],
@@ -173,7 +173,7 @@ test("deliverAlertWebhook returns timeout when fetch is aborted", async () => {
   }) as unknown as typeof fetch;
 
   const result = await deliverAlertWebhook(
-    { url: "https://example.com/alerts", secretHeader: "x-taskloom-alert-secret", timeoutMs: 10 },
+    { url: "https://example.com/alerts", secretHeader: "x-packetagent-alert-secret", timeoutMs: 10 },
     [makeEvent()],
     { fetchImpl },
   );
@@ -190,7 +190,7 @@ test("deliverAlertWebhook body shape contains alerts and deliveredAt", async () 
 
   const events = [makeEvent({ id: "a" }), makeEvent({ id: "b", severity: "critical" })];
   await deliverAlertWebhook(
-    { url: "https://example.com/alerts", secretHeader: "x-taskloom-alert-secret", timeoutMs: 5000 },
+    { url: "https://example.com/alerts", secretHeader: "x-packetagent-alert-secret", timeoutMs: 5000 },
     events,
     { fetchImpl },
   );

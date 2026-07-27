@@ -130,10 +130,10 @@ interface IntegrationSpec {
 }
 
 const EMAIL_ENV_KEYS = ["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_TOKEN", "SMTP_URL"];
-const DATABASE_ENV_KEYS = ["DATABASE_URL", "TASKLOOM_DATABASE_URL", "TASKLOOM_MANAGED_DATABASE_URL"];
+const DATABASE_ENV_KEYS = ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"];
 const GITHUB_ENV_KEYS = ["GITHUB_TOKEN", "GH_TOKEN"];
-const CUSTOM_API_ENV_KEYS = ["CUSTOM_API_BASE_URL", "CUSTOM_API_KEY", "TASKLOOM_CUSTOM_API_BASE_URL", "TASKLOOM_CUSTOM_API_KEY"];
-const WEBHOOK_ENV_KEYS = ["TASKLOOM_PUBLIC_APP_BASE_URL", "TASKLOOM_PUBLIC_BASE_URL", "TASKLOOM_WEBHOOK_SIGNING_SECRET"];
+const CUSTOM_API_ENV_KEYS = ["CUSTOM_API_BASE_URL", "CUSTOM_API_KEY", "PACKETAGENT_CUSTOM_API_BASE_URL", "PACKETAGENT_CUSTOM_API_KEY"];
+const WEBHOOK_ENV_KEYS = ["PACKETAGENT_PUBLIC_APP_BASE_URL", "PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_WEBHOOK_SIGNING_SECRET"];
 const STRIPE_ENV_KEYS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"];
 
 const INTEGRATION_SPECS: readonly IntegrationSpec[] = [
@@ -201,12 +201,12 @@ const INTEGRATION_SPECS: readonly IntegrationSpec[] = [
     ],
     readiness: (input, env) => {
       const publicBaseUrlReady = hasValue(input.webhook?.publicBaseUrl)
-        || hasAnyEnv(env, ["TASKLOOM_PUBLIC_APP_BASE_URL", "TASKLOOM_PUBLIC_BASE_URL"]);
+        || hasAnyEnv(env, ["PACKETAGENT_PUBLIC_APP_BASE_URL", "PACKETAGENT_PUBLIC_BASE_URL"]);
       const signingReady = input.webhook?.signingSecretConfigured === true
-        || hasValue(env.TASKLOOM_WEBHOOK_SIGNING_SECRET);
+        || hasValue(env.PACKETAGENT_WEBHOOK_SIGNING_SECRET);
       return [
-        ...(!publicBaseUrlReady ? ["Set TASKLOOM_PUBLIC_APP_BASE_URL or TASKLOOM_PUBLIC_BASE_URL before exposing webhook URLs."] : []),
-        ...(!signingReady ? ["Set TASKLOOM_WEBHOOK_SIGNING_SECRET before accepting signed webhook events."] : []),
+        ...(!publicBaseUrlReady ? ["Set PACKETAGENT_PUBLIC_APP_BASE_URL or PACKETAGENT_PUBLIC_BASE_URL before exposing webhook URLs."] : []),
+        ...(!signingReady ? ["Set PACKETAGENT_WEBHOOK_SIGNING_SECRET before accepting signed webhook events."] : []),
       ];
     },
   },
@@ -240,10 +240,10 @@ const INTEGRATION_SPECS: readonly IntegrationSpec[] = [
         || normalizedSet(input.availableTools).has("github");
       const webhookSecretReady = input.github?.webhookSecretConfigured === true
         || hasValue(env.GITHUB_WEBHOOK_SECRET)
-        || hasValue(env.TASKLOOM_WEBHOOK_SIGNING_SECRET);
+        || hasValue(env.PACKETAGENT_WEBHOOK_SIGNING_SECRET);
       return [
         ...(!connected ? ["Connect GitHub or set GITHUB_TOKEN/GH_TOKEN before repository event actions."] : []),
-        ...(!webhookSecretReady ? ["Set GITHUB_WEBHOOK_SECRET or TASKLOOM_WEBHOOK_SIGNING_SECRET before trusting GitHub webhook events."] : []),
+        ...(!webhookSecretReady ? ["Set GITHUB_WEBHOOK_SECRET or PACKETAGENT_WEBHOOK_SIGNING_SECRET before trusting GitHub webhook events."] : []),
       ];
     },
   },
@@ -305,7 +305,7 @@ const INTEGRATION_SPECS: readonly IntegrationSpec[] = [
     readiness: (input, env) => {
       const configured = input.database?.configured === true || hasAnyEnv(env, DATABASE_ENV_KEYS);
       return [
-        ...(!configured ? ["Configure DATABASE_URL, TASKLOOM_DATABASE_URL, or another generated-app database runtime."] : []),
+        ...(!configured ? ["Configure DATABASE_URL, PACKETAGENT_DATABASE_URL, or another generated-app database runtime."] : []),
         ...(input.database?.migrationsReady === false ? ["Run or confirm generated-app database migrations for affected database features."] : []),
         ...(input.database?.writable === false ? ["Confirm the generated-app database user can write affected feature records."] : []),
       ];

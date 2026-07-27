@@ -2,12 +2,12 @@ import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import type { JobRecord, JobStatus, TaskloomData } from "../taskloom-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../taskloom-store.js";
+import type { JobRecord, JobStatus, PacketAgentData } from "../packetagent-store.js";
+import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
-const DEFAULT_DB_FILE = "data/taskloom.sqlite";
+const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 
 export interface ListJobsFilter {
@@ -37,22 +37,22 @@ export interface AsyncJobsRepository {
 }
 
 export interface JobsRepositoryDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   dbPath?: string;
 }
 
 type MaybePromise<T> = T | Promise<T>;
 
 export interface AsyncJobsRepositoryDeps {
-  loadStore?: () => MaybePromise<TaskloomData>;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => MaybePromise<T>) => MaybePromise<T>;
+  loadStore?: () => MaybePromise<PacketAgentData>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => MaybePromise<T>) => MaybePromise<T>;
   repository?: JobsRepository;
   dbPath?: string;
 }
 
 export function createJobsRepository(deps: JobsRepositoryDeps = {}): JobsRepository {
-  if (process.env.TASKLOOM_STORE === "sqlite") return sqliteJobsRepository(deps);
+  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteJobsRepository(deps);
   return jsonJobsRepository(deps);
 }
 
@@ -88,7 +88,7 @@ export function asyncJobsRepositoryFromSync(repository: JobsRepository): AsyncJo
 
 export function createAsyncJobsRepository(deps: AsyncJobsRepositoryDeps = {}): AsyncJobsRepository {
   if (deps.repository) return asyncJobsRepository(deps.repository);
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     return asyncJobsRepository(sqliteJobsRepository({ dbPath: deps.dbPath }));
   }
   return asyncJsonJobsRepository(deps);
@@ -584,7 +584,7 @@ function clampLimit(limit?: number): number {
 
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
-  return resolve(process.cwd(), process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
 }
 
 function openDatabase(dbPath: string): DatabaseSync {

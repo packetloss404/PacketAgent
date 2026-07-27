@@ -61,7 +61,7 @@ const PROVIDER_KEY_ENV = [
   "MINIMAX_API_KEY",
   "GEMINI_API_KEY",
   "OPENROUTER_API_KEY",
-  "TASKLOOM_PROVIDER_PRIORITY",
+  "PACKETAGENT_PROVIDER_PRIORITY",
 ] as const;
 
 async function withNoProviderKeys(body: () => Promise<void>): Promise<void> {
@@ -72,7 +72,7 @@ async function withNoProviderKeys(body: () => Promise<void>): Promise<void> {
   }
   // Force ollama out of consideration by setting an explicit priority that
   // excludes it. The resolver assumes ollama is always reachable otherwise.
-  process.env.TASKLOOM_PROVIDER_PRIORITY = "anthropic,openai,minimax,gemini,openrouter";
+  process.env.PACKETAGENT_PROVIDER_PRIORITY = "anthropic,openai,minimax,gemini,openrouter";
   try {
     await body();
   } finally {

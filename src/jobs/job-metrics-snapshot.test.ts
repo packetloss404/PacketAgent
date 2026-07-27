@@ -6,16 +6,16 @@ import {
   snapshotJobMetrics,
 } from "./job-metrics-snapshot.js";
 import type { JobTypeMetrics } from "./scheduler-metrics.js";
-import type { JobMetricSnapshotRecord, TaskloomData } from "../taskloom-store.js";
+import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
 
-function makeStore(snapshots: JobMetricSnapshotRecord[] = []): TaskloomData {
-  return { jobMetricSnapshots: [...snapshots] } as unknown as TaskloomData;
+function makeStore(snapshots: JobMetricSnapshotRecord[] = []): PacketAgentData {
+  return { jobMetricSnapshots: [...snapshots] } as unknown as PacketAgentData;
 }
 
-function makeStoreDeps(data: TaskloomData) {
+function makeStoreDeps(data: PacketAgentData) {
   return {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
 }
 

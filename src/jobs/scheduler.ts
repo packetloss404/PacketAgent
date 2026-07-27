@@ -1,4 +1,4 @@
-import type { JobRecord } from "../taskloom-store.js";
+import type { JobRecord } from "../packetagent-store.js";
 import {
   cancelJobAsync,
   claimNextJobAsync,

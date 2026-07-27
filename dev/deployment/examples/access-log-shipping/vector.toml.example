@@ -1,5 +1,5 @@
 # =============================================================================
-# Taskloom access-log shipping example: Vector (vector.dev)
+# PacketAgent access-log shipping example: Vector (vector.dev)
 # -----------------------------------------------------------------------------
 # This is an EXAMPLE Vector v0.x configuration that ships the redacted
 # file-mode access log to Loki, S3, and CloudWatch Logs. You MUST
@@ -33,18 +33,18 @@ enabled = true
 address = "127.0.0.1:8686"
 
 # -----------------------------------------------------------------------------
-# Source: tail the Taskloom access log file.
+# Source: tail the PacketAgent access log file.
 # -----------------------------------------------------------------------------
-# Substitute the include path below with the value of TASKLOOM_ACCESS_LOG_PATH
-# from the Taskloom service environment.
+# Substitute the include path below with the value of PACKETAGENT_ACCESS_LOG_PATH
+# from the PacketAgent service environment.
 #
 # To also pick up rotated siblings on first start, use a glob form:
-#   include = ["/var/log/taskloom/access.log*"]
+#   include = ["/var/log/packetagent/access.log*"]
 # Vector follows renamed files automatically, so the non-glob form is enough
 # for steady-state operation; the glob is only useful for cold backfill.
-[sources.taskloom_access_log]
+[sources.packetagent_access_log]
 type = "file"
-include = ["/var/log/taskloom/access.log"]
+include = ["/var/log/packetagent/access.log"]
 read_from = "beginning"
 ignore_older_secs = 86400
 # `multiline` is intentionally OMITTED: each access-log entry is exactly one
@@ -56,12 +56,12 @@ ignore_older_secs = 86400
 # -----------------------------------------------------------------------------
 [transforms.parse_json]
 type = "remap"
-inputs = ["taskloom_access_log"]
+inputs = ["packetagent_access_log"]
 source = '''
 . = parse_json!(.message)
 .host = get_hostname!()
-.env = get_env_var("TASKLOOM_ENV") ?? "unknown"
-.service = "taskloom"
+.env = get_env_var("PACKETAGENT_ENV") ?? "unknown"
+.service = "packetagent"
 '''
 
 # -----------------------------------------------------------------------------
@@ -96,7 +96,7 @@ remove_label_fields = true
   password = "${LOKI_PASSWORD}"
 
   [sinks.loki.labels]
-  service = "taskloom"
+  service = "packetagent"
   env = "{{ env }}"
   host = "{{ host }}"
 
@@ -107,9 +107,9 @@ remove_label_fields = true
 [sinks.s3]
 type = "aws_s3"
 inputs = ["parse_json"]
-bucket = "taskloom-access-log-archive"
+bucket = "packetagent-access-log-archive"
 region = "us-east-1"
-key_prefix = "taskloom/access-log/year=%Y/month=%m/day=%d/"
+key_prefix = "packetagent/access-log/year=%Y/month=%m/day=%d/"
 compression = "gzip"
 framing.method = "newline_delimited"
 encoding.codec = "json"
@@ -120,7 +120,7 @@ encoding.codec = "json"
 
   # Credentials: prefer IAM instance / pod role over static keys.
   [sinks.s3.auth]
-  assume_role = "arn:aws:iam::123456789012:role/TaskloomVectorShipper"
+  assume_role = "arn:aws:iam::123456789012:role/PacketAgentVectorShipper"
 
 # -----------------------------------------------------------------------------
 # Sink: AWS CloudWatch Logs.
@@ -128,7 +128,7 @@ encoding.codec = "json"
 [sinks.cloudwatch]
 type = "aws_cloudwatch_logs"
 inputs = ["drop_health_checks"]
-group_name = "/taskloom/access"
+group_name = "/packetagent/access"
 stream_name = "{{ host }}"
 region = "us-east-1"
 encoding.codec = "json"

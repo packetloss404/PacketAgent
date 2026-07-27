@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { deriveAgentRunTraceSpans } from "./agent-run-trace.js";
-import type { AgentRunRecord } from "./taskloom-store.js";
+import type { AgentRunRecord } from "./packetagent-store.js";
 
 function makeRun(overrides: Partial<AgentRunRecord> = {}): AgentRunRecord {
   return {
@@ -139,7 +139,7 @@ test("deriveAgentRunTraceSpans redacts and bounds tool-call payloads", () => {
       {
         id: "call_search",
         toolName: "search",
-        input: { query: "taskloom", password: "topsecret1234", nested: { token: "abc1234567" } },
+        input: { query: "packetagent", password: "topsecret1234", nested: { token: "abc1234567" } },
         output: { body: `Found ${"x".repeat(80)}` },
         durationMs: 250,
         startedAt: "2026-05-27T14:00:01.000Z",
@@ -165,7 +165,7 @@ test("deriveAgentRunTraceSpans redacts and bounds tool-call payloads", () => {
   assert.equal(calls.length, 2);
   assert.equal(calls[0]?.toolName, "search");
   assert.deepEqual(calls[0]?.input, {
-    query: "taskloom",
+    query: "packetagent",
     password: "[redacted]:1234",
     nested: { token: "[redacted]:4567" },
   });

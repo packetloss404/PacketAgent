@@ -32,7 +32,7 @@ Constraints
 -----------
 - TypeScript only. No \`.js\`/\`.jsx\` source files except the optional \`postcss.config.js\`.
 - No external runtime dependencies beyond React, ReactDOM, Vite, and Tailwind.
-- If the app needs persistence, use the Taskloom-served generated app API with \`fetch('/api/app/generated-apps/' + appId + '/api/...')\`. Read \`appId\` from \`document.body.dataset.appId\`. Do not use sql.js, IndexedDB, localStorage, or browser-only persistence as the source of truth.
+- If the app needs persistence, use the PacketAgent-served generated app API with \`fetch('/api/app/generated-apps/' + appId + '/api/...')\`. Read \`appId\` from \`document.body.dataset.appId\`. Do not use sql.js, IndexedDB, localStorage, or browser-only persistence as the source of truth.
 - Do not invent extra config files (no ESLint, Prettier, Vitest, etc.) - the harness does not consume them.
 - Keep code paths deterministic and avoid network calls except same-origin calls to the generated app runtime API.
 

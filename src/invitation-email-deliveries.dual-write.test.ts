@@ -15,7 +15,7 @@ import {
   recordInvitationEmailProviderStatus,
   resetStoreForTests,
   type InvitationEmailDeliveryRecord,
-} from "./taskloom-store.js";
+} from "./packetagent-store.js";
 
 interface InvitationEmailDeliveryRow {
   id: string;
@@ -69,16 +69,16 @@ function findDedicated(dbPath: string, id: string): InvitationEmailDeliveryRow |
 }
 
 function withSqliteEnv(dbPath: string) {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   clearStoreCacheForTests();
   return () => {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     clearStoreCacheForTests();
   };
 }
@@ -101,8 +101,8 @@ function createDelivery(): InvitationEmailDeliveryRecord {
 }
 
 test("createInvitationEmailDelivery writes the dedicated invitation_email_deliveries table in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-ied-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-ied-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -130,8 +130,8 @@ test("createInvitationEmailDelivery writes the dedicated invitation_email_delive
 });
 
 test("markInvitationEmailDeliverySent writes the sent record to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-ied-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-ied-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -159,8 +159,8 @@ test("markInvitationEmailDeliverySent writes the sent record to the dedicated ta
 });
 
 test("markInvitationEmailDeliverySkipped writes the skipped record to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-ied-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-ied-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -188,8 +188,8 @@ test("markInvitationEmailDeliverySkipped writes the skipped record to the dedica
 });
 
 test("markInvitationEmailDeliveryFailed writes the failed record to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-ied-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-ied-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -217,8 +217,8 @@ test("markInvitationEmailDeliveryFailed writes the failed record to the dedicate
 });
 
 test("recordInvitationEmailProviderStatus writes the provider-status update to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-ied-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-ied-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -252,16 +252,16 @@ test("recordInvitationEmailProviderStatus writes the provider-status update to t
 });
 
 test("invitation-email-delivery mutators do not touch the dedicated table in JSON-default mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-ied-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-ied-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  delete process.env.TASKLOOM_STORE;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  delete process.env.PACKETAGENT_STORE;
   // Point the SQLite path at our temp DB so any accidental writes would land there
-  // (and we can detect them); but since TASKLOOM_STORE is unset, the dual-write
+  // (and we can detect them); but since PACKETAGENT_STORE is unset, the dual-write
   // code path is gated off and should not open this DB at all.
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   clearStoreCacheForTests();
   resetStoreForTests();
   try {
@@ -294,10 +294,10 @@ test("invitation-email-delivery mutators do not touch the dedicated table in JSO
     const after = readDedicatedRows(dbPath);
     assert.equal(after.length, before.length, "dedicated table must remain unchanged in JSON mode");
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     clearStoreCacheForTests();
     resetStoreForTests();
     rmSync(tempDir, { recursive: true, force: true });

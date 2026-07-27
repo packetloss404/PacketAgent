@@ -246,7 +246,7 @@ export async function spawnGeneratedAppRuntimeWorker(
   config: GeneratedAppRuntimeWorkerStartConfig,
 ): Promise<GeneratedAppRuntimeWorkerHandle> {
   const workerPath = fileURLToPath(new URL("./server-worker.ts", import.meta.url));
-  const configDir = path.join(tmpdir(), `taskloom-generated-runtime-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  const configDir = path.join(tmpdir(), `packetagent-generated-runtime-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   mkdirSync(configDir, { recursive: true });
   const configPath = path.join(configDir, "config.json");
   writeFileSync(configPath, JSON.stringify({
@@ -303,7 +303,7 @@ function runtimePoolKey(workspaceId: string, appId: string): string {
 }
 
 function defaultMaxProcesses(): number {
-  const parsed = Number.parseInt(process.env.TASKLOOM_GENERATED_APP_RUNTIME_MAX_PROCESSES ?? "", 10);
+  const parsed = Number.parseInt(process.env.PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_PROCESSES;
 }
 

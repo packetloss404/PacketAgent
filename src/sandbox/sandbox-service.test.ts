@@ -11,7 +11,7 @@ import type {
   SandboxStartSpec,
   SandboxSubscription,
 } from "./sandbox-driver.js";
-import type { TaskloomData } from "../taskloom-store.js";
+import type { PacketAgentData } from "../packetagent-store.js";
 
 interface MockHandleInternal extends SandboxHandle {
   emitter: EventEmitter;
@@ -98,10 +98,10 @@ function createMockDriver(opts: MockDriverOptions): SandboxDriver & {
 }
 
 function createInMemoryStore() {
-  const data: Partial<TaskloomData> = {};
+  const data: Partial<PacketAgentData> = {};
   return createJsonSandboxStore({
-    loadStore: () => data as TaskloomData,
-    mutateStore: <T,>(mutator: (data: TaskloomData) => T): T => mutator(data as TaskloomData),
+    loadStore: () => data as PacketAgentData,
+    mutateStore: <T,>(mutator: (data: PacketAgentData) => T): T => mutator(data as PacketAgentData),
   });
 }
 
@@ -144,7 +144,7 @@ test("sandbox service: happy path stdout exit 0 → success", async () => {
       handle.emitter.emit("exit", { exitCode: 0, signal: null });
     },
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const exec = await service.startExec({ workspaceId: "alpha", command: "echo hello" });
   const final = await service.waitForExec(exec.id);
   assert.equal(final?.status, "success");
@@ -162,7 +162,7 @@ test("sandbox service: cancel stops the exec and reports canceled", async () => 
       handle.emitter.emit("chunk", { stream: "stdout", data: "starting\n" });
     },
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const exec = await service.startExec({ workspaceId: "alpha", command: "sleep 60" });
   await new Promise((resolve) => setTimeout(resolve, 20));
   const canceled = await service.cancelExec("alpha", exec.id);
@@ -186,7 +186,7 @@ test("sandbox service: enforces driver timeout via timeout exit message", async 
       }));
     },
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const exec = await service.startExec({ workspaceId: "alpha", command: "sleep 99", timeoutMs: 50 });
   const final = await service.waitForExec(exec.id);
   assert.equal(final?.status, "timeout");
@@ -196,7 +196,7 @@ test("sandbox service: enforces driver timeout via timeout exit message", async 
 test("sandbox service: status reflects native driver insecure note", async () => {
   const store = createInMemoryStore();
   const driver = createMockDriver({ behavior: () => {} });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const status = await service.getStatus();
   assert.equal(status.driver, "native");
   assert.equal(status.available, true);
@@ -225,7 +225,7 @@ test("sandbox service: blocks auto fallback to native in production when Docker 
     store,
     dockerDriver,
     nativeDriver,
-    env: { NODE_ENV: "production", TASKLOOM_SANDBOX_DRIVER: "auto" },
+    env: { NODE_ENV: "production", PACKETAGENT_SANDBOX_DRIVER: "auto" },
   });
 
   await assert.rejects(() => service.getStatus(), /native fallback is disabled/);
@@ -241,7 +241,7 @@ test("sandbox service: allows explicit insecure native opt-in in production", as
     forcedDriver: "native",
     env: {
       NODE_ENV: "production",
-      TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true",
+      PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true",
     },
   });
 
@@ -257,7 +257,7 @@ test("sandbox service: runSmokeBatch aggregates pass when all items succeed", as
       handle.emitter.emit("exit", { exitCode: 0, signal: null });
     },
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const result = await service.runSmokeBatch("alpha", [
     { name: "route /a", command: "echo a" },
     { name: "route /b", command: "echo b" },
@@ -279,7 +279,7 @@ test("sandbox service: runSmokeBatch reports fail when any item exits non-zero",
       handle.emitter.emit("exit", { exitCode, signal: null });
     },
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const result = await service.runSmokeBatch("alpha", [
     { name: "first", command: "echo ok" },
     { name: "second", command: "false" },
@@ -299,7 +299,7 @@ test("sandbox service: stdout/stderr previews are bounded to ~16KB", async () =>
       handle.emitter.emit("exit", { exitCode: 0, signal: null });
     },
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const exec = await service.startExec({ workspaceId: "alpha", command: "spew" });
   const final = await service.waitForExec(exec.id);
   assert.ok(final?.stdoutPreview);

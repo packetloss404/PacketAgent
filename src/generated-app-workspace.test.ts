@@ -36,7 +36,7 @@ test("resolveGeneratedAppWorkspacePath resolves the safe generated app workspace
   );
   assert.equal(
     paths.relativeManifestPath,
-    "data/generated-apps/alpha/ops-board/workspace/.taskloom/generated-app-workspace-manifest.json",
+    "data/generated-apps/alpha/ops-board/workspace/.packetagent/generated-app-workspace-manifest.json",
   );
 });
 
@@ -187,7 +187,7 @@ test("writeGeneratedAppRuntimeWorkspace writes a runtime artifact into the gener
 });
 
 async function temporaryRoot(t: { after: (callback: () => Promise<void>) => void }) {
-  const root = await mkdtemp(path.join(tmpdir(), "taskloom-generated-app-workspace-"));
+  const root = await mkdtemp(path.join(tmpdir(), "packetagent-generated-app-workspace-"));
   t.after(async () => {
     await rm(root, { recursive: true, force: true });
   });

@@ -4,8 +4,8 @@ import { Hono } from "hono";
 import { SESSION_COOKIE_NAME } from "./auth-utils.js";
 import { getOperationsHealth, type OperationsHealthReport } from "./operations-health.js";
 import { operationsHealthRoutes } from "./operations-health-routes.js";
-import { login } from "./taskloom-services.js";
-import { mutateStore, resetStoreForTests } from "./taskloom-store.js";
+import { login } from "./packetagent-services.js";
+import { mutateStore, resetStoreForTests } from "./packetagent-store.js";
 
 function createApp() {
   const app = new Hono();
@@ -35,7 +35,7 @@ test("operations health route rejects unauthenticated requests", async () => {
 
 test("operations health route rejects members below admin role", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find(
       (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
@@ -55,7 +55,7 @@ test("operations health route rejects members below admin role", async () => {
 
 test("operations health route returns the report shape for an admin-equivalent owner", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createApp();
 
   const response = await app.request("/api/app/operations/health", {

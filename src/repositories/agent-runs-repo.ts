@@ -9,13 +9,13 @@ import type {
   AgentRunStep,
   AgentRunToolCall,
   AgentTriggerKind,
-  TaskloomData,
-} from "../taskloom-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../taskloom-store.js";
+  PacketAgentData,
+} from "../packetagent-store.js";
+import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
-const DEFAULT_DB_FILE = "data/taskloom.sqlite";
+const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 
 export interface AgentRunsRepository {
@@ -27,8 +27,8 @@ export interface AgentRunsRepository {
 }
 
 export interface AgentRunsRepositoryDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   dbPath?: string;
 }
 
@@ -43,8 +43,8 @@ export interface AsyncAgentRunsRepository {
 }
 
 export interface AsyncAgentRunsRepositoryDeps {
-  loadStore?: () => MaybePromise<TaskloomData>;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => MaybePromise<T>) => MaybePromise<T>;
+  loadStore?: () => MaybePromise<PacketAgentData>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => MaybePromise<T>) => MaybePromise<T>;
   repository?: AgentRunsRepository;
   dbPath?: string;
 }
@@ -52,7 +52,7 @@ export interface AsyncAgentRunsRepositoryDeps {
 export function createAgentRunsRepository(
   deps: AgentRunsRepositoryDeps = {},
 ): AgentRunsRepository {
-  if (process.env.TASKLOOM_STORE === "sqlite") return sqliteAgentRunsRepository(deps);
+  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteAgentRunsRepository(deps);
   return jsonAgentRunsRepository(deps);
 }
 
@@ -60,7 +60,7 @@ export function createAsyncAgentRunsRepository(
   deps: AsyncAgentRunsRepositoryDeps = {},
 ): AsyncAgentRunsRepository {
   if (deps.repository) return asyncAgentRunsRepositoryFromSync(deps.repository);
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     return asyncAgentRunsRepositoryFromSync(sqliteAgentRunsRepository({ dbPath: deps.dbPath }));
   }
   return asyncJsonAgentRunsRepository(deps);
@@ -351,7 +351,7 @@ function clampLimit(limit?: number): number {
 
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
-  return resolve(process.cwd(), process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
 }
 
 function openDatabase(dbPath: string): DatabaseSync {

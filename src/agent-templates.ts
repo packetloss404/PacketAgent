@@ -1,4 +1,4 @@
-import type { AgentInputField } from "./taskloom-store";
+import type { AgentInputField } from "./packetagent-store";
 
 export interface AgentTemplate {
   id: string;

@@ -2,8 +2,8 @@ import { Hono, type Context } from "hono";
 import { requirePrivateWorkspaceRole } from "./rbac.js";
 import { cancelJobAsync, enqueueJobAsync, findJobAsync, listJobsAsync } from "./jobs/store.js";
 import { parseCron } from "./jobs/cron.js";
-import { loadStoreAsync } from "./taskloom-store.js";
-import type { JobRecord, JobStatus } from "./taskloom-store.js";
+import { loadStoreAsync } from "./packetagent-store.js";
+import type { JobRecord, JobStatus } from "./packetagent-store.js";
 import { redactSensitiveString, redactSensitiveValue } from "./security/redaction.js";
 
 function errorResponse(c: Context, error: unknown) {

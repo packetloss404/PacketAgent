@@ -9,16 +9,16 @@ import { getOperationsHealthAsync, type OperationsHealthReport } from "../operat
 import { getJobTypeMetrics, type JobTypeMetrics } from "../jobs/scheduler-metrics.js";
 import { enqueueJob, enqueueJobAsync, type EnqueueJobInput } from "../jobs/store.js";
 import { nextAfter } from "../jobs/cron.js";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, type JobRecord, type TaskloomData } from "../taskloom-store.js";
+import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, type JobRecord, type PacketAgentData } from "../packetagent-store.js";
 
 export const ALERTS_EVALUATE_JOB_TYPE = "alerts.evaluate" as const;
 
-export const ALERT_JOB_FAILURE_RATE_THRESHOLD_ENV = "TASKLOOM_ALERT_JOB_FAILURE_RATE_THRESHOLD";
-export const ALERT_JOB_FAILURE_MIN_SAMPLES_ENV = "TASKLOOM_ALERT_JOB_FAILURE_MIN_SAMPLES";
-export const ALERT_EVALUATE_CRON_ENV = "TASKLOOM_ALERT_EVALUATE_CRON";
-export const ALERT_RETENTION_DAYS_ENV = "TASKLOOM_ALERT_RETENTION_DAYS";
-export const ALERT_WORKSPACE_ID_ENV = "TASKLOOM_ALERT_WORKSPACE_ID";
-export const ALERT_DELIVER_MAX_ATTEMPTS_ENV = "TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS";
+export const ALERT_JOB_FAILURE_RATE_THRESHOLD_ENV = "PACKETAGENT_ALERT_JOB_FAILURE_RATE_THRESHOLD";
+export const ALERT_JOB_FAILURE_MIN_SAMPLES_ENV = "PACKETAGENT_ALERT_JOB_FAILURE_MIN_SAMPLES";
+export const ALERT_EVALUATE_CRON_ENV = "PACKETAGENT_ALERT_EVALUATE_CRON";
+export const ALERT_RETENTION_DAYS_ENV = "PACKETAGENT_ALERT_RETENTION_DAYS";
+export const ALERT_WORKSPACE_ID_ENV = "PACKETAGENT_ALERT_WORKSPACE_ID";
+export const ALERT_DELIVER_MAX_ATTEMPTS_ENV = "PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS";
 export const ALERTS_DELIVER_JOB_TYPE = "alerts.deliver" as const;
 
 const DEFAULT_JOB_FAILURE_RATE_THRESHOLD = 0.5;
@@ -63,13 +63,13 @@ export interface AlertsEvaluateHandlerDeps {
 
 export interface EnsureAlertsCronJobDeps {
   env?: NodeJS.ProcessEnv;
-  loadStore?: () => TaskloomData;
+  loadStore?: () => PacketAgentData;
   enqueue?: (input: EnqueueJobInput) => JobRecord;
 }
 
 export interface EnsureAlertsCronJobAsyncDeps {
   env?: NodeJS.ProcessEnv;
-  loadStore?: () => TaskloomData | Promise<TaskloomData>;
+  loadStore?: () => PacketAgentData | Promise<PacketAgentData>;
   enqueue?: (input: EnqueueJobInput) => JobRecord | Promise<JobRecord>;
 }
 

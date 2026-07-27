@@ -7,7 +7,7 @@ import { Hono } from "hono";
 import { SESSION_COOKIE_NAME } from "./auth-utils";
 import { appRoutes, setHostInfoSourcesForTests } from "./app-routes";
 import { shutdownDefaultGeneratedAppRuntimeProcessPool } from "./generated-app-runtime/server.js";
-import { login } from "./taskloom-services";
+import { login } from "./packetagent-services";
 import {
   clearStoreCacheForTests,
   createSeedStore,
@@ -19,14 +19,14 @@ import {
   type ManagedPostgresStoreQueryClient,
   type ManagedPostgresStoreQueryResult,
   type GeneratedAppRecord,
-  type TaskloomData,
-} from "./taskloom-store";
+  type PacketAgentData,
+} from "./packetagent-store";
 
 const STORE_ENV_KEYS = [
-  "TASKLOOM_STORE",
+  "PACKETAGENT_STORE",
   "DATABASE_URL",
-  "TASKLOOM_DATABASE_URL",
-  "TASKLOOM_MANAGED_DATABASE_URL",
+  "PACKETAGENT_DATABASE_URL",
+  "PACKETAGENT_MANAGED_DATABASE_URL",
 ] as const;
 
 type StoreEnvKey = (typeof STORE_ENV_KEYS)[number];
@@ -39,18 +39,18 @@ class FakeManagedPostgresClient implements ManagedPostgresStoreQueryClient {
     params: readonly unknown[] = [],
   ): Promise<ManagedPostgresStoreQueryResult<TRow>> {
     const normalized = sql.replace(/\s+/g, " ").trim().toLowerCase();
-    if (normalized.startsWith("select payload from taskloom_document_store")) {
+    if (normalized.startsWith("select payload from packetagent_document_store")) {
       return { rows: this.payloadJson ? [{ payload: this.payloadJson } as unknown as TRow] : [] };
     }
-    if (normalized.startsWith("insert into taskloom_document_store")) {
+    if (normalized.startsWith("insert into packetagent_document_store")) {
       this.payloadJson = String(params[3]);
     }
     return { rows: [] };
   }
 
-  storedData(): TaskloomData {
+  storedData(): PacketAgentData {
     assert.ok(this.payloadJson);
-    return JSON.parse(this.payloadJson) as TaskloomData;
+    return JSON.parse(this.payloadJson) as PacketAgentData;
   }
 }
 
@@ -65,14 +65,14 @@ function authHeaders(cookieValue: string) {
 }
 
 async function withGeneratedAppWorkspaceRoot(run: (rootPath: string) => Promise<void> | void) {
-  const previous = process.env.TASKLOOM_GENERATED_APP_WORKSPACES_DIR;
-  const rootPath = mkdtempSync(join(tmpdir(), "taskloom-generated-apps-"));
-  process.env.TASKLOOM_GENERATED_APP_WORKSPACES_DIR = rootPath;
+  const previous = process.env.PACKETAGENT_GENERATED_APP_WORKSPACES_DIR;
+  const rootPath = mkdtempSync(join(tmpdir(), "packetagent-generated-apps-"));
+  process.env.PACKETAGENT_GENERATED_APP_WORKSPACES_DIR = rootPath;
   try {
     await run(rootPath);
   } finally {
-    if (previous === undefined) delete process.env.TASKLOOM_GENERATED_APP_WORKSPACES_DIR;
-    else process.env.TASKLOOM_GENERATED_APP_WORKSPACES_DIR = previous;
+    if (previous === undefined) delete process.env.PACKETAGENT_GENERATED_APP_WORKSPACES_DIR;
+    else process.env.PACKETAGENT_GENERATED_APP_WORKSPACES_DIR = previous;
     rmSync(rootPath, { recursive: true, force: true });
   }
 }
@@ -138,19 +138,19 @@ test("auth session routes run through the async managed store backend", async ()
   const client = new FakeManagedPostgresClient();
 
   await withManagedStoreEnv({
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, client, async (configs) => {
     const app = createTestApp();
 
     const loginResponse = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "demo12345" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "demo12345" }),
     });
     const loginBody = await loginResponse.json() as { authenticated: boolean; user: { id: string } };
 
-    assert.equal(configs[0].envKey, "TASKLOOM_DATABASE_URL");
+    assert.equal(configs[0].envKey, "PACKETAGENT_DATABASE_URL");
     assert.equal(loginResponse.status, 200);
     assert.equal(loginBody.authenticated, true);
     assert.equal(loginBody.user.id, "user_alpha");
@@ -170,7 +170,7 @@ test("auth session routes run through the async managed store backend", async ()
 test("app activation detail is scoped to the authenticated workspace", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const response = await app.request("/api/app/activation", {
     headers: authHeaders(alpha.cookieValue),
@@ -208,17 +208,17 @@ test("model routing presets route requires authentication", async () => {
 test("model routing presets route exposes safe workspace-scoped presets", async (t) => {
   resetStoreForTests();
   const previousOpenAi = process.env.OPENAI_API_KEY;
-  const previousFast = process.env.TASKLOOM_MODEL_PRESET_FAST;
+  const previousFast = process.env.PACKETAGENT_MODEL_PRESET_FAST;
   t.after(() => {
     if (previousOpenAi === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = previousOpenAi;
-    if (previousFast === undefined) delete process.env.TASKLOOM_MODEL_PRESET_FAST;
-    else process.env.TASKLOOM_MODEL_PRESET_FAST = previousFast;
+    if (previousFast === undefined) delete process.env.PACKETAGENT_MODEL_PRESET_FAST;
+    else process.env.PACKETAGENT_MODEL_PRESET_FAST = previousFast;
   });
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   process.env.OPENAI_API_KEY = "sk-route-secret";
-  process.env.TASKLOOM_MODEL_PRESET_FAST = "openai:gpt-4.1-mini";
+  process.env.PACKETAGENT_MODEL_PRESET_FAST = "openai:gpt-4.1-mini";
 
   const response = await app.request("/api/app/model-routing-presets", {
     headers: authHeaders(alpha.cookieValue),
@@ -238,7 +238,7 @@ test("model routing presets route exposes safe workspace-scoped presets", async 
   assert.equal(body.routingPresets?.version, "phase-72-lane-4");
   assert.equal(body.routingPresets?.presets?.fast?.primary?.provider, "openai");
   assert.equal(body.routingPresets?.presets?.fast?.primary?.model, "gpt-4.1-mini");
-  assert.ok(body.routingPresets?.presets?.fast?.primary?.envHints?.includes("TASKLOOM_MODEL_PRESET_FAST"));
+  assert.ok(body.routingPresets?.presets?.fast?.primary?.envHints?.includes("PACKETAGENT_MODEL_PRESET_FAST"));
   assert.equal(JSON.stringify(body).includes("sk-route-secret"), false);
 
   const aliasResponse = await app.request("/api/app/llm/routing-presets", {
@@ -255,7 +255,7 @@ test("integration marketplace route exposes cards, readiness, config, and test p
     else process.env.OPENAI_API_KEY = previousOpenAi;
   });
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   process.env.OPENAI_API_KEY = "sk-route-secret";
 
   const response = await app.request("/api/app/integration-marketplace", {
@@ -292,7 +292,7 @@ test("integration marketplace route exposes cards, readiness, config, and test p
 test("integration marketplace advertised test routes use deterministic sandbox checks", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   mutateStore((data) => {
@@ -352,7 +352,7 @@ test("integration marketplace advertised test routes use deterministic sandbox c
 test("activity list and detail do not expose another workspace", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   mutateStore((data) => {
     data.activities.unshift(
@@ -408,7 +408,7 @@ test("activity list and detail do not expose another workspace", async () => {
 test("generated apps list is workspace-scoped and returns lightweight summaries", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   mutateStore((data) => {
     data.generatedApps ??= [];
@@ -481,7 +481,7 @@ test("generated apps list is workspace-scoped and returns lightweight summaries"
 test("builder agent draft can be approved into an agent", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/agent-draft", {
@@ -557,7 +557,7 @@ test("builder agent draft can be approved into an agent", async () => {
 test("builder app draft can be generated and applied with smoke metadata", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -622,7 +622,7 @@ test("builder app-draft/apply stores generated source files for the current chec
   await withGeneratedAppWorkspaceRoot(async (rootPath) => {
     resetStoreForTests();
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
     const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -697,7 +697,7 @@ test("builder app-draft/apply stores generated source files for the current chec
 test("generated app source routes are workspace-scoped", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -772,14 +772,14 @@ test("generated app source routes are workspace-scoped", async () => {
 
 test("generated app runtime API persists records through per-app SQLite", async () => {
   resetStoreForTests();
-  const previousRuntimeRoot = process.env.TASKLOOM_GENERATED_APP_RUNTIME_DIR;
-  const previousLegacyTemplates = process.env.TASKLOOM_LEGACY_TEMPLATES;
-  const runtimeRoot = mkdtempSync(join(tmpdir(), "taskloom-generated-runtime-"));
-  process.env.TASKLOOM_GENERATED_APP_RUNTIME_DIR = runtimeRoot;
-  process.env.TASKLOOM_LEGACY_TEMPLATES = "1";
+  const previousRuntimeRoot = process.env.PACKETAGENT_GENERATED_APP_RUNTIME_DIR;
+  const previousLegacyTemplates = process.env.PACKETAGENT_LEGACY_TEMPLATES;
+  const runtimeRoot = mkdtempSync(join(tmpdir(), "packetagent-generated-runtime-"));
+  process.env.PACKETAGENT_GENERATED_APP_RUNTIME_DIR = runtimeRoot;
+  process.env.PACKETAGENT_LEGACY_TEMPLATES = "1";
   try {
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
     const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -798,8 +798,8 @@ test("generated app runtime API persists records through per-app SQLite", async 
     const firstListResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/api/account`, { headers });
     const firstList = await firstListResponse.json() as Array<{ id?: string; name?: string }>;
     assert.equal(firstListResponse.status, 200);
-    assert.equal(firstListResponse.headers.get("x-taskloom-generated-app-runtime"), "server-sqlite-process");
-    assert.ok(firstListResponse.headers.get("x-taskloom-generated-app-runtime-pid"));
+    assert.equal(firstListResponse.headers.get("x-packetagent-generated-app-runtime"), "server-sqlite-process");
+    assert.ok(firstListResponse.headers.get("x-packetagent-generated-app-runtime-pid"));
     assert.ok(firstList.some((record) => record.name === "Account 1"));
 
     const createResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/api/account`, {
@@ -822,10 +822,10 @@ test("generated app runtime API persists records through per-app SQLite", async 
     assert.ok(secondList.some((record) => record.id === created.id && record.name === "Shared Farm Co"));
   } finally {
     await shutdownDefaultGeneratedAppRuntimeProcessPool();
-    if (previousRuntimeRoot === undefined) delete process.env.TASKLOOM_GENERATED_APP_RUNTIME_DIR;
-    else process.env.TASKLOOM_GENERATED_APP_RUNTIME_DIR = previousRuntimeRoot;
-    if (previousLegacyTemplates === undefined) delete process.env.TASKLOOM_LEGACY_TEMPLATES;
-    else process.env.TASKLOOM_LEGACY_TEMPLATES = previousLegacyTemplates;
+    if (previousRuntimeRoot === undefined) delete process.env.PACKETAGENT_GENERATED_APP_RUNTIME_DIR;
+    else process.env.PACKETAGENT_GENERATED_APP_RUNTIME_DIR = previousRuntimeRoot;
+    if (previousLegacyTemplates === undefined) delete process.env.PACKETAGENT_LEGACY_TEMPLATES;
+    else process.env.PACKETAGENT_LEGACY_TEMPLATES = previousLegacyTemplates;
     rmSync(runtimeRoot, { recursive: true, force: true });
   }
 });
@@ -834,7 +834,7 @@ test("builder preview refresh rewrites generated app workspace files", async () 
   await withGeneratedAppWorkspaceRoot(async (rootPath) => {
     resetStoreForTests();
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
     const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -893,7 +893,7 @@ test("builder preview refresh rewrites generated app workspace files", async () 
 test("generated app preview route resolves by actual app id or slug", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -936,9 +936,9 @@ test("generated app preview route resolves by actual app id or slug", async () =
   const byIdHtml = await byIdResponse.text();
   assert.equal(byIdResponse.status, 200);
   assert.match(byIdResponse.headers.get("content-type") ?? "", /text\/html/);
-  assert.equal(byIdResponse.headers.get("x-taskloom-generated-app-id"), applied.app.id);
-  assert.equal(byIdResponse.headers.get("x-taskloom-generated-app-runtime"), "static");
-  assert.equal(byIdResponse.headers.get("x-taskloom-generated-app-live"), "false");
+  assert.equal(byIdResponse.headers.get("x-packetagent-generated-app-id"), applied.app.id);
+  assert.equal(byIdResponse.headers.get("x-packetagent-generated-app-runtime"), "static");
+  assert.equal(byIdResponse.headers.get("x-packetagent-generated-app-live"), "false");
   assert.match(byIdHtml, new RegExp(`data-app-id="${applied.app.id}"`));
 
   const sourceFileResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/preview/src/App.tsx`, {
@@ -969,7 +969,7 @@ test("generated app preview route resolves by actual app id or slug", async () =
   assert.equal(readinessBody.preview?.path, "index.html");
   assert.equal(readinessBody.preview?.runtime?.mode, "static");
   assert.equal(readinessBody.preview?.runtime?.live, false);
-  assert.equal(readinessBody.preview?.runtime?.servedBy, "taskloom-static-workspace");
+  assert.equal(readinessBody.preview?.runtime?.servedBy, "packetagent-static-workspace");
   assert.equal(readinessBody.preview?.runtime?.process?.status, "not_started");
   assert.match(readinessBody.preview?.runtime?.process?.command ?? "", /npm run dev/);
   assert.ok(readinessBody.artifact?.files?.some((file) => file.path === "src/App.tsx"));
@@ -979,7 +979,7 @@ test("generated app preview route resolves by actual app id or slug", async () =
   });
   const bySlugHtml = await bySlugResponse.text();
   assert.equal(bySlugResponse.status, 200);
-  assert.equal(bySlugResponse.headers.get("x-taskloom-generated-app-id"), applied.app.id);
+  assert.equal(bySlugResponse.headers.get("x-packetagent-generated-app-id"), applied.app.id);
   assert.match(bySlugHtml, new RegExp(`data-app-slug="${applied.app.slug}"`));
 
   const publishStateResponse = await app.request(`/api/app/builder/publish/state?appId=${applied.app.slug}`, {
@@ -1012,15 +1012,15 @@ const sandboxSmokeSkipReason = (() => {
 })();
 
 test(
-  "builder app-draft/apply runs smoke through the sandbox when TASKLOOM_SANDBOX_SMOKE_ENABLED=1",
+  "builder app-draft/apply runs smoke through the sandbox when PACKETAGENT_SANDBOX_SMOKE_ENABLED=1",
   { skip: sandboxSmokeSkipReason ?? false },
   async () => {
   resetStoreForTests();
-  const original = process.env.TASKLOOM_SANDBOX_SMOKE_ENABLED;
-  process.env.TASKLOOM_SANDBOX_SMOKE_ENABLED = "1";
+  const original = process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED;
+  process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED = "1";
   try {
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
     const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1044,15 +1044,15 @@ test(
     const firstCheckDetail = applyBody.smokeBuild?.checks?.[0]?.detail ?? "";
     assert.match(firstCheckDetail, /sandbox: exit/);
   } finally {
-    if (original === undefined) delete process.env.TASKLOOM_SANDBOX_SMOKE_ENABLED;
-    else process.env.TASKLOOM_SANDBOX_SMOKE_ENABLED = original;
+    if (original === undefined) delete process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED;
+    else process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED = original;
   }
 });
 
 test("builder app iteration can generate a diff, apply it, and rollback checkpoints", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1202,7 +1202,7 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
 test("builder canonical changes routes validate target app and expose preview, fix, and agent checkpoint contracts", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1379,7 +1379,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
     else process.env.SMTP_URL = previousSmtpUrl;
   });
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1407,7 +1407,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
       appId: applied.app.id,
       checkpointId: applied.checkpoint.id,
       visibility: "public",
-      localPublishRoot: "exports\\taskloom",
+      localPublishRoot: "exports\\packetagent",
       publicBaseUrl: "https://apps.example.test/",
       privateBaseUrl: "http://localhost:8484/",
     }),
@@ -1430,7 +1430,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   assert.equal(firstPublishResponse.status, 201);
   assert.equal(firstPublish.published, true);
   assert.equal(firstPublish.publish?.status, "published");
-  assert.match(firstPublish.publish?.localPublishPath ?? "", /^exports\/taskloom\/alpha-workspace\//);
+  assert.match(firstPublish.publish?.localPublishPath ?? "", /^exports\/packetagent\/alpha-workspace\//);
   assert.equal(firstPublish.publish?.workspacePath, firstPublish.publish?.localPublishPath);
   assert.equal(firstPublish.publish?.manifest?.fileName, "publish-artifacts.json");
   assert.ok(firstPublish.history?.some((entry) =>
@@ -1439,8 +1439,8 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
     && entry.manifest?.fileName === "publish-artifacts.json"
   ));
   assert.match(firstPublish.publish?.privateUrl ?? "", new RegExp(`/api/app/generated-apps/${applied.app.id}/preview`));
-  assert.match(firstPublish.dockerComposeExport?.yaml ?? "", /taskloom-app:/);
-  assert.ok(firstPublish.dockerComposeExport?.services?.includes("taskloom-app"));
+  assert.match(firstPublish.dockerComposeExport?.yaml ?? "", /packetagent-app:/);
+  assert.ok(firstPublish.dockerComposeExport?.services?.includes("packetagent-app"));
   assert.ok((firstPublish.publish?.logs.length ?? 0) >= 3);
 
   const privatePreviewUrl = new URL(firstPublish.publish?.privateUrl ?? "http://localhost/").pathname
@@ -1449,7 +1449,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(privatePreviewResponse.status, 200);
-  assert.match(privatePreviewResponse.headers.get("x-taskloom-generated-app-id") ?? "", new RegExp(`^${applied.app.id}$`));
+  assert.match(privatePreviewResponse.headers.get("x-packetagent-generated-app-id") ?? "", new RegExp(`^${applied.app.id}$`));
 
   const failedCheckpointId = "gapp_ckpt_publish_failed_test";
   mutateStore((data) => {
@@ -1506,7 +1506,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
 
   assert.equal(composeResponse.status, 200);
   assert.equal(compose.fileName, "docker-compose.publish.yml");
-  assert.match(compose.contents ?? "", /taskloom-app:/);
+  assert.match(compose.contents ?? "", /packetagent-app:/);
 
   const secondPublishResponse = await app.request("/api/app/builder/publish", {
     method: "POST",
@@ -1533,7 +1533,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   assert.equal(secondPublish.published, true);
   assert.equal(secondPublish.publish?.previousPublishId, firstPublish.publish?.id);
   assert.equal(secondPublish.publish?.rollbackCommand?.toPublishId, firstPublish.publish?.id);
-  assert.match(secondPublish.rollbackToPrevious?.command ?? "", /taskloom publish rollback/);
+  assert.match(secondPublish.rollbackToPrevious?.command ?? "", /packetagent publish rollback/);
   assert.match(secondPublish.state?.publishedUrl ?? "", new RegExp(`/api/app/generated-apps/${applied.app.id}/preview`));
 
   const rollbackResponse = await app.request(`/api/app/builder/publish/${secondPublish.publish?.id}/rollback`, {
@@ -1564,7 +1564,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
 test("builder publish prepare and compose export require workspace management", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1611,10 +1611,10 @@ test("builder publish prepare and compose export require workspace management", 
 
 test("builder publish blocks when the generated workspace artifact is missing", async (t) => {
   resetStoreForTests();
-  const publishRoot = mkdtempSync(join(tmpdir(), "taskloom-publish-missing-"));
+  const publishRoot = mkdtempSync(join(tmpdir(), "packetagent-publish-missing-"));
   t.after(() => rmSync(publishRoot, { recursive: true, force: true }));
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1699,7 +1699,7 @@ test("builder publish blocks requested integrations that are not ready", async (
   });
 
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1786,11 +1786,11 @@ test("builder app-draft/stream requires authentication", async () => {
 
 test("builder app-draft/stream emits step events, a draft event, and done", async () => {
   resetStoreForTests();
-  const previous = process.env.TASKLOOM_BUILDER_CHAT_STEP_MS;
-  process.env.TASKLOOM_BUILDER_CHAT_STEP_MS = "0";
+  const previous = process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
+  process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = "0";
   try {
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
     const response = await app.request("/api/app/builder/app-draft/stream", {
@@ -1811,18 +1811,18 @@ test("builder app-draft/stream emits step events, a draft event, and done", asyn
     assert.ok(draftEvent.draft.app.name);
     assert.ok(draftEvent.draft.app.slug);
   } finally {
-    if (previous === undefined) delete process.env.TASKLOOM_BUILDER_CHAT_STEP_MS;
-    else process.env.TASKLOOM_BUILDER_CHAT_STEP_MS = previous;
+    if (previous === undefined) delete process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
+    else process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = previous;
   }
 });
 
 test("builder app-draft/stream echoes the chosen routing preset in step events", async () => {
   resetStoreForTests();
-  const previous = process.env.TASKLOOM_BUILDER_CHAT_STEP_MS;
-  process.env.TASKLOOM_BUILDER_CHAT_STEP_MS = "0";
+  const previous = process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
+  process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = "0";
   try {
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
     const response = await app.request("/api/app/builder/app-draft/stream", {
@@ -1835,20 +1835,20 @@ test("builder app-draft/stream echoes the chosen routing preset in step events",
     const stepTexts = events.filter((e) => e.type === "step").map((e) => (e as unknown as { text: string }).text);
     assert.ok(stepTexts.some((text) => text.toLowerCase().includes("fast preset")), `expected a step mentioning the fast preset, got: ${stepTexts.join(" | ")}`);
   } finally {
-    if (previous === undefined) delete process.env.TASKLOOM_BUILDER_CHAT_STEP_MS;
-    else process.env.TASKLOOM_BUILDER_CHAT_STEP_MS = previous;
+    if (previous === undefined) delete process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
+    else process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = previous;
   }
 });
 
 test("builder app-draft/stream narrates the template fallback path with prose events", async () => {
   resetStoreForTests();
-  const previousStepMs = process.env.TASKLOOM_BUILDER_CHAT_STEP_MS;
+  const previousStepMs = process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
   const previousApiKey = process.env.ANTHROPIC_API_KEY;
-  process.env.TASKLOOM_BUILDER_CHAT_STEP_MS = "0";
+  process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = "0";
   delete process.env.ANTHROPIC_API_KEY;
   try {
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
     const response = await app.request("/api/app/builder/app-draft/stream", {
@@ -1868,8 +1868,8 @@ test("builder app-draft/stream narrates the template fallback path with prose ev
     const allProseConcat = proseEvents.map((e) => e.text).join("");
     assert.match(allProseConcat, /task_tracker|crm|booking|dashboard|portal/i);
   } finally {
-    if (previousStepMs === undefined) delete process.env.TASKLOOM_BUILDER_CHAT_STEP_MS;
-    else process.env.TASKLOOM_BUILDER_CHAT_STEP_MS = previousStepMs;
+    if (previousStepMs === undefined) delete process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
+    else process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = previousStepMs;
     if (previousApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = previousApiKey;
   }
@@ -1878,7 +1878,7 @@ test("builder app-draft/stream narrates the template fallback path with prose ev
 test("checkpoint branch creates a new app with previousCheckpointId chain", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1949,11 +1949,11 @@ test("checkpoint branch requires authentication", async () => {
 
 test("builder app-iteration/stream emits step events, a diff event, and done", async () => {
   resetStoreForTests();
-  const previous = process.env.TASKLOOM_BUILDER_CHAT_STEP_MS;
-  process.env.TASKLOOM_BUILDER_CHAT_STEP_MS = "0";
+  const previous = process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
+  process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = "0";
   try {
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
     const draftResponse = await app.request("/api/app/builder/app-draft", {
@@ -1985,8 +1985,8 @@ test("builder app-iteration/stream emits step events, a diff event, and done", a
     assert.ok(diffEvent.iteration.id);
     assert.ok(Array.isArray(diffEvent.iteration.files));
   } finally {
-    if (previous === undefined) delete process.env.TASKLOOM_BUILDER_CHAT_STEP_MS;
-    else process.env.TASKLOOM_BUILDER_CHAT_STEP_MS = previous;
+    if (previous === undefined) delete process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
+    else process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = previous;
   }
 });
 
@@ -2015,7 +2015,7 @@ test("host-info route requires authentication and reports LAN ips for share affo
   });
   t.after(() => restore());
 
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const response = await app.request("/api/app/host-info", { headers: authHeaders(alpha.cookieValue) });
   const body = await response.json() as { lanIps: string[]; port: number };
 
@@ -2037,7 +2037,7 @@ test("host-info route returns empty lanIps when no external IPv4 interfaces are 
   });
   t.after(() => restore());
 
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const response = await app.request("/api/app/host-info", { headers: authHeaders(alpha.cookieValue) });
   const body = await response.json() as { lanIps: string[]; port: number };
 
@@ -2049,7 +2049,7 @@ test("host-info route returns empty lanIps when no external IPv4 interfaces are 
 async function setupGeneratedAppForPreviewTokenTests() {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
   const draftResponse = await app.request("/api/app/builder/app-draft", {
     method: "POST",
@@ -2103,7 +2103,7 @@ test("preview-token endpoint mints a token with a future expiry and a previewUrl
 test("preview-token endpoint rejects appIds outside the caller's workspace", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     data.generatedApps ??= [];
     data.generatedApps.push({
@@ -2144,7 +2144,7 @@ test("preview route accepts a freshly minted token without a session cookie", as
   );
   assert.equal(previewResponse.status, 200);
   assert.match(previewResponse.headers.get("content-type") ?? "", /text\/html/);
-  assert.equal(previewResponse.headers.get("x-taskloom-generated-app-id"), applied.app.id);
+  assert.equal(previewResponse.headers.get("x-packetagent-generated-app-id"), applied.app.id);
   const html = await previewResponse.text();
   assert.match(html, new RegExp(`data-app-id="${applied.app.id}"`));
 });
@@ -2154,9 +2154,9 @@ test("preview route rejects an expired token with a friendly 401", async () => {
   // Build an expired token directly via HMAC (mirrors the server's tk_<appId>.<expirySec>.<hmac> shape).
   const crypto = await import("node:crypto");
   const secret =
-    process.env.TASKLOOM_PREVIEW_TOKEN_SECRET?.trim()
-    || process.env.TASKLOOM_MASTER_KEY?.trim()
-    || "taskloom-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
+    process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET?.trim()
+    || process.env.PACKETAGENT_MASTER_KEY?.trim()
+    || "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
   const expirySec = Math.floor(Date.now() / 1000) - 60;
   const hmac = crypto.createHmac("sha256", secret).update(`${applied.app.id}.${expirySec}`).digest("base64")
     .replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -2216,11 +2216,11 @@ test("preview route rejects a tampered or wrong-app token with a friendly 401", 
 
 test("auth:login limiter scopes the bucket by submitted email so one attacker can't lock everyone out", async (t) => {
   resetStoreForTests();
-  const previousMax = process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
-  process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS = "1";
+  const previousMax = process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+  process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS = "1";
   t.after(() => {
-    if (previousMax === undefined) delete process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
-    else process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS = previousMax;
+    if (previousMax === undefined) delete process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+    else process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS = previousMax;
   });
   const app = createTestApp();
 
@@ -2234,14 +2234,14 @@ test("auth:login limiter scopes the bucket by submitted email so one attacker ca
   // All requests share the same (test) network identity, so without email
   // scoping they'd all land in one bucket. With max=1 the attacker's first
   // attempt is allowed through to auth (401), the second is rate limited (429).
-  const attacker1 = await attempt("attacker@taskloom.local");
+  const attacker1 = await attempt("attacker@packetagent.local");
   assert.equal(attacker1.status, 401, "first attacker attempt should reach auth, not the limiter");
-  const attacker2 = await attempt("attacker@taskloom.local");
+  const attacker2 = await attempt("attacker@packetagent.local");
   assert.equal(attacker2.status, 429, "second attacker attempt should be rate limited");
 
   // A different victim email must NOT be collateral-damaged by the attacker's
   // exhausted bucket — it gets its own bucket and reaches auth (401, not 429).
-  const victim = await attempt("victim@taskloom.local");
+  const victim = await attempt("victim@packetagent.local");
   assert.equal(victim.status, 401, "victim should not inherit the attacker's exhausted bucket");
 });
 
@@ -2249,23 +2249,23 @@ test("auth:login limiter scopes the bucket by submitted email so one attacker ca
 
 test("preview-token minting refuses the baked-in fallback secret in production", async (t) => {
   const previousEnv = process.env.NODE_ENV;
-  const previousPreview = process.env.TASKLOOM_PREVIEW_TOKEN_SECRET;
-  const previousMaster = process.env.TASKLOOM_MASTER_KEY;
+  const previousPreview = process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
+  const previousMaster = process.env.PACKETAGENT_MASTER_KEY;
   t.after(() => {
     if (previousEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousEnv;
-    if (previousPreview === undefined) delete process.env.TASKLOOM_PREVIEW_TOKEN_SECRET;
-    else process.env.TASKLOOM_PREVIEW_TOKEN_SECRET = previousPreview;
-    if (previousMaster === undefined) delete process.env.TASKLOOM_MASTER_KEY;
-    else process.env.TASKLOOM_MASTER_KEY = previousMaster;
+    if (previousPreview === undefined) delete process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
+    else process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET = previousPreview;
+    if (previousMaster === undefined) delete process.env.PACKETAGENT_MASTER_KEY;
+    else process.env.PACKETAGENT_MASTER_KEY = previousMaster;
   });
 
   const { app, alpha, applied } = await setupGeneratedAppForPreviewTokenTests();
 
   // No real secret configured + production => minting must refuse, not forge.
   process.env.NODE_ENV = "production";
-  delete process.env.TASKLOOM_PREVIEW_TOKEN_SECRET;
-  delete process.env.TASKLOOM_MASTER_KEY;
+  delete process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
+  delete process.env.PACKETAGENT_MASTER_KEY;
 
   const refused = await app.request(`/api/app/generated-apps/${applied.app.id}/preview-token`, {
     method: "POST",
@@ -2276,7 +2276,7 @@ test("preview-token minting refuses the baked-in fallback secret in production",
   assert.match(refusedBody.error, /preview tokens are unavailable/);
 
   // Once a real secret is configured, production minting works again.
-  process.env.TASKLOOM_PREVIEW_TOKEN_SECRET = "a-real-production-preview-secret";
+  process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET = "a-real-production-preview-secret";
   const ok = await app.request(`/api/app/generated-apps/${applied.app.id}/preview-token`, {
     method: "POST",
     headers: authHeaders(alpha.cookieValue),
@@ -2288,15 +2288,15 @@ test("preview-token minting refuses the baked-in fallback secret in production",
 
 test("preview verification refuses fallback-forged tokens in production", async (t) => {
   const previousEnv = process.env.NODE_ENV;
-  const previousPreview = process.env.TASKLOOM_PREVIEW_TOKEN_SECRET;
-  const previousMaster = process.env.TASKLOOM_MASTER_KEY;
+  const previousPreview = process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
+  const previousMaster = process.env.PACKETAGENT_MASTER_KEY;
   t.after(() => {
     if (previousEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousEnv;
-    if (previousPreview === undefined) delete process.env.TASKLOOM_PREVIEW_TOKEN_SECRET;
-    else process.env.TASKLOOM_PREVIEW_TOKEN_SECRET = previousPreview;
-    if (previousMaster === undefined) delete process.env.TASKLOOM_MASTER_KEY;
-    else process.env.TASKLOOM_MASTER_KEY = previousMaster;
+    if (previousPreview === undefined) delete process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
+    else process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET = previousPreview;
+    if (previousMaster === undefined) delete process.env.PACKETAGENT_MASTER_KEY;
+    else process.env.PACKETAGENT_MASTER_KEY = previousMaster;
   });
 
   const { app, applied } = await setupGeneratedAppForPreviewTokenTests();
@@ -2304,7 +2304,7 @@ test("preview verification refuses fallback-forged tokens in production", async 
   // Forge a token against the baked-in dev fallback secret (what an attacker
   // who read the source would do).
   const crypto = await import("node:crypto");
-  const fallback = "taskloom-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
+  const fallback = "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
   const expirySec = Math.floor(Date.now() / 1000) + 3600;
   const hmac = crypto.createHmac("sha256", fallback).update(`${applied.app.id}.${expirySec}`).digest("base64")
     .replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -2313,8 +2313,8 @@ test("preview verification refuses fallback-forged tokens in production", async 
   // In production with no real secret, verification must refuse (401), not
   // accept the fallback-forged token.
   process.env.NODE_ENV = "production";
-  delete process.env.TASKLOOM_PREVIEW_TOKEN_SECRET;
-  delete process.env.TASKLOOM_MASTER_KEY;
+  delete process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
+  delete process.env.PACKETAGENT_MASTER_KEY;
 
   const previewResponse = await app.request(
     `/api/app/generated-apps/${applied.app.id}/preview/?token=${encodeURIComponent(forged)}`,

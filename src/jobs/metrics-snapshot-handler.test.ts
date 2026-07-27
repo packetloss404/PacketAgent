@@ -7,11 +7,11 @@ import {
   type MetricsSnapshotHandlerDeps,
 } from "./metrics-snapshot-handler.js";
 import type { EnqueueJobInput } from "./store.js";
-import type { JobRecord, TaskloomData } from "../taskloom-store.js";
+import type { JobRecord, PacketAgentData } from "../packetagent-store.js";
 import { nextAfter } from "./cron.js";
 
-function makeStore(jobs: JobRecord[] = []): TaskloomData {
-  return { jobs: [...jobs] } as unknown as TaskloomData;
+function makeStore(jobs: JobRecord[] = []): PacketAgentData {
+  return { jobs: [...jobs] } as unknown as PacketAgentData;
 }
 
 function makeJob(overrides: Partial<JobRecord> & { id: string; type: string; status: JobRecord["status"] }): JobRecord {
@@ -153,7 +153,7 @@ test("ensureMetricsSnapshotCronJob returns skipped and warns when cron is invali
   try {
     const enqueueCalls: EnqueueJobInput[] = [];
     const result = ensureMetricsSnapshotCronJob({
-      env: { TASKLOOM_JOB_METRICS_SNAPSHOT_CRON: "this is not cron" },
+      env: { PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON: "this is not cron" },
       loadStore: () => makeStore(),
       enqueue: (input) => {
         enqueueCalls.push(input);
@@ -180,7 +180,7 @@ test("ensureMetricsSnapshotCronJob returns exists when an active recurring job i
   });
   const enqueueCalls: EnqueueJobInput[] = [];
   const result = ensureMetricsSnapshotCronJob({
-    env: { TASKLOOM_JOB_METRICS_SNAPSHOT_CRON: cron },
+    env: { PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON: cron },
     loadStore: () => makeStore([existing]),
     enqueue: (input) => {
       enqueueCalls.push(input);
@@ -199,7 +199,7 @@ test("ensureMetricsSnapshotCronJob ignores failed/canceled jobs and enqueues a f
   ];
   const enqueueCalls: EnqueueJobInput[] = [];
   const result = ensureMetricsSnapshotCronJob({
-    env: { TASKLOOM_JOB_METRICS_SNAPSHOT_CRON: cron },
+    env: { PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON: cron },
     loadStore: () => makeStore(stale),
     enqueue: (input) => {
       enqueueCalls.push(input);
@@ -216,7 +216,7 @@ test("ensureMetricsSnapshotCronJob enqueues with default workspaceId, retentionD
   const enqueueCalls: EnqueueJobInput[] = [];
   const before = new Date();
   const result = ensureMetricsSnapshotCronJob({
-    env: { TASKLOOM_JOB_METRICS_SNAPSHOT_CRON: cron },
+    env: { PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON: cron },
     loadStore: () => makeStore(),
     enqueue: (input) => {
       enqueueCalls.push(input);
@@ -242,8 +242,8 @@ test("ensureMetricsSnapshotCronJob honors custom workspaceId env override", () =
   const enqueueCalls: EnqueueJobInput[] = [];
   ensureMetricsSnapshotCronJob({
     env: {
-      TASKLOOM_JOB_METRICS_SNAPSHOT_CRON: cron,
-      TASKLOOM_JOB_METRICS_SNAPSHOT_WORKSPACE_ID: "ops-workspace",
+      PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON: cron,
+      PACKETAGENT_JOB_METRICS_SNAPSHOT_WORKSPACE_ID: "ops-workspace",
     },
     loadStore: () => makeStore(),
     enqueue: (input) => {
@@ -260,8 +260,8 @@ test("ensureMetricsSnapshotCronJob honors valid custom retentionDays env overrid
   const enqueueCalls: EnqueueJobInput[] = [];
   ensureMetricsSnapshotCronJob({
     env: {
-      TASKLOOM_JOB_METRICS_SNAPSHOT_CRON: cron,
-      TASKLOOM_JOB_METRICS_SNAPSHOT_RETENTION_DAYS: "7",
+      PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON: cron,
+      PACKETAGENT_JOB_METRICS_SNAPSHOT_RETENTION_DAYS: "7",
     },
     loadStore: () => makeStore(),
     enqueue: (input) => {
@@ -280,8 +280,8 @@ test("ensureMetricsSnapshotCronJob falls back to default retentionDays when env 
     const enqueueCalls: EnqueueJobInput[] = [];
     ensureMetricsSnapshotCronJob({
       env: {
-        TASKLOOM_JOB_METRICS_SNAPSHOT_CRON: cron,
-        TASKLOOM_JOB_METRICS_SNAPSHOT_RETENTION_DAYS: value,
+        PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON: cron,
+        PACKETAGENT_JOB_METRICS_SNAPSHOT_RETENTION_DAYS: value,
       },
       loadStore: () => makeStore(),
       enqueue: (input) => {
@@ -299,8 +299,8 @@ test("ensureMetricsSnapshotCronJob accepts retentionDays=0 from env", () => {
   const enqueueCalls: EnqueueJobInput[] = [];
   ensureMetricsSnapshotCronJob({
     env: {
-      TASKLOOM_JOB_METRICS_SNAPSHOT_CRON: cron,
-      TASKLOOM_JOB_METRICS_SNAPSHOT_RETENTION_DAYS: "0",
+      PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON: cron,
+      PACKETAGENT_JOB_METRICS_SNAPSHOT_RETENTION_DAYS: "0",
     },
     loadStore: () => makeStore(),
     enqueue: (input) => {

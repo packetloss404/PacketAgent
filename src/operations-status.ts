@@ -1,5 +1,5 @@
-import type { TaskloomData } from "./taskloom-store.js";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync } from "./taskloom-store.js";
+import type { PacketAgentData } from "./packetagent-store.js";
+import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync } from "./packetagent-store.js";
 import { getJobTypeMetrics, type JobTypeMetrics } from "./jobs/scheduler-metrics.js";
 
 export type { JobTypeMetrics } from "./jobs/scheduler-metrics.js";
@@ -33,14 +33,14 @@ export interface OperationsStatus {
 }
 
 export interface OperationsStatusDeps {
-  loadStore?: () => TaskloomData;
+  loadStore?: () => PacketAgentData;
   env?: NodeJS.ProcessEnv;
   now?: () => Date;
   jobTypeMetrics?: () => JobTypeMetrics[];
 }
 
 export interface OperationsStatusAsyncDeps extends Omit<OperationsStatusDeps, "loadStore"> {
-  loadStore?: () => TaskloomData | Promise<TaskloomData>;
+  loadStore?: () => PacketAgentData | Promise<PacketAgentData>;
 }
 
 type LeaderMode = OperationsStatus["scheduler"]["leaderMode"];
@@ -59,17 +59,17 @@ export function __setSchedulerLeaderProbe(probe: (() => boolean) | null): void {
 }
 
 function resolveStoreMode(env: NodeJS.ProcessEnv): StoreMode {
-  return env.TASKLOOM_STORE === "sqlite" ? "sqlite" : "json";
+  return env.PACKETAGENT_STORE === "sqlite" ? "sqlite" : "json";
 }
 
 function resolveLeaderMode(env: NodeJS.ProcessEnv): LeaderMode {
-  const raw = (env.TASKLOOM_SCHEDULER_LEADER_MODE ?? "").trim().toLowerCase();
+  const raw = (env.PACKETAGENT_SCHEDULER_LEADER_MODE ?? "").trim().toLowerCase();
   if (VALID_LEADER_MODES.has(raw as LeaderMode)) return raw as LeaderMode;
   return "off";
 }
 
 function resolveLeaderTtlMs(env: NodeJS.ProcessEnv): number {
-  const raw = env.TASKLOOM_SCHEDULER_LEADER_TTL_MS;
+  const raw = env.PACKETAGENT_SCHEDULER_LEADER_TTL_MS;
   if (raw === undefined || raw === "") return DEFAULT_LEADER_TTL_MS;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LEADER_TTL_MS;
@@ -78,10 +78,10 @@ function resolveLeaderTtlMs(env: NodeJS.ProcessEnv): number {
 
 function resolveLockSummary(mode: LeaderMode, env: NodeJS.ProcessEnv): string {
   if (mode === "file") {
-    return env.TASKLOOM_SCHEDULER_LEADER_FILE_PATH || DEFAULT_FILE_LOCK_PATH;
+    return env.PACKETAGENT_SCHEDULER_LEADER_FILE_PATH || DEFAULT_FILE_LOCK_PATH;
   }
   if (mode === "http") {
-    const url = env.TASKLOOM_SCHEDULER_LEADER_HTTP_URL ?? "";
+    const url = env.PACKETAGENT_SCHEDULER_LEADER_HTTP_URL ?? "";
     const queryIndex = url.indexOf("?");
     return queryIndex >= 0 ? url.slice(0, queryIndex) : url;
   }
@@ -102,18 +102,18 @@ function resolveLeaderHeldLocally(mode: LeaderMode): boolean {
 }
 
 function resolveAccessLogMode(env: NodeJS.ProcessEnv): AccessLogMode {
-  const raw = (env.TASKLOOM_ACCESS_LOG_MODE ?? "").trim().toLowerCase();
+  const raw = (env.PACKETAGENT_ACCESS_LOG_MODE ?? "").trim().toLowerCase();
   if (VALID_ACCESS_LOG_MODES.has(raw as AccessLogMode)) return raw as AccessLogMode;
   return "off";
 }
 
 function resolveAccessLogPath(env: NodeJS.ProcessEnv): string | null {
-  const raw = env.TASKLOOM_ACCESS_LOG_PATH;
+  const raw = env.PACKETAGENT_ACCESS_LOG_PATH;
   return typeof raw === "string" && raw.length > 0 ? raw : null;
 }
 
 function resolveAccessLogMaxBytes(env: NodeJS.ProcessEnv): number {
-  const raw = env.TASKLOOM_ACCESS_LOG_MAX_BYTES;
+  const raw = env.PACKETAGENT_ACCESS_LOG_MAX_BYTES;
   if (raw === undefined || raw === "") return 0;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
@@ -121,14 +121,14 @@ function resolveAccessLogMaxBytes(env: NodeJS.ProcessEnv): number {
 }
 
 function resolveAccessLogMaxFiles(env: NodeJS.ProcessEnv): number {
-  const raw = env.TASKLOOM_ACCESS_LOG_MAX_FILES;
+  const raw = env.PACKETAGENT_ACCESS_LOG_MAX_FILES;
   if (raw === undefined || raw === "") return DEFAULT_ACCESS_LOG_MAX_FILES;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return DEFAULT_ACCESS_LOG_MAX_FILES;
   return Math.max(1, Math.floor(parsed));
 }
 
-function summarizeJobs(data: TaskloomData): JobQueueStatusSummary[] {
+function summarizeJobs(data: PacketAgentData): JobQueueStatusSummary[] {
   const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
   const byType = new Map<string, JobQueueStatusSummary>();
   for (const job of jobs) {

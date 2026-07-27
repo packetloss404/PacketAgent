@@ -13,17 +13,17 @@ import {
   type ManagedPostgresStoreQueryResult,
   mutateStoreAsync,
   setManagedPostgresStoreClientFactoryForTests,
-  type TaskloomData,
+  type PacketAgentData,
   upsertRequirement,
-} from "./taskloom-store";
+} from "./packetagent-store";
 
 const STORE_ENV_KEYS = [
-  "TASKLOOM_STORE",
-  "TASKLOOM_DB_PATH",
+  "PACKETAGENT_STORE",
+  "PACKETAGENT_DB_PATH",
   "DATABASE_URL",
-  "TASKLOOM_DATABASE_URL",
-  "TASKLOOM_MANAGED_DATABASE_URL",
-  "TASKLOOM_DATABASE_TOPOLOGY",
+  "PACKETAGENT_DATABASE_URL",
+  "PACKETAGENT_MANAGED_DATABASE_URL",
+  "PACKETAGENT_DATABASE_TOPOLOGY",
 ] as const;
 
 type StoreEnvKey = (typeof STORE_ENV_KEYS)[number];
@@ -46,13 +46,13 @@ class FakeManagedPostgresClient implements ManagedPostgresStoreQueryClient {
     this.queries.push({ sql, params });
     const normalized = sql.replace(/\s+/g, " ").trim().toLowerCase();
 
-    if (normalized.startsWith("select payload from taskloom_document_store")) {
+    if (normalized.startsWith("select payload from packetagent_document_store")) {
       return {
         rows: this.payloadJson ? [{ payload: this.payloadJson } as unknown as TRow] : [],
       };
     }
 
-    if (normalized.startsWith("insert into taskloom_document_store")) {
+    if (normalized.startsWith("insert into packetagent_document_store")) {
       this.metadataJson = String(params[2]);
       this.payloadJson = String(params[3]);
     }
@@ -64,9 +64,9 @@ class FakeManagedPostgresClient implements ManagedPostgresStoreQueryClient {
     this.closed += 1;
   }
 
-  storedData(): TaskloomData {
+  storedData(): PacketAgentData {
     assert.ok(this.payloadJson);
-    return JSON.parse(this.payloadJson) as TaskloomData;
+    return JSON.parse(this.payloadJson) as PacketAgentData;
   }
 
   normalizedQueries(): string[] {
@@ -110,20 +110,20 @@ test("loadStoreAsync initializes the managed Postgres document store", async () 
   const client = new FakeManagedPostgresClient();
 
   await withManagedStoreEnv({
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, client, async (configs) => {
     const loaded = await loadStoreAsync();
 
-    assert.equal(configs[0].envKey, "TASKLOOM_DATABASE_URL");
+    assert.equal(configs[0].envKey, "PACKETAGENT_DATABASE_URL");
     assert.equal(loaded.workspaces.some((entry) => entry.id === "alpha"), true);
-    assert.equal(client.storedData().users.some((entry) => entry.email === "alpha@taskloom.local"), true);
+    assert.equal(client.storedData().users.some((entry) => entry.email === "alpha@packetagent.local"), true);
     assert.deepEqual(JSON.parse(client.metadataJson ?? "{}"), {
       adapter: "managed-postgres-document-store",
       foundation: "phase-50",
     });
-    assert.equal(client.normalizedQueries().some((query) => query.startsWith("create table if not exists taskloom_document_store")), true);
-    assert.equal(client.normalizedQueries().some((query) => query.startsWith("insert into taskloom_document_store")), true);
+    assert.equal(client.normalizedQueries().some((query) => query.startsWith("create table if not exists packetagent_document_store")), true);
+    assert.equal(client.normalizedQueries().some((query) => query.startsWith("insert into packetagent_document_store")), true);
     assert.equal(client.closed, 1);
   });
 });
@@ -133,8 +133,8 @@ test("mutateStoreAsync persists managed Postgres document updates in a transacti
   client.payloadJson = JSON.stringify(createSeedStore());
 
   await withManagedStoreEnv({
-    TASKLOOM_STORE: "managed",
-    TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "managed",
+    PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, client, async () => {
     const requirementId = await mutateStoreAsync(async (data) => {
       await Promise.resolve();
@@ -165,7 +165,7 @@ test("mutateStoreAsync rolls back managed Postgres document updates when the mut
   client.payloadJson = JSON.stringify(createSeedStore());
 
   await withManagedStoreEnv({
-    DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, client, async () => {
     await assert.rejects(
       mutateStoreAsync((data) => {
@@ -192,15 +192,15 @@ test("managed database URL hints use the async Postgres backend even when sqlite
   const client = new FakeManagedPostgresClient();
 
   await withManagedStoreEnv({
-    TASKLOOM_STORE: "sqlite",
-    TASKLOOM_DB_PATH: "ignored-by-managed-url-hint.sqlite",
-    DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "sqlite",
+    PACKETAGENT_DB_PATH: "ignored-by-managed-url-hint.sqlite",
+    DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, client, async (configs) => {
     const loaded = await loadStoreAsync();
 
     assert.equal(configs[0].envKey, "DATABASE_URL");
     assert.equal(loaded.workspaces.some((entry) => entry.id === "alpha"), true);
-    assert.equal(client.normalizedQueries().some((query) => query.startsWith("create table if not exists taskloom_document_store")), true);
+    assert.equal(client.normalizedQueries().some((query) => query.startsWith("create table if not exists packetagent_document_store")), true);
   });
 });
 
@@ -209,16 +209,16 @@ test("async indexed helpers read through the managed Postgres document store", a
   client.payloadJson = JSON.stringify(createSeedStore());
 
   await withManagedStoreEnv({
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, client, async () => {
-    assert.equal((await findUserByEmailIndexedAsync("ALPHA@TASKLOOM.LOCAL"))?.id, "user_alpha");
+    assert.equal((await findUserByEmailIndexedAsync("ALPHA@PACKETAGENT.LOCAL"))?.id, "user_alpha");
     assert.equal((await findWorkspaceBriefIndexedAsync("alpha"))?.workspaceId, "alpha");
     assert.equal((await listAgentsForWorkspaceIndexedAsync("alpha")).length > 0, true);
     assert.equal((await listRequirementsForWorkspaceIndexedAsync("alpha")).length > 0, true);
 
     const queries = client.normalizedQueries();
-    assert.equal(queries.some((query) => query.startsWith("select payload from taskloom_document_store")), true);
+    assert.equal(queries.some((query) => query.startsWith("select payload from packetagent_document_store")), true);
   });
 });
 
@@ -226,7 +226,7 @@ test("managed URL alone supports startup load, mutate, and async reread through 
   const client = new FakeManagedPostgresClient();
 
   await withManagedStoreEnv({
-    TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@managed.example.com/taskloom",
+    PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@managed.example.com/packetagent",
   }, client, async (configs) => {
     const loaded = await loadStoreAsync();
     assert.equal(loaded.workspaces.some((entry) => entry.id === "alpha"), true);
@@ -245,15 +245,15 @@ test("managed URL alone supports startup load, mutate, and async reread through 
 
     assert.equal(requirementId, "req_managed_url_only_runtime_surface");
     assert.equal(requirements.some((entry) => entry.id === requirementId), true);
-    assert.equal(configs[0]?.envKey, "TASKLOOM_MANAGED_DATABASE_URL");
+    assert.equal(configs[0]?.envKey, "PACKETAGENT_MANAGED_DATABASE_URL");
     assert.equal(configs[0]?.resolution.mode, "managed");
     assert.equal(configs[0]?.resolution.requestedStore, "");
 
     const queries = client.normalizedQueries();
-    assert.equal(queries.some((query) => query.startsWith("create table if not exists taskloom_document_store")), true);
-    assert.equal(queries.some((query) => query.startsWith("insert into taskloom_document_store")), true);
+    assert.equal(queries.some((query) => query.startsWith("create table if not exists packetagent_document_store")), true);
+    assert.equal(queries.some((query) => query.startsWith("insert into packetagent_document_store")), true);
     assert.equal(queries.some((query) => query.includes("for update")), true);
-    assert.equal(queries.filter((query) => query.startsWith("select payload from taskloom_document_store")).length >= 2, true);
+    assert.equal(queries.filter((query) => query.startsWith("select payload from packetagent_document_store")).length >= 2, true);
   });
 });
 
@@ -261,9 +261,9 @@ test("single-writer managed Postgres remains supported through the async backend
   const client = new FakeManagedPostgresClient();
 
   await withManagedStoreEnv({
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
-    TASKLOOM_DATABASE_TOPOLOGY: "single-writer",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+    PACKETAGENT_DATABASE_TOPOLOGY: "single-writer",
   }, client, async (configs) => {
     const requirementId = await mutateStoreAsync((data) => upsertRequirement(data, {
       id: "req_single_writer_managed_postgres",
@@ -276,7 +276,7 @@ test("single-writer managed Postgres remains supported through the async backend
 
     assert.equal(requirementId, "req_single_writer_managed_postgres");
     assert.equal(client.storedData().requirements.some((entry) => entry.id === requirementId), true);
-    assert.equal(configs[0]?.envKey, "TASKLOOM_DATABASE_URL");
+    assert.equal(configs[0]?.envKey, "PACKETAGENT_DATABASE_URL");
     assert.equal(configs[0]?.resolution.mode, "postgres");
 
     const queries = client.normalizedQueries();

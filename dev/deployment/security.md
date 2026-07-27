@@ -1,12 +1,12 @@
 # Security
 
-This page covers the public-surface controls Taskloom enforces in-process: same-origin and CSRF protection on browser mutations, rate limits on auth and invitation routes, trusted-proxy handling, session cookie behavior, and the redaction posture that keeps tokens out of DTOs, exports, and access logs. The matching log-shipping recipes for proxy access logs live under `examples/proxy-access-log-redaction/` and in the [operations](./operations.md) page.
+This page covers the public-surface controls PacketAgent enforces in-process: same-origin and CSRF protection on browser mutations, rate limits on auth and invitation routes, trusted-proxy handling, session cookie behavior, and the redaction posture that keeps tokens out of DTOs, exports, and access logs. The matching log-shipping recipes for proxy access logs live under `examples/proxy-access-log-redaction/` and in the [operations](./operations.md) page.
 
 ## Same-origin and CSRF protection
 
 Private mutating routes under `/api/app/*` reject browser requests whose `Origin` host does not match the request host. Cross-origin mutations return `403 cross-origin requests are not allowed`.
 
-For same-origin browser mutations, Taskloom additionally requires the readable `taskloom_csrf` cookie to be echoed in the `X-CSRF-Token` request header. The token is bound to the session: it is derived from the session cookie, so a leaked CSRF cookie alone does not authorize a mutation, and a leaked session cookie alone does not echo correctly.
+For same-origin browser mutations, PacketAgent additionally requires the readable `packetagent_csrf` cookie to be echoed in the `X-CSRF-Token` request header. The token is bound to the session: it is derived from the session cookie, so a leaked CSRF cookie alone does not authorize a mutation, and a leaked session cookie alone does not echo correctly.
 
 The CSRF cookie is set when a session is established and cleared on logout. It is `httpOnly: false` (so the SPA can read it), `sameSite: Lax`, `path: /`, and is `Secure` whenever `NODE_ENV=production`.
 
@@ -16,22 +16,22 @@ Server-to-server callers that present the session cookie but no `Origin` header 
 
 Auth register/login routes and invitation create/accept/resend routes have store-backed rate limits. The defaults are 20 attempts per 60-second window per route family. Limited responses return `429` with a `Retry-After` header.
 
-Bucket IDs are SHA-256 hashed with `TASKLOOM_RATE_LIMIT_KEY_SALT`, so raw client identifiers never sit in the store. JSON mode stores buckets in the regular store; SQLite mode uses a dedicated `rate_limit_buckets` table.
+Bucket IDs are SHA-256 hashed with `PACKETAGENT_RATE_LIMIT_KEY_SALT`, so raw client identifiers never sit in the store. JSON mode stores buckets in the regular store; SQLite mode uses a dedicated `rate_limit_buckets` table.
 
-| Env var | Default | Notes |
-| --- | --- | --- |
-| `TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS` | `20` | Max auth register/login attempts per window. |
-| `TASKLOOM_AUTH_RATE_LIMIT_WINDOW_MS` | `60000` | Auth rate-limit window in milliseconds. |
-| `TASKLOOM_INVITATION_RATE_LIMIT_MAX_ATTEMPTS` | `20` | Max invitation create/accept/resend attempts per window. |
-| `TASKLOOM_INVITATION_RATE_LIMIT_WINDOW_MS` | `60000` | Invitation rate-limit window in milliseconds. |
-| `TASKLOOM_RATE_LIMIT_KEY_SALT` | `taskloom-rate-limit` | Salt for hashed rate-limit bucket IDs. **Set a deployment-specific secret in production.** |
-| `TASKLOOM_RATE_LIMIT_MAX_BUCKETS` | `5000` | Max retained app-level buckets before pruning. |
+| Env var                                          | Default                  | Notes                                                                                      |
+| ------------------------------------------------ | ------------------------ | ------------------------------------------------------------------------------------------ |
+| `PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS`       | `20`                     | Max auth register/login attempts per window.                                               |
+| `PACKETAGENT_AUTH_RATE_LIMIT_WINDOW_MS`          | `60000`                  | Auth rate-limit window in milliseconds.                                                    |
+| `PACKETAGENT_INVITATION_RATE_LIMIT_MAX_ATTEMPTS` | `20`                     | Max invitation create/accept/resend attempts per window.                                   |
+| `PACKETAGENT_INVITATION_RATE_LIMIT_WINDOW_MS`    | `60000`                  | Invitation rate-limit window in milliseconds.                                              |
+| `PACKETAGENT_RATE_LIMIT_KEY_SALT`                | `packetagent-rate-limit` | Salt for hashed rate-limit bucket IDs. **Set a deployment-specific secret in production.** |
+| `PACKETAGENT_RATE_LIMIT_MAX_BUCKETS`             | `5000`                   | Max retained app-level buckets before pruning.                                             |
 
-These are app-level guardrails. Local buckets are process and store scoped; they do not coordinate across separate stores, separate disks, or separate regions. For deployments with more than one Taskloom process, container, or region, also enable a shared limiter (next section) or enforce equivalent limits at the edge.
+These are app-level guardrails. Local buckets are process and store scoped; they do not coordinate across separate stores, separate disks, or separate regions. For deployments with more than one PacketAgent process, container, or region, also enable a shared limiter (next section) or enforce equivalent limits at the edge.
 
 ## Distributed rate limiter
 
-When `TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL` is set, Taskloom calls a shared HTTP limiter before updating local buckets. The local buckets remain as a backstop for restarts and edge bypass, but the cross-process counters live in the limiter you operate.
+When `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL` is set, PacketAgent calls a shared HTTP limiter before updating local buckets. The local buckets remain as a backstop for restarts and edge bypass, but the cross-process counters live in the limiter you operate.
 
 Request shape (`POST <url>`):
 
@@ -45,48 +45,48 @@ Request shape (`POST <url>`):
 }
 ```
 
-If `TASKLOOM_DISTRIBUTED_RATE_LIMIT_SECRET` is set, Taskloom sends `Authorization: Bearer <secret>`. The bucket ID is already salted and hashed; raw client identifiers never reach the limiter.
+If `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_SECRET` is set, PacketAgent sends `Authorization: Bearer <secret>`. The bucket ID is already salted and hashed; raw client identifiers never reach the limiter.
 
 Response semantics:
 
 - `2xx` with empty body or `{ "allowed": true }` allows the request to continue to the local backstop.
-- `429`, `{ "limited": true }`, or `{ "allowed": false }` makes Taskloom return `429` with `Retry-After`. The limiter can supply the retry window via the `Retry-After` header, `retryAfterSeconds`, or `resetAt` (ISO timestamp, epoch ms, or epoch seconds).
-- Non-2xx responses, timeouts, and network failures fail closed with `503 rate limit service unavailable` unless `TASKLOOM_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN=true` is set, in which case Taskloom falls back to the local backstop.
+- `429`, `{ "limited": true }`, or `{ "allowed": false }` makes PacketAgent return `429` with `Retry-After`. The limiter can supply the retry window via the `Retry-After` header, `retryAfterSeconds`, or `resetAt` (ISO timestamp, epoch ms, or epoch seconds).
+- Non-2xx responses, timeouts, and network failures fail closed with `503 rate limit service unavailable` unless `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN=true` is set, in which case PacketAgent falls back to the local backstop.
 
 Supported scopes: `auth:register`, `auth:login`, `invitation:create`, `invitation:accept`, `invitation:resend`.
 
-| Env var | Default | Notes |
-| --- | --- | --- |
-| `TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL` | unset | Optional HTTP limiter endpoint. When set, called before the local backstop. |
-| `TASKLOOM_DISTRIBUTED_RATE_LIMIT_SECRET` | unset | Optional bearer secret sent as `Authorization: Bearer <secret>`. |
-| `TASKLOOM_DISTRIBUTED_RATE_LIMIT_TIMEOUT_MS` | `750` | Per-request HTTP timeout in milliseconds. |
-| `TASKLOOM_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN` | unset (fail-closed) | Set to `true`, `1`, or `yes` to fall back to the local backstop on limiter outages. |
+| Env var                                         | Default             | Notes                                                                               |
+| ----------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------- |
+| `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL`        | unset               | Optional HTTP limiter endpoint. When set, called before the local backstop.         |
+| `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_SECRET`     | unset               | Optional bearer secret sent as `Authorization: Bearer <secret>`.                    |
+| `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_TIMEOUT_MS` | `750`               | Per-request HTTP timeout in milliseconds.                                           |
+| `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN`  | unset (fail-closed) | Set to `true`, `1`, or `yes` to fall back to the local backstop on limiter outages. |
 
-Taskloom does not ship a limiter service. The protocol is intentionally minimal so you can build the limiter against existing infrastructure (Redis with `SET NX PX`, a small Hono/Express service backed by any atomic-upsert datastore, an edge worker, or a CDN/WAF rule).
+PacketAgent does not ship a limiter service. The protocol is intentionally minimal so you can build the limiter against existing infrastructure (Redis with `SET NX PX`, a small Hono/Express service backed by any atomic-upsert datastore, an edge worker, or a CDN/WAF rule).
 
 ## Trusted-proxy configuration
 
-By default, the same-origin check uses the `Host` header from the immediate caller. When Taskloom is behind a proxy that terminates TLS or rewrites the host, set `TASKLOOM_TRUST_PROXY=true` so the `X-Forwarded-Host` header is honored for origin comparison.
+By default, the same-origin check uses the `Host` header from the immediate caller. When PacketAgent is behind a proxy that terminates TLS or rewrites the host, set `PACKETAGENT_TRUST_PROXY=true` so the `X-Forwarded-Host` header is honored for origin comparison.
 
-| Env var | Default | Notes |
-| --- | --- | --- |
-| `TASKLOOM_TRUST_PROXY` | unset (false) | Set to `true`, `1`, or `yes` to honor `X-Forwarded-Host` for origin comparison. |
+| Env var                   | Default       | Notes                                                                           |
+| ------------------------- | ------------- | ------------------------------------------------------------------------------- |
+| `PACKETAGENT_TRUST_PROXY` | unset (false) | Set to `true`, `1`, or `yes` to honor `X-Forwarded-Host` for origin comparison. |
 
 Only enable this when the upstream infrastructure strips and re-adds `X-Forwarded-Host` (and `X-Forwarded-For`, `X-Real-IP` for IP-based limiting at the edge). If the proxy passes through client-supplied forwarded headers, an attacker can spoof the host and bypass the same-origin check.
 
 ## Session cookies
 
-Sessions live in `taskloom_session`, an HTTP-only cookie. The CSRF token cookie `taskloom_csrf` is set alongside it, readable to the SPA, and bound to the session secret. Both cookies share the session TTL and are marked `Secure` when `NODE_ENV=production`.
+Sessions live in `packetagent_session`, an HTTP-only cookie. The CSRF token cookie `packetagent_csrf` is set alongside it, readable to the SPA, and bound to the session secret. Both cookies share the session TTL and are marked `Secure` when `NODE_ENV=production`.
 
 `npm run jobs:cleanup-sessions` prunes expired sessions. Run it on a cron or schedule equivalent to your session TTL.
 
-| Env var | Default | Notes |
-| --- | --- | --- |
+| Env var    | Default       | Notes                                                                                       |
+| ---------- | ------------- | ------------------------------------------------------------------------------------------- |
 | `NODE_ENV` | `development` | Set to `production` to mark session and CSRF cookies `Secure` and to disable dev shortcuts. |
 
 ## Token redaction
 
-Taskloom treats invitation tokens, share tokens, agent webhook tokens, and bearer values as secrets. They are redacted before they appear in API responses, persisted error records, frontend display paths, access logs, exports, and structured logs. Redaction is centralized in `src/security/redaction.ts` and reused by every surface that emits string content to an operator.
+PacketAgent treats invitation tokens, share tokens, agent webhook tokens, and bearer values as secrets. They are redacted before they appear in API responses, persisted error records, frontend display paths, access logs, exports, and structured logs. Redaction is centralized in `src/security/redaction.ts` and reused by every surface that emits string content to an operator.
 
 What stays unredacted:
 
@@ -110,7 +110,7 @@ Per-workspace JSON snapshot with all bearer fields masked:
 npm run jobs:export-workspace -- --workspace-id=<id> > export.json
 ```
 
-The export covers the workspace record, workflow records, agents, agent runs, activities, jobs, providers, environment variables, invitations, share tokens, and memberships. Sessions are excluded — they are not part of the workspace audit boundary and would expand the bearer surface of the export without operational benefit.
+The export covers the workspace record, workflow records, agents, agent runs, activities, jobs, providers, environment variables, invitations, share tokens, and memberships. Sessions are excluded - they are not part of the workspace audit boundary and would expand the bearer surface of the export without operational benefit.
 
 The export is read-only against the active store; it does not mutate workspace records or rotate tokens. Treat the resulting file as sensitive even though tokens are masked: it still contains workspace state, member emails, and freeform user content.
 
@@ -118,11 +118,11 @@ Suggested uses: audit handoff to security or compliance reviewers, support escal
 
 ## Proxy access logs
 
-The reverse-proxy access log captures requests Taskloom never sees in-process: TLS handshake failures, paths that 404 before reaching the upstream, health probes from load balancers, and traffic shed by edge filters. Configure your front-line proxy to redact known sensitive path segments (`/api/app/invitations/:token/accept`, `/api/public/share/:token`, `/api/public/webhooks/agents/:token`) and sensitive query parameters (`token`, `secret`, `api_key`, `bearer`) before the access log is written.
+The reverse-proxy access log captures requests PacketAgent never sees in-process: TLS handshake failures, paths that 404 before reaching the upstream, health probes from load balancers, and traffic shed by edge filters. Configure your front-line proxy to redact known sensitive path segments (`/api/app/invitations/:token/accept`, `/api/public/share/:token`, `/api/public/webhooks/agents/:token`) and sensitive query parameters (`token`, `secret`, `api_key`, `bearer`) before the access log is written.
 
 Starter configs: `examples/proxy-access-log-redaction/` ships nginx, Caddy, and Apache snippets.
 
-Validate a proxy log against Taskloom's pattern set:
+Validate a proxy log against PacketAgent's pattern set:
 
 ```bash
 node --import tsx src/security/proxy-access-log-validator.ts /var/log/proxy/access.log
@@ -134,24 +134,24 @@ Run after every proxy configuration change, after every release that adds a new 
 
 ## Secrets vault
 
-Provider credentials, environment variables, and similar workspace secrets live in an in-app encrypted vault (AES-256-GCM with a key derived from a passphrase using PBKDF2). The encrypted blobs sit in the active store; only the running Taskloom process can decrypt them.
+Provider credentials, environment variables, and similar workspace secrets live in an in-app encrypted vault (AES-256-GCM with a key derived from a passphrase using PBKDF2). The encrypted blobs sit in the active store; only the running PacketAgent process can decrypt them.
 
-| Env var | Default | Notes |
-| --- | --- | --- |
-| `MASTER_KEY` | _dev fallback_ | Vault master passphrase. **Set in production.** When unset, Taskloom logs a warning and falls back to a deterministic dev key — not safe for any deployment that persists real secrets. |
+| Env var      | Default        | Notes                                                                                                                                                                                      |
+| ------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MASTER_KEY` | _dev fallback_ | Vault master passphrase. **Set in production.** When unset, PacketAgent logs a warning and falls back to a deterministic dev key - not safe for any deployment that persists real secrets. |
 
-Manage stored secrets through the Settings → Providers and Settings → Environment views in the workbench. Taskloom never logs decrypted secret values, and DTOs surface only `tokenPreview`-style masked tails. Treat database backups containing the vault blobs as sensitive even though the values are encrypted at rest.
+Manage stored secrets through the Settings -> Providers and Settings -> Environment views in the workbench. PacketAgent never logs decrypted secret values, and DTOs surface only `tokenPreview`-style masked tails. Treat database backups containing the vault blobs as sensitive even though the values are encrypted at rest.
 
 ## Validation checklist
 
 Before promoting a change:
 
 - HTTPS terminates upstream of the Node server and `NODE_ENV=production` is set so cookies are marked `Secure`.
-- `TASKLOOM_RATE_LIMIT_KEY_SALT` and `MASTER_KEY` are set to deployment-specific secret values.
-- `TASKLOOM_AUTH_RATE_LIMIT_*` and `TASKLOOM_INVITATION_RATE_LIMIT_*` reflect the deployment's intended attempt budget.
-- If the deployment has more than one Taskloom process, container, or region, `TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL` is configured (or equivalent edge limits exist) for `/api/auth/register`, `/api/auth/login`, `/api/app/invitations`, `/api/app/invitations/:token/accept`, and `/api/app/invitations/:invitationId/resend`.
+- `PACKETAGENT_RATE_LIMIT_KEY_SALT` and `MASTER_KEY` are set to deployment-specific secret values.
+- `PACKETAGENT_AUTH_RATE_LIMIT_*` and `PACKETAGENT_INVITATION_RATE_LIMIT_*` reflect the deployment's intended attempt budget.
+- If the deployment has more than one PacketAgent process, container, or region, `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL` is configured (or equivalent edge limits exist) for `/api/auth/register`, `/api/auth/login`, `/api/app/invitations`, `/api/app/invitations/:token/accept`, and `/api/app/invitations/:invitationId/resend`.
 - Cross-origin browser mutations are rejected with `403`, and same-origin mutations include `X-CSRF-Token`.
-- `TASKLOOM_TRUST_PROXY=true` is only set when forwarded headers are stripped and re-added by trusted infrastructure.
+- `PACKETAGENT_TRUST_PROXY=true` is only set when forwarded headers are stripped and re-added by trusted infrastructure.
 - A sample `npm run jobs:export-workspace -- --workspace-id=<id>` produces JSON with no raw `whk_`, `Bearer `, `?token=`, `?secret=`, or `?api_key=` substrings.
 - A sample of the live proxy access log passes `node --import tsx src/security/proxy-access-log-validator.ts <log-path>` with exit code `0`.
 - `npm run jobs:cleanup-sessions` runs on a recurring schedule.

@@ -1,6 +1,6 @@
 import { recordedCall } from "./providers/ledger.js";
 import { getDefaultRouter } from "./providers/router.js";
-import type { AgentRunLogEntry, AgentRunRecord } from "./taskloom-store.js";
+import type { AgentRunLogEntry, AgentRunRecord } from "./packetagent-store.js";
 
 const DIAGNOSE_SYSTEM = `You are an SRE assistant. The user will give you the captured log timeline + summary of a failed agent run. Respond with strict JSON of shape:
 

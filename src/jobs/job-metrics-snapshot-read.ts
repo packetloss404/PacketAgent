@@ -1,5 +1,5 @@
 import { createJobMetricSnapshotsRepository, type JobMetricSnapshotsRepository } from "../repositories/job-metric-snapshots-repo.js";
-import type { JobMetricSnapshotRecord, TaskloomData } from "../taskloom-store.js";
+import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
 
 export interface ListJobMetricSnapshotsOptions {
   type?: string;
@@ -9,8 +9,8 @@ export interface ListJobMetricSnapshotsOptions {
 }
 
 export interface ListJobMetricSnapshotsDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   repository?: JobMetricSnapshotsRepository;
 }
 

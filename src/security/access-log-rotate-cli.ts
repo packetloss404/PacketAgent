@@ -17,7 +17,7 @@ export async function runAccessLogRotateCli(options: RunAccessLogRotateOptions =
   const err = options.err ?? ((line: string) => console.error(line));
 
   const argvPath = parseStringFlag(argv, "--path=");
-  const envPath = env.TASKLOOM_ACCESS_LOG_PATH;
+  const envPath = env.PACKETAGENT_ACCESS_LOG_PATH;
   const targetPath = argvPath
     ? resolve(argvPath)
     : envPath
@@ -25,7 +25,7 @@ export async function runAccessLogRotateCli(options: RunAccessLogRotateOptions =
       : null;
 
   if (!targetPath) {
-    err("access-log:rotate requires --path=<file> or TASKLOOM_ACCESS_LOG_PATH");
+    err("access-log:rotate requires --path=<file> or PACKETAGENT_ACCESS_LOG_PATH");
     return 2;
   }
 
@@ -61,7 +61,7 @@ function resolveMaxFiles(argv: string[], env: NodeJS.ProcessEnv): number {
       return parsed;
     }
   }
-  const envRaw = env.TASKLOOM_ACCESS_LOG_MAX_FILES;
+  const envRaw = env.PACKETAGENT_ACCESS_LOG_MAX_FILES;
   if (envRaw !== undefined && envRaw !== "") {
     const parsed = Number(envRaw);
     if (Number.isInteger(parsed) && parsed >= 1) {

@@ -1,3 +1,4 @@
+import { migrateLegacyDefaultDataFiles } from "./brand.js";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,7 +34,7 @@ import {
   updateAgentAsync,
   updateProviderAsync,
   updateWorkspaceEnvVarAsync,
-} from "./taskloom-services.js";
+} from "./packetagent-services.js";
 import { requirePrivateWorkspaceRoleAsync } from "./rbac.js";
 import { appRoutes } from "./app-routes.js";
 import { workflowRoutes } from "./workflow-routes.js";
@@ -77,6 +78,7 @@ import {
 } from "./alerts/alerts-deliver-handler.js";
 import { assertManagedDatabaseRuntimeSupported } from "./deployment/managed-database-runtime-guard.js";
 
+migrateLegacyDefaultDataFiles();
 registerDefaultProviders();
 registerDefaultTools();
 
@@ -277,7 +279,7 @@ app.post("/api/app/agent-runs/:runId/record-as-playbook", async (c) => {
 app.post("/api/app/agent-runs/:runId/diagnose", async (c) => {
   try {
     const ctx = await requirePrivateWorkspaceRoleAsync(c, "member");
-    const { loadStoreAsync } = await import("./taskloom-store.js");
+    const { loadStoreAsync } = await import("./packetagent-store.js");
     const data = await loadStoreAsync();
     const run = data.agentRuns.find((r) => r.id === c.req.param("runId") && r.workspaceId === ctx.workspace.id);
     if (!run) return errorResponse(c, Object.assign(new Error("agent run not found"), { status: 404 }));
@@ -375,7 +377,7 @@ scheduler.register({
   async handle(job) {
     const payload = job.payload as { agentId?: string; triggerKind?: string; inputs?: Record<string, unknown> };
     if (!payload.agentId) throw new Error("agent.run job missing agentId");
-    const { loadStoreAsync } = await import("./taskloom-store.js");
+    const { loadStoreAsync } = await import("./packetagent-store.js");
     const data = await loadStoreAsync();
     const agent = data.agents.find((a) => a.id === payload.agentId);
     if (!agent) throw new Error(`agent ${payload.agentId} not found`);
@@ -481,7 +483,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env): Promise
 
   const port = Number(env.PORT ?? 8484);
   serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => {
-    console.log(`taskloom listening on http://localhost:${info.port}`);
+    console.log(`packetagent listening on http://localhost:${info.port}`);
   });
 }
 
@@ -489,9 +491,9 @@ export function artifactServingEnabled(env: NodeJS.ProcessEnv = process.env): bo
   // Require an EXPLICIT opt-in regardless of NODE_ENV. Previously this
   // defaulted ON whenever NODE_ENV !== "production", silently exposing
   // unauthenticated artifact serving in dev. Now it is OFF unless the operator
-  // sets TASKLOOM_ARTIFACT_SERVING_ENABLED to a truthy value (matching the
+  // sets PACKETAGENT_ARTIFACT_SERVING_ENABLED to a truthy value (matching the
   // default-off documentation in .env.example).
-  return isEnvTruthy(env.TASKLOOM_ARTIFACT_SERVING_ENABLED);
+  return isEnvTruthy(env.PACKETAGENT_ARTIFACT_SERVING_ENABLED);
 }
 
 function isExecutedDirectly(): boolean {

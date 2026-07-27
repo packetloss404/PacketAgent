@@ -6,7 +6,7 @@ import {
   upsertApiKeyAsync,
 } from "./security/api-key-store.js";
 import { redactedErrorMessage } from "./security/redaction.js";
-import type { ApiKeyProvider } from "./taskloom-store.js";
+import type { ApiKeyProvider } from "./packetagent-store.js";
 
 const VALID_PROVIDERS: ApiKeyProvider[] = ["anthropic", "openai", "openrouter", "minimax", "ollama", "gemini"];
 

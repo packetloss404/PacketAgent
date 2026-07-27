@@ -69,7 +69,7 @@ const detected = PROVIDERS.filter((p) => {
 if (detected.length === 0) {
   errLine(`${YELLOW}${BOLD}No AI provider configured.${RESET}`);
   errLine(
-    "Taskloom needs at least one to generate apps. Three easy options:",
+    "PacketAgent needs at least one to generate apps. Three easy options:",
   );
   errLine("");
   errLine(`  ${BOLD}(a) Anthropic${RESET} ${DIM}— recommended${RESET}`);
@@ -226,7 +226,7 @@ function printSuccess(provider, modelCount) {
   if (extras) {
     line(`${DIM}(also configured: ${extras})${RESET}`);
   }
-  line(`${GREEN}Starting Taskloom...${RESET}`);
+  line(`${GREEN}Starting PacketAgent...${RESET}`);
 }
 
 function printAuthFailure(provider) {
@@ -276,7 +276,7 @@ function printNetworkSkip(provider) {
   if (extras) {
     line(`${DIM}(also configured: ${extras})${RESET}`);
   }
-  line(`${GREEN}Starting Taskloom...${RESET}`);
+  line(`${GREEN}Starting PacketAgent...${RESET}`);
 }
 
 const result = await probe(primary);
@@ -298,7 +298,7 @@ if (result.ok === "skip") {
   if (extras) {
     line(`${DIM}(also configured: ${extras})${RESET}`);
   }
-  line(`${GREEN}Starting Taskloom...${RESET}`);
+  line(`${GREEN}Starting PacketAgent...${RESET}`);
   process.exitCode = 0;
 } else if (result.ok === true) {
   printSuccess(primary, result.modelCount);

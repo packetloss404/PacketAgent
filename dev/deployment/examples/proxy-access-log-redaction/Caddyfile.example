@@ -1,13 +1,13 @@
 # =============================================================================
-# Taskloom proxy access-log redaction example: Caddy v2
+# PacketAgent proxy access-log redaction example: Caddy v2
 # -----------------------------------------------------------------------------
 # This file is an EXAMPLE. Tailor the site address, upstream, and TLS settings
 # before deploying. Tested against Caddy v2.7+.
 #
-# Goal: prevent raw Taskloom tokens from being written to disk by Caddy's
-# access log. Taskloom redacts its own application logs (see
+# Goal: prevent raw PacketAgent tokens from being written to disk by Caddy's
+# access log. PacketAgent redacts its own application logs (see
 # src/security/redaction.ts), but Caddy logs the inbound URI before the
-# request ever reaches Taskloom.
+# request ever reaches PacketAgent.
 #
 # Caddy v2 stock capabilities:
 #   - The `log` directive supports a JSON encoder and an `omit_headers` field
@@ -23,7 +23,7 @@
 #   1. Use `request_header_filter`/`query_filter` log filters (stock in v2)
 #      to redact specific query params at log-write time.
 #   2. For path-segment token masking, ship logs through a downstream
-#      processor (e.g. fluent-bit, vector) that runs the Taskloom validator
+#      processor (e.g. fluent-bit, vector) that runs the PacketAgent validator
 #      (src/security/proxy-access-log-validator.ts) and applies regex
 #      substitution before persisting to long-term storage.
 #
@@ -36,11 +36,11 @@
   auto_https disable_redirects
 }
 
-taskloom.example.com {
+packetagent.example.com {
   reverse_proxy 127.0.0.1:8787
 
   log {
-    output file /var/log/caddy/taskloom-access.log {
+    output file /var/log/caddy/packetagent-access.log {
       roll_size 100mb
       roll_keep 14
     }
@@ -91,7 +91,7 @@ taskloom.example.com {
 #       and add a `transform` block that runs regex substitutions on
 #       request>uri, OR
 #   (b) pipe the access log through a downstream processor (fluent-bit,
-#       vector, logstash) that runs the Taskloom validator on each line
+#       vector, logstash) that runs the PacketAgent validator on each line
 #       and substitutes path tokens with [redacted] before the line is
 #       written to its final destination, OR
 #   (c) gate token-bearing routes behind an additional layer (e.g. a
@@ -99,6 +99,6 @@ taskloom.example.com {
 #       see nginx.conf.example in this directory).
 #
 # Operators should run `node --import tsx src/security/proxy-access-log-validator.ts
-# /var/log/caddy/taskloom-access.log` periodically (or in CI / a cron job)
+# /var/log/caddy/packetagent-access.log` periodically (or in CI / a cron job)
 # to verify the configured filters are catching everything sensitive.
 # =============================================================================

@@ -13,7 +13,7 @@ import {
   type ActivitiesRepository,
   type ActivitiesRepositoryDeps,
 } from "./activities-repo.js";
-import type { ActivityRecord, TaskloomData } from "../taskloom-store.js";
+import type { ActivityRecord, PacketAgentData } from "../packetagent-store.js";
 
 function makeRecord(overrides: Partial<ActivityRecord> & { id: string }): ActivityRecord {
   return {
@@ -28,29 +28,29 @@ function makeRecord(overrides: Partial<ActivityRecord> & { id: string }): Activi
 }
 
 function makeJsonRepo(): ActivitiesRepository {
-  const data = { activities: [] as ActivityRecord[] } as unknown as TaskloomData;
+  const data = { activities: [] as ActivityRecord[] } as unknown as PacketAgentData;
   const deps: ActivitiesRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonActivitiesRepository(deps);
 }
 
 function withTempSqlite(testFn: (repo: ActivitiesRepository, dbPath: string) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-activities-repo-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-activities-repo-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = sqliteActivitiesRepository({ dbPath });
     testFn(repo, dbPath);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 }
@@ -184,10 +184,10 @@ test("asyncActivitiesRepositoryFromSync delegates to an existing sync repository
 });
 
 test("createAsyncActivitiesRepository accepts awaitable store dependencies", async () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
-    const data = { activities: [] as ActivityRecord[] } as unknown as TaskloomData;
+    delete process.env.PACKETAGENT_STORE;
+    const data = { activities: [] as ActivityRecord[] } as unknown as PacketAgentData;
     let loads = 0;
     let mutations = 0;
     const repo = createAsyncActivitiesRepository({
@@ -195,7 +195,7 @@ test("createAsyncActivitiesRepository accepts awaitable store dependencies", asy
         loads += 1;
         return data;
       },
-      mutateStore: async <T,>(mutator: (target: TaskloomData) => T | Promise<T>) => {
+      mutateStore: async <T,>(mutator: (target: PacketAgentData) => T | Promise<T>) => {
         mutations += 1;
         return mutator(data);
       },
@@ -208,8 +208,8 @@ test("createAsyncActivitiesRepository accepts awaitable store dependencies", asy
     assert.equal((await repo.list({ workspaceId: "ws_a" }))[0]?.id, "async_store");
     assert.equal(loads, 2);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
@@ -328,40 +328,40 @@ test("a corrupt payload row does not break list() or find()", () => {
 });
 
 test("createActivitiesRepository selects JSON implementation by default", () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
-    const data = { activities: [] as ActivityRecord[] } as unknown as TaskloomData;
+    delete process.env.PACKETAGENT_STORE;
+    const data = { activities: [] as ActivityRecord[] } as unknown as PacketAgentData;
     const repo = createActivitiesRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     repo.upsert(makeRecord({ id: "act_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);
     assert.equal(data.activities.length, 1);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
 test("createActivitiesRepository returns sqlite implementation when env requests it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-activities-repo-factory-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-activities-repo-factory-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = createActivitiesRepository({ dbPath });
     repo.upsert(makeRecord({ id: "act_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);
     assert.equal(repo.list({ workspaceId: "ws_a" })[0]?.id, "act_1");
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 });

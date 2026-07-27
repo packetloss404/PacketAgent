@@ -1,13 +1,13 @@
 import { createJobsRepository, type JobsRepository } from "./repositories/jobs-repo.js";
-import { loadStore as defaultLoadStore } from "./taskloom-store.js";
-import type { JobRecord, JobStatus, TaskloomData } from "./taskloom-store.js";
+import { loadStore as defaultLoadStore } from "./packetagent-store.js";
+import type { JobRecord, JobStatus, PacketAgentData } from "./packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
 
 export interface JobsReadDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   repository?: JobsRepository;
 }
 
@@ -21,7 +21,7 @@ export function listJobsForWorkspaceViaRepository(
     mutateStore: deps.mutateStore,
   });
   const primary = repo.list({ workspaceId, status: opts.status, limit: opts.limit });
-  if (process.env.TASKLOOM_STORE !== "sqlite") return primary;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return primary;
   const fallback = legacyJobsFromStore(deps).filter((entry) => {
     if (entry.workspaceId !== workspaceId) return false;
     if (opts.status && entry.status !== opts.status) return false;
@@ -40,7 +40,7 @@ export function findJobViaRepository(
   });
   const found = repo.find(jobId);
   if (found) return found;
-  if (process.env.TASKLOOM_STORE !== "sqlite") return null;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
   return legacyJobsFromStore(deps).find((entry) => entry.id === jobId) ?? null;
 }
 

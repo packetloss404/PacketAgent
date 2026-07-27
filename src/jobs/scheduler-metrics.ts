@@ -24,7 +24,7 @@ export interface JobRunRecord {
 const DEFAULT_WINDOW_SIZE = 50;
 
 function resolveInitialWindowSize(): number {
-  const raw = process.env.TASKLOOM_SCHEDULER_METRICS_WINDOW_SIZE;
+  const raw = process.env.PACKETAGENT_SCHEDULER_METRICS_WINDOW_SIZE;
   if (raw === undefined || raw === "") return DEFAULT_WINDOW_SIZE;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_WINDOW_SIZE;

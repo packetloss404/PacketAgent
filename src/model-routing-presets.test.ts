@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildModelRoutingPresets } from "./model-routing-presets";
-import type { IntegrationReadinessSummary } from "./taskloom-services";
-import type { ProviderKind, ProviderRecord } from "./taskloom-store";
+import type { IntegrationReadinessSummary } from "./packetagent-services";
+import type { ProviderKind, ProviderRecord } from "./packetagent-store";
 
 const readiness: IntegrationReadinessSummary = {
   status: "ready",
@@ -54,7 +54,7 @@ test("model routing presets use env model overrides without exposing env secrets
       provider("anthropic", "Anthropic", "claude-3-5-sonnet-latest"),
     ],
     env: {
-      TASKLOOM_MODEL_PRESET_SMART: "openai:gpt-4.1",
+      PACKETAGENT_MODEL_PRESET_SMART: "openai:gpt-4.1",
       OPENAI_API_KEY: "sk-route-secret",
       ANTHROPIC_API_KEY: "anthropic-secret",
       CUSTOM_PROVIDER_BASE_URL: "https://user:secret@example.test/v1",
@@ -63,7 +63,7 @@ test("model routing presets use env model overrides without exposing env secrets
 
   assert.equal(surface.presets.smart.primary.provider, "openai");
   assert.equal(surface.presets.smart.primary.model, "gpt-4.1");
-  assert.ok(surface.presets.smart.primary.envHints.includes("TASKLOOM_MODEL_PRESET_SMART"));
+  assert.ok(surface.presets.smart.primary.envHints.includes("PACKETAGENT_MODEL_PRESET_SMART"));
   assert.equal(JSON.stringify(surface).includes("sk-route-secret"), false);
   assert.equal(JSON.stringify(surface).includes("anthropic-secret"), false);
   assert.equal(JSON.stringify(surface).includes("user:secret"), false);

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
-import { login } from "./taskloom-services";
-import { resetStoreForTests, type WorkspaceRole } from "./taskloom-store";
+import { login } from "./packetagent-services";
+import { resetStoreForTests, type WorkspaceRole } from "./packetagent-store";
 import { workflowRoutes } from "./workflow-routes";
 import { ProviderRouter, resetDefaultRouterForTests, setDefaultRouter } from "./providers/router";
 import type { LLMProvider, ProviderCallOptions, ProviderCallResult } from "./providers/types";
@@ -18,7 +18,7 @@ function loginAlphaAs(role: WorkspaceRole) {
   const membership = store.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
   assert.ok(membership);
   membership.role = role;
-  return login({ email: "alpha@taskloom.local", password: "demo12345" });
+  return login({ email: "alpha@packetagent.local", password: "demo12345" });
 }
 
 test("workflow routes require authentication", async () => {
@@ -34,14 +34,14 @@ test("workflow routes require authentication", async () => {
 
 test("workflow route reports invalid JSON bodies as bad requests", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createTestApp();
 
   const response = await app.request("/api/app/workflow/brief", {
     method: "PUT",
     headers: {
       "content-type": "application/json",
-      cookie: `taskloom_session=${auth.cookieValue}`,
+      cookie: `packetagent_session=${auth.cookieValue}`,
     },
     body: "{not json",
   });
@@ -56,10 +56,10 @@ test("viewer can read workflow routes", async () => {
   const app = createTestApp();
 
   const briefResponse = await app.request("/api/app/workflow/brief", {
-    headers: { cookie: `taskloom_session=${auth.cookieValue}` },
+    headers: { cookie: `packetagent_session=${auth.cookieValue}` },
   });
   const templatesResponse = await app.request("/api/app/workflow/templates", {
-    headers: { cookie: `taskloom_session=${auth.cookieValue}` },
+    headers: { cookie: `packetagent_session=${auth.cookieValue}` },
   });
 
   assert.equal(briefResponse.status, 200);
@@ -71,7 +71,7 @@ test("viewer cannot write workflow routes", async () => {
   const app = createTestApp();
   const headers = {
     "content-type": "application/json",
-    cookie: `taskloom_session=${auth.cookieValue}`,
+    cookie: `packetagent_session=${auth.cookieValue}`,
   };
 
   const responses = await Promise.all([
@@ -112,7 +112,7 @@ test("member can write workflow routes", async () => {
   const app = createTestApp();
   const headers = {
     "content-type": "application/json",
-    cookie: `taskloom_session=${auth.cookieValue}`,
+    cookie: `packetagent_session=${auth.cookieValue}`,
   };
 
   const briefResponse = await app.request("/api/app/workflow/brief", {
@@ -137,12 +137,12 @@ test("member can write workflow routes", async () => {
 
 test("brief template apply uses the route template id", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createTestApp();
 
   const response = await app.request("/api/app/workflow/brief/templates/saas-activation/apply", {
     method: "POST",
-    headers: { cookie: `taskloom_session=${auth.cookieValue}` },
+    headers: { cookie: `packetagent_session=${auth.cookieValue}` },
   });
   const body = await response.json() as { summary: string; targetCustomers: string[] };
 
@@ -153,14 +153,14 @@ test("brief template apply uses the route template id", async () => {
 
 test("plan-mode apply filters empty items and normalizes statuses", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createTestApp();
 
   const response = await app.request("/api/app/workflow/plan-mode/apply", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      cookie: `taskloom_session=${auth.cookieValue}`,
+      cookie: `packetagent_session=${auth.cookieValue}`,
     },
     body: JSON.stringify({
       planItems: [
@@ -189,13 +189,13 @@ test("generate-from-prompt applies the LLM-shaped draft", async () => {
   setDefaultRouter(router);
 
   try {
-    const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const app = createTestApp();
     const response = await app.request("/api/app/workflow/generate-from-prompt", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        cookie: `taskloom_session=${auth.cookieValue}`,
+        cookie: `packetagent_session=${auth.cookieValue}`,
       },
       body: JSON.stringify({ prompt: "Build a workflow from this user prompt", apply: true }),
     });

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { Hono } from "hono";
 import { llmStreamRoutes } from "./llm-stream-routes.js";
 import { SESSION_COOKIE_NAME } from "./auth-utils.js";
-import { login } from "./taskloom-services.js";
-import { mutateStore, resetStoreForTests } from "./taskloom-store.js";
+import { login } from "./packetagent-services.js";
+import { mutateStore, resetStoreForTests } from "./packetagent-store.js";
 
 function authHeaders(cookieValue: string) {
   return { Cookie: `${SESSION_COOKIE_NAME}=${cookieValue}` };
@@ -32,7 +32,7 @@ test("/cancel/:id requires at least member role", async () => {
   resetStoreForTests();
   const app = new Hono();
   app.route("/api/app/llm", llmStreamRoutes);
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
     assert.ok(membership);

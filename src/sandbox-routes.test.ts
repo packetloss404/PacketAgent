@@ -6,8 +6,8 @@ import { SESSION_COOKIE_NAME } from "./auth-utils.js";
 import { appRoutes } from "./app-routes.js";
 import { createSandboxRoutes } from "./sandbox-routes.js";
 import { enforcePrivateAppMutationSecurity } from "./route-security.js";
-import { login } from "./taskloom-services.js";
-import { mutateStore, resetStoreForTests } from "./taskloom-store.js";
+import { login } from "./packetagent-services.js";
+import { mutateStore, resetStoreForTests } from "./packetagent-store.js";
 import { SandboxService } from "./sandbox/sandbox-service.js";
 import { createJsonSandboxStore } from "./sandbox/sandbox-store.js";
 import type {
@@ -17,7 +17,7 @@ import type {
   SandboxStartSpec,
   SandboxSubscription,
 } from "./sandbox/sandbox-driver.js";
-import type { TaskloomData } from "./taskloom-store.js";
+import type { PacketAgentData } from "./packetagent-store.js";
 
 interface MockHandleInternal extends SandboxHandle {
   emitter: EventEmitter;
@@ -73,10 +73,10 @@ function createMockDriver(behavior: (handle: MockHandleInternal, spec: SandboxSt
 }
 
 function createInMemoryStore() {
-  const data: Partial<TaskloomData> = {};
+  const data: Partial<PacketAgentData> = {};
   return createJsonSandboxStore({
-    loadStore: () => data as TaskloomData,
-    mutateStore: <T,>(mutator: (data: TaskloomData) => T): T => mutator(data as TaskloomData),
+    loadStore: () => data as PacketAgentData,
+    mutateStore: <T,>(mutator: (data: PacketAgentData) => T): T => mutator(data as PacketAgentData),
   });
 }
 
@@ -96,7 +96,7 @@ test("sandbox routes: GET /status requires authentication", async () => {
   resetStoreForTests();
   const store = createInMemoryStore();
   const driver = createMockDriver(() => {});
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const app = createTestApp(service);
   const response = await app.request("/api/app/sandbox/status");
   assert.equal(response.status, 401);
@@ -104,7 +104,7 @@ test("sandbox routes: GET /status requires authentication", async () => {
 
 test("sandbox routes: POST /exec rejects users without member role", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const m = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
     assert.ok(m);
@@ -112,7 +112,7 @@ test("sandbox routes: POST /exec rejects users without member role", async () =>
   });
   const store = createInMemoryStore();
   const driver = createMockDriver(() => {});
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const app = createTestApp(service);
 
   const response = await app.request("/api/app/sandbox/exec", {
@@ -125,13 +125,13 @@ test("sandbox routes: POST /exec rejects users without member role", async () =>
 
 test("sandbox routes: POST /exec returns running record on happy path", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = createInMemoryStore();
   const driver = createMockDriver((handle) => {
     handle.emitter.emit("chunk", { stream: "stdout", data: "hello\n" });
     handle.emitter.emit("exit", { exitCode: 0, signal: null });
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const app = createTestApp(service);
 
   const response = await app.request("/api/app/sandbox/exec", {
@@ -159,12 +159,12 @@ test("sandbox routes: POST /exec returns running record on happy path", async ()
 
 test("sandbox routes: GET /exec lists workspace execs", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = createInMemoryStore();
   const driver = createMockDriver((handle) => {
     handle.emitter.emit("exit", { exitCode: 0, signal: null });
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const app = createTestApp(service);
 
   const created = await app.request("/api/app/sandbox/exec", {
@@ -185,7 +185,7 @@ test("sandbox routes: GET /exec lists workspace execs", async () => {
 
 test("sandbox routes: POST /exec/:id/cancel returns canceled record", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = createInMemoryStore();
   const driver: SandboxDriver = (() => {
     let counter = 0;
@@ -245,7 +245,7 @@ test("sandbox routes: POST /exec/:id/cancel returns canceled record", async () =
     return inst;
   })();
 
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const app = createTestApp(service);
 
   const created = await app.request("/api/app/sandbox/exec", {
@@ -266,10 +266,10 @@ test("sandbox routes: POST /exec/:id/cancel returns canceled record", async () =
 
 test("sandbox routes: POST /exec rejects empty command", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = createInMemoryStore();
   const driver = createMockDriver(() => {});
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { TASKLOOM_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
   const app = createTestApp(service);
 
   const response = await app.request("/api/app/sandbox/exec", {

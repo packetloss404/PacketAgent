@@ -8,7 +8,7 @@ import {
 import type { AlertEvent } from "./alert-engine.js";
 import type { AlertWebhookConfig, DeliverAlertWebhookResult } from "./alert-webhook.js";
 import type { UpdateAlertDeliveryStatusInput } from "./alert-store.js";
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 
 function makeRecord(overrides: Partial<AlertEventRecord> & { id: string }): AlertEventRecord {
   return {
@@ -27,14 +27,14 @@ function makeRecord(overrides: Partial<AlertEventRecord> & { id: string }): Aler
   };
 }
 
-function makeStore(records: AlertEventRecord[]): TaskloomData {
-  return { alertEvents: [...records] } as unknown as TaskloomData;
+function makeStore(records: AlertEventRecord[]): PacketAgentData {
+  return { alertEvents: [...records] } as unknown as PacketAgentData;
 }
 
 function makeConfig(): AlertWebhookConfig {
   return {
     url: "https://example.com/hook",
-    secretHeader: "x-taskloom-alert-secret",
+    secretHeader: "x-packetagent-alert-secret",
     timeoutMs: 5000,
   };
 }
@@ -184,7 +184,7 @@ test("handleAlertsDeliverJob throws when delivery fails under maxAttempts", asyn
   const { deps, updateCalls } = makeDeps({
     records: [record],
     deliverResult: { ok: false, status: 503, error: "http 503" },
-    env: { TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS: "3" },
+    env: { PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS: "3" },
   });
 
   await assert.rejects(
@@ -202,7 +202,7 @@ test("handleAlertsDeliverJob dead-letters at maxAttempts without throwing", asyn
   const { deps, updateCalls } = makeDeps({
     records: [record],
     deliverResult: { ok: false, status: 500, error: "http 500" },
-    env: { TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS: "3" },
+    env: { PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS: "3" },
   });
 
   const result = await handleAlertsDeliverJob({ alertId: "evt_a" }, deps);
@@ -226,7 +226,7 @@ test("handleAlertsDeliverJob honors custom maxAttempts via env override", async 
   const { deps, updateCalls } = makeDeps({
     records: [record],
     deliverResult: { ok: false, error: "boom" },
-    env: { TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS: "1" },
+    env: { PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS: "1" },
   });
 
   const result = await handleAlertsDeliverJob({ alertId: "evt_a" }, deps);
@@ -243,7 +243,7 @@ test("handleAlertsDeliverJob falls back to default maxAttempts on invalid env va
     const { deps } = makeDeps({
       records: [record],
       deliverResult: { ok: false, error: "boom" },
-      env: { TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS: value },
+      env: { PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS: value },
     });
     await assert.rejects(
       () => handleAlertsDeliverJob({ alertId: "evt_a" }, deps),

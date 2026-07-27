@@ -450,13 +450,13 @@ export const PHASE_71_INTEGRATIONS: Phase71IntegrationDefinition[] = [
   {
     id: "custom_api",
     label: "Custom API provider",
-    envVars: ["CUSTOM_API_BASE_URL", "CUSTOM_API_KEY", "TASKLOOM_CUSTOM_API_BASE_URL", "TASKLOOM_CUSTOM_API_KEY"],
+    envVars: ["CUSTOM_API_BASE_URL", "CUSTOM_API_KEY", "PACKETAGENT_CUSTOM_API_BASE_URL", "PACKETAGENT_CUSTOM_API_KEY"],
     signals: [/\bcustom api\b/i, /\bexternal api\b/i, /\bthird[- ]party api\b/i, /\brest api\b/i, /\bhttp api\b/i, /\bapi key\b/i],
     flows: [
       "Route custom REST or OpenAI-compatible API calls through server-side generated integration boundaries.",
       "Expose base URL and credential setup state before live custom API calls while keeping unrelated draft features usable.",
     ],
-    setupGuidance: ["Set CUSTOM_API_BASE_URL plus CUSTOM_API_KEY, or the TASKLOOM_CUSTOM_API_* equivalents, before live custom API calls."],
+    setupGuidance: ["Set CUSTOM_API_BASE_URL plus CUSTOM_API_KEY, or the PACKETAGENT_CUSTOM_API_* equivalents, before live custom API calls."],
   },
   {
     id: "slack_webhook",
@@ -516,12 +516,12 @@ export const PHASE_71_INTEGRATIONS: Phase71IntegrationDefinition[] = [
   {
     id: "database",
     label: "Database runtime",
-    envVars: ["DATABASE_URL", "TASKLOOM_DATABASE_URL", "TASKLOOM_MANAGED_DATABASE_URL"],
+    envVars: ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"],
     signals: [/\bdatabase\b/i, /\bpostgres\b/i, /\bsql\b/i, /\bcrud\b/i, /\bpersist(s|ed|ence)?\b/i],
     flows: [
       "Persist generated records through the configured database runtime.",
       "Include migration, seed, and CRUD setup notes for deployment.",
     ],
-    setupGuidance: ["Set DATABASE_URL, TASKLOOM_DATABASE_URL, or TASKLOOM_MANAGED_DATABASE_URL for persistent database-backed features."],
+    setupGuidance: ["Set DATABASE_URL, PACKETAGENT_DATABASE_URL, or PACKETAGENT_MANAGED_DATABASE_URL for persistent database-backed features."],
   },
 ];

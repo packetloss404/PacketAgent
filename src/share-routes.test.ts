@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
 import { SESSION_COOKIE_NAME } from "./auth-utils";
-import { login } from "./taskloom-services";
-import { resetStoreForTests } from "./taskloom-store";
+import { login } from "./packetagent-services";
+import { resetStoreForTests } from "./packetagent-store";
 import { publicShareRoutes, shareRoutes } from "./share-routes";
 
 function createTestApp() {
@@ -20,7 +20,7 @@ function authHeaders(cookieValue: string) {
 test("share token list returns previews while create returns the one-time token", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = await app.request("/api/app/share", {
     method: "POST",

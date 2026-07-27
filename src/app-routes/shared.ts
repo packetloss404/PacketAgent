@@ -1,8 +1,8 @@
 import type { Context } from "hono";
 import { createHash } from "node:crypto";
 import { assertPermission, type WorkspacePermission } from "../rbac.js";
-import { findWorkspaceMembership, loadStoreAsync } from "../taskloom-store.js";
-import { requireAuthenticatedContextAsync } from "../taskloom-services.js";
+import { findWorkspaceMembership, loadStoreAsync } from "../packetagent-store.js";
+import { requireAuthenticatedContextAsync } from "../packetagent-services.js";
 import { redactedErrorMessage } from "../security/redaction.js";
 import type { ModelRoutingPresetId } from "../model-routing-presets.js";
 
@@ -42,7 +42,7 @@ export function configuredNonNegativeInteger(name: string, fallback: number) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
-const CHAT_STEP_DELAY_MS = Number(process.env.TASKLOOM_BUILDER_CHAT_STEP_MS ?? 120);
+const CHAT_STEP_DELAY_MS = Number(process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS ?? 120);
 
 export async function emitStep(sse: { writeSSE: (event: { event: string; data: string }) => Promise<void> }, text: string) {
   await sse.writeSSE({ event: "step", data: JSON.stringify({ type: "step", text }) });

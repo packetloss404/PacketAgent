@@ -33,35 +33,35 @@ test("local JSON runtime is allowed by default", () => {
 
 test("single-node SQLite runtime is allowed", () => {
   const report = buildManagedDatabaseRuntimeGuardReport({
-    TASKLOOM_STORE: "sqlite",
-    TASKLOOM_DB_PATH: "/srv/taskloom/taskloom.sqlite",
-    TASKLOOM_DATABASE_TOPOLOGY: "single-node-sqlite",
+    PACKETAGENT_STORE: "sqlite",
+    PACKETAGENT_DB_PATH: "/srv/packetagent/packetagent.sqlite",
+    PACKETAGENT_DATABASE_TOPOLOGY: "single-node-sqlite",
   });
 
   assert.equal(report.allowed, true);
   assert.equal(report.status, "pass");
   assert.equal(report.classification, "single-node-sqlite");
   assert.equal(report.observed.store, "sqlite");
-  assert.equal(report.observed.dbPath, "/srv/taskloom/taskloom.sqlite");
+  assert.equal(report.observed.dbPath, "/srv/packetagent/packetagent.sqlite");
   assert.equal(report.observed.databaseTopology, "single-node-sqlite");
   assert.equal(report.blockers.length, 0);
   assert.ok(report.summary.includes("single-node SQLite"));
 });
 
-test("SQLite without TASKLOOM_DB_PATH warns about the default path", () => {
-  const report = assessManagedDatabaseRuntimeGuard({ env: { TASKLOOM_STORE: "sqlite" } });
+test("SQLite without PACKETAGENT_DB_PATH warns about the default path", () => {
+  const report = assessManagedDatabaseRuntimeGuard({ env: { PACKETAGENT_STORE: "sqlite" } });
 
   assert.equal(report.allowed, true);
   assert.equal(report.classification, "single-node-sqlite");
-  assert.equal(report.observed.dbPath, "data/taskloom.sqlite");
-  assert.ok(report.warnings.some((warning) => warning.includes("TASKLOOM_DB_PATH is not set")));
+  assert.equal(report.observed.dbPath, "data/packetagent.sqlite");
+  assert.ok(report.warnings.some((warning) => warning.includes("PACKETAGENT_DB_PATH is not set")));
 });
 
 test("managed database URL is redacted and blocked", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "sqlite",
-      DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+      PACKETAGENT_STORE: "sqlite",
+      DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
     },
   });
   const urlEntry = observedEnvValue(report, "DATABASE_URL");
@@ -76,15 +76,15 @@ test("managed database URL is redacted and blocked", () => {
   assert.equal(report.observed.databaseUrl, "[redacted]");
   assert.ok(report.blockers.some((blocker) => blocker.includes("recognized managed Postgres adapter")));
   assert.ok(report.warnings.some((warning) => warning.includes("redacted")));
-  assert.ok(report.nextSteps.some((step) => step.includes("TASKLOOM_MANAGED_DATABASE_ADAPTER=postgres")));
+  assert.ok(report.nextSteps.some((step) => step.includes("PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres")));
 });
 
 test("recognized postgres adapter and managed URL allow managed Postgres startup", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "sqlite",
-      TASKLOOM_MANAGED_DATABASE_ADAPTER: "postgres",
-      TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+      PACKETAGENT_STORE: "sqlite",
+      PACKETAGENT_MANAGED_DATABASE_ADAPTER: "postgres",
+      PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
     },
   });
 
@@ -97,17 +97,17 @@ test("recognized postgres adapter and managed URL allow managed Postgres startup
   assert.ok(report.summary.includes("managed Postgres"));
   assert.doesNotThrow(() =>
     assertManagedDatabaseRuntimeSupported({
-      TASKLOOM_STORE: "sqlite",
-      TASKLOOM_MANAGED_DATABASE_ADAPTER: "postgres",
-      TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+      PACKETAGENT_STORE: "sqlite",
+      PACKETAGENT_MANAGED_DATABASE_ADAPTER: "postgres",
+      PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
     }),
   );
 });
 
-test("TASKLOOM_STORE=postgres without adapter is blocked at the managed runtime boundary", () => {
+test("PACKETAGENT_STORE=postgres without adapter is blocked at the managed runtime boundary", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "postgres",
+      PACKETAGENT_STORE: "postgres",
     },
   });
 
@@ -117,11 +117,11 @@ test("TASKLOOM_STORE=postgres without adapter is blocked at the managed runtime 
   assert.equal(report.classification, "managed-database-blocked");
   assert.equal(report.observed.store, "postgres");
   assert.ok(report.blockers.some((blocker) => blocker.includes("managed database runtime boundary")));
-  assert.ok(report.nextSteps.some((step) => step.includes("TASKLOOM_MANAGED_DATABASE_ADAPTER=postgres")));
+  assert.ok(report.nextSteps.some((step) => step.includes("PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres")));
   assert.throws(
     () =>
       assertManagedDatabaseRuntimeSupported({
-        TASKLOOM_STORE: "postgres",
+        PACKETAGENT_STORE: "postgres",
       }),
     ManagedDatabaseRuntimeGuardError,
   );
@@ -129,9 +129,9 @@ test("TASKLOOM_STORE=postgres without adapter is blocked at the managed runtime 
 
 test("sync managed-postgres store without adapter throws (re-pointed multi-writer posture)", () => {
   const env = {
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
-    TASKLOOM_DATABASE_TOPOLOGY: "distributed",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+    PACKETAGENT_DATABASE_TOPOLOGY: "distributed",
   } as const;
   const report = assessManagedDatabaseRuntimeGuard({ env });
 
@@ -143,12 +143,12 @@ test("sync managed-postgres store without adapter throws (re-pointed multi-write
   assert.throws(() => assertManagedDatabaseRuntimeSupported(env), ManagedDatabaseRuntimeGuardError);
 });
 
-test("TASKLOOM_STORE=postgres is allowed when managed Postgres adapter and URL are configured", () => {
+test("PACKETAGENT_STORE=postgres is allowed when managed Postgres adapter and URL are configured", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "postgres",
-      TASKLOOM_MANAGED_DATABASE_ADAPTER: "postgres",
-      TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_MANAGED_DATABASE_ADAPTER: "postgres",
+      PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
     },
   });
 
@@ -159,10 +159,10 @@ test("TASKLOOM_STORE=postgres is allowed when managed Postgres adapter and URL a
   assert.ok(report.checks.some((check) => check.id === "supported-runtime-store" && check.status === "pass"));
 });
 
-test("TASKLOOM_STORE=managed without adapter is blocked at the managed runtime boundary", () => {
+test("PACKETAGENT_STORE=managed without adapter is blocked at the managed runtime boundary", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "managed",
+      PACKETAGENT_STORE: "managed",
     },
   });
 
@@ -174,12 +174,12 @@ test("TASKLOOM_STORE=managed without adapter is blocked at the managed runtime b
   assert.ok(report.blockers.some((blocker) => blocker.includes("managed database runtime boundary")));
 });
 
-test("TASKLOOM_STORE=managed is allowed when managed Postgres adapter and URL are configured", () => {
+test("PACKETAGENT_STORE=managed is allowed when managed Postgres adapter and URL are configured", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "managed",
-      TASKLOOM_MANAGED_DATABASE_ADAPTER: "postgres",
-      TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@taskloom.internal/app",
+      PACKETAGENT_STORE: "managed",
+      PACKETAGENT_MANAGED_DATABASE_ADAPTER: "postgres",
+      PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@packetagent.internal/app",
     },
   });
 
@@ -192,13 +192,13 @@ test("TASKLOOM_STORE=managed is allowed when managed Postgres adapter and URL ar
 test("managed URL hints are redacted and block strict startup", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "sqlite",
-      TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
-      TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@taskloom.internal/app",
+      PACKETAGENT_STORE: "sqlite",
+      PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+      PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@packetagent.internal/app",
     },
   });
-  const managedUrl = observedEnvValue(report, "TASKLOOM_MANAGED_DATABASE_URL");
-  const taskloomDatabaseUrl = observedEnvValue(report, "TASKLOOM_DATABASE_URL");
+  const managedUrl = observedEnvValue(report, "PACKETAGENT_MANAGED_DATABASE_URL");
+  const packetagentDatabaseUrl = observedEnvValue(report, "PACKETAGENT_DATABASE_URL");
 
   assert.equal(report.allowed, false);
   assert.equal(report.managedDatabaseRuntimeBlocked, true);
@@ -206,14 +206,14 @@ test("managed URL hints are redacted and block strict startup", () => {
   assert.equal(report.classification, "managed-database-blocked");
   assert.equal(managedUrl.value, "[redacted]");
   assert.equal(managedUrl.redacted, true);
-  assert.equal(taskloomDatabaseUrl.value, "[redacted]");
-  assert.equal(taskloomDatabaseUrl.redacted, true);
+  assert.equal(packetagentDatabaseUrl.value, "[redacted]");
+  assert.equal(packetagentDatabaseUrl.redacted, true);
   assert.ok(report.warnings.some((warning) => warning.includes("recognized managed Postgres adapter")));
   assert.throws(
     () =>
       assertManagedDatabaseRuntimeSupported({
-        TASKLOOM_STORE: "sqlite",
-        TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@taskloom.internal/app",
+        PACKETAGENT_STORE: "sqlite",
+        PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@packetagent.internal/app",
       }),
     ManagedDatabaseRuntimeGuardError,
   );
@@ -222,9 +222,9 @@ test("managed URL hints are redacted and block strict startup", () => {
 test("unrecognized adapter does not unlock managed Postgres startup", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "postgres",
-      TASKLOOM_MANAGED_DATABASE_ADAPTER: "mysql",
-      TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_MANAGED_DATABASE_ADAPTER: "mysql",
+      PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
     },
   });
 
@@ -236,7 +236,7 @@ test("unrecognized adapter does not unlock managed Postgres startup", () => {
 test("unsupported store is classified and blocked", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "memory",
+      PACKETAGENT_STORE: "memory",
     },
   });
 
@@ -245,15 +245,15 @@ test("unsupported store is classified and blocked", () => {
   assert.equal(report.classification, "unsupported-store");
   assert.equal(report.observed.store, "memory");
   assert.ok(report.blockers.some((blocker) => blocker.includes("not a supported runtime storage mode")));
-  assert.ok(report.nextSteps.some((step) => step.includes("TASKLOOM_STORE=json")));
+  assert.ok(report.nextSteps.some((step) => step.includes("PACKETAGENT_STORE=json")));
 });
 
 test("bypass flag downgrades a blocked managed runtime to a warning", () => {
   const report = assessManagedDatabaseRuntimeGuard({
     env: {
-      TASKLOOM_STORE: "postgres",
-      TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
-      TASKLOOM_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS: "true",
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+      PACKETAGENT_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS: "true",
     },
   });
 
@@ -261,14 +261,14 @@ test("bypass flag downgrades a blocked managed runtime to a warning", () => {
   assert.equal(report.status, "warn");
   assert.equal(report.classification, "bypassed");
   assert.equal(report.observed.bypassEnabled, true);
-  assert.equal(observedEnvValue(report, "TASKLOOM_MANAGED_DATABASE_URL").value, "[redacted]");
+  assert.equal(observedEnvValue(report, "PACKETAGENT_MANAGED_DATABASE_URL").value, "[redacted]");
   assert.ok(report.blockers.length > 0);
   assert.ok(report.warnings.some((warning) => warning.includes("bypassed the managed database runtime guard")));
   assert.ok(report.summary.includes("bypassed"));
   assert.doesNotThrow(() =>
     assertManagedDatabaseRuntimeSupported({
-      TASKLOOM_STORE: "postgres",
-      TASKLOOM_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS: "true",
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_UNSUPPORTED_MANAGED_DB_RUNTIME_BYPASS: "true",
     }),
   );
 });
@@ -277,8 +277,8 @@ test("assert helper throws when unsupported runtime is not bypassed", () => {
   assert.throws(
     () =>
       assertManagedDatabaseRuntimeSupported({
-        TASKLOOM_STORE: "postgres",
-        TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@taskloom.internal/app",
+        PACKETAGENT_STORE: "postgres",
+        PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@packetagent.internal/app",
       }),
     (error) => {
       assert.ok(error instanceof ManagedDatabaseRuntimeGuardError);

@@ -28,8 +28,8 @@ test("openrouter: call() sends bearer auth + HTTP-Referer + X-Title attribution 
   const captured: { url?: string; body?: string; headers?: Record<string, string> } = {};
   const provider = new OpenRouterProvider({
     apiKeyResolver: async () => "or-key",
-    appName: "Taskloom",
-    siteUrl: "Taskloom",
+    appName: "PacketAgent",
+    siteUrl: "PacketAgent",
     fetchFn: (async (url: string | URL, init?: RequestInit) => {
       captured.url = url.toString();
       captured.body = init?.body as string;
@@ -51,8 +51,8 @@ test("openrouter: call() sends bearer auth + HTTP-Referer + X-Title attribution 
   assert.equal(res.providerName, "openrouter");
   assert.match(captured.url ?? "", /\/chat\/completions$/);
   assert.equal(captured.headers?.authorization, "Bearer or-key");
-  assert.equal(captured.headers?.["HTTP-Referer"], "Taskloom");
-  assert.equal(captured.headers?.["X-Title"], "Taskloom");
+  assert.equal(captured.headers?.["HTTP-Referer"], "PacketAgent");
+  assert.equal(captured.headers?.["X-Title"], "PacketAgent");
   // Body should carry the unmodified provider-prefixed model id and OpenAI shape.
   const body = JSON.parse(captured.body ?? "{}") as { model: string; messages: Array<{ role: string }> };
   assert.equal(body.model, "anthropic/claude-haiku-4-5");

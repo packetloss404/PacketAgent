@@ -10,8 +10,8 @@ import {
   type RequirementRecord,
   type ValidationEvidenceRecord,
   type WorkflowConcernRecord,
-  type TaskloomData,
-} from "../taskloom-store";
+  type PacketAgentData,
+} from "../packetagent-store";
 import {
   type AuthenticatedContext,
   httpError,
@@ -37,7 +37,7 @@ export async function getWorkspaceActivityDetailAsync(context: AuthenticatedCont
   return getWorkspaceActivityDetailFromData(data, context, activityId);
 }
 
-function getWorkspaceActivityDetailFromData(data: TaskloomData, context: AuthenticatedContext, activityId: string) {
+function getWorkspaceActivityDetailFromData(data: PacketAgentData, context: AuthenticatedContext, activityId: string) {
   const activities = workspaceActivitiesFromData(data, context.workspace.id, 50).map(redactActivity);
   const index = activities.findIndex((entry) => entry.id === activityId);
   if (index === -1) throw httpError(404, "activity not found");
@@ -51,7 +51,7 @@ function getWorkspaceActivityDetailFromData(data: TaskloomData, context: Authent
   };
 }
 
-function workspaceActivitiesFromData(data: TaskloomData, workspaceId: string, limit?: number) {
+function workspaceActivitiesFromData(data: PacketAgentData, workspaceId: string, limit?: number) {
   const activities = data.activities
     .filter((entry) => entry.workspaceId === workspaceId)
     .sort((left, right) => {
@@ -81,7 +81,7 @@ type ActivityRelatedContext = {
 };
 
 function buildActivityRelatedContext(
-  data: TaskloomData,
+  data: PacketAgentData,
   workspaceId: string,
   activity: ActivityRecord,
 ): ActivityRelatedContext {

@@ -1,30 +1,30 @@
 services:
-  taskloom:
+  packetagent:
     build: .
-    image: taskloom:local
+    image: packetagent:local
     ports:
       - "${PORT:-8484}:8484"
     environment:
       NODE_ENV: production
       PORT: 8484
       MASTER_KEY: "${MASTER_KEY:?set MASTER_KEY to a long random secret}"
-      TASKLOOM_STORE: "${TASKLOOM_STORE:-sqlite}"
-      TASKLOOM_DB_PATH: /app/data/taskloom.sqlite
-      TASKLOOM_RATE_LIMIT_KEY_SALT: "${TASKLOOM_RATE_LIMIT_KEY_SALT:?set TASKLOOM_RATE_LIMIT_KEY_SALT to a random secret}"
-      TASKLOOM_TRUST_PROXY: "${TASKLOOM_TRUST_PROXY:-false}"
-      TASKLOOM_SANDBOX_DRIVER: "${TASKLOOM_SANDBOX_DRIVER:-docker}"
-      TASKLOOM_SANDBOX_DEFAULT_RUNTIME: "${TASKLOOM_SANDBOX_DEFAULT_RUNTIME:-node-20}"
-      TASKLOOM_SANDBOX_DEFAULT_TIMEOUT_MS: "${TASKLOOM_SANDBOX_DEFAULT_TIMEOUT_MS:-120000}"
-      TASKLOOM_SANDBOX_MEMORY_MB: "${TASKLOOM_SANDBOX_MEMORY_MB:-512}"
-      TASKLOOM_SANDBOX_CPUS: "${TASKLOOM_SANDBOX_CPUS:-1}"
-      TASKLOOM_ARTIFACT_SERVING_ENABLED: "${TASKLOOM_ARTIFACT_SERVING_ENABLED:-false}"
-      TASKLOOM_ARTIFACTS_PATH: /app/data/artifacts
+      PACKETAGENT_STORE: "${PACKETAGENT_STORE:-sqlite}"
+      PACKETAGENT_DB_PATH: /app/data/packetagent.sqlite
+      PACKETAGENT_RATE_LIMIT_KEY_SALT: "${PACKETAGENT_RATE_LIMIT_KEY_SALT:?set PACKETAGENT_RATE_LIMIT_KEY_SALT to a random secret}"
+      PACKETAGENT_TRUST_PROXY: "${PACKETAGENT_TRUST_PROXY:-false}"
+      PACKETAGENT_SANDBOX_DRIVER: "${PACKETAGENT_SANDBOX_DRIVER:-docker}"
+      PACKETAGENT_SANDBOX_DEFAULT_RUNTIME: "${PACKETAGENT_SANDBOX_DEFAULT_RUNTIME:-node-20}"
+      PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS: "${PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS:-120000}"
+      PACKETAGENT_SANDBOX_MEMORY_MB: "${PACKETAGENT_SANDBOX_MEMORY_MB:-512}"
+      PACKETAGENT_SANDBOX_CPUS: "${PACKETAGENT_SANDBOX_CPUS:-1}"
+      PACKETAGENT_ARTIFACT_SERVING_ENABLED: "${PACKETAGENT_ARTIFACT_SERVING_ENABLED:-false}"
+      PACKETAGENT_ARTIFACTS_PATH: /app/data/artifacts
     volumes:
-      - taskloom-data:/app/data
+      - packetagent-data:/app/data
       # Docker sandbox execution requires Docker API access. Mount only on hosts
-      # where the Taskloom container is trusted to create and manage containers.
+      # where the PacketAgent container is trusted to create and manage containers.
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
 volumes:
-  taskloom-data:
+  packetagent-data:

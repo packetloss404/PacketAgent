@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-step launcher for Taskloom (macOS / Linux).
+# One-step launcher for PacketAgent (macOS / Linux).
 # Installs dependencies on first run, loads .env, checks for an AI provider,
 # opens the browser, and starts the dev server.
 

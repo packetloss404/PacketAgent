@@ -1,15 +1,15 @@
 {
-  "name": "taskloom",
+  "name": "packetagent",
   "version": "0.1.0",
   "private": false,
   "license": "MIT",
-  "homepage": "https://packetloss404.github.io/taskloom/",
+  "homepage": "https://packetloss404.github.io/packetagent/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/packetloss404/taskloom.git"
+    "url": "git+https://github.com/packetloss404/packetagent.git"
   },
   "bugs": {
-    "url": "https://github.com/packetloss404/taskloom/issues"
+    "url": "https://github.com/packetloss404/packetagent/issues"
   },
   "type": "module",
   "engines": {

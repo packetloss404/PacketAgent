@@ -328,7 +328,7 @@ test("call() with apiFormat=openai parses tool_calls", async () => {
             role: "assistant",
             content: null,
             tool_calls: [
-              { id: "call_1", type: "function", function: { name: "search", arguments: '{"q":"taskloom"}' } },
+              { id: "call_1", type: "function", function: { name: "search", arguments: '{"q":"packetagent"}' } },
             ],
           },
           finish_reason: "tool_calls",
@@ -352,5 +352,5 @@ test("call() with apiFormat=openai parses tool_calls", async () => {
   assert.equal(result.finishReason, "tool_use");
   assert.equal(result.toolCalls?.length, 1);
   assert.equal(result.toolCalls?.[0].name, "search");
-  assert.deepEqual(result.toolCalls?.[0].input, { q: "taskloom" });
+  assert.deepEqual(result.toolCalls?.[0].input, { q: "packetagent" });
 });

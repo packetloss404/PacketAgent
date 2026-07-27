@@ -1,11 +1,11 @@
 import type { AlertEvent, AlertSeverity } from "./alert-engine.js";
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 import {
   loadStore as defaultLoadStore,
   loadStoreAsync as defaultLoadStoreAsync,
   mutateStore as defaultMutateStore,
   mutateStoreAsync as defaultMutateStoreAsync,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 // Phase 33B: read path delegated to repository wrapper.
 import { listAlertsViaRepository } from "./alert-store-read.js";
 // Phase 33C: dedicated alert_events table dual-write.
@@ -31,12 +31,12 @@ export interface RecordAlertsOptions {
 }
 
 export interface RecordAlertsDeps {
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   alertEventsRepository?: AlertEventsRepository;
 }
 
 export interface RecordAlertsAsyncDeps {
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T | Promise<T>) => Promise<T>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T | Promise<T>) => Promise<T>;
   alertEventsRepository?: AlertEventsRepository;
 }
 
@@ -53,14 +53,14 @@ export interface ListAlertsOptions {
 }
 
 export interface ListAlertsDeps {
-  loadStore?: () => TaskloomData;
+  loadStore?: () => PacketAgentData;
 }
 
 export interface ListAlertsAsyncDeps {
-  loadStore?: () => Promise<TaskloomData>;
+  loadStore?: () => Promise<PacketAgentData>;
 }
 
-function ensureAlertCollection(data: TaskloomData): AlertEventRecord[] {
+function ensureAlertCollection(data: PacketAgentData): AlertEventRecord[] {
   if (!Array.isArray(data.alertEvents)) {
     data.alertEvents = [];
   }
@@ -138,7 +138,7 @@ export function recordAlerts(
     return { stored: records.length, pruned, records, retainAfterIso };
   });
 
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     try {
       const repo = deps.alertEventsRepository ?? createAlertEventsRepository({});
       if (outcome.records.length > 0) {
@@ -189,7 +189,7 @@ export async function recordAlertsAsync(
     return { stored: records.length, pruned, records, retainAfterIso };
   });
 
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     try {
       const repo = deps.alertEventsRepository ?? createAlertEventsRepository({});
       if (outcome.records.length > 0) {
@@ -215,12 +215,12 @@ export interface UpdateAlertDeliveryStatusInput {
 }
 
 export interface UpdateAlertDeliveryStatusDeps {
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   alertEventsRepository?: AlertEventsRepository;
 }
 
 export interface UpdateAlertDeliveryStatusAsyncDeps {
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T | Promise<T>) => Promise<T>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T | Promise<T>) => Promise<T>;
   alertEventsRepository?: AlertEventsRepository;
 }
 
@@ -252,7 +252,7 @@ export function updateAlertDeliveryStatus(
     return { ...target };
   });
 
-  if (updated && process.env.TASKLOOM_STORE === "sqlite") {
+  if (updated && process.env.PACKETAGENT_STORE === "sqlite") {
     try {
       const repo = deps.alertEventsRepository ?? createAlertEventsRepository({});
       const patch: {
@@ -307,7 +307,7 @@ export async function updateAlertDeliveryStatusAsync(
     return { ...target };
   });
 
-  if (updated && process.env.TASKLOOM_STORE === "sqlite") {
+  if (updated && process.env.PACKETAGENT_STORE === "sqlite") {
     try {
       const repo = deps.alertEventsRepository ?? createAlertEventsRepository({});
       const patch: {

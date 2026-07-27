@@ -16,9 +16,9 @@
 //      Ollama.
 //   3. For `fast` / `smart`: Anthropic → OpenAI → Gemini → OpenRouter → Ollama.
 //
-// Operators can override the order with `TASKLOOM_PROVIDER_PRIORITY`, a
+// Operators can override the order with `PACKETAGENT_PROVIDER_PRIORITY`, a
 // comma-separated list of provider names, e.g.
-//   TASKLOOM_PROVIDER_PRIORITY=ollama,openrouter,anthropic
+//   PACKETAGENT_PROVIDER_PRIORITY=ollama,openrouter,anthropic
 // The override applies to every preset; the first provider in the list that
 // has a configured key (env or vault) wins.
 //
@@ -138,7 +138,7 @@ export function providerHasCredentials(provider: ProviderName, env: NodeJS.Proce
 
 /**
  * Returns the list of providers that the resolver will consider, after
- * applying the optional `TASKLOOM_PROVIDER_PRIORITY` override. Filters to
+ * applying the optional `PACKETAGENT_PROVIDER_PRIORITY` override. Filters to
  * providers that are both registered on the router AND have credentials.
  */
 export function availableProviders(opts: ResolvePresetOptions = {}): ProviderName[] {
@@ -153,7 +153,7 @@ export function availableProviders(opts: ResolvePresetOptions = {}): ProviderNam
 }
 
 function parsePriorityOverride(env: NodeJS.ProcessEnv): ProviderName[] | null {
-  const raw = env.TASKLOOM_PROVIDER_PRIORITY;
+  const raw = env.PACKETAGENT_PROVIDER_PRIORITY;
   if (!raw || raw.trim().length === 0) return null;
   const parts = raw.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean);
   const valid: ProviderName[] = [];

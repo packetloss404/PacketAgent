@@ -10,7 +10,7 @@ import {
   type JobMetricSnapshotsRepository,
   type JobMetricSnapshotsRepositoryDeps,
 } from "./job-metric-snapshots-repo.js";
-import type { JobMetricSnapshotRecord, TaskloomData } from "../taskloom-store.js";
+import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
 
 function makeRecord(overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string }): JobMetricSnapshotRecord {
   return {
@@ -30,29 +30,29 @@ function makeRecord(overrides: Partial<JobMetricSnapshotRecord> & { id: string; 
 }
 
 function makeJsonRepo(): JobMetricSnapshotsRepository {
-  const data = { jobMetricSnapshots: [] as JobMetricSnapshotRecord[] } as unknown as TaskloomData;
+  const data = { jobMetricSnapshots: [] as JobMetricSnapshotRecord[] } as unknown as PacketAgentData;
   const deps: JobMetricSnapshotsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonJobMetricSnapshotsRepository(deps);
 }
 
 function withTempSqlite(testFn: (repo: JobMetricSnapshotsRepository) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-repo-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-repo-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = sqliteJobMetricSnapshotsRepository({ dbPath });
     testFn(repo);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 }
@@ -198,40 +198,40 @@ test("insertMany dedupes by id (idempotent re-insert)", () => {
 });
 
 test("createJobMetricSnapshotsRepository selects implementation by env", () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
-    const data = { jobMetricSnapshots: [] as JobMetricSnapshotRecord[] } as unknown as TaskloomData;
+    delete process.env.PACKETAGENT_STORE;
+    const data = { jobMetricSnapshots: [] as JobMetricSnapshotRecord[] } as unknown as PacketAgentData;
     const json = createJobMetricSnapshotsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     json.insertMany([makeRecord({ id: "a", capturedAt: "2026-04-26T10:00:00.000Z", type: "agent.run" })]);
     assert.equal(json.count(), 1);
     assert.equal(data.jobMetricSnapshots.length, 1);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
 test("createJobMetricSnapshotsRepository returns sqlite impl when env requests it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-repo-factory-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-repo-factory-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = createJobMetricSnapshotsRepository({ dbPath });
     repo.insertMany([makeRecord({ id: "a", capturedAt: "2026-04-26T10:00:00.000Z", type: "agent.run" })]);
     assert.equal(repo.count(), 1);
     assert.equal(repo.list()[0]?.id, "a");
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 });

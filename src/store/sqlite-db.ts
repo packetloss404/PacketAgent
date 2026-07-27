@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 // builtins — never a backend or the barrel. The migrations directory is
 // resolved relative to this file; this file lives in src/store/, so the
 // compiled location resolves "../db/migrations" to src/db/migrations.
-export const DEFAULT_DB_FILE = resolve(process.cwd(), "data", "taskloom.sqlite");
+export const DEFAULT_DB_FILE = resolve(process.cwd(), "data", "packetagent.sqlite");
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 
 export function openStoreDatabase(dbPath: string): DatabaseSync {

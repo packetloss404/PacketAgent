@@ -32,7 +32,7 @@ import {
   type RequirementPriority,
   type RequirementRecord,
   type RequirementStatus,
-  type TaskloomData,
+  type PacketAgentData,
   type UserRecord,
   type ValidationEvidenceOutcome,
   type ValidationEvidenceRecord,
@@ -43,7 +43,7 @@ import {
   type WorkspaceBriefRecord,
   type WorkspaceBriefVersionRecord,
   type WorkspaceRecord,
-} from "./taskloom-store";
+} from "./packetagent-store";
 
 export type WorkflowContext = {
   user: UserRecord;
@@ -1287,13 +1287,13 @@ function ensureWorkspaceExists(workspaceId: string): void {
   if (!findWorkspaceByIdIndexed(workspaceId)) throw httpError(404, "workspace not found");
 }
 
-function ensureWorkspace(data: TaskloomData, workspaceId: string): WorkspaceRecord {
+function ensureWorkspace(data: PacketAgentData, workspaceId: string): WorkspaceRecord {
   const workspace = data.workspaces.find((entry) => entry.id === workspaceId);
   if (!workspace) throw httpError(404, "workspace not found");
   return workspace;
 }
 
-function ensureActivationFacts(data: TaskloomData, workspaceId: string, timestamp: string) {
+function ensureActivationFacts(data: PacketAgentData, workspaceId: string, timestamp: string) {
   const facts = data.activationFacts[workspaceId] ?? { now: timestamp };
   facts.now = timestamp;
   data.activationFacts[workspaceId] = facts;
@@ -1301,7 +1301,7 @@ function ensureActivationFacts(data: TaskloomData, workspaceId: string, timestam
 }
 
 function markOnboardingStep(
-  data: TaskloomData,
+  data: PacketAgentData,
   workspaceId: string,
   stepKey: OnboardingStepKey,
   timestamp: string,
@@ -1343,7 +1343,7 @@ function actorFor(context: WorkflowContext): ActivityRecord["actor"] {
 }
 
 function pushActivity(
-  data: TaskloomData,
+  data: PacketAgentData,
   workspaceId: string,
   event: string,
   actor: ActivityRecord["actor"],

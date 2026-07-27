@@ -90,7 +90,7 @@ export function createDockerDriver(deps: DockerDriverDeps = {}): SandboxDriver {
         });
       }
 
-      const containerName = `taskloom-sandbox-${randomUUID()}`;
+      const containerName = `packetagent-sandbox-${randomUUID()}`;
       const memoryMb = Math.max(64, Math.floor(spec.memoryLimitMb ?? 512));
       const cpus = Math.max(1, Number(spec.cpus ?? 1));
 

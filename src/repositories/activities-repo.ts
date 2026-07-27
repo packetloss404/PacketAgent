@@ -2,10 +2,10 @@ import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import type { ActivityRecord, TaskloomData } from "../taskloom-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../taskloom-store.js";
+import type { ActivityRecord, PacketAgentData } from "../packetagent-store.js";
+import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
 
-const DEFAULT_DB_FILE = "data/taskloom.sqlite";
+const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 
 export interface ListActivitiesFilter {
@@ -21,8 +21,8 @@ export interface ActivitiesRepository {
 }
 
 export interface ActivitiesRepositoryDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   dbPath?: string;
 }
 
@@ -36,14 +36,14 @@ export interface AsyncActivitiesRepository {
 }
 
 export interface AsyncActivitiesRepositoryDeps {
-  loadStore?: () => MaybePromise<TaskloomData>;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => MaybePromise<T>) => MaybePromise<T>;
+  loadStore?: () => MaybePromise<PacketAgentData>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => MaybePromise<T>) => MaybePromise<T>;
   repository?: ActivitiesRepository;
   dbPath?: string;
 }
 
 export function createActivitiesRepository(deps: ActivitiesRepositoryDeps = {}): ActivitiesRepository {
-  if (process.env.TASKLOOM_STORE === "sqlite") return sqliteActivitiesRepository(deps);
+  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteActivitiesRepository(deps);
   return jsonActivitiesRepository(deps);
 }
 
@@ -51,7 +51,7 @@ export function createAsyncActivitiesRepository(
   deps: AsyncActivitiesRepositoryDeps = {},
 ): AsyncActivitiesRepository {
   if (deps.repository) return asyncActivitiesRepositoryFromSync(deps.repository);
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     return asyncActivitiesRepositoryFromSync(sqliteActivitiesRepository({ dbPath: deps.dbPath }));
   }
   return asyncJsonActivitiesRepository(deps);
@@ -256,7 +256,7 @@ function isPositiveLimit(limit: number | undefined): limit is number {
 
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
-  return resolve(process.cwd(), process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
 }
 
 function openDatabase(dbPath: string): DatabaseSync {

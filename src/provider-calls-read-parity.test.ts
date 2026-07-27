@@ -8,8 +8,8 @@ import {
   createProviderCallsRepository,
   type ProviderCallsRepository,
 } from "./repositories/provider-calls-repo.js";
-import { listProviderCallsForWorkspaceIndexed } from "./taskloom-store.js";
-import type { ProviderCallRecord, TaskloomData } from "./taskloom-store.js";
+import { listProviderCallsForWorkspaceIndexed } from "./packetagent-store.js";
+import type { ProviderCallRecord, PacketAgentData } from "./packetagent-store.js";
 
 type ProviderCallListFilter = {
   workspaceId: string;
@@ -17,8 +17,8 @@ type ProviderCallListFilter = {
   limit?: number;
 };
 
-function makeStore(records: ProviderCallRecord[] = []): TaskloomData {
-  return { providerCalls: [...records] } as unknown as TaskloomData;
+function makeStore(records: ProviderCallRecord[] = []): PacketAgentData {
+  return { providerCalls: [...records] } as unknown as PacketAgentData;
 }
 
 function makeRecord(
@@ -74,31 +74,31 @@ function compareProviderCalls(left: ProviderCallRecord, right: ProviderCallRecor
 }
 
 function withStoreMode<T>(store: string | undefined, fn: () => T): T {
-  const previousStore = process.env.TASKLOOM_STORE;
-  if (store === undefined) delete process.env.TASKLOOM_STORE;
-  else process.env.TASKLOOM_STORE = store;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  if (store === undefined) delete process.env.PACKETAGENT_STORE;
+  else process.env.PACKETAGENT_STORE = store;
   try {
     return fn();
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
   }
 }
 
 function withTempSqlite<T>(fn: (dbPath: string) => T): T {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-provider-calls-read-parity-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-provider-calls-read-parity-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     return fn(dbPath);
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 }

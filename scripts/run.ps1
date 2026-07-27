@@ -1,4 +1,4 @@
-# One-step launcher for Taskloom (Windows PowerShell).
+# One-step launcher for PacketAgent (Windows PowerShell).
 # Installs dependencies on first run, loads .env, checks for an AI provider,
 # opens the browser, and starts the dev server.
 

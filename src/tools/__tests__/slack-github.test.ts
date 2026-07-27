@@ -30,7 +30,7 @@ test("slack_post_webhook posts JSON to the supplied webhook", async () => {
   const result = await tool.handle({
     webhookUrl,
     text: "Build finished",
-    username: "Taskloom",
+    username: "PacketAgent",
     iconEmoji: ":white_check_mark:",
     channel: "#deploys",
     blocks: [{ type: "section", text: { type: "mrkdwn", text: "Build finished" } }],
@@ -43,7 +43,7 @@ test("slack_post_webhook posts JSON to the supplied webhook", async () => {
   assert.equal(seenInit?.signal, ctrl.signal);
   assert.deepEqual(JSON.parse(seenInit?.body as string), {
     text: "Build finished",
-    username: "Taskloom",
+    username: "PacketAgent",
     icon_emoji: ":white_check_mark:",
     channel: "#deploys",
     blocks: [{ type: "section", text: { type: "mrkdwn", text: "Build finished" } }],
@@ -75,13 +75,13 @@ test("github_api routes supported operations to GitHub REST paths", async () => 
     const requestUrl = new URL(url.toString());
     const responseInit = { headers: { "content-type": "application/json" } };
 
-    if (requestUrl.pathname === "/repos/octo/taskloom/pulls" && requestUrl.searchParams.get("state") === "closed") {
+    if (requestUrl.pathname === "/repos/octo/packetagent/pulls" && requestUrl.searchParams.get("state") === "closed") {
       return Response.json([{ number: 12, title: "Fix bug" }], responseInit);
     }
-    if (requestUrl.pathname === "/repos/octo/taskloom/pulls/12") {
+    if (requestUrl.pathname === "/repos/octo/packetagent/pulls/12") {
       return Response.json({ number: 12, title: "Fix bug" }, responseInit);
     }
-    if (requestUrl.pathname === "/repos/octo/taskloom/issues/12/comments") {
+    if (requestUrl.pathname === "/repos/octo/packetagent/issues/12/comments") {
       if (init?.method === "POST") return Response.json({ id: 45, body: "Looks good" }, { ...responseInit, status: 201 });
       return Response.json([{ id: 44, body: "Prior comment" }], responseInit);
     }
@@ -96,25 +96,25 @@ test("github_api routes supported operations to GitHub REST paths", async () => 
 
   const listed = await tool.handle({
     owner: "octo",
-    repo: "taskloom",
+    repo: "packetagent",
     operation: "list_prs",
     state: "closed",
   }, context());
   const pr = await tool.handle({
     owner: "octo",
-    repo: "taskloom",
+    repo: "packetagent",
     operation: "get_pr",
     pullNumber: 12,
   }, context());
   const comments = await tool.handle({
     owner: "octo",
-    repo: "taskloom",
+    repo: "packetagent",
     operation: "get_comments",
     pullNumber: 12,
   }, context());
   const created = await tool.handle({
     owner: "octo",
-    repo: "taskloom",
+    repo: "packetagent",
     operation: "create_comment",
     issueNumber: 12,
     body: "Looks good",
@@ -125,10 +125,10 @@ test("github_api routes supported operations to GitHub REST paths", async () => 
   assert.equal(comments.ok, true);
   assert.equal(created.ok, true);
   assert.deepEqual(calls.map((call) => `${call.init?.method} ${new URL(call.url).pathname}${new URL(call.url).search}`), [
-    "GET /repos/octo/taskloom/pulls?state=closed",
-    "GET /repos/octo/taskloom/pulls/12",
-    "GET /repos/octo/taskloom/issues/12/comments",
-    "POST /repos/octo/taskloom/issues/12/comments",
+    "GET /repos/octo/packetagent/pulls?state=closed",
+    "GET /repos/octo/packetagent/pulls/12",
+    "GET /repos/octo/packetagent/issues/12/comments",
+    "POST /repos/octo/packetagent/issues/12/comments",
   ]);
   for (const call of calls) {
     assert.equal(header(call.init, "authorization"), "Bearer ghp_envsecret");
@@ -153,7 +153,7 @@ test("github_api prefers explicit token and redacts it from errors", async () =>
   const result = await tool.handle({
     token: "ghp_explicitsecret",
     owner: "octo",
-    repo: "taskloom",
+    repo: "packetagent",
     operation: "list_prs",
   }, context());
 
@@ -170,7 +170,7 @@ test("github_api validates required token and create_comment body", async () => 
   const toolWithoutToken = createGithubApiTool({ fetchImpl, env: {}, apiBaseUrl: "https://github.test" });
   const missingToken = await toolWithoutToken.handle({
     owner: "octo",
-    repo: "taskloom",
+    repo: "packetagent",
     operation: "list_prs",
   }, context());
 
@@ -180,7 +180,7 @@ test("github_api validates required token and create_comment body", async () => 
   const tool = createGithubApiTool({ fetchImpl, env: { GITHUB_TOKEN: "ghp_envsecret" }, apiBaseUrl: "https://github.test" });
   const missingBody = await tool.handle({
     owner: "octo",
-    repo: "taskloom",
+    repo: "packetagent",
     operation: "create_comment",
     issueNumber: 1,
   }, context());

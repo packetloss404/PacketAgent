@@ -99,7 +99,7 @@ interface RuntimeApprovalInput {
 const TOKEN_VERSION = 1;
 export const DEFAULT_TOOL_APPROVAL_TTL_MS = 10 * 60 * 1000;
 
-const DEV_TOOL_APPROVAL_SECRET = "taskloom-dev-tool-capability-approval-secret";
+const DEV_TOOL_APPROVAL_SECRET = "packetagent-dev-tool-capability-approval-secret";
 const consumedApprovalJtis = new Map<string, number>();
 const EXTERNAL_SIDE_EFFECT_TOOLS = new Set([
   "slack_post_webhook",
@@ -301,7 +301,7 @@ function toTimeMs(value: Date | number | string | undefined): number {
 }
 
 function resolveSecret(secret?: string): string {
-  return firstNonEmpty(secret, process.env.TASKLOOM_TOOL_APPROVAL_SECRET, process.env.TASKLOOM_MASTER_KEY)
+  return firstNonEmpty(secret, process.env.PACKETAGENT_TOOL_APPROVAL_SECRET, process.env.PACKETAGENT_MASTER_KEY)
     ?? DEV_TOOL_APPROVAL_SECRET;
 }
 

@@ -35,13 +35,13 @@ let cachedFilePath: string | null = null;
 let cachedFileSize: number | null = null;
 
 function readConfig(): AccessLogConfig {
-  const rawMode = (process.env.TASKLOOM_ACCESS_LOG_MODE ?? "off").toLowerCase();
+  const rawMode = (process.env.PACKETAGENT_ACCESS_LOG_MODE ?? "off").toLowerCase();
   const mode: AccessLogMode = rawMode === "stdout" || rawMode === "file" ? rawMode : "off";
-  const rawPath = process.env.TASKLOOM_ACCESS_LOG_PATH;
+  const rawPath = process.env.PACKETAGENT_ACCESS_LOG_PATH;
   const filePath = mode === "file" && rawPath ? resolve(process.cwd(), rawPath) : null;
-  const rawMaxBytes = Number(process.env.TASKLOOM_ACCESS_LOG_MAX_BYTES ?? "0");
+  const rawMaxBytes = Number(process.env.PACKETAGENT_ACCESS_LOG_MAX_BYTES ?? "0");
   const maxBytes = Number.isFinite(rawMaxBytes) && rawMaxBytes > 0 ? Math.floor(rawMaxBytes) : 0;
-  const rawMaxFiles = Number(process.env.TASKLOOM_ACCESS_LOG_MAX_FILES ?? "5");
+  const rawMaxFiles = Number(process.env.PACKETAGENT_ACCESS_LOG_MAX_FILES ?? "5");
   const maxFiles = Number.isFinite(rawMaxFiles) && rawMaxFiles >= 1 ? Math.floor(rawMaxFiles) : 5;
   return { mode, filePath, maxBytes, maxFiles };
 }

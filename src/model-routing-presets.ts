@@ -1,5 +1,5 @@
-import type { IntegrationReadinessSummary } from "./taskloom-services.js";
-import type { ApiKeyProvider, ProviderKind, ProviderRecord } from "./taskloom-store.js";
+import type { IntegrationReadinessSummary } from "./packetagent-services.js";
+import type { ApiKeyProvider, ProviderKind, ProviderRecord } from "./packetagent-store.js";
 
 export type ModelRoutingPresetId = "fast" | "smart" | "cheap" | "local";
 export type ModelRoutingProviderKind = ProviderKind | "stub";
@@ -59,21 +59,21 @@ const PROVIDERS: Record<ProviderKind, ProviderDefinition> = {
     provider: "openai",
     defaultModel: "gpt-4o-mini",
     keyEnv: ["OPENAI_API_KEY"],
-    modelEnv: ["OPENAI_MODEL", "TASKLOOM_OPENAI_MODEL"],
+    modelEnv: ["OPENAI_MODEL", "PACKETAGENT_OPENAI_MODEL"],
     requiredEnv: ["OPENAI_API_KEY"],
   },
   anthropic: {
     provider: "anthropic",
     defaultModel: "claude-3-5-sonnet-latest",
     keyEnv: ["ANTHROPIC_API_KEY"],
-    modelEnv: ["ANTHROPIC_MODEL", "TASKLOOM_ANTHROPIC_MODEL"],
+    modelEnv: ["ANTHROPIC_MODEL", "PACKETAGENT_ANTHROPIC_MODEL"],
     requiredEnv: ["ANTHROPIC_API_KEY"],
   },
   minimax: {
     provider: "minimax",
     defaultModel: "abab6.5-chat",
     keyEnv: ["MINIMAX_API_KEY"],
-    modelEnv: ["MINIMAX_MODEL", "TASKLOOM_MINIMAX_MODEL"],
+    modelEnv: ["MINIMAX_MODEL", "PACKETAGENT_MINIMAX_MODEL"],
     requiredEnv: ["MINIMAX_API_KEY"],
   },
   azure_openai: {
@@ -87,21 +87,21 @@ const PROVIDERS: Record<ProviderKind, ProviderDefinition> = {
     provider: "ollama",
     defaultModel: "llama3.2",
     keyEnv: [],
-    modelEnv: ["OLLAMA_MODEL", "TASKLOOM_OLLAMA_MODEL"],
+    modelEnv: ["OLLAMA_MODEL", "PACKETAGENT_OLLAMA_MODEL"],
     requiredEnv: ["OLLAMA_BASE_URL"],
   },
   gemini: {
     provider: "gemini",
     defaultModel: "gemini-2.0-flash-exp",
     keyEnv: ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
-    modelEnv: ["GEMINI_MODEL", "TASKLOOM_GEMINI_MODEL"],
+    modelEnv: ["GEMINI_MODEL", "PACKETAGENT_GEMINI_MODEL"],
     requiredEnv: ["GOOGLE_API_KEY"],
   },
   custom: {
     provider: "custom",
     defaultModel: "custom-chat",
     keyEnv: ["CUSTOM_PROVIDER_API_KEY"],
-    modelEnv: ["CUSTOM_PROVIDER_MODEL", "TASKLOOM_CUSTOM_PROVIDER_MODEL"],
+    modelEnv: ["CUSTOM_PROVIDER_MODEL", "PACKETAGENT_CUSTOM_PROVIDER_MODEL"],
     requiredEnv: ["CUSTOM_PROVIDER_BASE_URL"],
   },
 };
@@ -118,28 +118,28 @@ const PRESETS: Array<{
     label: "Fast",
     goal: "Low-latency drafts, summaries, and interactive agent turns.",
     preference: ["openai", "gemini", "azure_openai", "minimax", "anthropic", "ollama", "custom"],
-    envHints: ["TASKLOOM_MODEL_PRESET_FAST", "TASKLOOM_FAST_MODEL"],
+    envHints: ["PACKETAGENT_MODEL_PRESET_FAST", "PACKETAGENT_FAST_MODEL"],
   },
   {
     id: "smart",
     label: "Smart",
     goal: "Heavier reasoning, review, and planning work where quality matters most.",
     preference: ["anthropic", "gemini", "openai", "azure_openai", "minimax", "custom", "ollama"],
-    envHints: ["TASKLOOM_MODEL_PRESET_SMART", "TASKLOOM_SMART_MODEL"],
+    envHints: ["PACKETAGENT_MODEL_PRESET_SMART", "PACKETAGENT_SMART_MODEL"],
   },
   {
     id: "cheap",
     label: "Cheap",
     goal: "High-volume background work with cost-aware hosted fallbacks.",
     preference: ["gemini", "openai", "minimax", "ollama", "azure_openai", "anthropic", "custom"],
-    envHints: ["TASKLOOM_MODEL_PRESET_CHEAP", "TASKLOOM_CHEAP_MODEL"],
+    envHints: ["PACKETAGENT_MODEL_PRESET_CHEAP", "PACKETAGENT_CHEAP_MODEL"],
   },
   {
     id: "local",
     label: "Local",
     goal: "Private local development first, with hosted providers only as fallback.",
     preference: ["ollama", "openai", "anthropic", "gemini", "minimax", "azure_openai", "custom"],
-    envHints: ["TASKLOOM_MODEL_PRESET_LOCAL", "TASKLOOM_LOCAL_MODEL"],
+    envHints: ["PACKETAGENT_MODEL_PRESET_LOCAL", "PACKETAGENT_LOCAL_MODEL"],
   },
 ];
 
@@ -149,7 +149,7 @@ const STUB_CHOICE: ModelRoutingChoice = {
   source: "fallback",
   ready: true,
   blockers: [],
-  reason: "No ready workspace or env-backed provider was available, so Taskloom can use deterministic stub output.",
+  reason: "No ready workspace or env-backed provider was available, so PacketAgent can use deterministic stub output.",
   envHints: [],
 };
 

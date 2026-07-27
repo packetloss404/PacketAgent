@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createAsyncJobMetricSnapshotsRepository, createJobMetricSnapshotsRepository } from "../repositories/job-metric-snapshots-repo.js";
-import type { JobMetricSnapshotRecord, TaskloomData } from "../taskloom-store.js";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, mutateStore as defaultMutateStore, mutateStoreAsync as defaultMutateStoreAsync } from "../taskloom-store.js";
+import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
+import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, mutateStore as defaultMutateStore, mutateStoreAsync as defaultMutateStoreAsync } from "../packetagent-store.js";
 import { getJobTypeMetrics, type JobTypeMetrics } from "./scheduler-metrics.js";
 // Phase 32 read-redirect (Slice B):
 import { listJobMetricSnapshotsViaRepository } from "./job-metrics-snapshot-read.js";
@@ -21,16 +21,16 @@ export interface SnapshotJobMetricsOptions {
 }
 
 export interface SnapshotJobMetricsDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   jobTypeMetrics?: () => JobTypeMetrics[];
   now?: () => Date;
   generateId?: () => string;
 }
 
 export interface SnapshotJobMetricsAsyncDeps {
-  loadStore?: () => Promise<TaskloomData>;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T | Promise<T>) => Promise<T>;
+  loadStore?: () => Promise<PacketAgentData>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T | Promise<T>) => Promise<T>;
   jobTypeMetrics?: () => JobTypeMetrics[];
   now?: () => Date;
   generateId?: () => string;
@@ -44,11 +44,11 @@ export interface ListJobMetricSnapshotsOptions {
 }
 
 export interface ListJobMetricSnapshotsDeps {
-  loadStore?: () => TaskloomData;
+  loadStore?: () => PacketAgentData;
 }
 
 export interface ListJobMetricSnapshotsAsyncDeps {
-  loadStore?: () => Promise<TaskloomData>;
+  loadStore?: () => Promise<PacketAgentData>;
 }
 
 export interface PruneJobMetricSnapshotsOptions {
@@ -60,16 +60,16 @@ export interface PruneJobMetricSnapshotsResult {
 }
 
 export interface PruneJobMetricSnapshotsDeps {
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   now?: () => Date;
 }
 
 export interface PruneJobMetricSnapshotsAsyncDeps {
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T | Promise<T>) => Promise<T>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T | Promise<T>) => Promise<T>;
   now?: () => Date;
 }
 
-function ensureSnapshotCollection(data: TaskloomData): JobMetricSnapshotRecord[] {
+function ensureSnapshotCollection(data: PacketAgentData): JobMetricSnapshotRecord[] {
   if (!Array.isArray(data.jobMetricSnapshots)) {
     data.jobMetricSnapshots = [];
   }
@@ -135,7 +135,7 @@ export function snapshotJobMetrics(
     };
   });
 
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     const repo = createJobMetricSnapshotsRepository({});
     if (result.snapshots.length > 0) {
       repo.insertMany(result.snapshots);
@@ -195,7 +195,7 @@ export async function snapshotJobMetricsAsync(
     };
   });
 
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     const repo = createJobMetricSnapshotsRepository({});
     if (result.snapshots.length > 0) {
       repo.insertMany(result.snapshots);
@@ -254,7 +254,7 @@ export function pruneJobMetricSnapshots(
     return { removed };
   });
 
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     const repo = createJobMetricSnapshotsRepository({});
     repo.prune(retainAfterIso);
   }
@@ -285,7 +285,7 @@ export async function pruneJobMetricSnapshotsAsync(
     return { removed };
   });
 
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     const repo = createJobMetricSnapshotsRepository({});
     repo.prune(retainAfterIso);
   }

@@ -16,7 +16,7 @@ function defaultProcessId(): string {
 }
 
 function resolveTtlMs(env: SchedulerLeaderEnv): number {
-  const raw = env.TASKLOOM_SCHEDULER_LEADER_TTL_MS;
+  const raw = env.PACKETAGENT_SCHEDULER_LEADER_TTL_MS;
   if (raw === undefined) return DEFAULT_TTL_MS;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_TTL_MS;
@@ -24,7 +24,7 @@ function resolveTtlMs(env: SchedulerLeaderEnv): number {
 }
 
 function resolveHttpTimeoutMs(env: SchedulerLeaderEnv): number {
-  const raw = env.TASKLOOM_SCHEDULER_LEADER_HTTP_TIMEOUT_MS;
+  const raw = env.PACKETAGENT_SCHEDULER_LEADER_HTTP_TIMEOUT_MS;
   if (raw === undefined) return DEFAULT_HTTP_TIMEOUT_MS;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_HTTP_TIMEOUT_MS;
@@ -32,13 +32,13 @@ function resolveHttpTimeoutMs(env: SchedulerLeaderEnv): number {
 }
 
 function resolveProcessId(env: SchedulerLeaderEnv): string {
-  const override = env.TASKLOOM_SCHEDULER_LEADER_PROCESS_ID;
+  const override = env.PACKETAGENT_SCHEDULER_LEADER_PROCESS_ID;
   if (override && override.length > 0) return override;
   return defaultProcessId();
 }
 
 export function selectSchedulerLeaderLock(env: SchedulerLeaderEnv = process.env): SchedulerLeaderLock {
-  const rawMode = env.TASKLOOM_SCHEDULER_LEADER_MODE;
+  const rawMode = env.PACKETAGENT_SCHEDULER_LEADER_MODE;
   const mode = rawMode === undefined ? "off" : rawMode.trim().toLowerCase();
 
   if (rawMode === undefined && mode === "off") {
@@ -50,7 +50,7 @@ export function selectSchedulerLeaderLock(env: SchedulerLeaderEnv = process.env)
   }
 
   if (mode === "file") {
-    const path = env.TASKLOOM_SCHEDULER_LEADER_FILE_PATH ?? DEFAULT_FILE_PATH;
+    const path = env.PACKETAGENT_SCHEDULER_LEADER_FILE_PATH ?? DEFAULT_FILE_PATH;
     return fileLeaderLock({
       path,
       processId: resolveProcessId(env),
@@ -59,12 +59,12 @@ export function selectSchedulerLeaderLock(env: SchedulerLeaderEnv = process.env)
   }
 
   if (mode === "http") {
-    const url = env.TASKLOOM_SCHEDULER_LEADER_HTTP_URL;
+    const url = env.PACKETAGENT_SCHEDULER_LEADER_HTTP_URL;
     if (!url || url.length === 0) {
-      throw new Error("TASKLOOM_SCHEDULER_LEADER_HTTP_URL must be set when TASKLOOM_SCHEDULER_LEADER_MODE=\"http\"");
+      throw new Error("PACKETAGENT_SCHEDULER_LEADER_HTTP_URL must be set when PACKETAGENT_SCHEDULER_LEADER_MODE=\"http\"");
     }
-    const secret = env.TASKLOOM_SCHEDULER_LEADER_HTTP_SECRET;
-    const failOpen = env.TASKLOOM_SCHEDULER_LEADER_HTTP_FAIL_OPEN === "true";
+    const secret = env.PACKETAGENT_SCHEDULER_LEADER_HTTP_SECRET;
+    const failOpen = env.PACKETAGENT_SCHEDULER_LEADER_HTTP_FAIL_OPEN === "true";
     return httpLeaderLock({
       url,
       processId: resolveProcessId(env),
@@ -75,5 +75,5 @@ export function selectSchedulerLeaderLock(env: SchedulerLeaderEnv = process.env)
     });
   }
 
-  throw new Error(`TASKLOOM_SCHEDULER_LEADER_MODE must be one of: off, file, http (got: "${rawMode ?? ""}")`);
+  throw new Error(`PACKETAGENT_SCHEDULER_LEADER_MODE must be one of: off, file, http (got: "${rawMode ?? ""}")`);
 }

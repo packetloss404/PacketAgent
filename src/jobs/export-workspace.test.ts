@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { exportWorkspaceData, type ExportWorkspaceDeps } from "./export-workspace.js";
-import type { TaskloomData } from "../taskloom-store.js";
+import type { PacketAgentData } from "../packetagent-store.js";
 import { maskSecret } from "../security/redaction.js";
 
 test("exportWorkspaceData throws 404 when the workspace does not exist", () => {
@@ -110,11 +110,11 @@ test("exportWorkspaceData recursively redacts nested sensitive values inside job
   assert.equal(serialized.includes("abc-secret-token-7777"), false);
 });
 
-function makeDeps(data: TaskloomData): ExportWorkspaceDeps {
+function makeDeps(data: PacketAgentData): ExportWorkspaceDeps {
   return { loadStore: () => data };
 }
 
-function makeStore(): TaskloomData {
+function makeStore(): PacketAgentData {
   return {
     users: [
       {

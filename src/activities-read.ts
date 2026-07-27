@@ -2,12 +2,12 @@ import {
   createActivitiesRepository,
   type ActivitiesRepository,
 } from "./repositories/activities-repo.js";
-import { loadStore as defaultLoadStore } from "./taskloom-store.js";
-import type { ActivityRecord, TaskloomData } from "./taskloom-store.js";
+import { loadStore as defaultLoadStore } from "./packetagent-store.js";
+import type { ActivityRecord, PacketAgentData } from "./packetagent-store.js";
 
 export interface ActivitiesReadDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   repository?: ActivitiesRepository;
 }
 
@@ -21,7 +21,7 @@ export function listActivitiesForWorkspaceViaRepository(
     mutateStore: deps.mutateStore,
   });
 
-  if (process.env.TASKLOOM_STORE !== "sqlite") {
+  if (process.env.PACKETAGENT_STORE !== "sqlite") {
     return repo.list({ workspaceId, limit });
   }
 

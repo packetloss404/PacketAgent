@@ -1,6 +1,6 @@
 export const brand = {
-  name: "Taskloom",
-  wordmark: "taskloom",
-  tagline: "Open-source agent workbench",
+  name: "PacketAgent",
+  wordmark: "packetagent",
+  tagline: "Autonomous workers that keep going",
   logoPath: "/logo.svg",
 };

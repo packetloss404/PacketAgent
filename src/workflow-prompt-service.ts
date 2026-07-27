@@ -9,7 +9,7 @@ import type {
   ImplementationPlanItemRecord,
   RequirementRecord,
   WorkspaceBriefRecord,
-} from "./taskloom-store.js";
+} from "./packetagent-store.js";
 
 export type WorkflowDraftInput = {
   prompt: string;

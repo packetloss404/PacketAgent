@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { migrateLegacyDefaultDataFiles } from "./brand.js";
 import { resolve } from "node:path";
 import { readActivationStatus } from "./activation/api";
 import type {
@@ -12,16 +13,16 @@ import {
   loadStore as loadDefaultStore,
   mutateStore as mutateDefaultStore,
   snapshotForWorkspace,
-  type TaskloomData,
+  type PacketAgentData,
   upsertActivationSignal,
-} from "./taskloom-store";
+} from "./packetagent-store";
 import { exportWorkspaceData } from "./jobs/export-workspace.js";
 import { reconcileInvitationEmails } from "./jobs/reconcile-invitation-emails.js";
 import { snapshotJobMetrics } from "./jobs/job-metrics-snapshot.js";
 
 export interface StoreJobDeps {
-  loadStore: () => TaskloomData;
-  mutateStore: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore: () => PacketAgentData;
+  mutateStore: <T>(mutator: (data: PacketAgentData) => T) => T;
 }
 
 export interface RecomputeActivationDeps extends StoreJobDeps {
@@ -30,7 +31,7 @@ export interface RecomputeActivationDeps extends StoreJobDeps {
     snapshot: ActivationSignalSnapshot,
     priorMilestones: ReadonlyArray<ActivationMilestoneRecord>,
   ) => ActivationStatusDto;
-  loadSnapshot?: (data: TaskloomData, workspaceId: string) => ActivationSignalSnapshot | Promise<ActivationSignalSnapshot>;
+  loadSnapshot?: (data: PacketAgentData, workspaceId: string) => ActivationSignalSnapshot | Promise<ActivationSignalSnapshot>;
 }
 
 export interface RecomputeActivationOptions {
@@ -130,7 +131,7 @@ function normalizeLegacyActivationSignals(deps: StoreJobDeps, workspaceId: strin
 }
 
 function recordLegacySignalCount(
-  data: TaskloomData,
+  data: PacketAgentData,
   workspaceId: string,
   kind: "retry" | "scope_change",
   factName: "retryCount" | "scopeChangeCount",
@@ -321,6 +322,7 @@ function isExecutedDirectly(): boolean {
 }
 
 if (isExecutedDirectly()) {
+  migrateLegacyDefaultDataFiles();
   runJobsCli().then((exitCode) => {
     process.exitCode = exitCode;
   }).catch((error: unknown) => {

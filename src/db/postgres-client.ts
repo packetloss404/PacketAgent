@@ -2,8 +2,8 @@ import { Pool } from "pg";
 import type { PoolConfig, QueryConfig, QueryResult, QueryResultRow } from "pg";
 
 export const MANAGED_POSTGRES_ENV_KEYS = [
-  "TASKLOOM_MANAGED_DATABASE_URL",
-  "TASKLOOM_DATABASE_URL",
+  "PACKETAGENT_MANAGED_DATABASE_URL",
+  "PACKETAGENT_DATABASE_URL",
   "DATABASE_URL",
 ] as const;
 

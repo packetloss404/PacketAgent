@@ -12,7 +12,7 @@ import {
   type JobsRepository,
   type JobsRepositoryDeps,
 } from "./jobs-repo.js";
-import type { JobRecord, TaskloomData } from "../taskloom-store.js";
+import type { JobRecord, PacketAgentData } from "../packetagent-store.js";
 
 function makeRecord(overrides: Partial<JobRecord> & { id: string }): JobRecord {
   const record: JobRecord = {
@@ -37,29 +37,29 @@ function makeRecord(overrides: Partial<JobRecord> & { id: string }): JobRecord {
 }
 
 function makeJsonRepo(): JobsRepository {
-  const data = { jobs: [] as JobRecord[] } as unknown as TaskloomData;
+  const data = { jobs: [] as JobRecord[] } as unknown as PacketAgentData;
   const deps: JobsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonJobsRepository(deps);
 }
 
 function withTempSqlite(testFn: (repo: JobsRepository) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-jobs-repo-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-jobs-repo-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = sqliteJobsRepository({ dbPath });
     testFn(repo);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 }
@@ -613,31 +613,31 @@ test("asyncJobsRepository delegates enqueue, claim, and sweep to the sync reposi
 });
 
 test("createJobsRepository returns json impl when env is unset", () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
-    const data = { jobs: [] as JobRecord[] } as unknown as TaskloomData;
+    delete process.env.PACKETAGENT_STORE;
+    const data = { jobs: [] as JobRecord[] } as unknown as PacketAgentData;
     const repo = createJobsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     repo.upsert(makeRecord({ id: "job_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);
     assert.equal(data.jobs.length, 1);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
 test("createAsyncJobsRepository wraps the selected repository implementation", async () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
-    const data = { jobs: [] as JobRecord[] } as unknown as TaskloomData;
+    delete process.env.PACKETAGENT_STORE;
+    const data = { jobs: [] as JobRecord[] } as unknown as PacketAgentData;
     const repo = createAsyncJobsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
 
     await repo.upsert(makeRecord({ id: "job_1", workspaceId: "ws_a" }));
@@ -646,20 +646,20 @@ test("createAsyncJobsRepository wraps the selected repository implementation", a
     assert.equal(data.jobs.length, 1);
     assert.equal((await repo.list({ workspaceId: "ws_a" }))[0]?.id, "job_1");
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
 test("createAsyncJobsRepository accepts awaitable store dependencies", async () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
-    const data = { jobs: [] as JobRecord[] } as unknown as TaskloomData;
+    delete process.env.PACKETAGENT_STORE;
+    const data = { jobs: [] as JobRecord[] } as unknown as PacketAgentData;
     let mutations = 0;
     const repo = createAsyncJobsRepository({
       loadStore: async () => data,
-      mutateStore: async <T,>(mutator: (target: TaskloomData) => T | Promise<T>) => {
+      mutateStore: async <T,>(mutator: (target: PacketAgentData) => T | Promise<T>) => {
         mutations += 1;
         return mutator(data);
       },
@@ -673,28 +673,28 @@ test("createAsyncJobsRepository accepts awaitable store dependencies", async () 
     assert.equal(claimed?.status, "running");
     assert.equal((await repo.list({ workspaceId: "ws_a" }))[0]?.status, "running");
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
 test("createJobsRepository returns sqlite impl when env requests it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-jobs-factory-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-jobs-factory-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = createJobsRepository({ dbPath });
     repo.upsert(makeRecord({ id: "job_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);
     assert.equal(repo.list({ workspaceId: "ws_a" })[0]?.id, "job_1");
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 });

@@ -155,7 +155,7 @@ export default function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
               <details className="card mono" style={{ marginTop: 18, padding: "10px 14px", fontSize: 11, color: "var(--silver-400)" }}>
                 <summary style={{ cursor: "pointer", color: "var(--silver-200)" }}>DEV SEED ACCOUNTS</summary>
                 <p style={{ marginTop: 8, lineHeight: 1.6 }}>
-                  <code>alpha@taskloom.local</code>, <code>beta@taskloom.local</code>, <code>gamma@taskloom.local</code> · password <code>demo12345</code>
+                  <code>alpha@packetagent.local</code>, <code>beta@packetagent.local</code>, <code>gamma@packetagent.local</code> · password <code>demo12345</code>
                 </p>
               </details>
             )}
@@ -163,7 +163,7 @@ export default function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
         </main>
 
         <footer style={{ borderTop: "1px solid var(--line)", padding: "20px 32px", display: "flex", alignItems: "center", gap: 14, maxWidth: 1100, margin: "0 auto" }}>
-          <span className="mono muted" style={{ fontSize: 11 }}>© Taskloom · v0.1.0</span>
+          <span className="mono muted" style={{ fontSize: 11 }}>© PacketAgent · v0.1.0</span>
           <span className="mono muted" style={{ fontSize: 11, marginLeft: "auto" }}>self-hosted · MIT</span>
         </footer>
       </div>

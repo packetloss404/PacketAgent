@@ -109,7 +109,7 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
     id: "database",
     surface: "runtime",
     label: "Database runtime sandbox",
-    envKeys: ["DATABASE_URL", "TASKLOOM_DATABASE_URL", "TASKLOOM_MANAGED_DATABASE_URL"],
+    envKeys: ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"],
     connectorNames: ["database", "postgres"],
     toolNames: ["database", "postgres"],
     signals: [
@@ -118,7 +118,7 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
       { label: "persistence", pattern: /\bpersist(s|ed|ence)?\b|\bsave records\b/i },
     ],
     defaultSetupGuide: [
-      "Configure DATABASE_URL, TASKLOOM_DATABASE_URL, or TASKLOOM_MANAGED_DATABASE_URL before testing persistence in the runtime sandbox.",
+      "Configure DATABASE_URL, PACKETAGENT_DATABASE_URL, or PACKETAGENT_MANAGED_DATABASE_URL before testing persistence in the runtime sandbox.",
       "Run migrations before treating database sandbox checks as publish-ready.",
     ],
   },
@@ -142,7 +142,7 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
     id: "webhook",
     surface: "runtime",
     label: "Webhook connector sandbox",
-    envKeys: ["TASKLOOM_PUBLIC_BASE_URL", "TASKLOOM_PUBLIC_APP_BASE_URL", "TASKLOOM_WEBHOOK_SIGNING_SECRET"],
+    envKeys: ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL", "PACKETAGENT_WEBHOOK_SIGNING_SECRET"],
     envKeyMode: "all",
     connectorNames: ["webhook"],
     toolNames: ["webhook"],
@@ -151,8 +151,8 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
       { label: "signature", pattern: /\bsign(ature|ed|ing)\b/i },
     ],
     defaultSetupGuide: [
-      "Set TASKLOOM_PUBLIC_APP_BASE_URL or TASKLOOM_PUBLIC_BASE_URL before registering sandbox webhook URLs.",
-      "Set TASKLOOM_WEBHOOK_SIGNING_SECRET before trusting inbound sandbox events.",
+      "Set PACKETAGENT_PUBLIC_APP_BASE_URL or PACKETAGENT_PUBLIC_BASE_URL before registering sandbox webhook URLs.",
+      "Set PACKETAGENT_WEBHOOK_SIGNING_SECRET before trusting inbound sandbox events.",
     ],
   },
   {
@@ -224,7 +224,7 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
     id: "preview_runtime",
     surface: "preview",
     label: "Preview runtime sandbox",
-    envKeys: ["TASKLOOM_PREVIEW_SANDBOX"],
+    envKeys: ["PACKETAGENT_PREVIEW_SANDBOX"],
     connectorNames: ["preview-runtime"],
     toolNames: ["preview-runtime"],
     signals: [
@@ -232,7 +232,7 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
       { label: "api-route", pattern: /\bapi route(s)?\b|\bendpoint(s)?\b/i },
     ],
     defaultSetupGuide: [
-      "Enable TASKLOOM_PREVIEW_SANDBOX or provide an explicit preview runtime override before exercising preview API routes.",
+      "Enable PACKETAGENT_PREVIEW_SANDBOX or provide an explicit preview runtime override before exercising preview API routes.",
       "Use stubbed preview data for external integrations until runtime sandbox checks pass.",
     ],
   },
@@ -360,7 +360,7 @@ function isAvailable(
   if (spec.surface === "runtime" && input.runtime?.sandboxEnabled === false) return false;
   if (spec.surface === "preview" && input.preview?.sandboxEnabled === false) return false;
   if (spec.id === "preview_renderer") return input.preview?.buildReady === true || hasValue(input.preview?.previewUrl);
-  if (spec.id === "preview_runtime") return input.preview?.sandboxEnabled === true || hasAnyEnv(env, ["TASKLOOM_PREVIEW_SANDBOX"]);
+  if (spec.id === "preview_runtime") return input.preview?.sandboxEnabled === true || hasAnyEnv(env, ["PACKETAGENT_PREVIEW_SANDBOX"]);
   return intersects(normalizedSet(input.availableTools), spec.toolNames)
     || intersects(normalizedSet(input.connectedConnectors), spec.connectorNames)
     || spec.envKeys.length > 0;
@@ -377,8 +377,8 @@ function isConfigured(
     || intersects(normalizedSet(input.connectedConnectors), spec.connectorNames)
   );
   if (spec.id === "webhook") {
-    return hasAnyEnv(env, ["TASKLOOM_PUBLIC_BASE_URL", "TASKLOOM_PUBLIC_APP_BASE_URL"])
-      && hasValue(env.TASKLOOM_WEBHOOK_SIGNING_SECRET);
+    return hasAnyEnv(env, ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL"])
+      && hasValue(env.PACKETAGENT_WEBHOOK_SIGNING_SECRET);
   }
   if (spec.envKeys.length === 0) {
     return intersects(normalizedSet(input.availableTools), spec.toolNames)

@@ -1,14 +1,14 @@
-import type { TaskloomData } from "./types.js";
+import type { PacketAgentData } from "./types.js";
 
 // Shared in-process cache for the most recently loaded store, keyed by the
 // backend that produced it. Kept module-private and exposed only through
 // accessor functions so consumers never bind to a mutable `let` (which would
 // be an ESM live-binding hazard if re-exported). This module is a LEAF: it
 // imports only types and must never import a backend or the barrel.
-let cache: TaskloomData | null = null;
+let cache: PacketAgentData | null = null;
 let cacheBackendKey: string | null = null;
 
-export function getCachedStore(): TaskloomData | null {
+export function getCachedStore(): PacketAgentData | null {
   return cache;
 }
 
@@ -16,7 +16,7 @@ export function getCacheBackendKey(): string | null {
   return cacheBackendKey;
 }
 
-export function setCachedStore(data: TaskloomData, backendKey: string): void {
+export function setCachedStore(data: PacketAgentData, backendKey: string): void {
   cache = data;
   cacheBackendKey = backendKey;
 }

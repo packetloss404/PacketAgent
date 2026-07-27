@@ -1,21 +1,21 @@
 # =============================================================================
-# Taskloom proxy access-log redaction example: Apache 2.4
+# PacketAgent proxy access-log redaction example: Apache 2.4
 # -----------------------------------------------------------------------------
 # This file is an EXAMPLE. Tailor virtual host, ServerName, SSL, and upstream
 # directives before deploying. Requires mod_rewrite, mod_setenvif, and
 # mod_log_config (all standard in Apache 2.4).
 #
-# Goal: prevent raw Taskloom tokens from being written to disk by Apache's
-# access log. Taskloom redacts its own application logs (see
+# Goal: prevent raw PacketAgent tokens from being written to disk by Apache's
+# access log. PacketAgent redacts its own application logs (see
 # src/security/redaction.ts), but Apache logs the inbound URI before the
-# request ever reaches Taskloom.
+# request ever reaches PacketAgent.
 #
 # Strategy:
 #   1. Use mod_rewrite with [E=...] to capture redacted versions of the
 #      path and query string into request-scoped environment variables.
 #   2. Use mod_setenvif to flip env vars when sensitive query keys appear,
 #      so the LogFormat substitutes [redacted] in place of %q.
-#   3. Define a custom LogFormat (taskloom_redacted) that references those
+#   3. Define a custom LogFormat (packetagent_redacted) that references those
 #      env vars instead of %U / %q directly.
 #   4. NEVER reference Authorization, Cookie, or X-Api-Key headers in the
 #      LogFormat. Apache only logs request headers that the format string
@@ -33,46 +33,46 @@ LoadModule setenvif_module   modules/mod_setenvif.so
 LoadModule log_config_module modules/mod_log_config.so
 
 <VirtualHost *:443>
-  ServerName taskloom.example.com
+  ServerName packetagent.example.com
 
   # ---- Redacted-path env var ---------------------------------------------
   # Default to the unmodified URI, then progressively rewrite token-bearing
-  # routes. The [E=TASKLOOM_REDACTED_URI:...] flag sets a request-scoped
+  # routes. The [E=PACKETAGENT_REDACTED_URI:...] flag sets a request-scoped
   # env var without altering the served URL ([PT] passes through).
   RewriteEngine On
 
-  RewriteRule "^(.*)$" "-" [E=TASKLOOM_REDACTED_URI:%{REQUEST_URI}]
+  RewriteRule "^(.*)$" "-" [E=PACKETAGENT_REDACTED_URI:%{REQUEST_URI}]
 
   RewriteCond "%{REQUEST_URI}" "^(/share/)[^/]+(.*)$"
-  RewriteRule "^.*$" "-" [E=TASKLOOM_REDACTED_URI:%1[redacted]%2]
+  RewriteRule "^.*$" "-" [E=PACKETAGENT_REDACTED_URI:%1[redacted]%2]
 
   RewriteCond "%{REQUEST_URI}" "^(/api/public/share/)[^/]+(.*)$"
-  RewriteRule "^.*$" "-" [E=TASKLOOM_REDACTED_URI:%1[redacted]%2]
+  RewriteRule "^.*$" "-" [E=PACKETAGENT_REDACTED_URI:%1[redacted]%2]
 
   RewriteCond "%{REQUEST_URI}" "^(/api/public/webhooks/agents/)[^/]+(.*)$"
-  RewriteRule "^.*$" "-" [E=TASKLOOM_REDACTED_URI:%1[redacted]%2]
+  RewriteRule "^.*$" "-" [E=PACKETAGENT_REDACTED_URI:%1[redacted]%2]
 
   RewriteCond "%{REQUEST_URI}" "^(/api/app/invitations/)[^/]+(/accept.*)$"
-  RewriteRule "^.*$" "-" [E=TASKLOOM_REDACTED_URI:%1[redacted]%2]
+  RewriteRule "^.*$" "-" [E=PACKETAGENT_REDACTED_URI:%1[redacted]%2]
 
   # ---- Redacted-query env var --------------------------------------------
   # If the query string contains a sensitive key=value pair, set
-  # TASKLOOM_QUERY_REDACTED so the LogFormat below can swap it.
-  SetEnvIfNoCase Query_String "(?:^|&)(?:token|access_token|api[_-]?key|apikey|key|secret)=" TASKLOOM_QUERY_REDACTED=1
+  # PACKETAGENT_QUERY_REDACTED so the LogFormat below can swap it.
+  SetEnvIfNoCase Query_String "(?:^|&)(?:token|access_token|api[_-]?key|apikey|key|secret)=" PACKETAGENT_QUERY_REDACTED=1
 
   # ---- Custom log format -------------------------------------------------
   # Field set mirrors the nginx example. NOTE: %{Authorization}i,
   # %{Cookie}i, and %{X-Api-Key}i are DELIBERATELY OMITTED.
-  LogFormat "{\"time\":\"%{%Y-%m-%dT%H:%M:%S%z}t\",\"method\":\"%m\",\"status\":%>s,\"request_time\":%D,\"bytes_sent\":%B,\"request_id\":\"%{X-Request-ID}i\",\"uri\":\"%{TASKLOOM_REDACTED_URI}e\",\"query\":\"%{TASKLOOM_QUERY_REDACTED}e\"}" taskloom_redacted_json
+  LogFormat "{\"time\":\"%{%Y-%m-%dT%H:%M:%S%z}t\",\"method\":\"%m\",\"status\":%>s,\"request_time\":%D,\"bytes_sent\":%B,\"request_id\":\"%{X-Request-ID}i\",\"uri\":\"%{PACKETAGENT_REDACTED_URI}e\",\"query\":\"%{PACKETAGENT_QUERY_REDACTED}e\"}" packetagent_redacted_json
 
-  # When TASKLOOM_QUERY_REDACTED is set, log "[redacted]"; otherwise log %q.
+  # When PACKETAGENT_QUERY_REDACTED is set, log "[redacted]"; otherwise log %q.
   # Apache cannot do this conditionally inside a single LogFormat token, so
   # we emit two separate log lines and let downstream processing pick one.
   # Stock workaround: log both lines with CustomLog ... env=... gating.
-  CustomLog "/var/log/apache2/taskloom-access.log" taskloom_redacted_json env=!TASKLOOM_QUERY_REDACTED
+  CustomLog "/var/log/apache2/packetagent-access.log" packetagent_redacted_json env=!PACKETAGENT_QUERY_REDACTED
 
-  LogFormat "{\"time\":\"%{%Y-%m-%dT%H:%M:%S%z}t\",\"method\":\"%m\",\"status\":%>s,\"request_time\":%D,\"bytes_sent\":%B,\"request_id\":\"%{X-Request-ID}i\",\"uri\":\"%{TASKLOOM_REDACTED_URI}e\",\"query\":\"[redacted]\"}" taskloom_redacted_json_qsafe
-  CustomLog "/var/log/apache2/taskloom-access.log" taskloom_redacted_json_qsafe env=TASKLOOM_QUERY_REDACTED
+  LogFormat "{\"time\":\"%{%Y-%m-%dT%H:%M:%S%z}t\",\"method\":\"%m\",\"status\":%>s,\"request_time\":%D,\"bytes_sent\":%B,\"request_id\":\"%{X-Request-ID}i\",\"uri\":\"%{PACKETAGENT_REDACTED_URI}e\",\"query\":\"[redacted]\"}" packetagent_redacted_json_qsafe
+  CustomLog "/var/log/apache2/packetagent-access.log" packetagent_redacted_json_qsafe env=PACKETAGENT_QUERY_REDACTED
 
   # ---- Reverse proxy -----------------------------------------------------
   ProxyPreserveHost On
@@ -89,10 +89,10 @@ LoadModule log_config_module modules/mod_log_config.so
 # such as:
 #
 #   SecRule QUERY_STRING "@rx (?i)(?:^|&)(token|access_token|api[_-]?key|apikey|key|secret)=([^&]+)" \
-#     "id:9001,phase:1,pass,nolog,setenv:TASKLOOM_REDACTED_QS=%{MATCHED_VAR}"
+#     "id:9001,phase:1,pass,nolog,setenv:PACKETAGENT_REDACTED_QS=%{MATCHED_VAR}"
 #
-# Then build the final logged URI from TASKLOOM_REDACTED_QS plus
-# TASKLOOM_REDACTED_URI. This is OUT OF SCOPE for the stock example but is
+# Then build the final logged URI from PACKETAGENT_REDACTED_QS plus
+# PACKETAGENT_REDACTED_URI. This is OUT OF SCOPE for the stock example but is
 # the recommended path for high-traffic deployments that cannot tolerate the
 # coarse "redact entire query string" behavior of the SetEnvIfNoCase rule
 # above.

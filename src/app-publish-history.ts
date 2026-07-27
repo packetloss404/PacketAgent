@@ -8,7 +8,7 @@ import type {
   GeneratedAppPublishRollbackStatus,
   GeneratedAppPublishStatus,
   GeneratedAppPublishVisibility,
-} from "./taskloom-store.js";
+} from "./packetagent-store.js";
 
 export interface GeneratedAppPublishRecordInput extends AppPublishReadinessInput {
   workspaceId: string;
@@ -91,8 +91,8 @@ export function buildGeneratedAppPublishRecord(input: GeneratedAppPublishRecordI
     versionLabel,
     localPublishPath: readiness.localPublishPath,
     workspacePath: readiness.localPublishPath,
-    publicUrl: dockerComposeExport.environment.TASKLOOM_PUBLIC_APP_BASE_URL,
-    privateUrl: dockerComposeExport.environment.TASKLOOM_PRIVATE_APP_BASE_URL,
+    publicUrl: dockerComposeExport.environment.PACKETAGENT_PUBLIC_APP_BASE_URL,
+    privateUrl: dockerComposeExport.environment.PACKETAGENT_PRIVATE_APP_BASE_URL,
     previewUrl: cleanString(input.previewUrl) || undefined,
     buildStatus: cleanString(input.buildStatus) || undefined,
     smokeStatus: cleanString(input.smokeStatus) || undefined,
@@ -140,7 +140,7 @@ export function generatedAppPublishUrlForBase(
   input: GeneratedAppPublishRuntimeRouteInput,
 ): string {
   const parsed = parseUrl(url);
-  if (!parsed || !isTaskloomRuntimeHost(parsed)) return url;
+  if (!parsed || !isPacketAgentRuntimeHost(parsed)) return url;
   parsed.pathname = generatedAppPublishRuntimePath(input).split("?")[0];
   parsed.search = cleanString(input.checkpointId) ? `?checkpointId=${encodeURIComponent(cleanString(input.checkpointId))}` : "";
   parsed.hash = "";
@@ -162,24 +162,24 @@ export function buildDockerComposeExport(input: {
   const environment = {
     NODE_ENV: "production",
     PORT: "8484",
-    TASKLOOM_STORE: "sqlite",
-    TASKLOOM_PUBLISH_ROOT: containerPublishPath,
-    TASKLOOM_APP_BUNDLE_PATH: `${containerPublishPath}/bundle`,
-    TASKLOOM_PUBLISH_MANIFEST_PATH: `${containerPublishPath}/publish-artifacts.json`,
-    TASKLOOM_PUBLIC_APP_BASE_URL: input.publicUrl,
-    TASKLOOM_PRIVATE_APP_BASE_URL: input.privateUrl,
+    PACKETAGENT_STORE: "sqlite",
+    PACKETAGENT_PUBLISH_ROOT: containerPublishPath,
+    PACKETAGENT_APP_BUNDLE_PATH: `${containerPublishPath}/bundle`,
+    PACKETAGENT_PUBLISH_MANIFEST_PATH: `${containerPublishPath}/publish-artifacts.json`,
+    PACKETAGENT_PUBLIC_APP_BASE_URL: input.publicUrl,
+    PACKETAGENT_PRIVATE_APP_BASE_URL: input.privateUrl,
   };
   const volume = `${input.localPublishPath}:/app/data/published-apps/${input.workspaceSlug}/${input.appSlug}:ro`;
   const instructions = [
     `Export the generated app bundle at ${bundlePath}.`,
     `Export the publish artifact manifest at ${manifestPath}.`,
-    `Mount ${input.localPublishPath} read-only so TASKLOOM_APP_BUNDLE_PATH resolves inside the taskloom-app container.`,
+    `Mount ${input.localPublishPath} read-only so PACKETAGENT_APP_BUNDLE_PATH resolves inside the packetagent-app container.`,
     "Run docker compose with this file from the repository root after npm dependencies are installed or the image is built.",
   ];
   const yaml = [
     'version: "3.9"',
     "services:",
-    "  taskloom-app:",
+    "  packetagent-app:",
     "    build: .",
     "    command: npm start",
     "    ports:",
@@ -189,31 +189,31 @@ export function buildDockerComposeExport(input: {
     "    volumes:",
     `      - ${JSON.stringify(volume)}`,
     "    depends_on:",
-    "      - taskloom-db",
+    "      - packetagent-db",
     "    healthcheck:",
     `      test: ["CMD", "node", "-e", "fetch('${input.privateUrl}/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]`,
     "      interval: 30s",
     "      timeout: 5s",
     "      retries: 3",
-    "  taskloom-db:",
+    "  packetagent-db:",
     "    image: postgres:16-alpine",
     "    environment:",
-    "      POSTGRES_DB: taskloom",
-    "      POSTGRES_USER: taskloom",
-    "      POSTGRES_PASSWORD: taskloom",
+    "      POSTGRES_DB: packetagent",
+    "      POSTGRES_USER: packetagent",
+    "      POSTGRES_PASSWORD: packetagent",
     "    volumes:",
-    "      - taskloom-db-data:/var/lib/postgresql/data",
+    "      - packetagent-db-data:/var/lib/postgresql/data",
     "volumes:",
-    "  taskloom-db-data:",
+    "  packetagent-db-data:",
   ].join("\n");
 
   return {
     fileName: "docker-compose.publish.yml",
     format: "docker-compose",
     version: "3.9",
-    services: ["taskloom-app", "taskloom-db"],
+    services: ["packetagent-app", "packetagent-db"],
     environment,
-    volumes: [volume, "taskloom-db-data:/var/lib/postgresql/data"],
+    volumes: [volume, "packetagent-db-data:/var/lib/postgresql/data"],
     bundlePath,
     manifestPath,
     instructions,
@@ -231,7 +231,7 @@ export function createGeneratedAppPublishRollbackCommand(
     input.reason ?? "",
   ].join(":")).slice(0, 16)}`;
   const command = [
-    "taskloom publish rollback",
+    "packetagent publish rollback",
     `--workspace=${input.current.workspaceId}`,
     `--app=${input.current.appId}`,
     `--from-publish=${input.current.id}`,
@@ -358,7 +358,7 @@ function parseUrl(value: string): URL | null {
   }
 }
 
-function isTaskloomRuntimeHost(url: URL): boolean {
+function isPacketAgentRuntimeHost(url: URL): boolean {
   const hostname = url.hostname.toLowerCase();
   return hostname === "localhost"
     || hostname === "127.0.0.1"

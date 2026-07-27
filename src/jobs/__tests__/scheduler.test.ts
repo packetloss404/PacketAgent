@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listInvitationEmailDeliveriesIndexed, resetStoreForTests } from "../../taskloom-store.js";
-import { createAgent, createWorkspaceInvitation, handleInvitationEmailJob, INVITATION_EMAIL_JOB_TYPE, login, resendWorkspaceInvitation, updateAgent } from "../../taskloom-services.js";
-import { TASKLOOM_INVITATION_EMAIL_MODE_ENV, TASKLOOM_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV } from "../../invitation-email.js";
+import { listInvitationEmailDeliveriesIndexed, resetStoreForTests } from "../../packetagent-store.js";
+import { createAgent, createWorkspaceInvitation, handleInvitationEmailJob, INVITATION_EMAIL_JOB_TYPE, login, resendWorkspaceInvitation, updateAgent } from "../../packetagent-services.js";
+import { PACKETAGENT_INVITATION_EMAIL_MODE_ENV, PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV } from "../../invitation-email.js";
 import { resetInvitationEmailDeliveryForTests, setInvitationEmailFetchForTests } from "../../invitation-email-delivery.js";
 import { defaultJobSchedulerStorage, enqueueJob, enqueueRecurringJob, findJob, listJobs, maintainScheduledAgentJobs, updateJob } from "../store.js";
 import { JobScheduler } from "../scheduler.js";
@@ -68,19 +68,19 @@ test("scheduler retries failing job up to maxAttempts then marks failed", async 
 });
 
 test("scheduler dead-letters invitation email retry jobs after webhook failures", async () => {
-  const previousMode = process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
-  const previousUrl = process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV];
-  const previousMaxAttempts = process.env[TASKLOOM_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV];
+  const previousMode = process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
+  const previousUrl = process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV];
+  const previousMaxAttempts = process.env[PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV];
   try {
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://email.example/invitations";
-    process.env[TASKLOOM_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV] = "2";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://email.example/invitations";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV] = "2";
     resetStoreForTests();
     resetInvitationEmailDeliveryForTests();
     setInvitationEmailFetchForTests(async () => {
       throw new Error("provider unavailable");
     });
-    const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const created = await createWorkspaceInvitation(auth.context, { email: "deadletter@test.example", role: "member" });
     const retryJobId = created.emailDelivery.retryJobId;
     assert.ok(retryJobId, "expected retry job id");
@@ -105,18 +105,18 @@ test("scheduler dead-letters invitation email retry jobs after webhook failures"
     assert.deepEqual(deliveries.map((delivery) => delivery.status), ["failed", "failed", "failed"]);
   } finally {
     resetInvitationEmailDeliveryForTests();
-    restoreEnv(TASKLOOM_INVITATION_EMAIL_MODE_ENV, previousMode);
-    restoreEnv(TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV, previousUrl);
-    restoreEnv(TASKLOOM_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, previousMaxAttempts);
+    restoreEnv(PACKETAGENT_INVITATION_EMAIL_MODE_ENV, previousMode);
+    restoreEnv(PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV, previousUrl);
+    restoreEnv(PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, previousMaxAttempts);
   }
 });
 
 test("invitation email retry jobs resolve the current invitation token", async () => {
-  const previousMode = process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
-  const previousUrl = process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV];
+  const previousMode = process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
+  const previousUrl = process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV];
   try {
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://email.example/invitations";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://email.example/invitations";
     resetStoreForTests();
     resetInvitationEmailDeliveryForTests();
     const webhookBodies: Array<{ token?: string; action?: string }> = [];
@@ -126,7 +126,7 @@ test("invitation email retry jobs resolve the current invitation token", async (
       if (webhookBodies.length === 1) throw new Error("first send failed");
       return new Response(null, { status: 204 });
     });
-    const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const created = await createWorkspaceInvitation(auth.context, { email: "current-token@test.example", role: "member" });
     const retryJobId = created.emailDelivery.retryJobId;
     assert.ok(retryJobId, "expected retry job id");
@@ -145,8 +145,8 @@ test("invitation email retry jobs resolve the current invitation token", async (
     assert.notEqual(webhookBodies[2]?.token, originalToken);
   } finally {
     resetInvitationEmailDeliveryForTests();
-    restoreEnv(TASKLOOM_INVITATION_EMAIL_MODE_ENV, previousMode);
-    restoreEnv(TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV, previousUrl);
+    restoreEnv(PACKETAGENT_INVITATION_EMAIL_MODE_ENV, previousMode);
+    restoreEnv(PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV, previousUrl);
   }
 });
 
@@ -197,7 +197,7 @@ test("cron job re-enqueues itself after success", async () => {
 
 test("scheduled agents maintain one future agent.run job", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { agent } = createAgent(auth.context, {
     name: "Scheduled Agent",
     instructions: "Run on a schedule and summarize workspace state.",
@@ -217,7 +217,7 @@ test("scheduled agents maintain one future agent.run job", () => {
 
 test("non-schedule or inactive agents do not keep queued scheduled jobs", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { agent } = createAgent(auth.context, {
     name: "Toggle Agent",
     instructions: "Run on a schedule and summarize workspace state.",
@@ -238,7 +238,7 @@ test("non-schedule or inactive agents do not keep queued scheduled jobs", () => 
 
 test("invalid agent cron schedules do not enqueue jobs", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { agent } = createAgent(auth.context, {
     name: "Invalid Cron Agent",
     instructions: "Run on a schedule and summarize workspace state.",
@@ -253,7 +253,7 @@ test("invalid agent cron schedules do not enqueue jobs", () => {
 
 test("scheduler runs a seeded scheduled agent.run job", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { agent } = createAgent(auth.context, {
     name: "Runnable Scheduled Agent",
     instructions: "Run on a schedule and summarize workspace state.",
@@ -350,7 +350,7 @@ test("scheduler records job-type metrics for successful runs", async () => {
 
 test("recurring scheduled agent jobs preserve payload inputs", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { agent } = createAgent(auth.context, {
     name: "Input Scheduled Agent",
     instructions: "Run on a schedule and summarize workspace state.",

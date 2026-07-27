@@ -3,7 +3,7 @@ import { loadStoreFromBackend } from "../runtime.js";
 import { DATA_FILE, persistJsonStore, runSerializedJsonMutation } from "../json-io.js";
 import { normalizeStore } from "../normalize.js";
 import { seedStore } from "../seed.js";
-import type { TaskloomData } from "../types.js";
+import type { PacketAgentData } from "../types.js";
 import type { AsyncStoreBackend, StoreBackend } from "./types.js";
 
 // BACKEND module: json file-backed store. Imports leaves only
@@ -15,7 +15,7 @@ export function jsonStoreBackend(): StoreBackend {
     key: `json:${DATA_FILE}`,
     load() {
       try {
-        return normalizeStore(JSON.parse(readFileSync(DATA_FILE, "utf8")) as Partial<TaskloomData>);
+        return normalizeStore(JSON.parse(readFileSync(DATA_FILE, "utf8")) as Partial<PacketAgentData>);
       } catch {
         const seeded = seedStore();
         persistJsonStore(seeded);

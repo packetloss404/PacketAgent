@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 
-export const SESSION_COOKIE_NAME = "taskloom_session";
+export const SESSION_COOKIE_NAME = "packetagent_session";
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function normalizeEmail(email: string): string {

@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { JobRecord, TaskloomData } from "./taskloom-store.js";
+import type { JobRecord, PacketAgentData } from "./packetagent-store.js";
 import {
   getOperationsStatus,
   type JobTypeMetrics,
 } from "./operations-status.js";
 
-function emptyStore(): TaskloomData {
-  return { jobs: [] } as unknown as TaskloomData;
+function emptyStore(): PacketAgentData {
+  return { jobs: [] } as unknown as PacketAgentData;
 }
 
-function storeWithJobs(jobs: JobRecord[]): TaskloomData {
-  return { jobs } as unknown as TaskloomData;
+function storeWithJobs(jobs: JobRecord[]): PacketAgentData {
+  return { jobs } as unknown as PacketAgentData;
 }
 
 function fakeJob(type: string, status: JobRecord["status"], id: string): JobRecord {
@@ -49,10 +49,10 @@ test("default env yields json store, off leader mode, off access log, default kn
   assert.equal(status.runtime.nodeVersion, process.versions.node);
 });
 
-test("TASKLOOM_STORE=sqlite flips store mode", () => {
+test("PACKETAGENT_STORE=sqlite flips store mode", () => {
   const status = getOperationsStatus({
     loadStore: () => emptyStore(),
-    env: { TASKLOOM_STORE: "sqlite" },
+    env: { PACKETAGENT_STORE: "sqlite" },
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   });
 
@@ -63,14 +63,14 @@ test("file leader mode reflects custom path and not-held when no probe registere
   const status = getOperationsStatus({
     loadStore: () => emptyStore(),
     env: {
-      TASKLOOM_SCHEDULER_LEADER_MODE: "FILE",
-      TASKLOOM_SCHEDULER_LEADER_FILE_PATH: "var/lib/taskloom/leader.json",
+      PACKETAGENT_SCHEDULER_LEADER_MODE: "FILE",
+      PACKETAGENT_SCHEDULER_LEADER_FILE_PATH: "var/lib/packetagent/leader.json",
     },
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   });
 
   assert.equal(status.scheduler.leaderMode, "file");
-  assert.equal(status.scheduler.lockSummary, "var/lib/taskloom/leader.json");
+  assert.equal(status.scheduler.lockSummary, "var/lib/packetagent/leader.json");
   assert.equal(status.scheduler.leaderHeldLocally, false);
 });
 
@@ -78,8 +78,8 @@ test("http leader mode strips query string from URL summary", () => {
   const status = getOperationsStatus({
     loadStore: () => emptyStore(),
     env: {
-      TASKLOOM_SCHEDULER_LEADER_MODE: "http",
-      TASKLOOM_SCHEDULER_LEADER_HTTP_URL: "https://coord.internal/leader?token=secret123&extra=yes",
+      PACKETAGENT_SCHEDULER_LEADER_MODE: "http",
+      PACKETAGENT_SCHEDULER_LEADER_HTTP_URL: "https://coord.internal/leader?token=secret123&extra=yes",
     },
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   });
@@ -92,7 +92,7 @@ test("http leader mode strips query string from URL summary", () => {
 test("invalid leader mode falls back to off without throwing", () => {
   const status = getOperationsStatus({
     loadStore: () => emptyStore(),
-    env: { TASKLOOM_SCHEDULER_LEADER_MODE: "bogus" },
+    env: { PACKETAGENT_SCHEDULER_LEADER_MODE: "bogus" },
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   });
 
@@ -128,10 +128,10 @@ test("access log reads max bytes, clamps max files to >= 1, and exposes file pat
   const clamped = getOperationsStatus({
     loadStore: () => emptyStore(),
     env: {
-      TASKLOOM_ACCESS_LOG_MODE: "FILE",
-      TASKLOOM_ACCESS_LOG_PATH: "logs/access.log",
-      TASKLOOM_ACCESS_LOG_MAX_BYTES: "1048576",
-      TASKLOOM_ACCESS_LOG_MAX_FILES: "0",
+      PACKETAGENT_ACCESS_LOG_MODE: "FILE",
+      PACKETAGENT_ACCESS_LOG_PATH: "logs/access.log",
+      PACKETAGENT_ACCESS_LOG_MAX_BYTES: "1048576",
+      PACKETAGENT_ACCESS_LOG_MAX_FILES: "0",
     },
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   });
@@ -144,8 +144,8 @@ test("access log reads max bytes, clamps max files to >= 1, and exposes file pat
   const stdoutMode = getOperationsStatus({
     loadStore: () => emptyStore(),
     env: {
-      TASKLOOM_ACCESS_LOG_MODE: "stdout",
-      TASKLOOM_ACCESS_LOG_MAX_FILES: "10",
+      PACKETAGENT_ACCESS_LOG_MODE: "stdout",
+      PACKETAGENT_ACCESS_LOG_MAX_FILES: "10",
     },
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   });
@@ -220,7 +220,7 @@ test("jobMetricsSnapshots picks the max capturedAt across out-of-order rows", ()
       { id: "s2", capturedAt: "2026-01-03T00:00:00.000Z", type: "agent.run" },
       { id: "s3", capturedAt: "2026-01-02T00:00:00.000Z", type: "agent.run" },
     ],
-  } as unknown as TaskloomData;
+  } as unknown as PacketAgentData;
 
   const status = getOperationsStatus({
     loadStore: () => store,
@@ -238,7 +238,7 @@ test("jobMetricsSnapshots falls back to null when the only row has an unparseabl
     jobMetricSnapshots: [
       { id: "s1", capturedAt: "not-a-date", type: "agent.run" },
     ],
-  } as unknown as TaskloomData;
+  } as unknown as PacketAgentData;
 
   const status = getOperationsStatus({
     loadStore: () => store,

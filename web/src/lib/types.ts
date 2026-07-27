@@ -183,7 +183,7 @@ export interface BuilderProviderResolution {
 export interface BuilderProviderStatusPayload {
   presets: Record<BuilderModelPresetId, BuilderProviderResolution | null>;
   availableProviders: BuilderProviderName[];
-  /** Raw TASKLOOM_PROVIDER_PRIORITY env value, or null if unset. */
+  /** Raw PACKETAGENT_PROVIDER_PRIORITY env value, or null if unset. */
   priority: string | null;
 }
 

@@ -38,14 +38,14 @@ test("publish integrations mark all requested live integrations ready when setup
     },
     env: {
       OPENAI_API_KEY: "set",
-      TASKLOOM_PUBLIC_APP_BASE_URL: "https://apps.example.test",
-      TASKLOOM_WEBHOOK_SIGNING_SECRET: "set",
+      PACKETAGENT_PUBLIC_APP_BASE_URL: "https://apps.example.test",
+      PACKETAGENT_WEBHOOK_SIGNING_SECRET: "set",
       RESEND_API_KEY: "set",
       STRIPE_SECRET_KEY: "set",
       STRIPE_WEBHOOK_SECRET: "set",
       STRIPE_PRICE_ID: "price_123",
-      DATABASE_URL: "postgres://taskloom:secret@db.example.test/taskloom",
-      TASKLOOM_STORE: "postgres",
+      DATABASE_URL: "postgres://packetagent:secret@db.example.test/packetagent",
+      PACKETAGENT_STORE: "postgres",
     },
     availableTools: ["browser-use"],
     connectedConnectors: ["github"],
@@ -77,8 +77,8 @@ test("publish integrations separate database warnings from publish blockers", ()
       dataModels: [{ name: "customer" }],
     },
     env: {
-      DATABASE_URL: "postgres://taskloom:secret@db.example.test/taskloom",
-      TASKLOOM_STORE: "postgres",
+      DATABASE_URL: "postgres://packetagent:secret@db.example.test/packetagent",
+      PACKETAGENT_STORE: "postgres",
     },
   });
 
@@ -88,7 +88,7 @@ test("publish integrations separate database warnings from publish blockers", ()
   assert.deepEqual(readiness.featureBlockers, []);
   assert.ok(readiness.warnings.some((warning) => warning.includes("db:migrate")));
   assert.ok(readiness.warnings.some((warning) => warning.includes("write smoke check")));
-  assert.equal(JSON.stringify(readiness).includes("postgres://taskloom:secret"), false);
+  assert.equal(JSON.stringify(readiness).includes("postgres://packetagent:secret"), false);
 });
 
 test("publish integrations stay quiet for static apps without requested integrations", () => {

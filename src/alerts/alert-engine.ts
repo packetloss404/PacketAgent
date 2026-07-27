@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { OperationsHealthReport } from "../operations-health.js";
 import type { JobTypeMetrics } from "../jobs/scheduler-metrics.js";
 
-export const ALERT_JOB_FAILURE_RATE_THRESHOLD_ENV = "TASKLOOM_ALERT_JOB_FAILURE_RATE_THRESHOLD";
+export const ALERT_JOB_FAILURE_RATE_THRESHOLD_ENV = "PACKETAGENT_ALERT_JOB_FAILURE_RATE_THRESHOLD";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 

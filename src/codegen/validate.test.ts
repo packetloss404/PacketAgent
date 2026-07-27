@@ -12,7 +12,7 @@ const SAMPLE_FILES = [
 ];
 
 function smokeEnv(): NodeJS.ProcessEnv {
-  return { TASKLOOM_SANDBOX_SMOKE_ENABLED: "1" };
+  return { PACKETAGENT_SANDBOX_SMOKE_ENABLED: "1" };
 }
 
 function silencingConsoleWarn(): { restore: () => void; messages: string[] } {

@@ -1,19 +1,19 @@
 # =============================================================================
-# Taskloom proxy access-log redaction example: nginx
+# PacketAgent proxy access-log redaction example: nginx
 # -----------------------------------------------------------------------------
 # This file is an EXAMPLE. You must tailor it to your nginx deployment (paths,
 # upstream block, TLS, server_name, etc.) before using it in production.
 #
 # Goal: prevent raw secrets from ever landing in the on-disk access log.
-# Taskloom redacts secrets inside its own application logs (see
+# PacketAgent redacts secrets inside its own application logs (see
 # src/security/redaction.ts), but a reverse proxy logs the request line BEFORE
-# it reaches Taskloom, so 404s, TLS errors, and health probes will leak
+# it reaches PacketAgent, so 404s, TLS errors, and health probes will leak
 # tokens unless the proxy itself rewrites the logged URI.
 #
 # Strategy:
 #   1. Build a $redacted_uri variable from $request_uri using `map` directives
 #      to strip sensitive query params and rewrite token-bearing path segments.
-#   2. Define a custom `log_format` (taskloom_redacted) that uses
+#   2. Define a custom `log_format` (packetagent_redacted) that uses
 #      $redacted_uri instead of $request_uri.
 #   3. Never log Authorization, Cookie, or X-Api-Key header values.
 #
@@ -58,7 +58,7 @@ map $redacted_query $redacted_uri_suffix {
 # --- Custom log format -----------------------------------------------------
 # NOTE: $http_authorization, $http_cookie, and $http_x_api_key are
 # DELIBERATELY OMITTED. Do not add them to this format.
-log_format taskloom_redacted escape=json
+log_format packetagent_redacted escape=json
   '{'
     '"time":"$time_iso8601",'
     '"method":"$request_method",'
@@ -72,13 +72,13 @@ log_format taskloom_redacted escape=json
 # --- Server / location wiring ---------------------------------------------
 server {
   listen 443 ssl http2;
-  server_name taskloom.example.com;
+  server_name packetagent.example.com;
 
   # Per-request fallback in case the maps above did not fire.
   set $redacted_path_final $redacted_path;
   set $redacted_query_final $redacted_query;
 
-  access_log /var/log/nginx/taskloom-access.log taskloom_redacted;
+  access_log /var/log/nginx/packetagent-access.log packetagent_redacted;
 
   # Authorization should NEVER be logged. We do not reference
   # $http_authorization in log_format above. As an extra defense, do not

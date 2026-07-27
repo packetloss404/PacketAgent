@@ -5,7 +5,7 @@ import {
   normalizeProviderStatus,
   parseInvitationEmailReconciliationBody,
 } from "./invitation-email-reconciliation.js";
-import type { InvitationEmailDeliveryRecord, TaskloomData } from "./taskloom-store.js";
+import type { InvitationEmailDeliveryRecord, PacketAgentData } from "./packetagent-store.js";
 
 function makeDelivery(overrides: Partial<InvitationEmailDeliveryRecord> = {}): InvitationEmailDeliveryRecord {
   return {
@@ -23,11 +23,11 @@ function makeDelivery(overrides: Partial<InvitationEmailDeliveryRecord> = {}): I
 }
 
 function makeFakeStore(deliveries: InvitationEmailDeliveryRecord[]): {
-  data: TaskloomData;
-  loadStore: () => TaskloomData;
-  mutateStore: <T>(mutator: (data: TaskloomData) => T) => T;
+  data: PacketAgentData;
+  loadStore: () => PacketAgentData;
+  mutateStore: <T>(mutator: (data: PacketAgentData) => T) => T;
 } {
-  const data = { invitationEmailDeliveries: deliveries } as unknown as TaskloomData;
+  const data = { invitationEmailDeliveries: deliveries } as unknown as PacketAgentData;
   return {
     data,
     loadStore: () => data,

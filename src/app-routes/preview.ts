@@ -1,7 +1,7 @@
 import { type Context, type Hono } from "hono";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { requireAuthenticatedContextAsync } from "../taskloom-services.js";
-import { loadStoreAsync } from "../taskloom-store.js";
+import { requireAuthenticatedContextAsync } from "../packetagent-services.js";
+import { loadStoreAsync } from "../packetagent-store.js";
 import { resolveGeneratedAppPreviewFile } from "../generated-app-process.js";
 import {
   buildGeneratedAppRuntimeModel,
@@ -55,11 +55,11 @@ async function previewGeneratedApp(c: Context) {
       requestedPath,
     });
     c.header("Cache-Control", "no-store");
-    c.header("X-Taskloom-Generated-App-Id", record.id);
-    c.header("X-Taskloom-Generated-App-Slug", record.slug);
-    c.header("X-Taskloom-Generated-App-Checkpoint", checkpoint.id);
-    c.header("X-Taskloom-Generated-App-Runtime", resolved.readiness.mode);
-    c.header("X-Taskloom-Generated-App-Live", String(resolved.readiness.live));
+    c.header("X-PacketAgent-Generated-App-Id", record.id);
+    c.header("X-PacketAgent-Generated-App-Slug", record.slug);
+    c.header("X-PacketAgent-Generated-App-Checkpoint", checkpoint.id);
+    c.header("X-PacketAgent-Generated-App-Runtime", resolved.readiness.mode);
+    c.header("X-PacketAgent-Generated-App-Live", String(resolved.readiness.live));
 
     if (wantsGeneratedAppPreviewReadiness(c)) {
       return c.json({
@@ -93,7 +93,7 @@ async function previewGeneratedApp(c: Context) {
         artifact,
       });
       if ("file" in fallback) {
-        c.header("X-Taskloom-Generated-App-Fallback", "entrypoint");
+        c.header("X-PacketAgent-Generated-App-Fallback", "entrypoint");
         const { content: fbContent, contentType: fbType } = await transformPreviewFile(fallback.file.path, fallback.file.content, fallback.file.contentType);
         c.header("Content-Type", fbType);
         return c.body(fbContent);
@@ -144,17 +144,17 @@ async function handleGeneratedAppRuntimeApi(c: Context) {
       appId: record.id,
       workspaceId,
       model,
-      runtimeRoot: process.env.TASKLOOM_GENERATED_APP_RUNTIME_DIR,
+      runtimeRoot: process.env.PACKETAGENT_GENERATED_APP_RUNTIME_DIR,
       method: c.req.method,
       path: generatedAppRuntimeApiPathFromRequest(c, appIdParam) || model.primaryEntity,
       body: await readGeneratedAppRuntimeBody(c),
     });
     c.status(result.status as any);
     c.header("Cache-Control", "no-store");
-    c.header("X-Taskloom-Generated-App-Id", record.id);
-    c.header("X-Taskloom-Generated-App-Checkpoint", checkpoint.id);
-    c.header("X-Taskloom-Generated-App-Runtime", "server-sqlite-process");
-    if (result.process.pid) c.header("X-Taskloom-Generated-App-Runtime-Pid", String(result.process.pid));
+    c.header("X-PacketAgent-Generated-App-Id", record.id);
+    c.header("X-PacketAgent-Generated-App-Checkpoint", checkpoint.id);
+    c.header("X-PacketAgent-Generated-App-Runtime", "server-sqlite-process");
+    if (result.process.pid) c.header("X-PacketAgent-Generated-App-Runtime-Pid", String(result.process.pid));
     return c.json(result.body);
   } catch (error) {
     return errorResponse(c, error);
@@ -178,13 +178,13 @@ function wantsGeneratedAppPreviewReadiness(c: Context) {
 const PREVIEW_TOKEN_PREFIX = "tk_";
 const PREVIEW_TOKEN_DEFAULT_TTL_SECONDS = 60 * 60; // 1 hour
 const PREVIEW_TOKEN_MAX_TTL_SECONDS = 24 * 60 * 60; // 24 hours
-const PREVIEW_TOKEN_DEV_FALLBACK_SECRET = "taskloom-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
+const PREVIEW_TOKEN_DEV_FALLBACK_SECRET = "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
 let previewTokenFallbackWarned = false;
 
 function previewTokenSecret(): string {
-  const fromPreview = (process.env.TASKLOOM_PREVIEW_TOKEN_SECRET ?? "").trim();
+  const fromPreview = (process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET ?? "").trim();
   if (fromPreview) return fromPreview;
-  const fromMaster = (process.env.TASKLOOM_MASTER_KEY ?? "").trim();
+  const fromMaster = (process.env.PACKETAGENT_MASTER_KEY ?? "").trim();
   if (fromMaster) return fromMaster;
   // In production we MUST NOT sign/verify with a constant baked-in secret —
   // anyone reading the source could forge preview tokens. Refuse outright so the
@@ -192,13 +192,13 @@ function previewTokenSecret(): string {
   if (process.env.NODE_ENV === "production") {
     throw httpRouteError(
       500,
-      "preview tokens are unavailable: set TASKLOOM_PREVIEW_TOKEN_SECRET or TASKLOOM_MASTER_KEY",
+      "preview tokens are unavailable: set PACKETAGENT_PREVIEW_TOKEN_SECRET or PACKETAGENT_MASTER_KEY",
     );
   }
   if (!previewTokenFallbackWarned) {
     previewTokenFallbackWarned = true;
     console.warn(
-      "[preview-token] No TASKLOOM_PREVIEW_TOKEN_SECRET or TASKLOOM_MASTER_KEY set — falling back to an in-process dev secret. Do NOT run this in production without configuring one of those env vars.",
+      "[preview-token] No PACKETAGENT_PREVIEW_TOKEN_SECRET or PACKETAGENT_MASTER_KEY set — falling back to an in-process dev secret. Do NOT run this in production without configuring one of those env vars.",
     );
   }
   return PREVIEW_TOKEN_DEV_FALLBACK_SECRET;

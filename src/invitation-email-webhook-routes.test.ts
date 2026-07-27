@@ -4,8 +4,8 @@ import test from "node:test";
 import { Hono } from "hono";
 import {
   DEFAULT_INVITATION_EMAIL_RECONCILIATION_SECRET_HEADER,
-  TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV,
-  TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_HEADER_ENV,
+  PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV,
+  PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_HEADER_ENV,
 } from "./invitation-email";
 import { invitationEmailWebhookRoutes } from "./invitation-email-webhook-routes";
 import {
@@ -14,11 +14,11 @@ import {
   loadStore,
   mutateStore,
   resetStoreForTests,
-} from "./taskloom-store";
+} from "./packetagent-store";
 
 const RECON_ENV_KEYS = [
-  TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV,
-  TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_HEADER_ENV,
+  PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV,
+  PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_HEADER_ENV,
 ];
 
 function createTestApp() {
@@ -77,7 +77,7 @@ test("returns 503 when no reconciliation secret is configured", async () => {
 
     assert.equal(response.status, 503);
     assert.match(body.error, /reconciliation webhook is disabled/);
-    assert.match(body.error, /TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET/);
+    assert.match(body.error, /PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET/);
   } finally {
     restoreEnv(snapshot);
   }
@@ -87,7 +87,7 @@ test("returns 401 when the secret header is missing", async () => {
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
     resetStoreForTests();
     const app = createTestApp();
 
@@ -109,7 +109,7 @@ test("returns 401 when the secret header value is wrong", async () => {
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
     resetStoreForTests();
     const app = createTestApp();
 
@@ -134,7 +134,7 @@ test("returns 400 when the request body is not JSON", async () => {
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
     resetStoreForTests();
     const app = createTestApp();
 
@@ -159,7 +159,7 @@ test("returns 400 with the offending field when validation fails", async () => {
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
     resetStoreForTests();
     const app = createTestApp();
 
@@ -184,7 +184,7 @@ test("returns 400 echoing the raw provider status when it is unknown", async () 
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
     resetStoreForTests();
     const app = createTestApp();
 
@@ -209,7 +209,7 @@ test("returns 404 when the delivery is unknown", async () => {
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
     resetStoreForTests();
     const app = createTestApp();
 
@@ -235,7 +235,7 @@ test("records provider status on the delivery row on success", async () => {
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
     resetStoreForTests();
     const app = createTestApp();
     const deliveryId = seedDelivery();
@@ -282,7 +282,7 @@ test("normalizes alias provider statuses on success", async () => {
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "shh-secret";
     resetStoreForTests();
     const app = createTestApp();
     const deliveryId = seedDelivery();
@@ -317,8 +317,8 @@ test("honors a custom secret header from env", async () => {
   const snapshot = captureEnv();
   try {
     clearReconciliationEnv();
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "another-secret";
-    process.env[TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET_HEADER_ENV] = "x-custom-recon";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_ENV] = "another-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET_HEADER_ENV] = "x-custom-recon";
     resetStoreForTests();
     const app = createTestApp();
     const deliveryId = seedDelivery();

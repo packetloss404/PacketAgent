@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createAsyncJobsRepository, createJobsRepository } from "../repositories/jobs-repo.js";
-import { clearStoreCache, findJobIndexed, listJobsForWorkspaceIndexed, loadStoreAsync, mutateStore, mutateStoreAsync, type AgentRecord, type JobRecord, type JobStatus, type TaskloomData } from "../taskloom-store.js";
+import { clearStoreCache, findJobIndexed, listJobsForWorkspaceIndexed, loadStoreAsync, mutateStore, mutateStoreAsync, type AgentRecord, type JobRecord, type JobStatus, type PacketAgentData } from "../packetagent-store.js";
 import { nextAfter } from "./cron.js";
 
 const STALE_RUNNING_MS = 5 * 60 * 1000;
@@ -10,7 +10,7 @@ function nowIso(): string {
 }
 
 function isSqliteMode(): boolean {
-  return process.env.TASKLOOM_STORE === "sqlite";
+  return process.env.PACKETAGENT_STORE === "sqlite";
 }
 
 function dualWriteJobs(records: JobRecord[]): void {
@@ -122,7 +122,7 @@ interface ScheduledAgentResult {
 }
 
 function ensureScheduledAgentJob(
-  data: TaskloomData,
+  data: PacketAgentData,
   agent: AgentRecord,
   timestamp: string,
   scheduledAt?: string,

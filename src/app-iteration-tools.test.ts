@@ -85,8 +85,8 @@ test("inspectAppIterationTools marks requested integrations ready from env and c
     env: {
       OPENAI_API_KEY: "set",
       RESEND_API_KEY: "set",
-      TASKLOOM_PUBLIC_BASE_URL: "https://apps.example.test",
-      TASKLOOM_WEBHOOK_SIGNING_SECRET: "set",
+      PACKETAGENT_PUBLIC_BASE_URL: "https://apps.example.test",
+      PACKETAGENT_WEBHOOK_SIGNING_SECRET: "set",
       STRIPE_SECRET_KEY: "set",
       STRIPE_WEBHOOK_SECRET: "set",
       STRIPE_PRICE_ID: "price_123",
@@ -127,7 +127,7 @@ test("inspectAppIterationTools separates webhook and email setup requirements", 
   });
   assert.equal(webhookOnly.readinessStatus, "blocked");
   assert.deepEqual(webhookOnly.missingSetup, [
-    "Configure TASKLOOM_WEBHOOK_SIGNING_SECRET for signed inbound webhook requests.",
+    "Configure PACKETAGENT_WEBHOOK_SIGNING_SECRET for signed inbound webhook requests.",
     "Connect the GitHub connector or configure GITHUB_TOKEN before live repository actions.",
   ]);
 });

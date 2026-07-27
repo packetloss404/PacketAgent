@@ -38,7 +38,7 @@ const draft: GeneratedAppRuntimeDraft = {
 };
 
 test("generated app SQLite runtime persists CRUD records across opens", () => {
-  const root = mkdtempSync(join(tmpdir(), "taskloom-generated-runtime-"));
+  const root = mkdtempSync(join(tmpdir(), "packetagent-generated-runtime-"));
   try {
     const dbPath = join(root, "runtime.sqlite");
     const model = buildGeneratedAppRuntimeModel(draft);
@@ -79,7 +79,7 @@ test("generated app SQLite runtime persists CRUD records across opens", () => {
 });
 
 test("generated app SQLite runtime drops and reseeds data on schema signature change", () => {
-  const root = mkdtempSync(join(tmpdir(), "taskloom-generated-runtime-"));
+  const root = mkdtempSync(join(tmpdir(), "packetagent-generated-runtime-"));
   try {
     const dbPath = join(root, "runtime.sqlite");
     const model = buildGeneratedAppRuntimeModel(draft);

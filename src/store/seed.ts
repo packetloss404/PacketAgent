@@ -20,7 +20,7 @@ import type {
   ProviderRecord,
   RequirementRecord,
   ReleaseConfirmationCollection,
-  TaskloomData,
+  PacketAgentData,
   UserRecord,
   ValidationEvidenceRecord,
   WorkflowConcernRecord,
@@ -33,12 +33,12 @@ import type {
 // LEAF module: seed data construction. Imports only types and auth-utils
 // (id/hash/slug/now helpers) — never a backend or the barrel.
 
-export function seedStore(): TaskloomData {
+export function seedStore(): PacketAgentData {
   const createdAt = now();
   const users: UserRecord[] = [
-    createSeedUser("user_alpha", "alpha@taskloom.local", "Alpha Owner", createdAt),
-    createSeedUser("user_beta", "beta@taskloom.local", "Beta Owner", createdAt),
-    createSeedUser("user_gamma", "gamma@taskloom.local", "Gamma Owner", createdAt),
+    createSeedUser("user_alpha", "alpha@packetagent.local", "Alpha Owner", createdAt),
+    createSeedUser("user_beta", "beta@packetagent.local", "Beta Owner", createdAt),
+    createSeedUser("user_gamma", "gamma@packetagent.local", "Gamma Owner", createdAt),
   ];
 
   const workspaces: WorkspaceRecord[] = [
@@ -729,7 +729,7 @@ export function seedStore(): TaskloomData {
   };
 }
 
-export function createSeedStore(): TaskloomData {
+export function createSeedStore(): PacketAgentData {
   return seedStore();
 }
 

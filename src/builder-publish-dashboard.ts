@@ -16,7 +16,7 @@ import { redactSensitiveString } from "./security/redaction.js";
 import type {
   GeneratedAppPublishLogEntry,
   GeneratedAppPublishRecord,
-} from "./taskloom-store.js";
+} from "./packetagent-store.js";
 
 export type BuilderPublishDashboardStatus = "ready" | "blocked" | "pending";
 export type BuilderPublishDashboardActionKind =

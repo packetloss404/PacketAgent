@@ -98,7 +98,7 @@ test("phase 71 integration prompts add setup metadata without changing core app 
   assert.ok(draft.components.some((component) => component.name === "IntegrationSetupPanel"));
   assert.ok(draft.apiRouteStubs.some((route) => route.path.endsWith("/integrations/github/setup") && route.purpose.includes("GITHUB_TOKEN")));
   assert.ok(draft.apiRouteStubs.some((route) => route.path.endsWith("/integrations/stripe/actions") && route.purpose.includes("Stripe")));
-  assert.ok(draft.dataSchema.notes.some((note) => note.includes("TASKLOOM_DATABASE_URL")));
+  assert.ok(draft.dataSchema.notes.some((note) => note.includes("PACKETAGENT_DATABASE_URL")));
   assert.ok(draft.acceptanceChecks.some((check) => check.includes("without blocking unrelated app features")));
 });
 
@@ -197,9 +197,9 @@ test("listAppDraftTemplateIds exposes the supported heuristics", () => {
 //   1. With NO provider keys and no env flags set, the new default path is
 //      exercised and falls through to the template generator without
 //      throwing.
-//   2. Setting `TASKLOOM_LEGACY_TEMPLATES=1` skips the file-tree path
+//   2. Setting `PACKETAGENT_LEGACY_TEMPLATES=1` skips the file-tree path
 //      entirely (legacy escape hatch / kill switch).
-//   3. Setting the legacy `TASKLOOM_FILETREE_CODEGEN=1` flag is a harmless
+//   3. Setting the legacy `PACKETAGENT_FILETREE_CODEGEN=1` flag is a harmless
 //      no-op — the path is on by default now anyway.
 // ---------------------------------------------------------------------------
 
@@ -209,9 +209,9 @@ const PROVIDER_KEY_ENV_FOR_DEFAULT_ON = [
   "MINIMAX_API_KEY",
   "GEMINI_API_KEY",
   "OPENROUTER_API_KEY",
-  "TASKLOOM_PROVIDER_PRIORITY",
-  "TASKLOOM_LEGACY_TEMPLATES",
-  "TASKLOOM_FILETREE_CODEGEN",
+  "PACKETAGENT_PROVIDER_PRIORITY",
+  "PACKETAGENT_LEGACY_TEMPLATES",
+  "PACKETAGENT_FILETREE_CODEGEN",
 ] as const;
 
 function withScrubbedEnv(
@@ -226,7 +226,7 @@ function withScrubbedEnv(
   // Exclude the keyless ollama provider so a fresh dev machine without
   // any API keys configured behaves identically to CI: the resolver
   // returns null, and `authorAppViaLLM` returns null in turn.
-  process.env.TASKLOOM_PROVIDER_PRIORITY =
+  process.env.PACKETAGENT_PROVIDER_PRIORITY =
     "anthropic,openai,minimax,gemini,openrouter";
   for (const [key, value] of Object.entries(overrides)) {
     process.env[key] = value;
@@ -272,9 +272,9 @@ test("generateAppDraftWithLLM default-on: file-tree path tried first, falls thro
   });
 });
 
-test("generateAppDraftWithLLM legacy escape hatch: TASKLOOM_LEGACY_TEMPLATES=1 skips the file-tree path", async () => {
+test("generateAppDraftWithLLM legacy escape hatch: PACKETAGENT_LEGACY_TEMPLATES=1 skips the file-tree path", async () => {
   await withScrubbedEnv(
-    { TASKLOOM_LEGACY_TEMPLATES: "1" },
+    { PACKETAGENT_LEGACY_TEMPLATES: "1" },
     async () => {
       const emitted: string[] = [];
       // With the kill switch set, behaviour reverts to the pre-Track-B
@@ -299,12 +299,12 @@ test("generateAppDraftWithLLM legacy escape hatch: TASKLOOM_LEGACY_TEMPLATES=1 s
   );
 });
 
-test("generateAppDraftWithLLM backward compat: TASKLOOM_FILETREE_CODEGEN=1 is a no-op", async () => {
+test("generateAppDraftWithLLM backward compat: PACKETAGENT_FILETREE_CODEGEN=1 is a no-op", async () => {
   // Setting the old opt-in flag must not change behaviour now that the
   // path is on by default. With no provider key the result is the same
   // template fallback as the default-on test above.
   await withScrubbedEnv(
-    { TASKLOOM_FILETREE_CODEGEN: "1" },
+    { PACKETAGENT_FILETREE_CODEGEN: "1" },
     async () => {
       const { draft, source } = await generateAppDraftWithLLM(
         "Build a CRM for sales teams to track leads and deals.",

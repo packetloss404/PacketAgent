@@ -1,6 +1,9 @@
-# Taskloom in one step
+# PacketAgent in one step
 
 You don't need to know Node, npm, or anything technical. Just one command.
+
+This starts the inherited local workbench. It can build and run capped agents
+today; the durable autonomous Worker lifecycle is still under development.
 
 ## Start it
 
@@ -16,7 +19,7 @@ You don't need to know Node, npm, or anything technical. Just one command.
 ./scripts/run.ps1
 ```
 
-That's it. Your browser will open to the Taskloom builder a few seconds later.
+That's it. Your browser will open to the PacketAgent builder a few seconds later.
 
 ## First time?
 
@@ -40,8 +43,13 @@ When you're done, press `Ctrl+C` in the terminal to stop it.
 
 ## FAQ
 
-**Why do I need a key?** Taskloom asks an AI to write your app; the key lets it talk to that AI. You bring your own; nothing goes to Taskloom. The key stays on your computer in the `.env` file.
+**Why do I need a key?** PacketAgent uses a model for open-ended agent and app
+authoring. You bring the provider relationship; PacketAgent does not proxy the
+key through a hosted service. Environment keys stay in your local `.env`; keys
+entered through the workbench use the encrypted vault.
 
-**Which provider should I pick?** Anthropic (Claude) is the smoothest. OpenAI works too. If you want everything free and local, install [Ollama](https://ollama.com) and use that — no key needed.
+**Which provider should I pick?** Anthropic (Claude) is the smoothest. OpenAI works too. If you want everything free and local, install [Ollama](https://ollama.com) and use that - no key needed.
 
-**Something went wrong.** Read the message in the terminal — it usually tells you exactly what to do. If you're stuck, the project README has the long version.
+**Something went wrong.** Read the message in the terminal - it usually tells
+you exactly what to do. The project README has the long version. For a new Codex
+project, use [`../dev/CODEX-HANDOFF.md`](../dev/CODEX-HANDOFF.md).

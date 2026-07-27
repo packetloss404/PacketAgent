@@ -655,7 +655,7 @@ export interface JobRecord {
   updatedAt: string;
 }
 
-export interface TaskloomData {
+export interface PacketAgentData {
   users: UserRecord[];
   sessions: SessionRecord[];
   rateLimits?: RateLimitRecord[];
@@ -689,10 +689,10 @@ export interface TaskloomData {
   activationReadModels: Record<string, ActivationStatusDto>;
 }
 
-export type TaskloomStoreMode = "json" | "sqlite" | "managed" | "postgres";
+export type PacketAgentStoreMode = "json" | "sqlite" | "managed" | "postgres";
 
-export interface ResolvedTaskloomStoreMode {
-  mode: TaskloomStoreMode;
+export interface ResolvedPacketAgentStoreMode {
+  mode: PacketAgentStoreMode;
   requestedStore: string;
   managedDatabaseUrlKeys: string[];
 }
@@ -723,7 +723,7 @@ export interface ManagedPostgresStoreTransactionClient {
 export interface ManagedPostgresStoreClientConfig {
   url: string;
   envKey: string;
-  resolution: ResolvedTaskloomStoreMode;
+  resolution: ResolvedPacketAgentStoreMode;
 }
 
 export type ManagedPostgresStoreClientFactory =

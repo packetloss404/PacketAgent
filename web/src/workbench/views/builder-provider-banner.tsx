@@ -55,7 +55,7 @@ export function ProviderBanner() {
         <div className="flex-1">
           <div className="text-sm font-medium">No AI provider configured</div>
           <p className="mt-1 text-sm text-amber-800/90">
-            Taskloom needs at least one provider to generate real apps. Without
+            PacketAgent needs at least one provider to generate real apps. Without
             a key, you'll get a basic template instead of an AI-generated
             result.
           </p>

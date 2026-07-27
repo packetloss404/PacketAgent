@@ -7,7 +7,7 @@ import { executeTool } from "../executor.js";
 import { createShellForAgentTool } from "../shell-agent.js";
 
 function makeTempDir(): string {
-  return mkdtempSync(join(tmpdir(), "tl-shell-agent-"));
+  return mkdtempSync(join(tmpdir(), "packetagent-shell-agent-"));
 }
 
 function context(agentId = "agent-1") {
@@ -52,7 +52,7 @@ test("requires an agent id and defaults cwd to a per-agent artifact work directo
 
     const record = await executeTool({
       tool,
-      input: { command: "pwd" },
+      input: { command: "node", args: ["-e", "console.log(process.cwd())"] },
       context: { ...context("agent/path:one"), artifactDir: contextArtifactRoot },
     });
 
@@ -122,13 +122,13 @@ test("runs an allowed command without shell interpolation and captures output", 
 
 test("scrubs the environment to PATH and NODE_ENV", async () => {
   const root = makeTempDir();
-  const previousSecret = process.env.TASKLOOM_SECRET_SHOULD_NOT_LEAK;
-  process.env.TASKLOOM_SECRET_SHOULD_NOT_LEAK = "secret";
+  const previousSecret = process.env.PACKETAGENT_SECRET_SHOULD_NOT_LEAK;
+  process.env.PACKETAGENT_SECRET_SHOULD_NOT_LEAK = "secret";
   try {
     const envProbeScript = [
       "console.log(JSON.stringify({",
       "home:Object.hasOwn(process.env,'HOME'),",
-      "secret:Object.hasOwn(process.env,'TASKLOOM_SECRET_SHOULD_NOT_LEAK'),",
+      "secret:Object.hasOwn(process.env,'PACKETAGENT_SECRET_SHOULD_NOT_LEAK'),",
       "path:Object.hasOwn(process.env,'PATH'),",
       "nodeEnv:Object.hasOwn(process.env,'NODE_ENV')",
       "}))",
@@ -156,8 +156,8 @@ test("scrubs the environment to PATH and NODE_ENV", async () => {
       nodeEnv: true,
     });
   } finally {
-    if (previousSecret === undefined) delete process.env.TASKLOOM_SECRET_SHOULD_NOT_LEAK;
-    else process.env.TASKLOOM_SECRET_SHOULD_NOT_LEAK = previousSecret;
+    if (previousSecret === undefined) delete process.env.PACKETAGENT_SECRET_SHOULD_NOT_LEAK;
+    else process.env.PACKETAGENT_SECRET_SHOULD_NOT_LEAK = previousSecret;
     rmSync(root, { recursive: true, force: true });
   }
 });

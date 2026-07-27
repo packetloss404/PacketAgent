@@ -1,3 +1,4 @@
+import { migrateLegacyDefaultDataFiles } from "../brand.js";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +12,7 @@ import { sqliteInvitationEmailDeliveriesRepository } from "../repositories/invit
 import { sqliteJobMetricSnapshotsRepository } from "../repositories/job-metric-snapshots-repo";
 import { sqliteJobsRepository } from "../repositories/jobs-repo";
 import { sqliteProviderCallsRepository } from "../repositories/provider-calls-repo";
-import type { ActivationSignalRecord, ActivityRecord, AgentRunLogEntry, AgentRunRecord, AgentRunStatus, AgentRunStep, AgentRunToolCall, AgentTriggerKind, AlertEventRecord, InvitationEmailDeliveryMode, InvitationEmailDeliveryRecord, InvitationEmailDeliveryStatus, JobMetricSnapshotRecord, JobRecord, JobStatus, ProviderCallRecord } from "../taskloom-store";
+import type { ActivationSignalRecord, ActivityRecord, AgentRunLogEntry, AgentRunRecord, AgentRunStatus, AgentRunStep, AgentRunToolCall, AgentTriggerKind, AlertEventRecord, InvitationEmailDeliveryMode, InvitationEmailDeliveryRecord, InvitationEmailDeliveryStatus, JobMetricSnapshotRecord, JobRecord, JobStatus, ProviderCallRecord } from "../packetagent-store";
 import {
   createSeedStore,
   loadStoreAsync,
@@ -21,8 +22,8 @@ import {
   persistSqliteAppData,
   resetLocalStore,
   snapshotForWorkspace,
-  type TaskloomData,
-} from "../taskloom-store";
+  type PacketAgentData,
+} from "../packetagent-store";
 
 export interface DbCliOptions {
   dbPath?: string;
@@ -105,7 +106,7 @@ export interface ManagedPostgresStoreComparison {
 export interface ManagedPostgresSourceResult {
   source: ManagedPostgresSource;
   sourcePath?: string;
-  data: TaskloomData;
+  data: PacketAgentData;
 }
 
 export interface BackfillManagedPostgresResult {
@@ -143,11 +144,11 @@ export interface VerifyManagedPostgresResult {
 }
 
 export interface ManagedPostgresDocumentStoreDeps {
-  loadTargetStore?: () => Promise<TaskloomData>;
-  mutateTargetStore?: <T>(mutator: (data: TaskloomData) => T | Promise<T>) => Promise<T>;
-  loadJsonSource?: (jsonPath: string) => TaskloomData;
-  loadSqliteSource?: (dbPath: string) => TaskloomData | null;
-  createSeedSource?: () => TaskloomData;
+  loadTargetStore?: () => Promise<PacketAgentData>;
+  mutateTargetStore?: <T>(mutator: (data: PacketAgentData) => T | Promise<T>) => Promise<T>;
+  loadJsonSource?: (jsonPath: string) => PacketAgentData;
+  loadSqliteSource?: (dbPath: string) => PacketAgentData | null;
+  createSeedSource?: () => PacketAgentData;
 }
 
 export interface BackfillJobMetricSnapshotsResult {
@@ -349,8 +350,8 @@ export interface BackfillActivationSignalsOptions extends DbCliOptions {
   dryRun?: boolean;
 }
 
-const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "taskloom.sqlite");
-const DEFAULT_JSON_PATH = resolve(process.cwd(), "data", "taskloom.json");
+const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "packetagent.sqlite");
+const DEFAULT_JSON_PATH = resolve(process.cwd(), "data", "packetagent.json");
 const DEFAULT_MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "migrations");
 
 export function migrateDatabase(options: DbCliOptions = {}): MigrationResult {
@@ -522,7 +523,7 @@ export function restoreDatabase(options: DbCliOptions = {}): RestoreResult {
   }
 }
 
-export function seedDatabase(options: DbCliOptions = {}, seedData: TaskloomData = createSeedStore()): DbSeedResult {
+export function seedDatabase(options: DbCliOptions = {}, seedData: PacketAgentData = createSeedStore()): DbSeedResult {
   const migrated = migrateDatabase(options);
   const db = new DatabaseSync(migrated.dbPath);
   try {
@@ -615,30 +616,30 @@ export function seedDatabase(options: DbCliOptions = {}, seedData: TaskloomData 
   }
 }
 
-export function seedAppDatabase(options: DbCliOptions = {}, seedData: TaskloomData = createSeedStore()): AppDataResult {
+export function seedAppDatabase(options: DbCliOptions = {}, seedData: PacketAgentData = createSeedStore()): AppDataResult {
   return writeAppData(options, normalizeStore(seedData), "seed", "seed-app");
 }
 
 export function backfillAppDatabase(options: DbCliOptions = {}): AppDataResult {
   const jsonPath = options.jsonPath ?? DEFAULT_JSON_PATH;
-  const data = normalizeStore(JSON.parse(readFileSync(jsonPath, "utf8")) as Partial<TaskloomData>);
+  const data = normalizeStore(JSON.parse(readFileSync(jsonPath, "utf8")) as Partial<PacketAgentData>);
   return writeAppData(options, data, "backfill", "backfill");
 }
 
-export function resetAppDatabase(options: DbCliOptions = {}, seedData: TaskloomData = createSeedStore()): AppDataResult {
+export function resetAppDatabase(options: DbCliOptions = {}, seedData: PacketAgentData = createSeedStore()): AppDataResult {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
   if (existsSync(dbPath)) rmSync(dbPath);
   return writeAppData(options, normalizeStore(seedData), "seed", "reset-app");
 }
 
-export function readAppData(options: DbCliOptions = {}): TaskloomData | null {
+export function readAppData(options: DbCliOptions = {}): PacketAgentData | null {
   const migrated = migrateDatabase(options);
   return loadSqliteAppData(migrated.dbPath);
 }
 
 function writeAppData(
   options: DbCliOptions,
-  data: TaskloomData,
+  data: PacketAgentData,
   source: AppDataResult["source"],
   command: AppDataResult["command"],
 ): AppDataResult {
@@ -666,12 +667,12 @@ export function resetDatabase(options: DbCliOptions = {}): ResetResult {
 
 export function seedLocalStore(): ResetResult {
   resetLocalStore();
-  return { command: "seed-store", path: resolve(process.cwd(), "data", "taskloom.json") };
+  return { command: "seed-store", path: resolve(process.cwd(), "data", "packetagent.json") };
 }
 
 export function resetLocalDataStore(): ResetResult {
   resetLocalStore();
-  return { command: "reset-store", path: resolve(process.cwd(), "data", "taskloom.json") };
+  return { command: "reset-store", path: resolve(process.cwd(), "data", "packetagent.json") };
 }
 
 const STORE_COMPARISON_COLLECTIONS = [
@@ -705,7 +706,7 @@ const STORE_COMPARISON_COLLECTIONS = [
   "activationFacts",
   "activationMilestones",
   "activationReadModels",
-] as const satisfies readonly (keyof TaskloomData)[];
+] as const satisfies readonly (keyof PacketAgentData)[];
 
 export async function backfillManagedPostgres(
   options: ManagedPostgresOptions = {},
@@ -803,16 +804,16 @@ export function loadManagedPostgresSource(
   }
   const data = deps.loadJsonSource
     ? deps.loadJsonSource(jsonPath)
-    : normalizeStore(JSON.parse(readFileSync(jsonPath, "utf8")) as Partial<TaskloomData>);
+    : normalizeStore(JSON.parse(readFileSync(jsonPath, "utf8")) as Partial<PacketAgentData>);
   return { source: "json", sourcePath: jsonPath, data: normalizeStore(data) };
 }
 
-async function loadManagedPostgresTargetStore(): Promise<TaskloomData> {
+async function loadManagedPostgresTargetStore(): Promise<PacketAgentData> {
   return withManagedPostgresTargetEnv(() => loadStoreAsync());
 }
 
 async function mutateManagedPostgresTargetStore<T>(
-  mutator: (data: TaskloomData) => T | Promise<T>,
+  mutator: (data: PacketAgentData) => T | Promise<T>,
 ): Promise<T> {
   return withManagedPostgresTargetEnv(() => mutateStoreAsync(mutator));
 }
@@ -820,29 +821,29 @@ async function mutateManagedPostgresTargetStore<T>(
 async function withManagedPostgresTargetEnv<T>(run: () => Promise<T>): Promise<T> {
   if (hasManagedPostgresTargetHint()) return run();
 
-  const previousStore = process.env.TASKLOOM_STORE;
-  process.env.TASKLOOM_STORE = "postgres";
+  const previousStore = process.env.PACKETAGENT_STORE;
+  process.env.PACKETAGENT_STORE = "postgres";
   try {
     return await run();
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
   }
 }
 
 function hasManagedPostgresTargetHint(env: NodeJS.ProcessEnv = process.env): boolean {
-  const requestedStore = (env.TASKLOOM_STORE ?? "").trim().toLowerCase();
+  const requestedStore = (env.PACKETAGENT_STORE ?? "").trim().toLowerCase();
   return requestedStore === "managed"
     || requestedStore === "managed-db"
     || requestedStore === "managed-database"
     || requestedStore === "postgres"
     || requestedStore === "postgresql"
     || Boolean((env.DATABASE_URL ?? "").trim())
-    || Boolean((env.TASKLOOM_DATABASE_URL ?? "").trim())
-    || Boolean((env.TASKLOOM_MANAGED_DATABASE_URL ?? "").trim());
+    || Boolean((env.PACKETAGENT_DATABASE_URL ?? "").trim())
+    || Boolean((env.PACKETAGENT_MANAGED_DATABASE_URL ?? "").trim());
 }
 
-export function managedPostgresStoreStats(data: TaskloomData): ManagedPostgresStoreStats {
+export function managedPostgresStoreStats(data: PacketAgentData): ManagedPostgresStoreStats {
   const normalized = normalizeStore(data);
   const collections: Record<string, number> = {};
   let records = 0;
@@ -855,8 +856,8 @@ export function managedPostgresStoreStats(data: TaskloomData): ManagedPostgresSt
 }
 
 export function compareManagedPostgresStores(
-  sourceData: TaskloomData,
-  targetData: TaskloomData,
+  sourceData: PacketAgentData,
+  targetData: PacketAgentData,
 ): ManagedPostgresStoreComparison {
   const source = comparableStoreEntries(normalizeStore(sourceData));
   const target = comparableStoreEntries(normalizeStore(targetData));
@@ -882,14 +883,14 @@ export function compareManagedPostgresStores(
   return { sourceOnly, targetOnly, contentDrift, matched };
 }
 
-function replaceManagedPostgresStoreData(target: TaskloomData, source: TaskloomData): void {
+function replaceManagedPostgresStoreData(target: PacketAgentData, source: PacketAgentData): void {
   const normalized = normalizeStore(source);
   for (const collection of STORE_COMPARISON_COLLECTIONS) {
     target[collection] = normalized[collection] as never;
   }
 }
 
-function comparableStoreEntries(data: TaskloomData): Map<string, string> {
+function comparableStoreEntries(data: PacketAgentData): Map<string, string> {
   const entries = new Map<string, string>();
   for (const collection of STORE_COMPARISON_COLLECTIONS) {
     for (const [id, value] of collectionEntries(collection, data[collection])) {
@@ -899,7 +900,7 @@ function comparableStoreEntries(data: TaskloomData): Map<string, string> {
   return entries;
 }
 
-function collectionEntries(collection: keyof TaskloomData, value: unknown): Array<[string, unknown]> {
+function collectionEntries(collection: keyof PacketAgentData, value: unknown): Array<[string, unknown]> {
   if (Array.isArray(value)) {
     return value.map((entry, index) => [recordComparisonId(collection, entry, index), entry]);
   }
@@ -909,7 +910,7 @@ function collectionEntries(collection: keyof TaskloomData, value: unknown): Arra
   return [];
 }
 
-function recordComparisonId(collection: keyof TaskloomData, value: unknown, index: number): string {
+function recordComparisonId(collection: keyof PacketAgentData, value: unknown, index: number): string {
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
     if (typeof record.id === "string") return record.id;
@@ -2551,7 +2552,7 @@ function parseManagedPostgresSource(args: string[]): ManagedPostgresSource | und
 }
 
 function writeUsage(): void {
-  console.error("Usage: node --import tsx src/db/cli.ts <migrate|status|backup|restore|seed-db|seed-app|backfill|backfill-managed-postgres|verify-managed-postgres|reset-db|reset-app|seed-store|reset-store|backfill-job-metric-snapshots|verify-job-metric-snapshots|backfill-alert-events|verify-alert-events|backfill-agent-runs|verify-agent-runs|backfill-jobs|verify-jobs|backfill-invitation-email-deliveries|verify-invitation-email-deliveries|backfill-activities|verify-activities|backfill-provider-calls|verify-provider-calls|backfill-activation-signals|verify-activation-signals> [--db-path=data/taskloom.sqlite] [--json-path=data/taskloom.json] [--backup-path=data/taskloom.sqlite.bak] [--source=json|sqlite|seed] [--dry-run] [--check-orphans]");
+  console.error("Usage: node --import tsx src/db/cli.ts <migrate|status|backup|restore|seed-db|seed-app|backfill|backfill-managed-postgres|verify-managed-postgres|reset-db|reset-app|seed-store|reset-store|backfill-job-metric-snapshots|verify-job-metric-snapshots|backfill-alert-events|verify-alert-events|backfill-agent-runs|verify-agent-runs|backfill-jobs|verify-jobs|backfill-invitation-email-deliveries|verify-invitation-email-deliveries|backfill-activities|verify-activities|backfill-provider-calls|verify-provider-calls|backfill-activation-signals|verify-activation-signals> [--db-path=data/packetagent.sqlite] [--json-path=data/packetagent.json] [--backup-path=data/packetagent.sqlite.bak] [--source=json|sqlite|seed] [--dry-run] [--check-orphans]");
 }
 
 function isExecutedDirectly(): boolean {
@@ -2561,6 +2562,7 @@ function isExecutedDirectly(): boolean {
 }
 
 if (isExecutedDirectly()) {
+  migrateLegacyDefaultDataFiles();
   runDbCli().then((exitCode) => {
     process.exitCode = exitCode;
   }).catch((error: unknown) => {

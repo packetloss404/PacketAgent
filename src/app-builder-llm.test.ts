@@ -110,7 +110,7 @@ const PROVIDER_KEY_ENV = [
   "MINIMAX_API_KEY",
   "GEMINI_API_KEY",
   "OPENROUTER_API_KEY",
-  "TASKLOOM_PROVIDER_PRIORITY",
+  "PACKETAGENT_PROVIDER_PRIORITY",
 ] as const;
 
 function withNoProviderKeys(body: () => Promise<void>): Promise<void> {
@@ -122,7 +122,7 @@ function withNoProviderKeys(body: () => Promise<void>): Promise<void> {
   // Force ollama to be considered "not configured" too: the resolver assumes
   // ollama is always reachable, so we shadow it by setting a priority list that
   // excludes it. This keeps the "no provider configured" assertion pure.
-  process.env.TASKLOOM_PROVIDER_PRIORITY = "anthropic,openai,minimax,gemini,openrouter";
+  process.env.PACKETAGENT_PROVIDER_PRIORITY = "anthropic,openai,minimax,gemini,openrouter";
   return body().finally(() => {
     for (const key of PROVIDER_KEY_ENV) {
       const original = originals[key];

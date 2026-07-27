@@ -150,7 +150,7 @@ export function validateWorkspacePath(rawPath: string): PathValidationResult {
   // stays inside it. `path.posix.resolve("/", "foo/bar")` -> `/foo/bar`;
   // anything that escapes would surface as a path without the `/__root__/`
   // prefix.
-  const ROOT = "/__taskloom_workspace_root__";
+  const ROOT = "/__packetagent_workspace_root__";
   const resolved = path.resolve(ROOT, normalized);
   if (resolved !== ROOT && !resolved.startsWith(`${ROOT}/`)) {
     return fail("path resolves outside the workspace root");

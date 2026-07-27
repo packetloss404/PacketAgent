@@ -2,12 +2,12 @@ import {
   createInvitationEmailDeliveriesRepository,
   type InvitationEmailDeliveriesRepository,
 } from "./repositories/invitation-email-deliveries-repo.js";
-import { loadStore as defaultLoadStore } from "./taskloom-store.js";
-import type { InvitationEmailDeliveryRecord, TaskloomData } from "./taskloom-store.js";
+import { loadStore as defaultLoadStore } from "./packetagent-store.js";
+import type { InvitationEmailDeliveryRecord, PacketAgentData } from "./packetagent-store.js";
 
 export interface InvitationEmailDeliveriesReadDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   repository?: InvitationEmailDeliveriesRepository;
 }
 
@@ -21,7 +21,7 @@ export function listInvitationEmailDeliveriesViaRepository(
     mutateStore: deps.mutateStore,
   });
   const primary = repo.list({ workspaceId, invitationId });
-  if (process.env.TASKLOOM_STORE !== "sqlite") return primary;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return primary;
   const fallback = legacyDeliveriesFromStore(deps).filter((entry) => {
     if (entry.workspaceId !== workspaceId) return false;
     if (invitationId !== undefined && entry.invitationId !== invitationId) return false;

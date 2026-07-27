@@ -84,7 +84,7 @@ export function ThreadMessage({
       }}>{isUser ? "U" : "TL"}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="kicker" style={{ fontSize: 9.5, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-          <span>{isUser ? "You" : "Taskloom"}</span>
+          <span>{isUser ? "You" : "PacketAgent"}</span>
           {streaming && <span className="mono" style={{ color: "var(--green)" }}>· thinking</span>}
           {hasAnyHoverAction && (
             <div
@@ -260,14 +260,14 @@ function ThreadMessageBody({
 
 /**
  * Renders a chat-thread error tone with non-technical copy and an optional
- * "Try again" button. Retry dispatches a window-level `taskloom:retry-last-action`
+ * "Try again" button. Retry dispatches a window-level `packetagent:retry-last-action`
  * event so BuilderView can re-seed the composer with the last prompt — keeping
  * this component decoupled from the action plumbing.
  */
 function FriendlyErrorCard({ raw }: { raw: string }) {
   const friendly = translateError(raw);
   const handleRetry = () => {
-    window.dispatchEvent(new CustomEvent("taskloom:retry-last-action"));
+    window.dispatchEvent(new CustomEvent("packetagent:retry-last-action"));
   };
   return (
     <div

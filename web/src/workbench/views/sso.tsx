@@ -53,7 +53,7 @@ export function SSOView() {
         <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
           <PanelHeader title="Allowed email domains" sub="Members from these domains auto-join with the listed role"/>
           <div style={{ padding: 18, color: "var(--silver-300)", fontSize: 12.5 }}>
-            Domain allow-listing is configured server-side via <span className="mono">TASKLOOM_AUTO_JOIN_DOMAINS</span>.
+            Domain allow-listing is configured server-side via <span className="mono">PACKETAGENT_AUTO_JOIN_DOMAINS</span>.
           </div>
         </div>
 
@@ -61,7 +61,7 @@ export function SSOView() {
           <div className="h3" style={{ fontSize: 15, marginBottom: 14 }}>Session policy</div>
           <p className="muted" style={{ fontSize: 12.5 }}>
             Session lifetime, IP allow-list, and MFA enforcement are managed via deployment env vars
-            (<span className="mono">TASKLOOM_SESSION_*</span>). They surface here read-only.
+            (<span className="mono">PACKETAGENT_SESSION_*</span>). They surface here read-only.
           </p>
         </div>
     </div>

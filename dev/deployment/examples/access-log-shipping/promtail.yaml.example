@@ -1,5 +1,5 @@
 # =============================================================================
-# Taskloom access-log shipping example: Grafana Promtail (v2 / v3)
+# PacketAgent access-log shipping example: Grafana Promtail (v2 / v3)
 # -----------------------------------------------------------------------------
 # This is an EXAMPLE Promtail configuration that tails the redacted
 # file-mode access log and pushes it to a Loki cluster. You MUST adapt paths,
@@ -36,7 +36,7 @@ clients:
   # than inlining the secret. Promtail re-reads the file on each push, so
   # secret rotation does not require a Promtail restart.
   - url: https://loki.example.internal/loki/api/v1/push
-    tenant_id: taskloom-prod
+    tenant_id: packetagent-prod
     bearer_token_file: /etc/promtail/loki.token
     backoff_config:
       min_period: 500ms
@@ -46,19 +46,19 @@ clients:
     batchsize: 1048576
 
 scrape_configs:
-  - job_name: taskloom-access-log
+  - job_name: packetagent-access-log
     static_configs:
       - targets:
           - localhost
         labels:
-          job: taskloom-access-log
-          service: taskloom
+          job: packetagent-access-log
+          service: packetagent
           env: production
-          # Substitute __path__ with TASKLOOM_ACCESS_LOG_PATH from the
-          # Taskloom service environment. To also pick up
+          # Substitute __path__ with PACKETAGENT_ACCESS_LOG_PATH from the
+          # PacketAgent service environment. To also pick up
           # rotated siblings on first start, use the glob form:
-          #   __path__: /var/log/taskloom/access.log*
-          __path__: /var/log/taskloom/access.log
+          #   __path__: /var/log/packetagent/access.log*
+          __path__: /var/log/packetagent/access.log
 
     pipeline_stages:
       # 1. Extract a small set of fields from the JSON line. Deeper fields

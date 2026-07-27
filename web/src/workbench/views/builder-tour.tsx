@@ -16,7 +16,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
  * cold-start screen in `builder.tsx` exposes a small "Show tour" link that does
  * this for users who want to revisit the walkthrough.
  */
-const STORAGE_KEY = "taskloom_builder_tour_seen";
+const STORAGE_KEY = "packetagent_builder_tour_seen";
 
 interface TourStep {
   anchor: string;

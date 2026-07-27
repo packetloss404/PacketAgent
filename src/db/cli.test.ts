@@ -5,17 +5,17 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { backfillActivationSignals, backfillActivities, backfillAgentRuns, backfillAlertEvents, backfillAppDatabase, backfillInvitationEmailDeliveries, backfillJobMetricSnapshots, backfillJobs, backfillManagedPostgres, backfillProviderCalls, backupDatabase, compareManagedPostgresStores, loadManagedPostgresSource, managedPostgresStoreStats, migrateDatabase, migrationStatus, readAppData, resetAppDatabase, resetDatabase, restoreDatabase, seedAppDatabase, seedDatabase, verifyActivationSignals, verifyActivities, verifyAgentRuns, verifyAlertEvents, verifyInvitationEmailDeliveries, verifyJobMetricSnapshots, verifyJobs, verifyManagedPostgres, verifyProviderCalls, type ManagedPostgresDocumentStoreDeps } from "./cli";
-import type { ActivationSignalRecord, ActivityRecord, AgentRunRecord, AlertEventRecord, InvitationEmailDeliveryRecord, JobMetricSnapshotRecord, JobRecord, ProviderCallRecord, TaskloomData } from "../taskloom-store";
-import { createSeedStore } from "../taskloom-store";
+import type { ActivationSignalRecord, ActivityRecord, AgentRunRecord, AlertEventRecord, InvitationEmailDeliveryRecord, JobMetricSnapshotRecord, JobRecord, ProviderCallRecord, PacketAgentData } from "../packetagent-store";
+import { createSeedStore } from "../packetagent-store";
 
 const expectedMigrations = readdirSync(resolve(process.cwd(), "src", "db", "migrations"))
   .filter((name) => name.endsWith(".sql"))
   .sort();
 
 test("migrateDatabase applies activation migrations idempotently", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
 
     const first = migrateDatabase({ dbPath });
     const second = migrateDatabase({ dbPath });
@@ -37,9 +37,9 @@ test("migrateDatabase applies activation migrations idempotently", () => {
 });
 
 test("migrateDatabase creates runtime app tables", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
 
     migrateDatabase({ dbPath });
 
@@ -91,9 +91,9 @@ test("migrateDatabase creates runtime app tables", () => {
 });
 
 test("rate limit bucket migration backfills legacy app_records buckets", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     const legacyBucket = {
       id: "auth:login:sha256:legacy",
       count: 7,
@@ -142,7 +142,7 @@ test("rate limit bucket migration backfills legacy app_records buckets", () => {
 });
 
 test("migrationStatus reports pending and applied migrations without creating a database", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
     const dbPath = join(tempDir, "missing.sqlite");
 
@@ -162,10 +162,10 @@ test("migrationStatus reports pending and applied migrations without creating a 
 });
 
 test("backupDatabase copies a migrated database and restoreDatabase validates before replacing", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
-    const backupPath = join(tempDir, "taskloom.backup.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
+    const backupPath = join(tempDir, "packetagent.backup.sqlite");
     seedAppDatabase({ dbPath });
 
     const backup = backupDatabase({ dbPath, backupPath });
@@ -187,9 +187,9 @@ test("backupDatabase copies a migrated database and restoreDatabase validates be
 });
 
 test("seedAppDatabase writes the full seed store and activation rows", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
 
     const result = seedAppDatabase({ dbPath });
     const data = readAppData({ dbPath });
@@ -217,10 +217,10 @@ test("seedAppDatabase writes the full seed store and activation rows", () => {
 });
 
 test("backfillAppDatabase reads a JSON store path into SQLite", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
-    const jsonPath = join(tempDir, "taskloom.json");
+    const dbPath = join(tempDir, "packetagent.sqlite");
+    const jsonPath = join(tempDir, "packetagent.json");
     const data = createSeedStore();
     data.workspaces[0] = { ...data.workspaces[0], name: "Backfilled Workspace" };
     data.rateLimits = [{
@@ -265,7 +265,7 @@ test("backfillAppDatabase reads a JSON store path into SQLite", () => {
   }
 });
 
-function managedPostgresDeps(target: TaskloomData): ManagedPostgresDocumentStoreDeps {
+function managedPostgresDeps(target: PacketAgentData): ManagedPostgresDocumentStoreDeps {
   return {
     async loadTargetStore() {
       return structuredClone(target);
@@ -277,7 +277,7 @@ function managedPostgresDeps(target: TaskloomData): ManagedPostgresDocumentStore
 }
 
 test("loadManagedPostgresSource falls back to the default seed when JSON is missing", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
     const result = loadManagedPostgresSource({ jsonPath: join(tempDir, "missing.json") });
 
@@ -334,7 +334,7 @@ test("backfillManagedPostgres dry-run reports differences without mutating the a
 });
 
 test("backfillManagedPostgres defaults to the managed async store boundary", async () => {
-  const envKeys = ["TASKLOOM_STORE", "DATABASE_URL", "TASKLOOM_DATABASE_URL", "TASKLOOM_MANAGED_DATABASE_URL"] as const;
+  const envKeys = ["PACKETAGENT_STORE", "DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"] as const;
   const previous = new Map(envKeys.map((key) => [key, process.env[key]]));
   try {
     for (const key of envKeys) delete process.env[key];
@@ -347,7 +347,7 @@ test("backfillManagedPostgres defaults to the managed async store boundary", asy
         return true;
       },
     );
-    assert.equal(process.env.TASKLOOM_STORE, undefined);
+    assert.equal(process.env.PACKETAGENT_STORE, undefined);
   } finally {
     for (const key of envKeys) {
       const value = previous.get(key);
@@ -376,9 +376,9 @@ test("backfillManagedPostgres writes JSON source data through the async target b
 });
 
 test("verifyManagedPostgres compares a SQLite hydrated source with the async target", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     const source = createSeedStore();
     seedAppDatabase({ dbPath }, source);
     const target = structuredClone(source);
@@ -400,10 +400,10 @@ test("verifyManagedPostgres compares a SQLite hydrated source with the async tar
 });
 
 test("resetAppDatabase recreates migrated DB state with seed app data", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
-    const jsonPath = join(tempDir, "taskloom.json");
+    const dbPath = join(tempDir, "packetagent.sqlite");
+    const jsonPath = join(tempDir, "packetagent.json");
     writeFileSync(jsonPath, JSON.stringify({ workspaces: [{ id: "json-only" }] }));
     seedAppDatabase({ dbPath });
 
@@ -430,9 +430,9 @@ test("resetAppDatabase recreates migrated DB state with seed app data", () => {
 });
 
 test("seedDatabase writes activation rows derived from the local seed store", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
 
     const result = seedDatabase({ dbPath });
 
@@ -456,9 +456,9 @@ test("seedDatabase writes activation rows derived from the local seed store", ()
 });
 
 test("resetDatabase recreates an empty migrated database", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     seedDatabase({ dbPath });
 
     const result = resetDatabase({ dbPath });
@@ -545,9 +545,9 @@ function countDedicatedSnapshots(dbPath: string): number {
 }
 
 test("backfillJobMetricSnapshots reports zero for an empty store", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
 
     const result = backfillJobMetricSnapshots({ dbPath });
@@ -564,9 +564,9 @@ test("backfillJobMetricSnapshots reports zero for an empty store", () => {
 });
 
 test("backfillJobMetricSnapshots inserts JSON-side rows into the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordSnapshot(dbPath, makeJobMetricSnapshot({ id: "snap_a", totalRuns: 5 }));
 
@@ -583,9 +583,9 @@ test("backfillJobMetricSnapshots inserts JSON-side rows into the dedicated table
 });
 
 test("backfillJobMetricSnapshots is idempotent on re-run", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordSnapshot(dbPath, makeJobMetricSnapshot({ id: "snap_a", totalRuns: 5 }));
 
@@ -604,9 +604,9 @@ test("backfillJobMetricSnapshots is idempotent on re-run", () => {
 });
 
 test("backfillJobMetricSnapshots --dry-run does not write", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordSnapshot(dbPath, makeJobMetricSnapshot({ id: "snap_a" }));
     insertAppRecordSnapshot(dbPath, makeJobMetricSnapshot({ id: "snap_b" }));
@@ -624,9 +624,9 @@ test("backfillJobMetricSnapshots --dry-run does not write", () => {
 });
 
 test("backfillJobMetricSnapshots reports drift when content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const jsonRecord = makeJobMetricSnapshot({ id: "snap_a", totalRuns: 5 });
     insertAppRecordSnapshot(dbPath, jsonRecord);
@@ -645,9 +645,9 @@ test("backfillJobMetricSnapshots reports drift when content differs", () => {
 });
 
 test("verifyJobMetricSnapshots reports matched when both sides identical", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeJobMetricSnapshot({ id: "snap_a", totalRuns: 7 });
     insertAppRecordSnapshot(dbPath, record);
@@ -665,9 +665,9 @@ test("verifyJobMetricSnapshots reports matched when both sides identical", () =>
 });
 
 test("verifyJobMetricSnapshots reports jsonOnly when JSON-side has rows not yet backfilled", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordSnapshot(dbPath, makeJobMetricSnapshot({ id: "snap_a" }));
     insertAppRecordSnapshot(dbPath, makeJobMetricSnapshot({ id: "snap_b" }));
@@ -684,9 +684,9 @@ test("verifyJobMetricSnapshots reports jsonOnly when JSON-side has rows not yet 
 });
 
 test("verifyJobMetricSnapshots reports sqliteOnly when dedicated table has extra rows", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertDedicatedSnapshot(dbPath, makeJobMetricSnapshot({ id: "extra" }));
 
@@ -702,9 +702,9 @@ test("verifyJobMetricSnapshots reports sqliteOnly when dedicated table has extra
 });
 
 test("verifyJobMetricSnapshots reports contentDrift when ids match but content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeJobMetricSnapshot({ id: "snap_a", totalRuns: 5 });
     insertAppRecordSnapshot(dbPath, record);
@@ -790,9 +790,9 @@ function countDedicatedAlerts(dbPath: string): number {
 }
 
 test("backfillAlertEvents reports zero for an empty store", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
 
     const result = backfillAlertEvents({ dbPath });
@@ -809,9 +809,9 @@ test("backfillAlertEvents reports zero for an empty store", () => {
 });
 
 test("backfillAlertEvents inserts JSON-side rows into the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAlert(dbPath, makeAlertRecord({ id: "alert_a" }));
 
@@ -828,9 +828,9 @@ test("backfillAlertEvents inserts JSON-side rows into the dedicated table", () =
 });
 
 test("backfillAlertEvents is idempotent on re-run", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAlert(dbPath, makeAlertRecord({ id: "alert_a" }));
 
@@ -849,9 +849,9 @@ test("backfillAlertEvents is idempotent on re-run", () => {
 });
 
 test("backfillAlertEvents --dry-run does not write", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAlert(dbPath, makeAlertRecord({ id: "alert_a" }));
     insertAppRecordAlert(dbPath, makeAlertRecord({ id: "alert_b" }));
@@ -869,9 +869,9 @@ test("backfillAlertEvents --dry-run does not write", () => {
 });
 
 test("backfillAlertEvents reports drift when content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const jsonRecord = makeAlertRecord({ id: "alert_a", title: "json title" });
     insertAppRecordAlert(dbPath, jsonRecord);
@@ -890,9 +890,9 @@ test("backfillAlertEvents reports drift when content differs", () => {
 });
 
 test("verifyAlertEvents reports matched when both sides identical", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeAlertRecord({ id: "alert_a" });
     insertAppRecordAlert(dbPath, record);
@@ -910,9 +910,9 @@ test("verifyAlertEvents reports matched when both sides identical", () => {
 });
 
 test("verifyAlertEvents reports jsonOnly when JSON-side has rows not yet backfilled", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAlert(dbPath, makeAlertRecord({ id: "alert_a" }));
     insertAppRecordAlert(dbPath, makeAlertRecord({ id: "alert_b" }));
@@ -929,9 +929,9 @@ test("verifyAlertEvents reports jsonOnly when JSON-side has rows not yet backfil
 });
 
 test("verifyAlertEvents reports sqliteOnly when dedicated table has extra rows", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertDedicatedAlert(dbPath, makeAlertRecord({ id: "extra" }));
 
@@ -947,9 +947,9 @@ test("verifyAlertEvents reports sqliteOnly when dedicated table has extra rows",
 });
 
 test("verifyAlertEvents reports contentDrift when ids match but content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeAlertRecord({ id: "alert_a", title: "json title" });
     insertAppRecordAlert(dbPath, record);
@@ -1062,9 +1062,9 @@ function countDedicatedAgentRuns(dbPath: string): number {
 }
 
 test("backfillAgentRuns reports zero for an empty store", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
 
     const result = backfillAgentRuns({ dbPath });
@@ -1081,9 +1081,9 @@ test("backfillAgentRuns reports zero for an empty store", () => {
 });
 
 test("backfillAgentRuns inserts JSON-side rows into the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAgentRun(dbPath, makeAgentRun({ id: "run_a" }));
 
@@ -1100,9 +1100,9 @@ test("backfillAgentRuns inserts JSON-side rows into the dedicated table", () => 
 });
 
 test("backfillAgentRuns is idempotent on re-run", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAgentRun(dbPath, makeAgentRun({ id: "run_a" }));
 
@@ -1121,9 +1121,9 @@ test("backfillAgentRuns is idempotent on re-run", () => {
 });
 
 test("backfillAgentRuns --dry-run does not write", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAgentRun(dbPath, makeAgentRun({ id: "run_a" }));
     insertAppRecordAgentRun(dbPath, makeAgentRun({ id: "run_b" }));
@@ -1141,9 +1141,9 @@ test("backfillAgentRuns --dry-run does not write", () => {
 });
 
 test("verifyAgentRuns reports matched when both sides identical", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeAgentRun({ id: "run_a" });
     insertAppRecordAgentRun(dbPath, record);
@@ -1161,9 +1161,9 @@ test("verifyAgentRuns reports matched when both sides identical", () => {
 });
 
 test("verifyAgentRuns reports jsonOnly when JSON-side has rows not yet backfilled", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAgentRun(dbPath, makeAgentRun({ id: "run_a" }));
     insertAppRecordAgentRun(dbPath, makeAgentRun({ id: "run_b" }));
@@ -1180,9 +1180,9 @@ test("verifyAgentRuns reports jsonOnly when JSON-side has rows not yet backfille
 });
 
 test("verifyAgentRuns reports sqliteOnly when dedicated table has extra rows", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertDedicatedAgentRun(dbPath, makeAgentRun({ id: "extra" }));
 
@@ -1198,9 +1198,9 @@ test("verifyAgentRuns reports sqliteOnly when dedicated table has extra rows", (
 });
 
 test("verifyAgentRuns reports contentDrift when ids match but content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeAgentRun({ id: "run_a", status: "success" });
     insertAppRecordAgentRun(dbPath, record);
@@ -1218,9 +1218,9 @@ test("verifyAgentRuns reports contentDrift when ids match but content differs", 
 });
 
 test("backfillAgentRuns --check-orphans counts runs whose agentId references a missing agent", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordAgent(dbPath, "agent_present", "workspace_a");
     insertAppRecordAgentRun(dbPath, makeAgentRun({ id: "run_orphan", agentId: "agent_missing" }));
@@ -1238,9 +1238,9 @@ test("backfillAgentRuns --check-orphans counts runs whose agentId references a m
 });
 
 test("verifyAgentRuns --check-orphans surfaces orphan count without blocking verification", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const orphan = makeAgentRun({ id: "run_orphan", agentId: "agent_missing" });
     insertAppRecordAgentRun(dbPath, orphan);
@@ -1333,9 +1333,9 @@ function countDedicatedJobs(dbPath: string): number {
 }
 
 test("backfillJobs reports zero for an empty store", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
 
     const result = backfillJobs({ dbPath });
@@ -1352,9 +1352,9 @@ test("backfillJobs reports zero for an empty store", () => {
 });
 
 test("backfillJobs inserts JSON-side rows into the dedicated jobs table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordJob(dbPath, makeJob({ id: "job_a" }));
 
@@ -1371,9 +1371,9 @@ test("backfillJobs inserts JSON-side rows into the dedicated jobs table", () => 
 });
 
 test("backfillJobs is idempotent on re-run", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordJob(dbPath, makeJob({ id: "job_a" }));
 
@@ -1392,9 +1392,9 @@ test("backfillJobs is idempotent on re-run", () => {
 });
 
 test("backfillJobs --dry-run does not write", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordJob(dbPath, makeJob({ id: "job_a" }));
     insertAppRecordJob(dbPath, makeJob({ id: "job_b" }));
@@ -1412,9 +1412,9 @@ test("backfillJobs --dry-run does not write", () => {
 });
 
 test("backfillJobs reports drift when content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const jsonRecord = makeJob({ id: "job_a", status: "queued" });
     insertAppRecordJob(dbPath, jsonRecord);
@@ -1433,9 +1433,9 @@ test("backfillJobs reports drift when content differs", () => {
 });
 
 test("verifyJobs reports matched when both sides identical", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeJob({ id: "job_a" });
     insertAppRecordJob(dbPath, record);
@@ -1453,9 +1453,9 @@ test("verifyJobs reports matched when both sides identical", () => {
 });
 
 test("verifyJobs reports jsonOnly when JSON-side has rows not yet backfilled", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordJob(dbPath, makeJob({ id: "job_a" }));
     insertAppRecordJob(dbPath, makeJob({ id: "job_b" }));
@@ -1472,9 +1472,9 @@ test("verifyJobs reports jsonOnly when JSON-side has rows not yet backfilled", (
 });
 
 test("verifyJobs reports sqliteOnly when dedicated table has extra rows", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertDedicatedJob(dbPath, makeJob({ id: "extra" }));
 
@@ -1490,9 +1490,9 @@ test("verifyJobs reports sqliteOnly when dedicated table has extra rows", () => 
 });
 
 test("verifyJobs reports contentDrift when ids match but content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeJob({ id: "job_a", status: "queued" });
     insertAppRecordJob(dbPath, record);
@@ -1593,9 +1593,9 @@ function countDedicatedInvitationEmailDeliveries(dbPath: string): number {
 }
 
 test("backfillInvitationEmailDeliveries reports zero for an empty store", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
 
     const result = backfillInvitationEmailDeliveries({ dbPath });
@@ -1612,9 +1612,9 @@ test("backfillInvitationEmailDeliveries reports zero for an empty store", () => 
 });
 
 test("backfillInvitationEmailDeliveries inserts JSON-side rows into the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordInvitationEmailDelivery(dbPath, makeInvitationEmailDelivery({ id: "ied_a" }));
 
@@ -1631,9 +1631,9 @@ test("backfillInvitationEmailDeliveries inserts JSON-side rows into the dedicate
 });
 
 test("backfillInvitationEmailDeliveries is idempotent on re-run", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordInvitationEmailDelivery(dbPath, makeInvitationEmailDelivery({ id: "ied_a" }));
 
@@ -1652,9 +1652,9 @@ test("backfillInvitationEmailDeliveries is idempotent on re-run", () => {
 });
 
 test("backfillInvitationEmailDeliveries --dry-run does not write", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordInvitationEmailDelivery(dbPath, makeInvitationEmailDelivery({ id: "ied_a" }));
     insertAppRecordInvitationEmailDelivery(dbPath, makeInvitationEmailDelivery({ id: "ied_b" }));
@@ -1672,9 +1672,9 @@ test("backfillInvitationEmailDeliveries --dry-run does not write", () => {
 });
 
 test("backfillInvitationEmailDeliveries reports drift when content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const jsonRecord = makeInvitationEmailDelivery({ id: "ied_a", status: "pending" });
     insertAppRecordInvitationEmailDelivery(dbPath, jsonRecord);
@@ -1693,9 +1693,9 @@ test("backfillInvitationEmailDeliveries reports drift when content differs", () 
 });
 
 test("verifyInvitationEmailDeliveries reports matched when both sides identical", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeInvitationEmailDelivery({ id: "ied_a" });
     insertAppRecordInvitationEmailDelivery(dbPath, record);
@@ -1713,9 +1713,9 @@ test("verifyInvitationEmailDeliveries reports matched when both sides identical"
 });
 
 test("verifyInvitationEmailDeliveries reports jsonOnly when JSON-side has rows not yet backfilled", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordInvitationEmailDelivery(dbPath, makeInvitationEmailDelivery({ id: "ied_a" }));
     insertAppRecordInvitationEmailDelivery(dbPath, makeInvitationEmailDelivery({ id: "ied_b" }));
@@ -1732,9 +1732,9 @@ test("verifyInvitationEmailDeliveries reports jsonOnly when JSON-side has rows n
 });
 
 test("verifyInvitationEmailDeliveries reports sqliteOnly when dedicated table has extra rows", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertDedicatedInvitationEmailDelivery(dbPath, makeInvitationEmailDelivery({ id: "extra" }));
 
@@ -1750,9 +1750,9 @@ test("verifyInvitationEmailDeliveries reports sqliteOnly when dedicated table ha
 });
 
 test("verifyInvitationEmailDeliveries reports contentDrift when ids match but content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeInvitationEmailDelivery({ id: "ied_a", status: "pending" });
     insertAppRecordInvitationEmailDelivery(dbPath, record);
@@ -1826,9 +1826,9 @@ function countDedicatedActivities(dbPath: string): number {
 }
 
 test("backfillActivities reports zero for an empty store", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
 
     const result = backfillActivities({ dbPath });
@@ -1845,9 +1845,9 @@ test("backfillActivities reports zero for an empty store", () => {
 });
 
 test("backfillActivities inserts JSON-side rows into the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordActivity(dbPath, makeActivityRecord({ id: "activity_a" }));
 
@@ -1864,9 +1864,9 @@ test("backfillActivities inserts JSON-side rows into the dedicated table", () =>
 });
 
 test("backfillActivities is idempotent on re-run", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordActivity(dbPath, makeActivityRecord({ id: "activity_a" }));
 
@@ -1885,9 +1885,9 @@ test("backfillActivities is idempotent on re-run", () => {
 });
 
 test("backfillActivities --dry-run does not write", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordActivity(dbPath, makeActivityRecord({ id: "activity_a" }));
     insertAppRecordActivity(dbPath, makeActivityRecord({ id: "activity_b" }));
@@ -1905,9 +1905,9 @@ test("backfillActivities --dry-run does not write", () => {
 });
 
 test("backfillActivities reports drift when content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const jsonRecord = makeActivityRecord({ id: "activity_a", event: "workspace.updated" });
     insertAppRecordActivity(dbPath, jsonRecord);
@@ -1926,9 +1926,9 @@ test("backfillActivities reports drift when content differs", () => {
 });
 
 test("verifyActivities reports matched when both sides identical", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeActivityRecord({ id: "activity_a" });
     insertAppRecordActivity(dbPath, record);
@@ -1946,9 +1946,9 @@ test("verifyActivities reports matched when both sides identical", () => {
 });
 
 test("verifyActivities reports jsonOnly when JSON-side has rows not yet backfilled", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordActivity(dbPath, makeActivityRecord({ id: "activity_a" }));
     insertAppRecordActivity(dbPath, makeActivityRecord({ id: "activity_b" }));
@@ -1965,9 +1965,9 @@ test("verifyActivities reports jsonOnly when JSON-side has rows not yet backfill
 });
 
 test("verifyActivities reports sqliteOnly when dedicated table has extra rows", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertDedicatedActivity(dbPath, makeActivityRecord({ id: "extra" }));
 
@@ -1983,9 +1983,9 @@ test("verifyActivities reports sqliteOnly when dedicated table has extra rows", 
 });
 
 test("verifyActivities reports contentDrift when ids match but content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const record = makeActivityRecord({ id: "activity_a", data: { title: "Original title" } });
     insertAppRecordActivity(dbPath, record);
@@ -2078,9 +2078,9 @@ function countDedicatedProviderCalls(dbPath: string): number {
 }
 
 test("backfillProviderCalls reports zero for an empty store", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
 
     const result = backfillProviderCalls({ dbPath });
@@ -2097,9 +2097,9 @@ test("backfillProviderCalls reports zero for an empty store", () => {
 });
 
 test("backfillProviderCalls inserts JSON-side rows into the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
     insertAppRecordProviderCall(dbPath, makeProviderCall({ id: "provider_call_a" }));
 
@@ -2116,9 +2116,9 @@ test("backfillProviderCalls inserts JSON-side rows into the dedicated table", ()
 });
 
 test("backfillProviderCalls is idempotent on re-run", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
     insertAppRecordProviderCall(dbPath, makeProviderCall({ id: "provider_call_a" }));
 
@@ -2137,9 +2137,9 @@ test("backfillProviderCalls is idempotent on re-run", () => {
 });
 
 test("backfillProviderCalls --dry-run does not write", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
     insertAppRecordProviderCall(dbPath, makeProviderCall({ id: "provider_call_a" }));
     insertAppRecordProviderCall(dbPath, makeProviderCall({ id: "provider_call_b" }));
@@ -2157,9 +2157,9 @@ test("backfillProviderCalls --dry-run does not write", () => {
 });
 
 test("backfillProviderCalls reports drift when content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
     const jsonRecord = makeProviderCall({ id: "provider_call_a", promptTokens: 5 });
     insertAppRecordProviderCall(dbPath, jsonRecord);
@@ -2178,9 +2178,9 @@ test("backfillProviderCalls reports drift when content differs", () => {
 });
 
 test("verifyProviderCalls reports matched when both sides identical", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
     const record = makeProviderCall({ id: "provider_call_a" });
     insertAppRecordProviderCall(dbPath, record);
@@ -2198,9 +2198,9 @@ test("verifyProviderCalls reports matched when both sides identical", () => {
 });
 
 test("verifyProviderCalls reports jsonOnly when JSON-side has rows not yet backfilled", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
     insertAppRecordProviderCall(dbPath, makeProviderCall({ id: "provider_call_a" }));
     insertAppRecordProviderCall(dbPath, makeProviderCall({ id: "provider_call_b" }));
@@ -2217,9 +2217,9 @@ test("verifyProviderCalls reports jsonOnly when JSON-side has rows not yet backf
 });
 
 test("verifyProviderCalls reports sqliteOnly when dedicated table has extra rows", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
     insertDedicatedProviderCall(dbPath, makeProviderCall({ id: "extra" }));
 
@@ -2235,9 +2235,9 @@ test("verifyProviderCalls reports sqliteOnly when dedicated table has extra rows
 });
 
 test("verifyProviderCalls reports contentDrift when ids match but content differs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     prepareProviderCallDb(dbPath);
     const record = makeProviderCall({ id: "provider_call_a", status: "success" });
     insertAppRecordProviderCall(dbPath, record);
@@ -2318,9 +2318,9 @@ function countDedicatedActivationSignals(dbPath: string): number {
 }
 
 test("backfillActivationSignals inserts JSON-side rows into the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordActivationSignal(dbPath, makeActivationSignal({ id: "signal_a", stableKey: "alpha:signal:a" }));
 
@@ -2337,9 +2337,9 @@ test("backfillActivationSignals inserts JSON-side rows into the dedicated table"
 });
 
 test("backfillActivationSignals is idempotent and supports dry-run", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertAppRecordActivationSignal(dbPath, makeActivationSignal({ id: "signal_a", stableKey: "alpha:signal:a" }));
 
@@ -2358,9 +2358,9 @@ test("backfillActivationSignals is idempotent and supports dry-run", () => {
 });
 
 test("backfillActivationSignals treats matching stable-key rows with different ids as drift", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const jsonRecord = makeActivationSignal({
       id: "legacy_signal",
@@ -2390,9 +2390,9 @@ test("backfillActivationSignals treats matching stable-key rows with different i
 });
 
 test("verifyActivationSignals treats dedicated-only rows as healthy after mirror retirement", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     insertDedicatedActivationSignal(dbPath, makeActivationSignal({ id: "dedicated_only", stableKey: "alpha:dedicated-only" }));
 
@@ -2408,9 +2408,9 @@ test("verifyActivationSignals treats dedicated-only rows as healthy after mirror
 });
 
 test("verifyActivationSignals reports jsonOnly sqliteOnly and contentDrift", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
-    const dbPath = join(tempDir, "taskloom.sqlite");
+    const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const matching = makeActivationSignal({ id: "matching", stableKey: "alpha:matching" });
     const drift = makeActivationSignal({ id: "drift", source: "user_fact", stableKey: "alpha:drift" });

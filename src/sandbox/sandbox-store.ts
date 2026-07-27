@@ -1,7 +1,7 @@
 /**
  * Sandbox exec persistence layer.
  *
- * Mirrors the existing dual-write convention: when TASKLOOM_STORE=sqlite the
+ * Mirrors the existing dual-write convention: when PACKETAGENT_STORE=sqlite the
  * canonical store is a sqlite table backed by the migrations under
  * src/db/migrations/. Otherwise the data lives in the JSON store under a new
  * `sandboxExecs` collection.
@@ -11,7 +11,7 @@ import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore, type TaskloomData } from "../taskloom-store.js";
+import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore, type PacketAgentData } from "../packetagent-store.js";
 import type {
   SandboxDriver as SandboxDriverId,
   SandboxExecRecord,
@@ -20,7 +20,7 @@ import type {
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
-const DEFAULT_DB_FILE = "data/taskloom.sqlite";
+const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 
 export interface SandboxStoreFilters {
@@ -37,17 +37,17 @@ export interface SandboxStore {
 }
 
 export interface SandboxStoreDeps {
-  loadStore?: () => TaskloomData | Promise<TaskloomData>;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T | Promise<T>;
+  loadStore?: () => PacketAgentData | Promise<PacketAgentData>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T | Promise<T>;
   dbPath?: string;
 }
 
-interface MutableTaskloomData extends TaskloomData {
+interface MutablePacketAgentData extends PacketAgentData {
   sandboxExecs?: SandboxExecRecord[];
 }
 
 export function createSandboxStore(deps: SandboxStoreDeps = {}): SandboxStore {
-  if (process.env.TASKLOOM_STORE === "sqlite") return createSqliteSandboxStore(deps);
+  if (process.env.PACKETAGENT_STORE === "sqlite") return createSqliteSandboxStore(deps);
   return createJsonSandboxStore(deps);
 }
 
@@ -58,7 +58,7 @@ export function createJsonSandboxStore(deps: SandboxStoreDeps = {}): SandboxStor
   return {
     async insertExec(record) {
       await mutate((data) => {
-        const collection = ensureSandboxCollection(data as MutableTaskloomData);
+        const collection = ensureSandboxCollection(data as MutablePacketAgentData);
         const idx = collection.findIndex((entry) => entry.id === record.id);
         if (idx >= 0) collection[idx] = record;
         else collection.push(record);
@@ -69,7 +69,7 @@ export function createJsonSandboxStore(deps: SandboxStoreDeps = {}): SandboxStor
 
     async updateExec(id, patch) {
       const result = await mutate((data) => {
-        const collection = ensureSandboxCollection(data as MutableTaskloomData);
+        const collection = ensureSandboxCollection(data as MutablePacketAgentData);
         const idx = collection.findIndex((entry) => entry.id === id);
         if (idx < 0) return null;
         const existing = collection[idx]!;
@@ -85,7 +85,7 @@ export function createJsonSandboxStore(deps: SandboxStoreDeps = {}): SandboxStor
     },
 
     async listExecs(workspaceId, filters = {}) {
-      const data = (await load()) as MutableTaskloomData;
+      const data = (await load()) as MutablePacketAgentData;
       const collection = Array.isArray(data.sandboxExecs) ? data.sandboxExecs : [];
       const filtered = collection.filter((entry) => {
         if (entry.workspaceId !== workspaceId) return false;
@@ -97,14 +97,14 @@ export function createJsonSandboxStore(deps: SandboxStoreDeps = {}): SandboxStor
     },
 
     async getExec(workspaceId, id) {
-      const data = (await load()) as MutableTaskloomData;
+      const data = (await load()) as MutablePacketAgentData;
       const collection = Array.isArray(data.sandboxExecs) ? data.sandboxExecs : [];
       return collection.find((entry) => entry.workspaceId === workspaceId && entry.id === id) ?? null;
     },
   };
 }
 
-function ensureSandboxCollection(data: MutableTaskloomData): SandboxExecRecord[] {
+function ensureSandboxCollection(data: MutablePacketAgentData): SandboxExecRecord[] {
   if (!Array.isArray(data.sandboxExecs)) data.sandboxExecs = [];
   return data.sandboxExecs;
 }
@@ -291,7 +291,7 @@ function clampLimit(limit?: number): number {
 
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
-  return resolve(process.cwd(), process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
 }
 
 function openDatabase(dbPath: string): DatabaseSync {

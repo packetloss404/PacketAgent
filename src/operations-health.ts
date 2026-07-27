@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve as resolvePath } from "node:path";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync } from "./taskloom-store.js";
+import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync } from "./packetagent-store.js";
 import { getSchedulerHeartbeat as defaultSchedulerHeartbeat, type SchedulerHeartbeat } from "./jobs/scheduler-heartbeat.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 import {
@@ -122,7 +122,7 @@ function checkAccessLog(
   fileExists: (path: string) => boolean,
   checkedAt: string,
 ): SubsystemHealth {
-  const mode = (env.TASKLOOM_ACCESS_LOG_MODE ?? "").trim().toLowerCase() || "off";
+  const mode = (env.PACKETAGENT_ACCESS_LOG_MODE ?? "").trim().toLowerCase() || "off";
   if (mode === "off") {
     return { name: "accessLog", status: "disabled", detail: "access log is off", checkedAt };
   }
@@ -130,12 +130,12 @@ function checkAccessLog(
     return { name: "accessLog", status: "ok", detail: "writing to stdout", checkedAt };
   }
   if (mode === "file") {
-    const rawPath = env.TASKLOOM_ACCESS_LOG_PATH;
+    const rawPath = env.PACKETAGENT_ACCESS_LOG_PATH;
     if (typeof rawPath !== "string" || rawPath.length === 0) {
       return {
         name: "accessLog",
         status: "down",
-        detail: "file mode requires TASKLOOM_ACCESS_LOG_PATH",
+        detail: "file mode requires PACKETAGENT_ACCESS_LOG_PATH",
         checkedAt,
       };
     }
@@ -163,7 +163,7 @@ function checkAccessLog(
 }
 
 function checkSandboxSync(env: NodeJS.ProcessEnv, checkedAt: string): SubsystemHealth {
-  const requested = (env.TASKLOOM_SANDBOX_DRIVER ?? "auto").toLowerCase();
+  const requested = (env.PACKETAGENT_SANDBOX_DRIVER ?? "auto").toLowerCase();
   const driver = requested === "native" ? "native" : requested === "docker" ? "docker" : "auto";
   return {
     name: "sandbox",

@@ -57,7 +57,7 @@ const PRESET_TO_MODEL: Record<AppIterationPresetId, string> = {
 const DEFAULT_LLM_MODEL = "claude-sonnet-4-6";
 
 const ITERATION_SYSTEM_PROMPT = [
-  "You are Taskloom's app-builder iteration assistant.",
+  "You are PacketAgent's app-builder iteration assistant.",
   "Given a current app draft (pages, API routes, data entities, auth, config) and a user iteration prompt,",
   "produce a concrete change set as a tool call to `submit_iteration_diff`.",
   "",

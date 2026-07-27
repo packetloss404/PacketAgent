@@ -1,5 +1,5 @@
 # =============================================================================
-# Taskloom access-log shipping example: Fluent Bit (v1.9 / v2.x / v3.x)
+# PacketAgent access-log shipping example: Fluent Bit (v1.9 / v2.x / v3.x)
 # -----------------------------------------------------------------------------
 # This is an EXAMPLE Fluent Bit configuration that tails the redacted
 # file-mode access log and forwards it to Loki and (optionally) a downstream
@@ -17,7 +17,7 @@
 #   - The tail input uses a DB file so that file position survives Fluent Bit
 #     restarts AND cascade rotation (<path> -> <path>.1 -> ...).
 #   - Rotate_Wait gives Fluent Bit a grace window to drain the renamed file
-#     before TASKLOOM_ACCESS_LOG_MAX_FILES prunes it.
+#     before PACKETAGENT_ACCESS_LOG_MAX_FILES prunes it.
 #   - High-cardinality fields (userId, workspaceId, requestId) MUST stay in
 #     the log record and MUST NOT be promoted to Loki labels.
 #   - License: example, adapt to taste.
@@ -36,23 +36,23 @@
     storage.checksum  off
 
 # -----------------------------------------------------------------------------
-# Input: tail the Taskloom access log.
+# Input: tail the PacketAgent access log.
 # -----------------------------------------------------------------------------
-# Substitute the Path below with the value of TASKLOOM_ACCESS_LOG_PATH from
-# the Taskloom service environment.
+# Substitute the Path below with the value of PACKETAGENT_ACCESS_LOG_PATH from
+# the PacketAgent service environment.
 #
 # To also pick up rotated siblings on first start, switch the Path to the
 # glob form:
-#     Path /var/log/taskloom/access.log*
+#     Path /var/log/packetagent/access.log*
 # In steady state the non-glob form is enough; Fluent Bit follows renamed
 # files via the DB file below.
 [INPUT]
     Name              tail
-    Path              /var/log/taskloom/access.log
+    Path              /var/log/packetagent/access.log
     Path_Key          source_file
     Parser            json
-    Tag               taskloom.access
-    DB                /var/log/taskloom/fluent-bit-tail.db
+    Tag               packetagent.access
+    DB                /var/log/packetagent/fluent-bit-tail.db
     DB.Sync           Normal
     Refresh_Interval  5
     Rotate_Wait       30
@@ -66,10 +66,10 @@
 # -----------------------------------------------------------------------------
 [FILTER]
     Name           record_modifier
-    Match          taskloom.access
+    Match          packetagent.access
     Record         host    ${HOSTNAME}
-    Record         env     ${TASKLOOM_ENV}
-    Record         service taskloom
+    Record         env     ${PACKETAGENT_ENV}
+    Record         service packetagent
 
 # -----------------------------------------------------------------------------
 # OPTIONAL filter: drop noisy health-check lines.
@@ -78,7 +78,7 @@
 #
 # [FILTER]
 #     Name      grep
-#     Match     taskloom.access
+#     Match     packetagent.access
 #     Exclude   path ^/api/health$
 
 # -----------------------------------------------------------------------------
@@ -90,13 +90,13 @@
 # line filters.
 [OUTPUT]
     Name        loki
-    Match       taskloom.access
+    Match       packetagent.access
     Host        loki.example.internal
     Port        3100
     Tls         On
     Tls.verify  On
-    Tenant_ID   taskloom-prod
-    Labels      host=$host,service=taskloom,env=$env
+    Tenant_ID   packetagent-prod
+    Labels      host=$host,service=packetagent,env=$env
     Label_keys  $method,$status
     Line_format json
     Auto_kubernetes_labels off
@@ -109,7 +109,7 @@
 #
 # [OUTPUT]
 #     Name        forward
-#     Match       taskloom.access
+#     Match       packetagent.access
 #     Host        fluentd.example.internal
 #     Port        24224
 #     Shared_Key  REPLACE_ME

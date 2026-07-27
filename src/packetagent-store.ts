@@ -79,12 +79,12 @@ import type {
   RequirementPriority,
   RequirementRecord,
   RequirementStatus,
-  ResolvedTaskloomStoreMode,
+  ResolvedPacketAgentStoreMode,
   SessionRecord,
   ShareTokenRecord,
   ShareTokenScope,
-  TaskloomData,
-  TaskloomStoreMode,
+  PacketAgentData,
+  PacketAgentStoreMode,
   UserRecord,
   ValidationEvidenceOutcome,
   ValidationEvidenceRecord,
@@ -112,7 +112,7 @@ import {
   ManagedDatabaseStoreBoundaryError,
   ManagedPostgresStoreConfigurationError,
   MANAGED_DATABASE_SYNC_ADAPTER_GAP_MESSAGE,
-  resolveTaskloomStoreMode,
+  resolvePacketAgentStoreMode,
 } from "./store/mode.js";
 import { clearStoreCacheState, getCacheBackendKey, getCachedStore, getMutateSqliteDepth, setCachedStore } from "./store/cache.js";
 import { workspaceBriefEntries, releaseConfirmationEntries } from "./store/collections.js";
@@ -213,12 +213,12 @@ export type {
   RequirementPriority,
   RequirementRecord,
   RequirementStatus,
-  ResolvedTaskloomStoreMode,
+  ResolvedPacketAgentStoreMode,
   SessionRecord,
   ShareTokenRecord,
   ShareTokenScope,
-  TaskloomData,
-  TaskloomStoreMode,
+  PacketAgentData,
+  PacketAgentStoreMode,
   UserRecord,
   ValidationEvidenceOutcome,
   ValidationEvidenceRecord,
@@ -244,25 +244,25 @@ export {
   ManagedDatabaseStoreBoundaryError,
   ManagedPostgresStoreConfigurationError,
   MANAGED_DATABASE_SYNC_ADAPTER_GAP_MESSAGE,
-  resolveTaskloomStoreMode,
+  resolvePacketAgentStoreMode,
 } from "./store/mode.js";
 export { normalizeStore } from "./store/normalize.js";
 export { createSeedStore } from "./store/seed.js";
 export { loadSqliteAppData, persistSqliteAppData } from "./store/backends/sqlite.js";
 export { setManagedPostgresStoreClientFactoryForTests } from "./store/backends/managed-postgres.js";
 
-function assertSupportedSyncStoreMode(resolution: ResolvedTaskloomStoreMode): void {
+function assertSupportedSyncStoreMode(resolution: ResolvedPacketAgentStoreMode): void {
   if (resolution.mode === "managed" || resolution.mode === "postgres" || resolution.managedDatabaseUrlKeys.length > 0) {
     throw new ManagedDatabaseStoreBoundaryError(resolution);
   }
 }
 
-export function loadStore(): TaskloomData {
+export function loadStore(): PacketAgentData {
   const backend = currentStoreBackend();
   return loadStoreFromBackend(backend);
 }
 
-export async function loadStoreAsync(): Promise<TaskloomData> {
+export async function loadStoreAsync(): Promise<PacketAgentData> {
   const backend = currentAsyncStoreBackend();
   const cached = getCachedStore();
   if (cached && getCacheBackendKey() === backend.key) return cached;
@@ -272,12 +272,12 @@ export async function loadStoreAsync(): Promise<TaskloomData> {
   return loaded;
 }
 
-export function mutateStore<T>(mutator: (data: TaskloomData) => T): T {
-  const resolution = resolveTaskloomStoreMode();
+export function mutateStore<T>(mutator: (data: PacketAgentData) => T): T {
+  const resolution = resolvePacketAgentStoreMode();
   assertSupportedSyncStoreMode(resolution);
 
   if (resolution.mode === "sqlite") {
-    return mutateSqliteStore(resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE), mutator);
+    return mutateSqliteStore(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE), mutator);
   }
 
   const data = loadStore();
@@ -286,7 +286,7 @@ export function mutateStore<T>(mutator: (data: TaskloomData) => T): T {
   return result;
 }
 
-export async function mutateStoreAsync<T>(mutator: (data: TaskloomData) => T | Promise<T>): Promise<T> {
+export async function mutateStoreAsync<T>(mutator: (data: PacketAgentData) => T | Promise<T>): Promise<T> {
   return currentAsyncStoreBackend().mutate(mutator);
 }
 
@@ -296,7 +296,7 @@ export interface RecordActivityOptions {
 }
 
 export function recordActivity(
-  data: TaskloomData,
+  data: PacketAgentData,
   activity: ActivityRecord,
   options: RecordActivityOptions = {},
 ): ActivityRecord {
@@ -314,36 +314,36 @@ export function recordActivity(
   return activity;
 }
 
-export function persistStore(data: TaskloomData): void {
+export function persistStore(data: PacketAgentData): void {
   currentStoreBackend().persist(data);
 }
 
 function currentStoreBackend(): StoreBackend {
-  const resolution = resolveTaskloomStoreMode();
+  const resolution = resolvePacketAgentStoreMode();
   assertSupportedSyncStoreMode(resolution);
-  if (resolution.mode === "sqlite") return sqliteStoreBackend(resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE));
+  if (resolution.mode === "sqlite") return sqliteStoreBackend(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE));
   return jsonStoreBackend();
 }
 
 function currentAsyncStoreBackend(): AsyncStoreBackend {
-  const resolution = resolveTaskloomStoreMode();
+  const resolution = resolvePacketAgentStoreMode();
   if (resolution.mode === "managed" || resolution.mode === "postgres" || resolution.managedDatabaseUrlKeys.length > 0) {
     return managedDatabaseAsyncStoreBackend(resolution);
   }
 
-  if (resolution.mode === "sqlite") return sqliteAsyncStoreBackend(resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE));
+  if (resolution.mode === "sqlite") return sqliteAsyncStoreBackend(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE));
   return syncStoreAsyncBackend(jsonStoreBackend());
 }
 
 function sqliteIndexedRecord<T>(collection: Parameters<typeof sqliteIndexedRecordImpl>[1], whereSql: string, values: Parameters<typeof sqliteIndexedRecordImpl>[3]): T | null {
-  if (process.env.TASKLOOM_STORE !== "sqlite") return null;
-  const dbPath = resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
+  const dbPath = resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
   return sqliteIndexedRecordImpl<T>(dbPath, collection, whereSql, values);
 }
 
 function sqliteIndexedRecords<T>(collection: Parameters<typeof sqliteIndexedRecordsImpl>[1], whereSql: string, values: Parameters<typeof sqliteIndexedRecordsImpl>[3], orderSql = "app_records.id"): T[] | null {
-  if (process.env.TASKLOOM_STORE !== "sqlite") return null;
-  const dbPath = resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
+  const dbPath = resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
   return sqliteIndexedRecordsImpl<T>(dbPath, collection, whereSql, values, orderSql);
 }
 
@@ -380,7 +380,7 @@ export async function listWorkspaceRecordsIndexedAsync<K extends WorkspaceRecord
 }
 
 function shouldUseSqliteIndexedReads(): boolean {
-  const resolution = resolveTaskloomStoreMode();
+  const resolution = resolvePacketAgentStoreMode();
   return resolution.mode === "sqlite" && resolution.managedDatabaseUrlKeys.length === 0;
 }
 
@@ -390,8 +390,8 @@ function sqliteWorkspaceRecords<K extends WorkspaceRecordCollectionKey>(
   orderBy: WorkspaceRecordOrder,
   limit: number | undefined,
 ): WorkspaceRecordCollectionMap[K][] | null {
-  if (process.env.TASKLOOM_STORE !== "sqlite") return null;
-  const dbPath = resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
+  const dbPath = resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
   return sqliteWorkspaceRecordsImpl(dbPath, collection, workspaceId, orderBy, limit);
 }
 
@@ -405,7 +405,7 @@ function listWorkspaceRecordsFromStore<K extends WorkspaceRecordCollectionKey>(
 }
 
 function listWorkspaceRecordsFromData<K extends WorkspaceRecordCollectionKey>(
-  data: TaskloomData,
+  data: PacketAgentData,
   collection: K,
   workspaceId: string,
   orderBy: WorkspaceRecordOrder,
@@ -923,14 +923,14 @@ export async function findJobIndexedAsync(jobId: string): Promise<JobRecord | nu
     : (await loadStoreAsync()).jobs.find((entry) => entry.id === jobId) ?? null;
 }
 
-export function resetLocalStore(): TaskloomData {
+export function resetLocalStore(): PacketAgentData {
   const backend = currentStoreBackend();
   const reset = backend.reset();
   setCachedStore(reset, backend.key);
   return reset;
 }
 
-export function resetStoreForTests(): TaskloomData {
+export function resetStoreForTests(): PacketAgentData {
   return resetLocalStore();
 }
 
@@ -946,7 +946,7 @@ export interface RateLimitUpsertInput {
   maxBuckets: number;
 }
 
-export function upsertRateLimit(data: TaskloomData, input: RateLimitUpsertInput): number | null {
+export function upsertRateLimit(data: PacketAgentData, input: RateLimitUpsertInput): number | null {
   const updatedAt = new Date(input.timestamp).toISOString();
   const resetAtTimestamp = input.timestamp + input.windowMs;
   data.rateLimits = (data.rateLimits ?? []).filter((entry) => new Date(entry.resetAt).getTime() > input.timestamp);
@@ -974,7 +974,7 @@ export interface RateLimitRepository {
 }
 
 export function rateLimitRepository(): RateLimitRepository {
-  if (process.env.TASKLOOM_STORE === "sqlite") return sqliteRateLimitRepository(resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE));
+  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteRateLimitRepository(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE));
   return jsonRateLimitRepository();
 }
 
@@ -1028,7 +1028,7 @@ function sqliteRateLimitRepository(dbPath: string): RateLimitRepository {
   };
 }
 
-function pruneRateLimitBuckets(data: TaskloomData, maxBuckets: number) {
+function pruneRateLimitBuckets(data: PacketAgentData, maxBuckets: number) {
   const limit = Math.max(1, Math.floor(maxBuckets));
   if (!data.rateLimits || data.rateLimits.length <= limit) return;
   data.rateLimits = [...data.rateLimits]
@@ -1040,15 +1040,15 @@ export function clearStoreCache(): void {
   clearStoreCacheState();
 }
 
-export function defaultWorkspaceIdForUser(data: TaskloomData, userId: string): string | null {
+export function defaultWorkspaceIdForUser(data: PacketAgentData, userId: string): string | null {
   return data.memberships.find((entry) => entry.userId === userId)?.workspaceId ?? null;
 }
 
-export function findWorkspaceMembership(data: TaskloomData, workspaceId: string, userId: string): WorkspaceMemberRecord | null {
+export function findWorkspaceMembership(data: PacketAgentData, workspaceId: string, userId: string): WorkspaceMemberRecord | null {
   return data.memberships.find((entry) => entry.workspaceId === workspaceId && entry.userId === userId) ?? null;
 }
 
-export function upsertWorkspaceMembership(data: TaskloomData, input: WorkspaceMemberRecord): WorkspaceMemberRecord {
+export function upsertWorkspaceMembership(data: PacketAgentData, input: WorkspaceMemberRecord): WorkspaceMemberRecord {
   const existing = findWorkspaceMembership(data, input.workspaceId, input.userId);
   if (existing) {
     existing.role = input.role;
@@ -1060,18 +1060,18 @@ export function upsertWorkspaceMembership(data: TaskloomData, input: WorkspaceMe
   return input;
 }
 
-export function listWorkspaceInvitations(data: TaskloomData, workspaceId: string): WorkspaceInvitationRecord[] {
+export function listWorkspaceInvitations(data: PacketAgentData, workspaceId: string): WorkspaceInvitationRecord[] {
   return data.workspaceInvitations
     .filter((entry) => entry.workspaceId === workspaceId)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export function findWorkspaceInvitationByToken(data: TaskloomData, token: string): WorkspaceInvitationRecord | null {
+export function findWorkspaceInvitationByToken(data: PacketAgentData, token: string): WorkspaceInvitationRecord | null {
   return data.workspaceInvitations.find((entry) => entry.token === token) ?? null;
 }
 
 export function upsertWorkspaceInvitation(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: WorkspaceInvitationRecord,
 ): WorkspaceInvitationRecord {
   const existing = data.workspaceInvitations.find((entry) => entry.id === input.id);
@@ -1091,7 +1091,7 @@ export type CreateInvitationEmailDeliveryInput = Omit<InvitationEmailDeliveryRec
 };
 
 export function createInvitationEmailDelivery(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: CreateInvitationEmailDeliveryInput,
   timestamp = now(),
 ): InvitationEmailDeliveryRecord {
@@ -1114,17 +1114,17 @@ export function createInvitationEmailDelivery(
   return delivery;
 }
 
-export function listInvitationEmailDeliveries(data: TaskloomData, workspaceId: string, invitationId?: string): InvitationEmailDeliveryRecord[] {
+export function listInvitationEmailDeliveries(data: PacketAgentData, workspaceId: string, invitationId?: string): InvitationEmailDeliveryRecord[] {
   return data.invitationEmailDeliveries
     .filter((entry) => entry.workspaceId === workspaceId && (!invitationId || entry.invitationId === invitationId))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id));
 }
 
-export function findInvitationEmailDelivery(data: TaskloomData, deliveryId: string): InvitationEmailDeliveryRecord | null {
+export function findInvitationEmailDelivery(data: PacketAgentData, deliveryId: string): InvitationEmailDeliveryRecord | null {
   return data.invitationEmailDeliveries.find((entry) => entry.id === deliveryId) ?? null;
 }
 
-export function markInvitationEmailDeliverySent(data: TaskloomData, deliveryId: string, timestamp = now()): InvitationEmailDeliveryRecord | null {
+export function markInvitationEmailDeliverySent(data: PacketAgentData, deliveryId: string, timestamp = now()): InvitationEmailDeliveryRecord | null {
   const delivery = findInvitationEmailDelivery(data, deliveryId);
   if (!delivery) return null;
   delivery.status = "sent";
@@ -1134,7 +1134,7 @@ export function markInvitationEmailDeliverySent(data: TaskloomData, deliveryId: 
   return delivery;
 }
 
-export function markInvitationEmailDeliverySkipped(data: TaskloomData, deliveryId: string, reason?: string): InvitationEmailDeliveryRecord | null {
+export function markInvitationEmailDeliverySkipped(data: PacketAgentData, deliveryId: string, reason?: string): InvitationEmailDeliveryRecord | null {
   const delivery = findInvitationEmailDelivery(data, deliveryId);
   if (!delivery) return null;
   delivery.status = "skipped";
@@ -1144,7 +1144,7 @@ export function markInvitationEmailDeliverySkipped(data: TaskloomData, deliveryI
   return delivery;
 }
 
-export function markInvitationEmailDeliveryFailed(data: TaskloomData, deliveryId: string, error: string): InvitationEmailDeliveryRecord | null {
+export function markInvitationEmailDeliveryFailed(data: PacketAgentData, deliveryId: string, error: string): InvitationEmailDeliveryRecord | null {
   const delivery = findInvitationEmailDelivery(data, deliveryId);
   if (!delivery) return null;
   delivery.status = "failed";
@@ -1163,7 +1163,7 @@ export interface RecordInvitationEmailProviderStatusInput {
 }
 
 export function recordInvitationEmailProviderStatus(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: RecordInvitationEmailProviderStatusInput,
 ): InvitationEmailDeliveryRecord | null {
   const delivery = findInvitationEmailDelivery(data, input.deliveryId);
@@ -1187,18 +1187,18 @@ export function recordInvitationEmailProviderStatus(
 export type WorkspaceBriefUpsertInput = Omit<WorkspaceBriefRecord, "createdAt" | "updatedAt"> &
   Partial<Pick<WorkspaceBriefRecord, "createdAt" | "updatedAt">>;
 
-export function findWorkspaceBrief(data: TaskloomData, workspaceId: string): WorkspaceBriefRecord | null {
+export function findWorkspaceBrief(data: PacketAgentData, workspaceId: string): WorkspaceBriefRecord | null {
   return workspaceBriefEntries(data.workspaceBriefs).find((entry) => entry.workspaceId === workspaceId) ?? null;
 }
 
-export function listWorkspaceBriefVersions(data: TaskloomData, workspaceId: string): WorkspaceBriefVersionRecord[] {
+export function listWorkspaceBriefVersions(data: PacketAgentData, workspaceId: string): WorkspaceBriefVersionRecord[] {
   return data.workspaceBriefVersions
     .filter((entry) => entry.workspaceId === workspaceId)
     .sort((left, right) => right.versionNumber - left.versionNumber);
 }
 
 export function findWorkspaceBriefVersion(
-  data: TaskloomData,
+  data: PacketAgentData,
   workspaceId: string,
   versionId: string,
 ): WorkspaceBriefVersionRecord | null {
@@ -1206,7 +1206,7 @@ export function findWorkspaceBriefVersion(
 }
 
 export function appendWorkspaceBriefVersion(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: Omit<WorkspaceBriefVersionRecord, "id" | "versionNumber" | "createdAt"> & {
     id?: string;
     createdAt?: string;
@@ -1237,7 +1237,7 @@ export function appendWorkspaceBriefVersion(
 }
 
 export function upsertWorkspaceBrief(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: WorkspaceBriefUpsertInput,
   timestamp = now(),
 ): WorkspaceBriefRecord {
@@ -1263,33 +1263,33 @@ export function upsertWorkspaceBrief(
 export type RequirementUpsertInput = Omit<RequirementRecord, "id" | "createdAt" | "updatedAt"> &
   Partial<Pick<RequirementRecord, "id" | "createdAt" | "updatedAt">>;
 
-export function listRequirementsForWorkspace(data: TaskloomData, workspaceId: string): RequirementRecord[] {
+export function listRequirementsForWorkspace(data: PacketAgentData, workspaceId: string): RequirementRecord[] {
   return data.requirements.filter((entry) => entry.workspaceId === workspaceId);
 }
 
-export function findRequirement(data: TaskloomData, requirementId: string): RequirementRecord | null {
+export function findRequirement(data: PacketAgentData, requirementId: string): RequirementRecord | null {
   return data.requirements.find((entry) => entry.id === requirementId) ?? null;
 }
 
-export function upsertRequirement(data: TaskloomData, input: RequirementUpsertInput, timestamp = now()): RequirementRecord {
+export function upsertRequirement(data: PacketAgentData, input: RequirementUpsertInput, timestamp = now()): RequirementRecord {
   return upsertRecord(data.requirements, input, timestamp);
 }
 
 export type ImplementationPlanItemUpsertInput = Omit<ImplementationPlanItemRecord, "id" | "createdAt" | "updatedAt"> &
   Partial<Pick<ImplementationPlanItemRecord, "id" | "createdAt" | "updatedAt">>;
 
-export function listImplementationPlanItemsForWorkspace(data: TaskloomData, workspaceId: string): ImplementationPlanItemRecord[] {
+export function listImplementationPlanItemsForWorkspace(data: PacketAgentData, workspaceId: string): ImplementationPlanItemRecord[] {
   return data.implementationPlanItems
     .filter((entry) => entry.workspaceId === workspaceId)
     .sort((left, right) => left.order - right.order);
 }
 
-export function findImplementationPlanItem(data: TaskloomData, planItemId: string): ImplementationPlanItemRecord | null {
+export function findImplementationPlanItem(data: PacketAgentData, planItemId: string): ImplementationPlanItemRecord | null {
   return data.implementationPlanItems.find((entry) => entry.id === planItemId) ?? null;
 }
 
 export function upsertImplementationPlanItem(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: ImplementationPlanItemUpsertInput,
   timestamp = now(),
 ): ImplementationPlanItemRecord {
@@ -1300,19 +1300,19 @@ export type WorkflowConcernUpsertInput = Omit<WorkflowConcernRecord, "id" | "cre
   Partial<Pick<WorkflowConcernRecord, "id" | "createdAt" | "updatedAt">>;
 
 export function listWorkflowConcernsForWorkspace(
-  data: TaskloomData,
+  data: PacketAgentData,
   workspaceId: string,
   kind?: WorkflowConcernKind,
 ): WorkflowConcernRecord[] {
   return data.workflowConcerns.filter((entry) => entry.workspaceId === workspaceId && (!kind || entry.kind === kind));
 }
 
-export function findWorkflowConcern(data: TaskloomData, concernId: string): WorkflowConcernRecord | null {
+export function findWorkflowConcern(data: PacketAgentData, concernId: string): WorkflowConcernRecord | null {
   return data.workflowConcerns.find((entry) => entry.id === concernId) ?? null;
 }
 
 export function upsertWorkflowConcern(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: WorkflowConcernUpsertInput,
   timestamp = now(),
 ): WorkflowConcernRecord {
@@ -1322,16 +1322,16 @@ export function upsertWorkflowConcern(
 export type ValidationEvidenceUpsertInput = Omit<ValidationEvidenceRecord, "id" | "createdAt" | "updatedAt"> &
   Partial<Pick<ValidationEvidenceRecord, "id" | "createdAt" | "updatedAt">>;
 
-export function listValidationEvidenceForWorkspace(data: TaskloomData, workspaceId: string): ValidationEvidenceRecord[] {
+export function listValidationEvidenceForWorkspace(data: PacketAgentData, workspaceId: string): ValidationEvidenceRecord[] {
   return data.validationEvidence.filter((entry) => entry.workspaceId === workspaceId);
 }
 
-export function findValidationEvidence(data: TaskloomData, evidenceId: string): ValidationEvidenceRecord | null {
+export function findValidationEvidence(data: PacketAgentData, evidenceId: string): ValidationEvidenceRecord | null {
   return data.validationEvidence.find((entry) => entry.id === evidenceId) ?? null;
 }
 
 export function upsertValidationEvidence(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: ValidationEvidenceUpsertInput,
   timestamp = now(),
 ): ValidationEvidenceRecord {
@@ -1341,18 +1341,18 @@ export function upsertValidationEvidence(
 export type ReleaseConfirmationUpsertInput = Omit<ReleaseConfirmationRecord, "id" | "createdAt" | "updatedAt"> &
   Partial<Pick<ReleaseConfirmationRecord, "id" | "createdAt" | "updatedAt">>;
 
-export function listReleaseConfirmationsForWorkspace(data: TaskloomData, workspaceId: string): ReleaseConfirmationRecord[] {
+export function listReleaseConfirmationsForWorkspace(data: PacketAgentData, workspaceId: string): ReleaseConfirmationRecord[] {
   return releaseConfirmationEntries(data.releaseConfirmations).filter((entry) => entry.workspaceId === workspaceId);
 }
 
-export function findReleaseConfirmation(data: TaskloomData, releaseConfirmationId: string): ReleaseConfirmationRecord | null {
+export function findReleaseConfirmation(data: PacketAgentData, releaseConfirmationId: string): ReleaseConfirmationRecord | null {
   return releaseConfirmationEntries(data.releaseConfirmations).find((entry) => {
     return entry.id === releaseConfirmationId || entry.workspaceId === releaseConfirmationId;
   }) ?? null;
 }
 
 export function upsertReleaseConfirmation(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: ReleaseConfirmationUpsertInput,
   timestamp = now(),
 ): ReleaseConfirmationRecord {
@@ -1381,51 +1381,51 @@ export function upsertReleaseConfirmation(
 export type AgentUpsertInput = Omit<AgentRecord, "id" | "createdAt" | "updatedAt"> &
   Partial<Pick<AgentRecord, "id" | "createdAt" | "updatedAt">>;
 
-export function listAgentsForWorkspace(data: TaskloomData, workspaceId: string, includeArchived = false): AgentRecord[] {
+export function listAgentsForWorkspace(data: PacketAgentData, workspaceId: string, includeArchived = false): AgentRecord[] {
   return data.agents
     .filter((entry) => entry.workspaceId === workspaceId && (includeArchived || entry.status !== "archived"))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
-export function findAgent(data: TaskloomData, agentId: string): AgentRecord | null {
+export function findAgent(data: PacketAgentData, agentId: string): AgentRecord | null {
   return data.agents.find((entry) => entry.id === agentId) ?? null;
 }
 
-export function upsertAgent(data: TaskloomData, input: AgentUpsertInput, timestamp = now()): AgentRecord {
+export function upsertAgent(data: PacketAgentData, input: AgentUpsertInput, timestamp = now()): AgentRecord {
   return upsertRecord(data.agents, input, timestamp);
 }
 
-export function listProvidersForWorkspace(data: TaskloomData, workspaceId: string): ProviderRecord[] {
+export function listProvidersForWorkspace(data: PacketAgentData, workspaceId: string): ProviderRecord[] {
   return data.providers
     .filter((entry) => entry.workspaceId === workspaceId)
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export function findProvider(data: TaskloomData, providerId: string): ProviderRecord | null {
+export function findProvider(data: PacketAgentData, providerId: string): ProviderRecord | null {
   return data.providers.find((entry) => entry.id === providerId) ?? null;
 }
 
 export type ProviderUpsertInput = Omit<ProviderRecord, "id" | "createdAt" | "updatedAt"> &
   Partial<Pick<ProviderRecord, "id" | "createdAt" | "updatedAt">>;
 
-export function upsertProvider(data: TaskloomData, input: ProviderUpsertInput, timestamp = now()): ProviderRecord {
+export function upsertProvider(data: PacketAgentData, input: ProviderUpsertInput, timestamp = now()): ProviderRecord {
   return upsertRecord(data.providers, input, timestamp);
 }
 
 export type AgentRunUpsertInput = Omit<AgentRunRecord, "id" | "createdAt" | "updatedAt"> &
   Partial<Pick<AgentRunRecord, "id" | "createdAt" | "updatedAt">>;
 
-export function listAgentRunsForWorkspace(data: TaskloomData, workspaceId: string): AgentRunRecord[] {
+export function listAgentRunsForWorkspace(data: PacketAgentData, workspaceId: string): AgentRunRecord[] {
   return data.agentRuns
     .filter((entry) => entry.workspaceId === workspaceId)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export function listAgentRunsForAgent(data: TaskloomData, workspaceId: string, agentId: string): AgentRunRecord[] {
+export function listAgentRunsForAgent(data: PacketAgentData, workspaceId: string, agentId: string): AgentRunRecord[] {
   return listAgentRunsForWorkspace(data, workspaceId).filter((entry) => entry.agentId === agentId);
 }
 
-export function upsertAgentRun(data: TaskloomData, input: AgentRunUpsertInput, timestamp = now()): AgentRunRecord {
+export function upsertAgentRun(data: PacketAgentData, input: AgentRunUpsertInput, timestamp = now()): AgentRunRecord {
   const record = upsertRecord(data.agentRuns, input, timestamp);
   enqueueAgentRunDualWrite(record);
   return record;
@@ -1440,7 +1440,7 @@ export interface ActivationSignalRepository {
 }
 
 export function activationSignalRepository(): ActivationSignalRepository {
-  if (process.env.TASKLOOM_STORE === "sqlite") return sqliteActivationSignalRepository(resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE));
+  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteActivationSignalRepository(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE));
   return jsonActivationSignalRepository();
 }
 
@@ -1529,13 +1529,13 @@ function findSqliteActivationSignalForUpsert(db: ReturnType<typeof openStoreData
   return idRow ? normalizeActivationSignalRecord(JSON.parse(idRow.payload) as ActivationSignalRecord) : null;
 }
 
-export function listActivationSignalsForWorkspace(data: TaskloomData, workspaceId: string): ActivationSignalRecord[] {
+export function listActivationSignalsForWorkspace(data: PacketAgentData, workspaceId: string): ActivationSignalRecord[] {
   return data.activationSignals
     .filter((entry) => entry.workspaceId === workspaceId)
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
 }
 
-export function upsertActivationSignal(data: TaskloomData, input: ActivationSignalUpsertInput, timestamp = now()): ActivationSignalRecord {
+export function upsertActivationSignal(data: PacketAgentData, input: ActivationSignalUpsertInput, timestamp = now()): ActivationSignalRecord {
   const existing = input.stableKey
     ? data.activationSignals.find((entry) => entry.workspaceId === input.workspaceId && entry.stableKey === input.stableKey)
     : null;
@@ -1566,7 +1566,7 @@ export function nextIncompleteStep(completedSteps: OnboardingStepKey[]): Onboard
   return ONBOARDING_STEPS.find((step) => !completedSteps.includes(step)) ?? "confirm_release";
 }
 
-export function snapshotForWorkspace(data: TaskloomData, workspaceId: string) {
+export function snapshotForWorkspace(data: PacketAgentData, workspaceId: string) {
   const timestamp = now();
   const facts = data.activationFacts[workspaceId];
   const productRecords = activationProductRecordsForWorkspace(data, workspaceId, timestamp);
@@ -1581,7 +1581,7 @@ export function snapshotForWorkspace(data: TaskloomData, workspaceId: string) {
   });
 }
 
-function activationProductRecordsForWorkspace(data: TaskloomData, workspaceId: string, timestamp: string) {
+function activationProductRecordsForWorkspace(data: PacketAgentData, workspaceId: string, timestamp: string) {
   const workspace = data.workspaces.find((entry) => entry.id === workspaceId);
   const facts = data.activationFacts[workspaceId];
   const brief = findWorkspaceBrief(data, workspaceId);
@@ -1799,13 +1799,13 @@ function upsertRecord<TRecord extends { id: string; createdAt: string; updatedAt
   return next;
 }
 
-export function listWorkspaceEnvVars(data: TaskloomData, workspaceId: string): WorkspaceEnvVarRecord[] {
+export function listWorkspaceEnvVars(data: PacketAgentData, workspaceId: string): WorkspaceEnvVarRecord[] {
   return data.workspaceEnvVars
     .filter((entry) => entry.workspaceId === workspaceId)
     .sort((left, right) => left.key.localeCompare(right.key));
 }
 
-export function findWorkspaceEnvVar(data: TaskloomData, envVarId: string): WorkspaceEnvVarRecord | null {
+export function findWorkspaceEnvVar(data: PacketAgentData, envVarId: string): WorkspaceEnvVarRecord | null {
   return data.workspaceEnvVars.find((entry) => entry.id === envVarId) ?? null;
 }
 
@@ -1813,14 +1813,14 @@ export type WorkspaceEnvVarUpsertInput = Omit<WorkspaceEnvVarRecord, "id" | "cre
   Partial<Pick<WorkspaceEnvVarRecord, "id" | "createdAt" | "updatedAt">>;
 
 export function upsertWorkspaceEnvVar(
-  data: TaskloomData,
+  data: PacketAgentData,
   input: WorkspaceEnvVarUpsertInput,
   timestamp = now(),
 ): WorkspaceEnvVarRecord {
   return upsertRecord(data.workspaceEnvVars, input, timestamp);
 }
 
-export function deleteWorkspaceEnvVar(data: TaskloomData, envVarId: string): boolean {
+export function deleteWorkspaceEnvVar(data: PacketAgentData, envVarId: string): boolean {
   const before = data.workspaceEnvVars.length;
   data.workspaceEnvVars = data.workspaceEnvVars.filter((entry) => entry.id !== envVarId);
   return data.workspaceEnvVars.length < before;

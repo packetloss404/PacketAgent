@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { requirePrivateWorkspaceRole } from "./rbac.js";
-import { findAgent, loadStoreAsync, mutateStoreAsync } from "./taskloom-store.js";
+import { findAgent, loadStoreAsync, mutateStoreAsync } from "./packetagent-store.js";
 import { enqueueJobAsync } from "./jobs/store.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 

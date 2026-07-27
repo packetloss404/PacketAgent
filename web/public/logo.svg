@@ -3,5 +3,5 @@
   <path d="M14 14h7.2c3.9 0 6.8 2.8 6.8 6s-2.9 6-6.8 6H14V14Z" stroke="#f4f4f5" stroke-width="2.4" stroke-linejoin="round"/>
   <path d="M21.4 20H32" stroke="#a1a1aa" stroke-width="2.4" stroke-linecap="round"/>
   <path d="M22 10v4M22 26v4" stroke="#a1a1aa" stroke-width="2.2" stroke-linecap="round"/>
-  <text x="48" y="26" fill="#f4f4f5" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="19" font-weight="700" letter-spacing="0">taskloom</text>
+  <text x="48" y="26" fill="#f4f4f5" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="19" font-weight="700" letter-spacing="0">packetagent</text>
 </svg>

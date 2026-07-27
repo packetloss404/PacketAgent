@@ -3,7 +3,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { hashSessionSecret, SESSION_COOKIE_NAME, SESSION_TTL_MS } from "./auth-utils.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 
-export const CSRF_COOKIE_NAME = "taskloom_csrf";
+export const CSRF_COOKIE_NAME = "packetagent_csrf";
 export const CSRF_HEADER_NAME = "x-csrf-token";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -77,7 +77,7 @@ function originComparisonHost(c: Context) {
 }
 
 function trustedProxyEnabled() {
-  return ["1", "true", "yes"].includes((process.env.TASKLOOM_TRUST_PROXY ?? "").trim().toLowerCase());
+  return ["1", "true", "yes"].includes((process.env.PACKETAGENT_TRUST_PROXY ?? "").trim().toLowerCase());
 }
 
 function httpRouteError(status: number, message: string) {

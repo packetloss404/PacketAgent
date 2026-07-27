@@ -602,7 +602,7 @@ export function GeneratedApp() {
     <main className="app-shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">Generated Taskloom app</p>
+          <p className="eyebrow">Generated PacketAgent app</p>
           <h1>{appName}</h1>
           <p>{description}</p>
         </div>
@@ -1168,14 +1168,14 @@ Primary entity: \`${model?.primaryEntity ?? draft.app.dataSchema[0]?.name ?? "re
 
 ## Server-backed CRUD
 
-The generated app talks to Taskloom's per-app SQLite runtime through \`/api/app/generated-apps/:appId/api/*\`.
+The generated app talks to PacketAgent's per-app SQLite runtime through \`/api/app/generated-apps/:appId/api/*\`.
 Data survives page reloads and is shared across browser tabs for the same generated app.
 
 ## Data Files
 
 - \`src/data/schema.ts\` - typed server-runtime schema.
 - \`src/data/seed-data.json\` - starter records used to initialize SQLite.
-- \`src/api/generated-api.ts\` - browser client for the Taskloom runtime API.
+- \`src/api/generated-api.ts\` - browser client for the PacketAgent runtime API.
 - \`src/db/migrations/0001_initial.sql\` - starter table DDL.
 - \`src/db/seed.ts\` - seed loader helper.
 

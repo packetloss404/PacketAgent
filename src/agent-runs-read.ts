@@ -1,13 +1,13 @@
 import { createAgentRunsRepository, type AgentRunsRepository } from "./repositories/agent-runs-repo.js";
-import { loadStore as defaultLoadStore } from "./taskloom-store.js";
-import type { AgentRunRecord, TaskloomData } from "./taskloom-store.js";
+import { loadStore as defaultLoadStore } from "./packetagent-store.js";
+import type { AgentRunRecord, PacketAgentData } from "./packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
 
 export interface AgentRunsReadDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   repository?: AgentRunsRepository;
 }
 
@@ -21,7 +21,7 @@ export function listAgentRunsForWorkspaceViaRepository(
     mutateStore: deps.mutateStore,
   });
   const primary = repo.list(workspaceId, limit);
-  if (process.env.TASKLOOM_STORE !== "sqlite") return primary;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return primary;
   const fallback = legacyAgentRunsFromStore(deps).filter((entry) => entry.workspaceId === workspaceId);
   return mergeAndLimit(primary, fallback, limit);
 }
@@ -37,7 +37,7 @@ export function listAgentRunsForAgentViaRepository(
     mutateStore: deps.mutateStore,
   });
   const primary = repo.listForAgent(workspaceId, agentId, limit);
-  if (process.env.TASKLOOM_STORE !== "sqlite") return primary;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return primary;
   const fallback = legacyAgentRunsFromStore(deps).filter(
     (entry) => entry.workspaceId === workspaceId && entry.agentId === agentId,
   );
@@ -55,7 +55,7 @@ export function findAgentRunForWorkspaceViaRepository(
   });
   const found = repo.find(workspaceId, runId);
   if (found) return found;
-  if (process.env.TASKLOOM_STORE !== "sqlite") return null;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
   return legacyAgentRunsFromStore(deps)
     .find((entry) => entry.workspaceId === workspaceId && entry.id === runId) ?? null;
 }

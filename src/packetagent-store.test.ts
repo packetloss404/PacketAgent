@@ -54,8 +54,8 @@ import {
   upsertWorkspaceBrief,
   upsertWorkspaceMembership,
   type WorkspaceRole,
-} from "./taskloom-store";
-import { recordLocalInvitationEmailDelivery, TASKLOOM_INVITATION_EMAIL_MODE_ENV } from "./invitation-email";
+} from "./packetagent-store";
+import { recordLocalInvitationEmailDelivery, PACKETAGENT_INVITATION_EMAIL_MODE_ENV } from "./invitation-email";
 
 test("seed store includes product workflow records for each workspace", () => {
   const store = resetStoreForTests();
@@ -128,10 +128,10 @@ test("workspace memberships support expanded roles", () => {
 });
 
 test("invitation email deliveries record local sent and skipped attempts", () => {
-  const previousMode = process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
+  const previousMode = process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
 
   try {
-    delete process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
+    delete process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
     const store = resetStoreForTests();
     const invitation = {
       id: "invite_email_delivery",
@@ -155,10 +155,10 @@ test("invitation email deliveries record local sent and skipped attempts", () =>
     assert.equal(sent.mode, "dev");
     assert.equal(sent.provider, "local");
     assert.equal(sent.recipientEmail, "invitee@example.com");
-    assert.equal(sent.subject, "You're invited to Alpha Workspace on Taskloom");
+    assert.equal(sent.subject, "You're invited to Alpha Workspace on PacketAgent");
     assert.equal(sent.sentAt, "2026-04-01T00:00:01.000Z");
 
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "skip";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "skip";
     const skipped = recordLocalInvitationEmailDelivery(store, {
       invitation: { ...invitation, id: "invite_email_delivery_skipped" },
       deliveryId: "delivery_skipped",
@@ -168,12 +168,12 @@ test("invitation email deliveries record local sent and skipped attempts", () =>
     assert.equal(skipped.status, "skipped");
     assert.equal(skipped.mode, "skip");
     assert.equal(skipped.sentAt, undefined);
-    assert.equal(skipped.error, `${TASKLOOM_INVITATION_EMAIL_MODE_ENV}=skip`);
+    assert.equal(skipped.error, `${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=skip`);
     assert.deepEqual(listInvitationEmailDeliveries(store, "alpha").map((entry) => entry.id), ["delivery_skipped", "delivery_sent"]);
     assert.deepEqual(listInvitationEmailDeliveries(store, "alpha", "invite_email_delivery").map((entry) => entry.id), ["delivery_sent"]);
   } finally {
-    if (previousMode === undefined) delete process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
-    else process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = previousMode;
+    if (previousMode === undefined) delete process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
+    else process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = previousMode;
   }
 });
 
@@ -199,12 +199,12 @@ test("invitation email delivery helpers create and mark durable records", () => 
 });
 
 test("activation signal repository deduplicates JSON records by stable key", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
 
   try {
-    delete process.env.TASKLOOM_STORE;
-    delete process.env.TASKLOOM_DB_PATH;
+    delete process.env.PACKETAGENT_STORE;
+    delete process.env.PACKETAGENT_DB_PATH;
     const store = resetStoreForTests();
 
     const direct = upsertActivationSignal(store, {
@@ -242,21 +242,21 @@ test("activation signal repository deduplicates JSON records by stable key", () 
     assert.equal(listActivationSignalsForWorkspace(loadStore(), "alpha").some((entry) => entry.id === first.id), true);
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
   }
 });
 
 test("sqlite store persists mutations across cache reloads", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-"));
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-"));
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = join(tempDir, "taskloom.sqlite");
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = join(tempDir, "packetagent.sqlite");
 
     resetStoreForTests();
     mutateStore((data) => {
@@ -280,23 +280,23 @@ test("sqlite store persists mutations across cache reloads", () => {
     assert.equal(findWorkspaceBrief(reloaded, "alpha")?.workspaceId, "alpha");
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("sqlite recordActivity writes activities to the dedicated table only", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-activity-dual-write-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-activity-dual-write-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
     resetStoreForTests();
 
     mutateStore((data) => {
@@ -328,25 +328,25 @@ test("sqlite recordActivity writes activities to the dedicated table only", () =
     }
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("sqlite: a failing dedicated-table dual-write flush does NOT make the primary mutation throw", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-flush-failure-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-flush-failure-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   const originalWarn = console.warn;
   const warnings: string[] = [];
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
     resetStoreForTests();
 
     // Make ONLY the post-commit dual-write flush fail, while the canonical
@@ -407,23 +407,23 @@ test("sqlite: a failing dedicated-table dual-write flush does NOT make the prima
   } finally {
     console.warn = originalWarn;
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("sqlite store hydrates retired relational collections from dedicated tables", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-dedicated-hydrate-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-dedicated-hydrate-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
     const data = resetStoreForTests();
     data.jobMetricSnapshots.push({
       id: "metric_dedicated",
@@ -557,23 +557,23 @@ test("sqlite store hydrates retired relational collections from dedicated tables
     assert.equal(reloaded.activationSignals.some((entry) => entry.id === "signal_dedicated"), true);
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("sqlite mutateStore loads fresh state before persisting cached mutations", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-fresh-mutate-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-fresh-mutate-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
 
     const cached = resetStoreForTests();
     const external = structuredClone(cached);
@@ -609,22 +609,22 @@ test("sqlite mutateStore loads fresh state before persisting cached mutations", 
     assert.equal(reloaded.requirements.some((entry) => entry.id === "req_sqlite_mutation"), true);
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("sqlite mutateStore rolls back and preserves cache when mutator throws", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-rollback-"));
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-rollback-"));
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = join(tempDir, "taskloom.sqlite");
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = join(tempDir, "packetagent.sqlite");
 
     resetStoreForTests();
 
@@ -649,23 +649,23 @@ test("sqlite mutateStore rolls back and preserves cache when mutator throws", ()
     assert.equal(loadStore().requirements.some((entry) => entry.id === "req_sqlite_rollback"), false);
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("activation signal repository persists and lists SQLite records by workspace", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-signals-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-signals-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
 
     resetStoreForTests();
     const repository = activationSignalRepository();
@@ -700,23 +700,23 @@ test("activation signal repository persists and lists SQLite records by workspac
     assert.equal(signals[0]?.stableKey, "workspace_sqlite_signals:scope:billing");
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("activation signal repository de-dupes legacy fallback rows by stable key", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-signal-fallback-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-signal-fallback-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
 
     resetStoreForTests();
     const repository = activationSignalRepository();
@@ -740,23 +740,23 @@ test("activation signal repository de-dupes legacy fallback rows by stable key",
     assert.equal(signals[0]?.sourceId, "run_dedicated");
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("sqlite upsertActivationSignal writes dedicated records during mutations", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-signal-mutation-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-signal-mutation-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
 
     resetStoreForTests();
     mutateStore((data) => {
@@ -780,23 +780,23 @@ test("sqlite upsertActivationSignal writes dedicated records during mutations", 
     assert.equal(signals[0]?.sourceId, "run_sqlite_signal_mutation");
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("sqlite indexed helpers read high-value records and stay in sync", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-index-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-index-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
 
     resetStoreForTests();
     mutateStore((data) => {
@@ -847,7 +847,7 @@ test("sqlite indexed helpers read high-value records and stay in sync", () => {
         workspaceId: "workspace_sqlite_index",
         invitationId: "invite_sqlite_index",
         recipientEmail: "invitee@example.com",
-        subject: "You're invited to SQLite Index on Taskloom",
+        subject: "You're invited to SQLite Index on PacketAgent",
         status: "sent",
         provider: "local",
         mode: "dev",
@@ -900,23 +900,23 @@ test("sqlite indexed helpers read high-value records and stay in sync", () => {
     assert.equal(findShareTokenByTokenIndexed("share-token-sqlite-updated")?.readCount, 3);
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("sqlite workspace record helpers read scoped collections with route ordering", () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-store-workspace-records-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-store-workspace-records-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
 
     resetStoreForTests();
     mutateStore((data) => {
@@ -1153,10 +1153,10 @@ test("sqlite workspace record helpers read scoped collections with route orderin
     assert.equal(listValidationEvidenceForWorkspaceIndexed("workspace_records").length, 0);
   } finally {
     clearStoreCacheForTests();
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
@@ -1193,7 +1193,7 @@ function activationSignalAppRecordRowCount(dbPath: string, workspaceId?: string)
   }
 }
 
-function insertLegacyActivationSignalAppRecord(dbPath: string, record: import("./taskloom-store").ActivationSignalRecord): void {
+function insertLegacyActivationSignalAppRecord(dbPath: string, record: import("./packetagent-store").ActivationSignalRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
     db.prepare(`

@@ -23,7 +23,7 @@ function baseDeps(overrides: Partial<OperationsHealthDeps> = {}): OperationsHeal
   return {
     loadStore: () => ({ ok: true }),
     schedulerHeartbeat: () => heartbeat(),
-    env: { TASKLOOM_ACCESS_LOG_MODE: "off" },
+    env: { PACKETAGENT_ACCESS_LOG_MODE: "off" },
     now: fixedNow("2026-04-26T10:00:01.000Z"),
     fileExists: () => true,
     schedulerStaleAfterMs: 60_000,
@@ -117,7 +117,7 @@ test("scheduler with recent tick -> ok with ticksSinceStart in detail", () => {
 });
 
 test("access log mode stdout -> ok", () => {
-  const report = getOperationsHealth(baseDeps({ env: { TASKLOOM_ACCESS_LOG_MODE: "stdout" } }));
+  const report = getOperationsHealth(baseDeps({ env: { PACKETAGENT_ACCESS_LOG_MODE: "stdout" } }));
   const accessLog = findSubsystem(report, "accessLog");
   assert.equal(accessLog.status, "ok");
   assert.equal(accessLog.detail, "writing to stdout");
@@ -125,17 +125,17 @@ test("access log mode stdout -> ok", () => {
 });
 
 test("access log mode file without path -> down", () => {
-  const report = getOperationsHealth(baseDeps({ env: { TASKLOOM_ACCESS_LOG_MODE: "file" } }));
+  const report = getOperationsHealth(baseDeps({ env: { PACKETAGENT_ACCESS_LOG_MODE: "file" } }));
   const accessLog = findSubsystem(report, "accessLog");
   assert.equal(accessLog.status, "down");
-  assert.equal(accessLog.detail, "file mode requires TASKLOOM_ACCESS_LOG_PATH");
+  assert.equal(accessLog.detail, "file mode requires PACKETAGENT_ACCESS_LOG_PATH");
   assert.equal(report.overall, "down");
 });
 
 test("access log mode file with missing parent dir -> down", () => {
   const report = getOperationsHealth(
     baseDeps({
-      env: { TASKLOOM_ACCESS_LOG_MODE: "file", TASKLOOM_ACCESS_LOG_PATH: "var/logs/access.log" },
+      env: { PACKETAGENT_ACCESS_LOG_MODE: "file", PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log" },
       fileExists: () => false,
     }),
   );
@@ -148,7 +148,7 @@ test("access log mode file with missing parent dir -> down", () => {
 test("access log mode file with parent dir present but file absent -> degraded", () => {
   const report = getOperationsHealth(
     baseDeps({
-      env: { TASKLOOM_ACCESS_LOG_MODE: "file", TASKLOOM_ACCESS_LOG_PATH: "var/logs/access.log" },
+      env: { PACKETAGENT_ACCESS_LOG_MODE: "file", PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log" },
       fileExists: (path) => !path.endsWith("access.log"),
     }),
   );
@@ -161,7 +161,7 @@ test("access log mode file with parent dir present but file absent -> degraded",
 test("access log mode file with file present -> ok", () => {
   const report = getOperationsHealth(
     baseDeps({
-      env: { TASKLOOM_ACCESS_LOG_MODE: "file", TASKLOOM_ACCESS_LOG_PATH: "var/logs/access.log" },
+      env: { PACKETAGENT_ACCESS_LOG_MODE: "file", PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log" },
       fileExists: () => true,
     }),
   );
@@ -192,7 +192,7 @@ test("overall is degraded when only degraded subsystems exist", () => {
 
 test("disabled access log does not poison overall", () => {
   const report = getOperationsHealth(
-    baseDeps({ env: { TASKLOOM_ACCESS_LOG_MODE: "off" } }),
+    baseDeps({ env: { PACKETAGENT_ACCESS_LOG_MODE: "off" } }),
   );
   assert.equal(findSubsystem(report, "accessLog").status, "disabled");
   assert.equal(report.overall, "ok");

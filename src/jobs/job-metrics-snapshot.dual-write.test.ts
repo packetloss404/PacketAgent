@@ -10,16 +10,16 @@ import {
   snapshotJobMetrics,
 } from "./job-metrics-snapshot.js";
 import type { JobTypeMetrics } from "./scheduler-metrics.js";
-import type { JobMetricSnapshotRecord, TaskloomData } from "../taskloom-store.js";
+import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
 
-function makeStore(snapshots: JobMetricSnapshotRecord[] = []): TaskloomData {
-  return { jobMetricSnapshots: [...snapshots] } as unknown as TaskloomData;
+function makeStore(snapshots: JobMetricSnapshotRecord[] = []): PacketAgentData {
+  return { jobMetricSnapshots: [...snapshots] } as unknown as PacketAgentData;
 }
 
-function makeStoreDeps(data: TaskloomData) {
+function makeStoreDeps(data: PacketAgentData) {
   return {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
 }
 
@@ -97,21 +97,21 @@ function readDedicated(dbPath: string): JobMetricSnapshotRecord[] {
 }
 
 function withSqliteEnv(dbPath: string) {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   return () => {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
   };
 }
 
 test("snapshotJobMetrics dual-writes JSON-side and dedicated SQLite table in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-dual-write-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-dual-write-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -144,8 +144,8 @@ test("snapshotJobMetrics dual-writes JSON-side and dedicated SQLite table in SQL
 });
 
 test("pruneJobMetricSnapshots dual-deletes from JSON-side and dedicated SQLite table in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-dual-write-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-dual-write-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -198,11 +198,11 @@ test("pruneJobMetricSnapshots dual-deletes from JSON-side and dedicated SQLite t
 });
 
 test("snapshotJobMetrics is a no-op for the dedicated table in JSON-default mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-dual-write-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-dual-write-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
-  const previousStore = process.env.TASKLOOM_STORE;
-  delete process.env.TASKLOOM_STORE;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  delete process.env.PACKETAGENT_STORE;
   try {
     const data = makeStore();
     let counter = 0;
@@ -220,8 +220,8 @@ test("snapshotJobMetrics is a no-op for the dedicated table in JSON-default mode
     const dedicated = readDedicated(dbPath);
     assert.equal(dedicated.length, 0);
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });

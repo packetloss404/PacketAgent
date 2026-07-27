@@ -8,15 +8,15 @@ import { Hono } from "hono";
 import { appRoutes, resetAppRouteSecurityForTests } from "./app-routes.js";
 import { SESSION_COOKIE_NAME } from "./auth-utils.js";
 import { enforcePrivateAppMutationSecurity } from "./route-security.js";
-import { TASKLOOM_INVITATION_EMAIL_MODE_ENV, TASKLOOM_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV } from "./invitation-email.js";
+import { PACKETAGENT_INVITATION_EMAIL_MODE_ENV, PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV } from "./invitation-email.js";
 import {
   listInvitationEmailDeliveryRecordsForTests,
   resetInvitationEmailDeliveryForTests,
   setInvitationEmailDeliveryAdapterForTests,
   setInvitationEmailFetchForTests,
 } from "./invitation-email-delivery.js";
-import { INVITATION_EMAIL_JOB_TYPE, login } from "./taskloom-services.js";
-import { clearStoreCacheForTests, listInvitationEmailDeliveriesIndexed, loadStore, mutateStore, resetStoreForTests, type WorkspaceRole } from "./taskloom-store.js";
+import { INVITATION_EMAIL_JOB_TYPE, login } from "./packetagent-services.js";
+import { clearStoreCacheForTests, listInvitationEmailDeliveriesIndexed, loadStore, mutateStore, resetStoreForTests, type WorkspaceRole } from "./packetagent-store.js";
 
 function createTestApp() {
   const app = new Hono();
@@ -38,14 +38,14 @@ function cookieValue(response: Response) {
 
 function csrfCookieValue(response: Response) {
   const cookie = response.headers.get("set-cookie") ?? "";
-  const match = cookie.match(/taskloom_csrf=([^;]+)/);
+  const match = cookie.match(/packetagent_csrf=([^;]+)/);
   assert.ok(match?.[1], "expected response to set a csrf cookie");
   return match[1];
 }
 
 function browserAuthHeaders(cookie: string, csrfToken: string) {
   return {
-    Cookie: `${SESSION_COOKIE_NAME}=${cookie}; taskloom_csrf=${csrfToken}`,
+    Cookie: `${SESSION_COOKIE_NAME}=${cookie}; packetagent_csrf=${csrfToken}`,
     Origin: "http://localhost",
     Host: "localhost",
     "X-CSRF-Token": csrfToken,
@@ -97,7 +97,7 @@ test("login rejects invalid credentials with route-level 401 response", async ()
   const response = await app.request("/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+    body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
   });
   const body = await response.json();
 
@@ -132,7 +132,7 @@ test("auth routes rate limit repeated local attempts", async () => {
     const response = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.11" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(response.status, 401);
   }
@@ -140,18 +140,18 @@ test("auth routes rate limit repeated local attempts", async () => {
   const limitedLogin = await app.request("/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.11" },
-    body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+    body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
   });
   assert.equal(limitedLogin.status, 429);
   assert.deepEqual(await limitedLogin.json(), { error: "too many requests" });
 });
 
 test("auth rate limit env overrides max attempts and window", async () => {
-  const previousMaxAttempts = process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
-  const previousWindowMs = process.env.TASKLOOM_AUTH_RATE_LIMIT_WINDOW_MS;
+  const previousMaxAttempts = process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+  const previousWindowMs = process.env.PACKETAGENT_AUTH_RATE_LIMIT_WINDOW_MS;
   try {
-    process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS = "2";
-    process.env.TASKLOOM_AUTH_RATE_LIMIT_WINDOW_MS = "2500";
+    process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS = "2";
+    process.env.PACKETAGENT_AUTH_RATE_LIMIT_WINDOW_MS = "2500";
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     const app = createTestApp();
@@ -160,7 +160,7 @@ test("auth rate limit env overrides max attempts and window", async () => {
     const first = await app.request("/api/auth/login", {
       method: "POST",
       headers,
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(first.status, 401);
     const bucket = (loadStore().rateLimits ?? []).find((entry) => entry.id.startsWith("auth:login:"));
@@ -170,28 +170,28 @@ test("auth rate limit env overrides max attempts and window", async () => {
     const second = await app.request("/api/auth/login", {
       method: "POST",
       headers,
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(second.status, 401);
 
     const limited = await app.request("/api/auth/login", {
       method: "POST",
       headers,
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(limited.status, 429);
   } finally {
-    restoreEnv("TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
-    restoreEnv("TASKLOOM_AUTH_RATE_LIMIT_WINDOW_MS", previousWindowMs);
+    restoreEnv("PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
+    restoreEnv("PACKETAGENT_AUTH_RATE_LIMIT_WINDOW_MS", previousWindowMs);
   }
 });
 
 test("auth rate limit invalid env values fall back to defaults", async () => {
-  const previousMaxAttempts = process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
-  const previousWindowMs = process.env.TASKLOOM_AUTH_RATE_LIMIT_WINDOW_MS;
+  const previousMaxAttempts = process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+  const previousWindowMs = process.env.PACKETAGENT_AUTH_RATE_LIMIT_WINDOW_MS;
   try {
-    process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS = "0";
-    process.env.TASKLOOM_AUTH_RATE_LIMIT_WINDOW_MS = "not-a-number";
+    process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS = "0";
+    process.env.PACKETAGENT_AUTH_RATE_LIMIT_WINDOW_MS = "not-a-number";
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     const app = createTestApp();
@@ -200,7 +200,7 @@ test("auth rate limit invalid env values fall back to defaults", async () => {
     const first = await app.request("/api/auth/login", {
       method: "POST",
       headers,
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(first.status, 401);
     const bucket = (loadStore().rateLimits ?? []).find((entry) => entry.id.startsWith("auth:login:"));
@@ -211,7 +211,7 @@ test("auth rate limit invalid env values fall back to defaults", async () => {
       const response = await app.request("/api/auth/login", {
         method: "POST",
         headers,
-        body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+        body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
       });
       assert.equal(response.status, 401);
     }
@@ -219,27 +219,27 @@ test("auth rate limit invalid env values fall back to defaults", async () => {
     const limited = await app.request("/api/auth/login", {
       method: "POST",
       headers,
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(limited.status, 429);
   } finally {
-    restoreEnv("TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
-    restoreEnv("TASKLOOM_AUTH_RATE_LIMIT_WINDOW_MS", previousWindowMs);
+    restoreEnv("PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
+    restoreEnv("PACKETAGENT_AUTH_RATE_LIMIT_WINDOW_MS", previousWindowMs);
   }
 });
 
 test("auth route rate limits persist across app instances and store reloads", { concurrency: false }, async () => {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const previousTrustProxy = process.env.TASKLOOM_TRUST_PROXY;
-  const previousSalt = process.env.TASKLOOM_RATE_LIMIT_KEY_SALT;
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-rate-limit-"));
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const previousTrustProxy = process.env.PACKETAGENT_TRUST_PROXY;
+  const previousSalt = process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-rate-limit-"));
 
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = join(tempDir, "taskloom.sqlite");
-    process.env.TASKLOOM_TRUST_PROXY = "true";
-    process.env.TASKLOOM_RATE_LIMIT_KEY_SALT = "test-rate-limit-salt";
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = join(tempDir, "packetagent.sqlite");
+    process.env.PACKETAGENT_TRUST_PROXY = "true";
+    process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT = "test-rate-limit-salt";
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     const headers = { "content-type": "application/json", "x-forwarded-for": "203.0.113.12" };
@@ -248,7 +248,7 @@ test("auth route rate limits persist across app instances and store reloads", { 
       const response = await createTestApp().request("/api/auth/login", {
         method: "POST",
         headers,
-        body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+        body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
       });
       assert.equal(response.status, 401);
     }
@@ -256,7 +256,7 @@ test("auth route rate limits persist across app instances and store reloads", { 
     assert.equal(buckets.length, 1);
     assert.match(buckets[0]?.id ?? "", /^auth:login:sha256:[a-f0-9]{64}$/);
     assert.equal(buckets[0]?.id.includes("203.0.113.12"), false);
-    assert.deepEqual(rateLimitSqliteSnapshot(process.env.TASKLOOM_DB_PATH), {
+    assert.deepEqual(rateLimitSqliteSnapshot(process.env.PACKETAGENT_DB_PATH), {
       appRecordRateLimits: 0,
       buckets: 1,
       count: 20,
@@ -268,27 +268,27 @@ test("auth route rate limits persist across app instances and store reloads", { 
     const limited = await app.request("/api/auth/login", {
       method: "POST",
       headers,
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(limited.status, 429);
     assert.deepEqual(await limited.json(), { error: "too many requests" });
-    assert.deepEqual(rateLimitSqliteSnapshot(process.env.TASKLOOM_DB_PATH), {
+    assert.deepEqual(rateLimitSqliteSnapshot(process.env.PACKETAGENT_DB_PATH), {
       appRecordRateLimits: 0,
       buckets: 1,
       count: 21,
     });
   } finally {
     clearStoreCacheForTests();
-    restoreEnv("TASKLOOM_STORE", previousStore);
-    restoreEnv("TASKLOOM_DB_PATH", previousDbPath);
-    restoreEnv("TASKLOOM_TRUST_PROXY", previousTrustProxy);
-    restoreEnv("TASKLOOM_RATE_LIMIT_KEY_SALT", previousSalt);
+    restoreEnv("PACKETAGENT_STORE", previousStore);
+    restoreEnv("PACKETAGENT_DB_PATH", previousDbPath);
+    restoreEnv("PACKETAGENT_TRUST_PROXY", previousTrustProxy);
+    restoreEnv("PACKETAGENT_RATE_LIMIT_KEY_SALT", previousSalt);
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 function rateLimitSqliteSnapshot(dbPath: string | undefined) {
-  assert.ok(dbPath, "expected TASKLOOM_DB_PATH");
+  assert.ok(dbPath, "expected PACKETAGENT_DB_PATH");
   const db = new DatabaseSync(dbPath);
   try {
     const appRecords = db.prepare("select count(*) as count from app_records where collection = 'rateLimits'").get() as { count: number };
@@ -300,11 +300,11 @@ function rateLimitSqliteSnapshot(dbPath: string | undefined) {
 }
 
 test("rate limit client keys only trust forwarded headers when enabled", async () => {
-  const previousTrustProxy = process.env.TASKLOOM_TRUST_PROXY;
-  const previousSalt = process.env.TASKLOOM_RATE_LIMIT_KEY_SALT;
+  const previousTrustProxy = process.env.PACKETAGENT_TRUST_PROXY;
+  const previousSalt = process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT;
   try {
-    process.env.TASKLOOM_RATE_LIMIT_KEY_SALT = "test-rate-limit-salt";
-    delete process.env.TASKLOOM_TRUST_PROXY;
+    process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT = "test-rate-limit-salt";
+    delete process.env.PACKETAGENT_TRUST_PROXY;
     resetStoreForTests();
     const app = createTestApp();
 
@@ -312,52 +312,52 @@ test("rate limit client keys only trust forwarded headers when enabled", async (
       const response = await app.request("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json", "x-forwarded-for": `203.0.113.${index}` },
-        body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+        body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
       });
       assert.equal(response.status, 401);
     }
     const untrustedLimited = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.200" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(untrustedLimited.status, 429);
 
-    process.env.TASKLOOM_TRUST_PROXY = "true";
+    process.env.PACKETAGENT_TRUST_PROXY = "true";
     resetStoreForTests();
     for (let index = 0; index < 20; index += 1) {
       const response = await app.request("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json", "x-forwarded-for": `203.0.113.${index}` },
-        body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+        body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
       });
       assert.equal(response.status, 401);
     }
     const trustedSeparateClient = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.200" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(trustedSeparateClient.status, 401);
     assert.equal((loadStore().rateLimits ?? []).some((entry) => entry.id.includes("203.0.113")), false);
   } finally {
-    restoreEnv("TASKLOOM_TRUST_PROXY", previousTrustProxy);
-    restoreEnv("TASKLOOM_RATE_LIMIT_KEY_SALT", previousSalt);
+    restoreEnv("PACKETAGENT_TRUST_PROXY", previousTrustProxy);
+    restoreEnv("PACKETAGENT_RATE_LIMIT_KEY_SALT", previousSalt);
   }
 });
 
 test("distributed rate limiter receives hashed auth and invitation bucket checks", async () => {
-  const previousUrl = process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL;
-  const previousSecret = process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_SECRET;
-  const previousTrustProxy = process.env.TASKLOOM_TRUST_PROXY;
-  const previousSalt = process.env.TASKLOOM_RATE_LIMIT_KEY_SALT;
+  const previousUrl = process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL;
+  const previousSecret = process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_SECRET;
+  const previousTrustProxy = process.env.PACKETAGENT_TRUST_PROXY;
+  const previousSalt = process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT;
   const previousFetch = globalThis.fetch;
   const calls: Array<{ url: string; headers: Headers; body: Record<string, unknown> }> = [];
   try {
-    process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL = "https://limits.example/check";
-    process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_SECRET = "shared-secret";
-    process.env.TASKLOOM_TRUST_PROXY = "true";
-    process.env.TASKLOOM_RATE_LIMIT_KEY_SALT = "test-rate-limit-salt";
+    process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL = "https://limits.example/check";
+    process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_SECRET = "shared-secret";
+    process.env.PACKETAGENT_TRUST_PROXY = "true";
+    process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT = "test-rate-limit-salt";
     globalThis.fetch = async (input, init) => {
       const body = init?.body;
       const headers = init?.headers;
@@ -373,13 +373,13 @@ test("distributed rate limiter receives hashed auth and invitation bucket checks
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     setAlphaRole("admin");
 
     const loginResponse = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.40" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(loginResponse.status, 401);
 
@@ -405,18 +405,18 @@ test("distributed rate limiter receives hashed auth and invitation bucket checks
     assert.equal((loadStore().rateLimits ?? []).some((entry) => entry.id.startsWith("invitation:create:")), true);
   } finally {
     globalThis.fetch = previousFetch;
-    restoreEnv("TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL", previousUrl);
-    restoreEnv("TASKLOOM_DISTRIBUTED_RATE_LIMIT_SECRET", previousSecret);
-    restoreEnv("TASKLOOM_TRUST_PROXY", previousTrustProxy);
-    restoreEnv("TASKLOOM_RATE_LIMIT_KEY_SALT", previousSalt);
+    restoreEnv("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL", previousUrl);
+    restoreEnv("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_SECRET", previousSecret);
+    restoreEnv("PACKETAGENT_TRUST_PROXY", previousTrustProxy);
+    restoreEnv("PACKETAGENT_RATE_LIMIT_KEY_SALT", previousSalt);
   }
 });
 
 test("distributed rate limiter blocks before local buckets and sets retry-after", async () => {
-  const previousUrl = process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL;
+  const previousUrl = process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL;
   const previousFetch = globalThis.fetch;
   try {
-    process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL = "https://limits.example/check";
+    process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL = "https://limits.example/check";
     globalThis.fetch = async () => new Response(JSON.stringify({ limited: true }), {
       status: 429,
       headers: { "content-type": "application/json", "retry-after": "7" },
@@ -428,7 +428,7 @@ test("distributed rate limiter blocks before local buckets and sets retry-after"
     const response = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
 
     assert.equal(response.status, 429);
@@ -437,17 +437,17 @@ test("distributed rate limiter blocks before local buckets and sets retry-after"
     assert.equal((loadStore().rateLimits ?? []).length, 0);
   } finally {
     globalThis.fetch = previousFetch;
-    restoreEnv("TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL", previousUrl);
+    restoreEnv("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL", previousUrl);
   }
 });
 
 test("distributed rate limiter fails closed unless fail-open is enabled", async () => {
-  const previousUrl = process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL;
-  const previousFailOpen = process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN;
-  const previousMaxAttempts = process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+  const previousUrl = process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL;
+  const previousFailOpen = process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN;
+  const previousMaxAttempts = process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS;
   const previousFetch = globalThis.fetch;
   try {
-    process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL = "https://limits.example/check";
+    process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL = "https://limits.example/check";
     globalThis.fetch = async () => {
       throw new Error("limiter unavailable");
     };
@@ -456,39 +456,39 @@ test("distributed rate limiter fails closed unless fail-open is enabled", async 
     const closedResponse = await createTestApp().request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(closedResponse.status, 503);
     assert.deepEqual(await closedResponse.json(), { error: "rate limit service unavailable" });
     assert.equal((loadStore().rateLimits ?? []).length, 0);
 
-    process.env.TASKLOOM_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN = "true";
-    process.env.TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS = "1";
+    process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN = "true";
+    process.env.PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS = "1";
     resetStoreForTests();
     const failOpenFirst = await createTestApp().request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(failOpenFirst.status, 401);
     const failOpenLimited = await createTestApp().request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(failOpenLimited.status, 429);
   } finally {
     globalThis.fetch = previousFetch;
-    restoreEnv("TASKLOOM_DISTRIBUTED_RATE_LIMIT_URL", previousUrl);
-    restoreEnv("TASKLOOM_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN", previousFailOpen);
-    restoreEnv("TASKLOOM_AUTH_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
+    restoreEnv("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL", previousUrl);
+    restoreEnv("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN", previousFailOpen);
+    restoreEnv("PACKETAGENT_AUTH_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
   }
 });
 
 test("rate limit cleanup drops expired buckets and caps retained buckets", async () => {
-  const previousMaxBuckets = process.env.TASKLOOM_RATE_LIMIT_MAX_BUCKETS;
+  const previousMaxBuckets = process.env.PACKETAGENT_RATE_LIMIT_MAX_BUCKETS;
   try {
-    process.env.TASKLOOM_RATE_LIMIT_MAX_BUCKETS = "2";
+    process.env.PACKETAGENT_RATE_LIMIT_MAX_BUCKETS = "2";
     resetStoreForTests();
     mutateStore((data) => {
       data.rateLimits = [
@@ -506,14 +506,14 @@ test("rate limit cleanup drops expired buckets and caps retained buckets", async
     await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
 
     const buckets = loadStore().rateLimits ?? [];
     assert.equal(buckets.some((entry) => entry.id === "expired"), false);
     assert.equal(buckets.length, 2);
   } finally {
-    restoreEnv("TASKLOOM_RATE_LIMIT_MAX_BUCKETS", previousMaxBuckets);
+    restoreEnv("PACKETAGENT_RATE_LIMIT_MAX_BUCKETS", previousMaxBuckets);
   }
 });
 
@@ -524,7 +524,7 @@ test("browser private mutations enforce same-origin and session-bound csrf", asy
   const loginResponse = await app.request("/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "alpha@taskloom.local", password: "demo12345" }),
+    body: JSON.stringify({ email: "alpha@packetagent.local", password: "demo12345" }),
   });
   const sessionCookie = cookieValue(loginResponse);
   const csrfToken = csrfCookieValue(loginResponse);
@@ -557,7 +557,7 @@ test("browser private mutations enforce same-origin and session-bound csrf", asy
   const invalidCsrf = await app.request("/api/app/profile", {
     method: "PATCH",
     headers: {
-      Cookie: `${SESSION_COOKIE_NAME}=${sessionCookie}; taskloom_csrf=invalid`,
+      Cookie: `${SESSION_COOKIE_NAME}=${sessionCookie}; packetagent_csrf=invalid`,
       Origin: "http://localhost",
       Host: "localhost",
       "X-CSRF-Token": "invalid",
@@ -586,7 +586,7 @@ test("browser private mutations enforce same-origin and session-bound csrf", asy
 test("logout removes the current session so subsequent session reads are anonymous", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const logoutResponse = await app.request("/api/auth/logout", {
     method: "POST",
@@ -613,7 +613,7 @@ test("workspace route requires auth, validates website, and returns the updated 
   assert.equal(unauthorized.status, 401);
   assert.deepEqual(await unauthorized.json(), { error: "authentication required" });
 
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const invalid = await app.request("/api/app/workspace", {
     method: "PATCH",
     headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
@@ -639,7 +639,7 @@ test("workspace route requires auth, validates website, and returns the updated 
 test("workspace settings require admin or owner membership", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   for (const role of ["viewer", "member"] as const) {
     setAlphaRole(role);
@@ -668,7 +668,7 @@ test("workspace settings require admin or owner membership", async () => {
 test("viewer memberships can read shared app state and update their own profile", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   setAlphaRole("viewer");
 
   for (const path of ["/api/auth/session", "/api/app/bootstrap", "/api/app/activation", "/api/app/activity", "/api/app/onboarding"] as const) {
@@ -733,7 +733,7 @@ test("activation route reflects normalized durable activation signals", async ()
 test("onboarding completion requires member or above membership", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   setAlphaRole("viewer");
   const denied = await app.request("/api/app/onboarding/steps/create_workspace_profile/complete", {
@@ -794,7 +794,7 @@ test("member and invitation routes enforce workspace management permissions", as
   resetStoreForTests();
   resetAppRouteSecurityForTests();
   const app = createTestApp();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   setAlphaRole("viewer");
   const list = await app.request("/api/app/members", { headers: authHeaders(auth.cookieValue) });
@@ -806,7 +806,7 @@ test("member and invitation routes enforce workspace management permissions", as
     const denied = await app.request("/api/app/invitations", {
       method: "POST",
       headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
-      body: JSON.stringify({ email: "beta@taskloom.local", role: "member" }),
+      body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
     });
 
     assert.equal(denied.status, 403);
@@ -818,7 +818,7 @@ test("private mutating app routes reject cross-origin browser requests", async (
   resetStoreForTests();
   resetAppRouteSecurityForTests();
   const app = createTestApp();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const rejected = await app.request("/api/app/workspace", {
     method: "PATCH",
@@ -838,13 +838,13 @@ test("private mutating app routes reject cross-origin browser requests", async (
 test("member listing exposes invitation previews without full tokens", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   setAlphaRole("admin");
 
   const created = await app.request("/api/app/invitations", {
     method: "POST",
     headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
-    body: JSON.stringify({ email: "beta@taskloom.local", role: "member" }),
+    body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
   });
   assert.equal(created.status, 201);
 
@@ -865,19 +865,19 @@ test("admins can invite an existing user and that user can accept", async () => 
   resetStoreForTests();
   resetAppRouteSecurityForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
-  const beta = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
+  const beta = login({ email: "beta@packetagent.local", password: "demo12345" });
   setAlphaRole("admin");
 
   const created = await app.request("/api/app/invitations", {
     method: "POST",
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
-    body: JSON.stringify({ email: "Beta@Taskloom.Local", role: "member" }),
+    body: JSON.stringify({ email: "Beta@PacketAgent.Local", role: "member" }),
   });
   const createdBody = await created.json() as { invitation: { token: string; email: string; role: string; status: string } };
 
   assert.equal(created.status, 201);
-  assert.equal(createdBody.invitation.email, "beta@taskloom.local");
+  assert.equal(createdBody.invitation.email, "beta@packetagent.local");
   assert.equal(createdBody.invitation.role, "member");
   assert.equal(createdBody.invitation.status, "pending");
   assert.ok(createdBody.invitation.token);
@@ -896,14 +896,14 @@ test("admins can invite an existing user and that user can accept", async () => 
 });
 
 test("invitation create, accept, and resend routes are rate limited", async () => {
-  const previousTrustProxy = process.env.TASKLOOM_TRUST_PROXY;
+  const previousTrustProxy = process.env.PACKETAGENT_TRUST_PROXY;
   try {
-    process.env.TASKLOOM_TRUST_PROXY = "true";
+    process.env.PACKETAGENT_TRUST_PROXY = "true";
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
-    const beta = login({ email: "beta@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
+    const beta = login({ email: "beta@packetagent.local", password: "demo12345" });
     setAlphaRole("admin");
 
   for (let index = 0; index < 20; index += 1) {
@@ -924,7 +924,7 @@ test("invitation create, accept, and resend routes are rate limited", async () =
   const created = await app.request("/api/app/invitations", {
     method: "POST",
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json", "x-forwarded-for": "203.0.113.21" },
-    body: JSON.stringify({ email: "beta@taskloom.local", role: "member" }),
+    body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
   });
   const createdBody = await created.json() as { invitation: { id: string; token: string } };
 
@@ -954,20 +954,20 @@ test("invitation create, accept, and resend routes are rate limited", async () =
   });
     assert.equal(acceptLimited.status, 429);
   } finally {
-    restoreEnv("TASKLOOM_TRUST_PROXY", previousTrustProxy);
+    restoreEnv("PACKETAGENT_TRUST_PROXY", previousTrustProxy);
   }
 });
 
 test("invitation rate limit env overrides max attempts and window", async () => {
-  const previousMaxAttempts = process.env.TASKLOOM_INVITATION_RATE_LIMIT_MAX_ATTEMPTS;
-  const previousWindowMs = process.env.TASKLOOM_INVITATION_RATE_LIMIT_WINDOW_MS;
+  const previousMaxAttempts = process.env.PACKETAGENT_INVITATION_RATE_LIMIT_MAX_ATTEMPTS;
+  const previousWindowMs = process.env.PACKETAGENT_INVITATION_RATE_LIMIT_WINDOW_MS;
   try {
-    process.env.TASKLOOM_INVITATION_RATE_LIMIT_MAX_ATTEMPTS = "1";
-    process.env.TASKLOOM_INVITATION_RATE_LIMIT_WINDOW_MS = "3456";
+    process.env.PACKETAGENT_INVITATION_RATE_LIMIT_MAX_ATTEMPTS = "1";
+    process.env.PACKETAGENT_INVITATION_RATE_LIMIT_WINDOW_MS = "3456";
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     setAlphaRole("admin");
     const headers = { ...authHeaders(alpha.cookieValue), "content-type": "application/json" };
 
@@ -988,21 +988,21 @@ test("invitation rate limit env overrides max attempts and window", async () => 
     });
     assert.equal(limited.status, 429);
   } finally {
-    restoreEnv("TASKLOOM_INVITATION_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
-    restoreEnv("TASKLOOM_INVITATION_RATE_LIMIT_WINDOW_MS", previousWindowMs);
+    restoreEnv("PACKETAGENT_INVITATION_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
+    restoreEnv("PACKETAGENT_INVITATION_RATE_LIMIT_WINDOW_MS", previousWindowMs);
   }
 });
 
 test("invitation rate limit invalid env values fall back to defaults", async () => {
-  const previousMaxAttempts = process.env.TASKLOOM_INVITATION_RATE_LIMIT_MAX_ATTEMPTS;
-  const previousWindowMs = process.env.TASKLOOM_INVITATION_RATE_LIMIT_WINDOW_MS;
+  const previousMaxAttempts = process.env.PACKETAGENT_INVITATION_RATE_LIMIT_MAX_ATTEMPTS;
+  const previousWindowMs = process.env.PACKETAGENT_INVITATION_RATE_LIMIT_WINDOW_MS;
   try {
-    process.env.TASKLOOM_INVITATION_RATE_LIMIT_MAX_ATTEMPTS = "-1";
-    process.env.TASKLOOM_INVITATION_RATE_LIMIT_WINDOW_MS = "";
+    process.env.PACKETAGENT_INVITATION_RATE_LIMIT_MAX_ATTEMPTS = "-1";
+    process.env.PACKETAGENT_INVITATION_RATE_LIMIT_WINDOW_MS = "";
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     setAlphaRole("admin");
     const headers = { ...authHeaders(alpha.cookieValue), "content-type": "application/json" };
 
@@ -1032,8 +1032,8 @@ test("invitation rate limit invalid env values fall back to defaults", async () 
     });
     assert.equal(limited.status, 429);
   } finally {
-    restoreEnv("TASKLOOM_INVITATION_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
-    restoreEnv("TASKLOOM_INVITATION_RATE_LIMIT_WINDOW_MS", previousWindowMs);
+    restoreEnv("PACKETAGENT_INVITATION_RATE_LIMIT_MAX_ATTEMPTS", previousMaxAttempts);
+    restoreEnv("PACKETAGENT_INVITATION_RATE_LIMIT_WINDOW_MS", previousWindowMs);
   }
 });
 
@@ -1041,14 +1041,14 @@ test("admins can resend invitations by rotating token and expiry", async () => {
   resetStoreForTests();
   resetAppRouteSecurityForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
-  const beta = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
+  const beta = login({ email: "beta@packetagent.local", password: "demo12345" });
   setAlphaRole("admin");
 
   const created = await app.request("/api/app/invitations", {
     method: "POST",
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
-    body: JSON.stringify({ email: "beta@taskloom.local", role: "member" }),
+    body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
   });
   const createdBody = await created.json() as { invitation: { id: string; token: string; expiresAt: string } };
 
@@ -1086,9 +1086,9 @@ test("invitation create and resend record email deliveries", async () => {
   resetStoreForTests();
   resetAppRouteSecurityForTests();
   resetInvitationEmailDeliveryForTests();
-  delete process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
+  delete process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   setAlphaRole("admin");
 
   const created = await app.request("/api/app/invitations", {
@@ -1128,12 +1128,12 @@ test("invitation delivery failures are recorded without rolling back invitation 
   resetStoreForTests();
   resetAppRouteSecurityForTests();
   resetInvitationEmailDeliveryForTests();
-  delete process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
+  delete process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
   setInvitationEmailDeliveryAdapterForTests(() => {
     throw new Error("smtp unavailable");
   });
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   setAlphaRole("admin");
 
   const created = await app.request("/api/app/invitations", {
@@ -1154,13 +1154,13 @@ test("invitation delivery failures are recorded without rolling back invitation 
 });
 
 test("webhook invitation delivery failures enqueue retry jobs without tokens", async () => {
-  const previousMode = process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
-  const previousUrl = process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV];
-  const previousMaxAttempts = process.env[TASKLOOM_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV];
+  const previousMode = process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
+  const previousUrl = process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV];
+  const previousMaxAttempts = process.env[PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV];
   try {
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://email.example/invitations";
-    process.env[TASKLOOM_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV] = "2";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://email.example/invitations";
+    process.env[PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV] = "2";
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     resetInvitationEmailDeliveryForTests();
@@ -1168,7 +1168,7 @@ test("webhook invitation delivery failures enqueue retry jobs without tokens", a
       throw new Error("provider unavailable");
     });
     const app = createTestApp();
-    const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
     setAlphaRole("admin");
 
     const created = await app.request("/api/app/invitations", {
@@ -1196,9 +1196,9 @@ test("webhook invitation delivery failures enqueue retry jobs without tokens", a
     assert.ok(loadStore().activities.some((entry) => entry.data.retryJobId === job.id));
   } finally {
     resetInvitationEmailDeliveryForTests();
-    restoreEnv(TASKLOOM_INVITATION_EMAIL_MODE_ENV, previousMode);
-    restoreEnv(TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV, previousUrl);
-    restoreEnv(TASKLOOM_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, previousMaxAttempts);
+    restoreEnv(PACKETAGENT_INVITATION_EMAIL_MODE_ENV, previousMode);
+    restoreEnv(PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV, previousUrl);
+    restoreEnv(PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, previousMaxAttempts);
   }
 });
 
@@ -1206,10 +1206,10 @@ test("revoked and accepted invitations do not send email on resend failures", as
   resetStoreForTests();
   resetAppRouteSecurityForTests();
   resetInvitationEmailDeliveryForTests();
-  delete process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV];
+  delete process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
-  const beta = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
+  const beta = login({ email: "beta@packetagent.local", password: "demo12345" });
   setAlphaRole("admin");
 
   const revokedCreate = await app.request("/api/app/invitations", {
@@ -1236,7 +1236,7 @@ test("revoked and accepted invitations do not send email on resend failures", as
   const acceptedCreate = await app.request("/api/app/invitations", {
     method: "POST",
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
-    body: JSON.stringify({ email: "beta@taskloom.local", role: "member" }),
+    body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
   });
   const acceptedBody = await acceptedCreate.json() as { invitation: { id: string; token: string } };
   assert.equal(listInvitationEmailDeliveriesIndexed("alpha").length, 2);
@@ -1259,13 +1259,13 @@ test("invitation revoke and resend enforce workspace roles", async () => {
   resetStoreForTests();
   resetAppRouteSecurityForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   setAlphaRole("admin");
 
   const created = await app.request("/api/app/invitations", {
     method: "POST",
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
-    body: JSON.stringify({ email: "beta@taskloom.local", role: "member" }),
+    body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
   });
   const createdBody = await created.json() as { invitation: { id: string; token: string } };
 
@@ -1297,7 +1297,7 @@ test("invitation revoke and resend enforce workspace roles", async () => {
 
   const accepted = await app.request(`/api/app/invitations/${createdBody.invitation.token}/accept`, {
     method: "POST",
-    headers: authHeaders(login({ email: "beta@taskloom.local", password: "demo12345" }).cookieValue),
+    headers: authHeaders(login({ email: "beta@packetagent.local", password: "demo12345" }).cookieValue),
   });
   assert.equal(accepted.status, 400);
   assert.deepEqual(await accepted.json(), { error: "invitation has been revoked" });
@@ -1306,7 +1306,7 @@ test("invitation revoke and resend enforce workspace roles", async () => {
 test("member role updates and removals protect owner-only operations", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   mutateStore((data) => {
     data.memberships.push({ workspaceId: "alpha", userId: "user_beta", role: "member", joinedAt: new Date().toISOString() });

@@ -2,12 +2,12 @@ import {
   createProviderCallsRepository,
   type ProviderCallsRepository,
 } from "./repositories/provider-calls-repo.js";
-import { loadStore as defaultLoadStore } from "./taskloom-store.js";
-import type { ProviderCallRecord, TaskloomData } from "./taskloom-store.js";
+import { loadStore as defaultLoadStore } from "./packetagent-store.js";
+import type { ProviderCallRecord, PacketAgentData } from "./packetagent-store.js";
 
 export interface ProviderCallsReadDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   repository?: ProviderCallsRepository;
 }
 
@@ -26,7 +26,7 @@ export function listProviderCallsForWorkspaceViaRepository(
     mutateStore: deps.mutateStore,
   });
 
-  if (process.env.TASKLOOM_STORE !== "sqlite") {
+  if (process.env.PACKETAGENT_STORE !== "sqlite") {
     return repo.list({ workspaceId, since: opts.since, limit: opts.limit });
   }
 

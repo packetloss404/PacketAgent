@@ -20,8 +20,8 @@ import {
   requirePrivateWorkspaceRoleAsync,
   requireWorkspaceRole,
 } from "./rbac";
-import { login } from "./taskloom-services.js";
-import { mutateStore, resetStoreForTests } from "./taskloom-store.js";
+import { login } from "./packetagent-services.js";
+import { mutateStore, resetStoreForTests } from "./packetagent-store.js";
 
 test("workspace roles are ordered from least to most privileged", () => {
   assert.deepEqual(WORKSPACE_ROLES, ["viewer", "member", "admin", "owner"]);
@@ -95,7 +95,7 @@ test("route policy helpers require an authenticated session", async () => {
 
 test("route policy helpers reject malformed workspace memberships", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
     assert.ok(membership);
@@ -111,7 +111,7 @@ test("route policy helpers reject malformed workspace memberships", async () => 
 
 test("route policy helpers reject insufficient workspace permissions", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
     assert.ok(membership);
@@ -127,7 +127,7 @@ test("route policy helpers reject insufficient workspace permissions", async () 
 
 test("route policy helpers return the authenticated context when permission is allowed", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
     assert.ok(membership);
@@ -143,7 +143,7 @@ test("route policy helpers return the authenticated context when permission is a
 
 test("route role policy helper accepts roles above the minimum", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createPolicyApp("role");
 
   const response = await app.request("/private", { headers: authHeaders(auth.cookieValue) });
@@ -154,7 +154,7 @@ test("route role policy helper accepts roles above the minimum", async () => {
 
 test("async route policy helpers return the authenticated context when permission is allowed", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
     assert.ok(membership);

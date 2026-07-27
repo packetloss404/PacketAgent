@@ -6,7 +6,7 @@ import { useApiData } from "../useApiData";
 interface PreviewCheck { icon: IconKey; label: string; value: string }
 
 export const PREVIEW_TRUTH_COPY =
-  "This checkpoint is saved in Taskloom and available through the local preview route. It is not a public deployment unless publish history includes a validated handoff URL.";
+  "This checkpoint is saved in PacketAgent and available through the local preview route. It is not a public deployment unless publish history includes a validated handoff URL.";
 
 export const CHECKS: PreviewCheck[] = [
   { icon: "code", label: "Generated source", value: "Source metadata, route map, and app manifest are captured" },

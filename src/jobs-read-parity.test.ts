@@ -6,7 +6,7 @@ import test from "node:test";
 import {
   findJobIndexed,
   listJobsForWorkspaceIndexed,
-} from "./taskloom-store.js";
+} from "./packetagent-store.js";
 import {
   createJobsRepository,
   jsonJobsRepository,
@@ -15,10 +15,10 @@ import {
   findJobViaRepository,
   listJobsForWorkspaceViaRepository,
 } from "./jobs-read.js";
-import type { JobRecord, JobStatus, TaskloomData } from "./taskloom-store.js";
+import type { JobRecord, JobStatus, PacketAgentData } from "./packetagent-store.js";
 
-function makeStore(records: JobRecord[] = []): TaskloomData {
-  return { jobs: [...records] } as unknown as TaskloomData;
+function makeStore(records: JobRecord[] = []): PacketAgentData {
+  return { jobs: [...records] } as unknown as PacketAgentData;
 }
 
 function makeRecord(
@@ -47,19 +47,19 @@ function makeRecord(
 }
 
 function withTempSqlite<T>(fn: (dbPath: string) => T): T {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-read-parity-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-read-parity-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     return fn(dbPath);
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 }
@@ -155,7 +155,7 @@ test("findJobIndexed returns the matching row regardless of workspace and null w
   assert.equal(missing, null);
 });
 
-test("listJobsForWorkspaceIndexed reads from the SQLite repository when TASKLOOM_STORE=sqlite", () => {
+test("listJobsForWorkspaceIndexed reads from the SQLite repository when PACKETAGENT_STORE=sqlite", () => {
   withTempSqlite((dbPath) => {
     const seedRecords: JobRecord[] = [
       makeRecord({ id: "sqlite_a", workspaceId: "ws_target", status: "queued", createdAt: "2026-04-26T01:00:00.000Z" }),

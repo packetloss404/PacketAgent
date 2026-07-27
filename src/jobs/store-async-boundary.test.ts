@@ -8,7 +8,7 @@ import {
   type EnqueueJobInput,
   type JobSchedulerStorageSync,
 } from "./store.js";
-import { resetStoreForTests, type JobRecord, type JobStatus } from "../taskloom-store.js";
+import { resetStoreForTests, type JobRecord, type JobStatus } from "../packetagent-store.js";
 
 function restoreEnv(name: string, value: string | undefined): void {
   if (value === undefined) delete process.env[name];
@@ -76,9 +76,9 @@ test("asyncJobSchedulerStorage returns the underlying sync boundary results", as
 });
 
 test("default async job scheduler boundary enqueues, claims, and sweeps through the existing store", async () => {
-  const previousStore = process.env.TASKLOOM_STORE;
+  const previousStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
+    delete process.env.PACKETAGENT_STORE;
     resetStoreForTests();
     const storage = asyncJobSchedulerStorage();
 
@@ -100,7 +100,7 @@ test("default async job scheduler boundary enqueues, claims, and sweeps through 
     assert.equal(findJob(job.id)?.status, "queued");
     assert.equal(findJob(job.id)?.startedAt, undefined);
   } finally {
-    restoreEnv("TASKLOOM_STORE", previousStore);
+    restoreEnv("PACKETAGENT_STORE", previousStore);
     resetStoreForTests();
   }
 });

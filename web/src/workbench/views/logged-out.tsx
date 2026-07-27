@@ -137,7 +137,7 @@ export function LoggedOutView({ onSignIn: _onSignIn }: { onSignIn: () => void })
       </form>
 
       <div style={{ marginTop: 28, display: "flex", gap: 14, alignItems: "center" }}>
-        <span className="mono muted" style={{ fontSize: 10.5 }}>© Taskloom · {VERSION}</span>
+        <span className="mono muted" style={{ fontSize: 10.5 }}>© PacketAgent · {VERSION}</span>
         <span className="mono muted" style={{ fontSize: 10.5 }}>self-hosted · MIT</span>
       </div>
     </div>

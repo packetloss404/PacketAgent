@@ -84,8 +84,8 @@ test("formatAccessLogLine keeps method, status, durationMs, userId, workspaceId 
 });
 
 test("middleware in 'off' mode does not write to stdout", async () => {
-  const previousMode = process.env.TASKLOOM_ACCESS_LOG_MODE;
-  process.env.TASKLOOM_ACCESS_LOG_MODE = "off";
+  const previousMode = process.env.PACKETAGENT_ACCESS_LOG_MODE;
+  process.env.PACKETAGENT_ACCESS_LOG_MODE = "off";
   __resetAccessLogForTests();
   const captured: string[] = [];
   const originalWrite = process.stdout.write.bind(process.stdout);
@@ -102,41 +102,41 @@ test("middleware in 'off' mode does not write to stdout", async () => {
     assert.equal(captured.length, 0);
   } finally {
     (process.stdout as unknown as { write: typeof originalWrite }).write = originalWrite;
-    if (previousMode === undefined) delete process.env.TASKLOOM_ACCESS_LOG_MODE;
-    else process.env.TASKLOOM_ACCESS_LOG_MODE = previousMode;
+    if (previousMode === undefined) delete process.env.PACKETAGENT_ACCESS_LOG_MODE;
+    else process.env.PACKETAGENT_ACCESS_LOG_MODE = previousMode;
     __resetAccessLogForTests();
   }
 });
 
 function makeTmpDir(label: string): string {
-  const dir = join(tmpdir(), `taskloom-access-log-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const dir = join(tmpdir(), `packetagent-access-log-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
   return dir;
 }
 
 function withFileEnv(filePath: string, maxBytes: string | null, maxFiles: string | null): () => void {
   const previous = {
-    mode: process.env.TASKLOOM_ACCESS_LOG_MODE,
-    path: process.env.TASKLOOM_ACCESS_LOG_PATH,
-    maxBytes: process.env.TASKLOOM_ACCESS_LOG_MAX_BYTES,
-    maxFiles: process.env.TASKLOOM_ACCESS_LOG_MAX_FILES,
+    mode: process.env.PACKETAGENT_ACCESS_LOG_MODE,
+    path: process.env.PACKETAGENT_ACCESS_LOG_PATH,
+    maxBytes: process.env.PACKETAGENT_ACCESS_LOG_MAX_BYTES,
+    maxFiles: process.env.PACKETAGENT_ACCESS_LOG_MAX_FILES,
   };
-  process.env.TASKLOOM_ACCESS_LOG_MODE = "file";
-  process.env.TASKLOOM_ACCESS_LOG_PATH = filePath;
-  if (maxBytes === null) delete process.env.TASKLOOM_ACCESS_LOG_MAX_BYTES;
-  else process.env.TASKLOOM_ACCESS_LOG_MAX_BYTES = maxBytes;
-  if (maxFiles === null) delete process.env.TASKLOOM_ACCESS_LOG_MAX_FILES;
-  else process.env.TASKLOOM_ACCESS_LOG_MAX_FILES = maxFiles;
+  process.env.PACKETAGENT_ACCESS_LOG_MODE = "file";
+  process.env.PACKETAGENT_ACCESS_LOG_PATH = filePath;
+  if (maxBytes === null) delete process.env.PACKETAGENT_ACCESS_LOG_MAX_BYTES;
+  else process.env.PACKETAGENT_ACCESS_LOG_MAX_BYTES = maxBytes;
+  if (maxFiles === null) delete process.env.PACKETAGENT_ACCESS_LOG_MAX_FILES;
+  else process.env.PACKETAGENT_ACCESS_LOG_MAX_FILES = maxFiles;
   __resetAccessLogForTests();
   return () => {
-    if (previous.mode === undefined) delete process.env.TASKLOOM_ACCESS_LOG_MODE;
-    else process.env.TASKLOOM_ACCESS_LOG_MODE = previous.mode;
-    if (previous.path === undefined) delete process.env.TASKLOOM_ACCESS_LOG_PATH;
-    else process.env.TASKLOOM_ACCESS_LOG_PATH = previous.path;
-    if (previous.maxBytes === undefined) delete process.env.TASKLOOM_ACCESS_LOG_MAX_BYTES;
-    else process.env.TASKLOOM_ACCESS_LOG_MAX_BYTES = previous.maxBytes;
-    if (previous.maxFiles === undefined) delete process.env.TASKLOOM_ACCESS_LOG_MAX_FILES;
-    else process.env.TASKLOOM_ACCESS_LOG_MAX_FILES = previous.maxFiles;
+    if (previous.mode === undefined) delete process.env.PACKETAGENT_ACCESS_LOG_MODE;
+    else process.env.PACKETAGENT_ACCESS_LOG_MODE = previous.mode;
+    if (previous.path === undefined) delete process.env.PACKETAGENT_ACCESS_LOG_PATH;
+    else process.env.PACKETAGENT_ACCESS_LOG_PATH = previous.path;
+    if (previous.maxBytes === undefined) delete process.env.PACKETAGENT_ACCESS_LOG_MAX_BYTES;
+    else process.env.PACKETAGENT_ACCESS_LOG_MAX_BYTES = previous.maxBytes;
+    if (previous.maxFiles === undefined) delete process.env.PACKETAGENT_ACCESS_LOG_MAX_FILES;
+    else process.env.PACKETAGENT_ACCESS_LOG_MAX_FILES = previous.maxFiles;
     __resetAccessLogForTests();
   };
 }
@@ -291,8 +291,8 @@ test("middleware honors MAX_FILES cap across many rotations", async () => {
 });
 
 test("middleware in 'stdout' mode writes one redacted line per request", async () => {
-  const previousMode = process.env.TASKLOOM_ACCESS_LOG_MODE;
-  process.env.TASKLOOM_ACCESS_LOG_MODE = "stdout";
+  const previousMode = process.env.PACKETAGENT_ACCESS_LOG_MODE;
+  process.env.PACKETAGENT_ACCESS_LOG_MODE = "stdout";
   __resetAccessLogForTests();
   const captured: string[] = [];
   const originalWrite = process.stdout.write.bind(process.stdout);
@@ -317,8 +317,8 @@ test("middleware in 'stdout' mode writes one redacted line per request", async (
     assert.equal(typeof parsed.durationMs, "number");
   } finally {
     (process.stdout as unknown as { write: typeof originalWrite }).write = originalWrite;
-    if (previousMode === undefined) delete process.env.TASKLOOM_ACCESS_LOG_MODE;
-    else process.env.TASKLOOM_ACCESS_LOG_MODE = previousMode;
+    if (previousMode === undefined) delete process.env.PACKETAGENT_ACCESS_LOG_MODE;
+    else process.env.PACKETAGENT_ACCESS_LOG_MODE = previousMode;
     __resetAccessLogForTests();
   }
 });

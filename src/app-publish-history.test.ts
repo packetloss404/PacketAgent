@@ -18,7 +18,7 @@ test("generated app publish records include local hosting metadata and compose p
     buildStatus: "passed",
     smokeStatus: "pass",
     visibility: "public",
-    localPublishRoot: "exports\\taskloom",
+    localPublishRoot: "exports\\packetagent",
     publicBaseUrl: "https://apps.example.test/",
     privateBaseUrl: "http://localhost:8484/",
     createdByUserId: "user_alpha",
@@ -28,16 +28,16 @@ test("generated app publish records include local hosting metadata and compose p
   assert.match(publish.id, /^gapp_publish_[a-f0-9]{16}$/);
   assert.equal(publish.status, "published");
   assert.equal(publish.visibility, "public");
-  assert.equal(publish.localPublishPath, "exports/taskloom/alpha-workspace/booking-app");
-  assert.equal(publish.workspacePath, "exports/taskloom/alpha-workspace/booking-app");
+  assert.equal(publish.localPublishPath, "exports/packetagent/alpha-workspace/booking-app");
+  assert.equal(publish.workspacePath, "exports/packetagent/alpha-workspace/booking-app");
   assert.equal(publish.publicUrl, "https://apps.example.test/alpha-workspace/booking-app");
   assert.equal(publish.privateUrl, "http://localhost:8484/api/app/generated-apps/gapp_booking/preview?checkpointId=ckpt_1");
   assert.equal(publish.dockerComposeExport.fileName, "docker-compose.publish.yml");
-  assert.equal(publish.dockerComposeExport.services.includes("taskloom-app"), true);
-  assert.match(publish.dockerComposeExport.yaml, /taskloom-app:/);
-  assert.equal(publish.dockerComposeExport.bundlePath, "exports/taskloom/alpha-workspace/booking-app/bundle");
-  assert.equal(publish.dockerComposeExport.manifestPath, "exports/taskloom/alpha-workspace/booking-app/publish-artifacts.json");
-  assert.match(publish.dockerComposeExport.yaml, /TASKLOOM_APP_BUNDLE_PATH/);
+  assert.equal(publish.dockerComposeExport.services.includes("packetagent-app"), true);
+  assert.match(publish.dockerComposeExport.yaml, /packetagent-app:/);
+  assert.equal(publish.dockerComposeExport.bundlePath, "exports/packetagent/alpha-workspace/booking-app/bundle");
+  assert.equal(publish.dockerComposeExport.manifestPath, "exports/packetagent/alpha-workspace/booking-app/publish-artifacts.json");
+  assert.match(publish.dockerComposeExport.yaml, /PACKETAGENT_APP_BUNDLE_PATH/);
   assert.ok(publish.dockerComposeExport.instructions.some((step) => step.includes("generated app bundle")));
   assert.equal(publish.artifactManifest.fileName, "publish-artifacts.json");
   assert.equal(publish.manifest.fileName, "publish-artifacts.json");
@@ -73,7 +73,7 @@ test("second publish keeps previous publish rollback command and result shape", 
   assert.equal(second.rollbackCommand?.kind, "generated-app-publish-rollback");
   assert.equal(second.rollbackCommand?.fromPublishId, second.id);
   assert.equal(second.rollbackCommand?.toPublishId, first.id);
-  assert.match(second.rollbackCommand?.command ?? "", /taskloom publish rollback/);
+  assert.match(second.rollbackCommand?.command ?? "", /packetagent publish rollback/);
 
   const command = createGeneratedAppPublishRollbackCommand({ current: second, target: first, reason: "test" });
   const result = buildGeneratedAppPublishRollbackResult({

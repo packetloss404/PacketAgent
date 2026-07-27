@@ -6,7 +6,7 @@ import { OllamaProvider } from "./ollama.js";
 import { GeminiProvider } from "./gemini.js";
 import { getDefaultRouter, hasGeminiEnvKey } from "./router.js";
 import { vaultApiKeyResolver } from "../security/api-key-store.js";
-import type { ApiKeyProvider } from "../taskloom-store.js";
+import type { ApiKeyProvider } from "../packetagent-store.js";
 import type { ApiKeyResolver, ProviderName } from "./types.js";
 
 let registered = false;

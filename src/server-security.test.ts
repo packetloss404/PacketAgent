@@ -17,20 +17,20 @@ test("artifact serving is disabled by default when NODE_ENV is unset", () => {
 test("artifact serving requires explicit opt-in in production", () => {
   assert.equal(artifactServingEnabled({
     NODE_ENV: "production",
-    TASKLOOM_ARTIFACT_SERVING_ENABLED: "true",
+    PACKETAGENT_ARTIFACT_SERVING_ENABLED: "true",
   }), true);
 });
 
 test("artifact serving requires explicit opt-in in development", () => {
   assert.equal(artifactServingEnabled({
     NODE_ENV: "development",
-    TASKLOOM_ARTIFACT_SERVING_ENABLED: "1",
+    PACKETAGENT_ARTIFACT_SERVING_ENABLED: "1",
   }), true);
 });
 
 test("artifact serving stays off when explicitly disabled", () => {
   assert.equal(artifactServingEnabled({
     NODE_ENV: "development",
-    TASKLOOM_ARTIFACT_SERVING_ENABLED: "false",
+    PACKETAGENT_ARTIFACT_SERVING_ENABLED: "false",
   }), false);
 });

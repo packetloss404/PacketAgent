@@ -1,7 +1,7 @@
 import { snapshotJobMetricsAsync, type SnapshotJobMetricsResult } from "./job-metrics-snapshot.js";
 import { enqueueJob, enqueueJobAsync, type EnqueueJobInput } from "./store.js";
 import { nextAfter } from "./cron.js";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, type JobRecord, type TaskloomData } from "../taskloom-store.js";
+import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, type JobRecord, type PacketAgentData } from "../packetagent-store.js";
 
 export const METRICS_SNAPSHOT_JOB_TYPE = "metrics.snapshot" as const;
 
@@ -25,13 +25,13 @@ export interface MetricsSnapshotHandlerDeps {
 
 export interface EnsureMetricsSnapshotCronJobDeps {
   env?: NodeJS.ProcessEnv;
-  loadStore?: () => TaskloomData;
+  loadStore?: () => PacketAgentData;
   enqueue?: (input: EnqueueJobInput) => JobRecord;
 }
 
 export interface EnsureMetricsSnapshotCronJobAsyncDeps {
   env?: NodeJS.ProcessEnv;
-  loadStore?: () => TaskloomData | Promise<TaskloomData>;
+  loadStore?: () => PacketAgentData | Promise<PacketAgentData>;
   enqueue?: (input: EnqueueJobInput) => JobRecord | Promise<JobRecord>;
 }
 
@@ -77,7 +77,7 @@ export function ensureMetricsSnapshotCronJob(
   const loadStore = deps.loadStore ?? defaultLoadStore;
   const enqueue = deps.enqueue ?? enqueueJob;
 
-  const cron = env.TASKLOOM_JOB_METRICS_SNAPSHOT_CRON?.trim();
+  const cron = env.PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON?.trim();
   if (!cron) return { action: "skipped" };
 
   let firstRun: Date;
@@ -85,7 +85,7 @@ export function ensureMetricsSnapshotCronJob(
     firstRun = nextAfter(cron, new Date());
   } catch (error) {
     console.warn(
-      `metrics.snapshot: invalid TASKLOOM_JOB_METRICS_SNAPSHOT_CRON expression ${JSON.stringify(cron)}; skipping bootstrap (${(error as Error).message})`,
+      `metrics.snapshot: invalid PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON expression ${JSON.stringify(cron)}; skipping bootstrap (${(error as Error).message})`,
     );
     return { action: "skipped" };
   }
@@ -100,8 +100,8 @@ export function ensureMetricsSnapshotCronJob(
   );
   if (existing) return { action: "exists", jobId: existing.id };
 
-  const workspaceId = env.TASKLOOM_JOB_METRICS_SNAPSHOT_WORKSPACE_ID?.trim() || DEFAULT_WORKSPACE_ID;
-  const retentionDays = parseRetentionFromEnv(env.TASKLOOM_JOB_METRICS_SNAPSHOT_RETENTION_DAYS);
+  const workspaceId = env.PACKETAGENT_JOB_METRICS_SNAPSHOT_WORKSPACE_ID?.trim() || DEFAULT_WORKSPACE_ID;
+  const retentionDays = parseRetentionFromEnv(env.PACKETAGENT_JOB_METRICS_SNAPSHOT_RETENTION_DAYS);
 
   const created = enqueue({
     workspaceId,
@@ -121,7 +121,7 @@ export async function ensureMetricsSnapshotCronJobAsync(
   const loadStore = deps.loadStore ?? defaultLoadStoreAsync;
   const enqueue = deps.enqueue ?? enqueueJobAsync;
 
-  const cron = env.TASKLOOM_JOB_METRICS_SNAPSHOT_CRON?.trim();
+  const cron = env.PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON?.trim();
   if (!cron) return { action: "skipped" };
 
   let firstRun: Date;
@@ -129,7 +129,7 @@ export async function ensureMetricsSnapshotCronJobAsync(
     firstRun = nextAfter(cron, new Date());
   } catch (error) {
     console.warn(
-      `metrics.snapshot: invalid TASKLOOM_JOB_METRICS_SNAPSHOT_CRON expression ${JSON.stringify(cron)}; skipping bootstrap (${(error as Error).message})`,
+      `metrics.snapshot: invalid PACKETAGENT_JOB_METRICS_SNAPSHOT_CRON expression ${JSON.stringify(cron)}; skipping bootstrap (${(error as Error).message})`,
     );
     return { action: "skipped" };
   }
@@ -144,8 +144,8 @@ export async function ensureMetricsSnapshotCronJobAsync(
   );
   if (existing) return { action: "exists", jobId: existing.id };
 
-  const workspaceId = env.TASKLOOM_JOB_METRICS_SNAPSHOT_WORKSPACE_ID?.trim() || DEFAULT_WORKSPACE_ID;
-  const retentionDays = parseRetentionFromEnv(env.TASKLOOM_JOB_METRICS_SNAPSHOT_RETENTION_DAYS);
+  const workspaceId = env.PACKETAGENT_JOB_METRICS_SNAPSHOT_WORKSPACE_ID?.trim() || DEFAULT_WORKSPACE_ID;
+  const retentionDays = parseRetentionFromEnv(env.PACKETAGENT_JOB_METRICS_SNAPSHOT_RETENTION_DAYS);
 
   const created = await enqueue({
     workspaceId,

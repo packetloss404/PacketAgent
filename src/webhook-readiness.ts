@@ -1,4 +1,4 @@
-import type { AgentTriggerKind } from "./taskloom-store";
+import type { AgentTriggerKind } from "./packetagent-store";
 
 export type WebhookTriggerReadiness = {
   recommended: boolean;

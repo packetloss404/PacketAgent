@@ -32,13 +32,13 @@ import {
   type ProviderRecord,
   type WorkspaceEnvVarRecord,
   type WorkspaceEnvVarScope,
-  type TaskloomData,
+  type PacketAgentData,
   upsertActivationSignal,
   upsertAgent,
   upsertAgentRun,
   upsertProvider,
   upsertWorkspaceEnvVar,
-} from "../taskloom-store";
+} from "../packetagent-store";
 import {
   deriveAgentRunTraceSpans as deriveStoredAgentRunTraceSpans,
   type AgentRunTraceSpan as StoredAgentRunTraceSpan,
@@ -990,7 +990,7 @@ async function runAgentWithToolLoop(args: {
 }
 
 function resolveAgentExecutionTarget(
-  data: TaskloomData,
+  data: PacketAgentData,
   workspaceId: string,
   agent: AgentRecord,
   routeKey: string,
@@ -1714,7 +1714,7 @@ function buildAgentInstructions(prompt: string, actions: string[], enabledTools:
   const actionList = actions.map((action, index) => `${index + 1}. ${titleCase(action)}`).join("\n");
   const toolList = enabledTools.length ? enabledTools.join(", ") : "no tools";
   return [
-    "You are a Taskloom workspace agent generated from an operator prompt.",
+    "You are a PacketAgent workspace agent generated from an operator prompt.",
     "Turn the prompt into reliable, auditable work and keep outputs concise.",
     "",
     `Original prompt: ${prompt}`,
@@ -1997,7 +1997,7 @@ function buildAgentRunDetail(run: AgentRunRecord, agentName?: string): AgentRunD
   };
 }
 
-function findRunAgentName(data: TaskloomData, workspaceId: string, run: AgentRunRecord): string | undefined {
+function findRunAgentName(data: PacketAgentData, workspaceId: string, run: AgentRunRecord): string | undefined {
   if (!run.agentId) return undefined;
   const agent = findAgent(data, run.agentId);
   return agent && agent.workspaceId === workspaceId ? agent.name : undefined;
@@ -2356,7 +2356,7 @@ export async function listReleaseHistoryAsync(context: AuthenticatedContext) {
   return listReleaseHistoryFromData(data, context.workspace.id);
 }
 
-function listReleaseHistoryFromData(data: TaskloomData, workspaceId: string) {
+function listReleaseHistoryFromData(data: PacketAgentData, workspaceId: string) {
   const releases = listReleaseConfirmationsForWorkspace(data, workspaceId)
     .sort((left, right) => (right.confirmedAt ?? right.updatedAt).localeCompare(left.confirmedAt ?? left.updatedAt));
 
@@ -2762,14 +2762,14 @@ function validateProvider(data: ReturnType<typeof loadStore>, workspaceId: strin
   }
 }
 
-function isProviderReadyForAgentRuns(data: TaskloomData, workspaceId: string, provider: ProviderRecord): boolean {
+function isProviderReadyForAgentRuns(data: PacketAgentData, workspaceId: string, provider: ProviderRecord): boolean {
   if (provider.status === "disabled") return false;
   const apiKeyProvider = apiKeyProviderForKind(provider.kind);
   if (!apiKeyProvider || provider.kind === "ollama") return true;
   return provider.apiKeyConfigured || data.apiKeys.some((key) => key.workspaceId === workspaceId && key.provider === apiKeyProvider);
 }
 
-function buildIntegrationReadinessSummary(data: TaskloomData, workspaceId: string): IntegrationReadinessSummary {
+function buildIntegrationReadinessSummary(data: PacketAgentData, workspaceId: string): IntegrationReadinessSummary {
   const tools = listDefaultToolSummaries();
   const toolNames = [...new Set(tools.map((tool) => tool.name))].sort();
   const generatedPlanTools = [...new Set(AGENT_TEMPLATES.flatMap((template) => template.tools))].sort();

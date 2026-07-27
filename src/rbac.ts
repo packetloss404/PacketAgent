@@ -1,6 +1,6 @@
 import type { Context } from "hono";
-import { requireAuthenticatedContext, requireAuthenticatedContextAsync } from "./taskloom-services.js";
-import { findWorkspaceMembership, loadStore, loadStoreAsync } from "./taskloom-store.js";
+import { requireAuthenticatedContext, requireAuthenticatedContextAsync } from "./packetagent-services.js";
+import { findWorkspaceMembership, loadStore, loadStoreAsync } from "./packetagent-store.js";
 
 export const WORKSPACE_ROLES = ["viewer", "member", "admin", "owner"] as const;
 

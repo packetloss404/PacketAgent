@@ -12,8 +12,8 @@ import type {
   ManagedPostgresStoreClientFactory,
   ManagedPostgresStoreQueryClient,
   ManagedPostgresStoreTransactionClient,
-  ResolvedTaskloomStoreMode,
-  TaskloomData,
+  ResolvedPacketAgentStoreMode,
+  PacketAgentData,
 } from "../types.js";
 import type { AsyncStoreBackend } from "./types.js";
 
@@ -23,7 +23,7 @@ import type { AsyncStoreBackend } from "./types.js";
 // factory (and its test override) is module-private state exposed through
 // accessors.
 
-const MANAGED_POSTGRES_DOCUMENT_KEY = "taskloom:store";
+const MANAGED_POSTGRES_DOCUMENT_KEY = "packetagent:store";
 const MANAGED_POSTGRES_SCHEMA_VERSION = 1;
 
 let managedPostgresStoreClientFactory: ManagedPostgresStoreClientFactory = createDefaultManagedPostgresStoreClient;
@@ -36,7 +36,7 @@ export function setManagedPostgresStoreClientFactoryForTests(factory: ManagedPos
   };
 }
 
-export function managedDatabaseAsyncStoreBackend(resolution: ResolvedTaskloomStoreMode): AsyncStoreBackend {
+export function managedDatabaseAsyncStoreBackend(resolution: ResolvedPacketAgentStoreMode): AsyncStoreBackend {
   const config = resolveManagedPostgresStoreClientConfig(resolution);
 
   return {
@@ -50,11 +50,11 @@ export function managedDatabaseAsyncStoreBackend(resolution: ResolvedTaskloomSto
   };
 }
 
-function resolveManagedPostgresStoreClientConfig(resolution: ResolvedTaskloomStoreMode): ManagedPostgresStoreClientConfig {
+function resolveManagedPostgresStoreClientConfig(resolution: ResolvedPacketAgentStoreMode): ManagedPostgresStoreClientConfig {
   const envKey = MANAGED_DATABASE_URL_ENV_KEYS.find((key) => cleanStoreEnvValue(process.env[key]).length > 0);
   if (!envKey) {
     throw new ManagedPostgresStoreConfigurationError(
-      "Managed Postgres storage requires DATABASE_URL, TASKLOOM_DATABASE_URL, or TASKLOOM_MANAGED_DATABASE_URL.",
+      "Managed Postgres storage requires DATABASE_URL, PACKETAGENT_DATABASE_URL, or PACKETAGENT_MANAGED_DATABASE_URL.",
     );
   }
 
@@ -109,7 +109,7 @@ async function withManagedPostgresClient<T>(
 
 async function ensureManagedPostgresDocumentStore(client: ManagedPostgresStoreQueryClient): Promise<void> {
   await client.query(`
-    create table if not exists taskloom_document_store (
+    create table if not exists packetagent_document_store (
       document_key text primary key,
       schema_version integer not null,
       metadata jsonb not null default '{}'::jsonb,
@@ -120,7 +120,7 @@ async function ensureManagedPostgresDocumentStore(client: ManagedPostgresStoreQu
   `);
 }
 
-async function loadManagedPostgresStore(config: ManagedPostgresStoreClientConfig): Promise<TaskloomData> {
+async function loadManagedPostgresStore(config: ManagedPostgresStoreClientConfig): Promise<PacketAgentData> {
   const backendKey = managedPostgresBackendKey(config);
   return withManagedPostgresClient(config, async (client) => {
     await ensureManagedPostgresDocumentStore(client);
@@ -144,7 +144,7 @@ async function loadManagedPostgresStore(config: ManagedPostgresStoreClientConfig
 
 async function mutateManagedPostgresStore<T>(
   config: ManagedPostgresStoreClientConfig,
-  mutator: (data: TaskloomData) => T | Promise<T>,
+  mutator: (data: PacketAgentData) => T | Promise<T>,
 ): Promise<T> {
   const backendKey = managedPostgresBackendKey(config);
   return withManagedPostgresMutationRetry(() => withManagedPostgresClient(config, async (client) => {
@@ -245,11 +245,11 @@ function managedPostgresBackendKey(config: ManagedPostgresStoreClientConfig): st
 async function readManagedPostgresStore(
   client: ManagedPostgresStoreQueryClient,
   forUpdate = false,
-): Promise<TaskloomData | null> {
+): Promise<PacketAgentData | null> {
   const result = await client.query<{ payload: unknown }>(
     `
       select payload
-      from taskloom_document_store
+      from packetagent_document_store
       where document_key = $1
       limit 1
       ${forUpdate ? "for update" : ""}
@@ -259,13 +259,13 @@ async function readManagedPostgresStore(
   const row = result.rows[0];
   if (!row) return null;
   const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
-  return normalizeStore(payload as Partial<TaskloomData>);
+  return normalizeStore(payload as Partial<PacketAgentData>);
 }
 
-async function persistManagedPostgresStore(client: ManagedPostgresStoreQueryClient, data: TaskloomData): Promise<void> {
+async function persistManagedPostgresStore(client: ManagedPostgresStoreQueryClient, data: PacketAgentData): Promise<void> {
   await client.query(
     `
-      insert into taskloom_document_store (
+      insert into packetagent_document_store (
         document_key, schema_version, metadata, payload, created_at, updated_at
       )
       values ($1, $2, $3::jsonb, $4::jsonb, now(), now())

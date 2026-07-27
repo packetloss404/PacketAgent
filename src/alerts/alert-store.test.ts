@@ -2,15 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { listAlerts, recordAlerts, updateAlertDeliveryStatus } from "./alert-store.js";
 import type { AlertEvent } from "./alert-engine.js";
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 
-function makeStore(records: AlertEventRecord[] = []): TaskloomData {
-  return { alertEvents: [...records] } as unknown as TaskloomData;
+function makeStore(records: AlertEventRecord[] = []): PacketAgentData {
+  return { alertEvents: [...records] } as unknown as PacketAgentData;
 }
 
-function makeStoreDeps(data: TaskloomData) {
+function makeStoreDeps(data: PacketAgentData) {
   return {
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
 }
 

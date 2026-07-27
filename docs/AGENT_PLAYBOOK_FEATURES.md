@@ -1,17 +1,23 @@
 # Agent/playbook builder and run trace inspector
 
-This feature turns Taskloom's agent path from a configuration form into a task-native agent studio: describe an agent, review the generated plan, save a reusable playbook, run it with typed inputs, approve risky tools, and inspect what happened afterward.
+> **Status: implemented historical feature brief.** The agent builder,
+> playbooks, launch approval flow, and derived run trace are present in the
+> inherited codebase. Remaining Worker lifecycle work is tracked in
+> [`../BACKLOG.md`](../BACKLOG.md). This file is design context, not an active
+> plan.
+
+This feature turns PacketAgent's agent path from a configuration form into a task-native agent studio: describe an agent, review the generated plan, save a reusable playbook, run it with typed inputs, approve risky tools, and inspect what happened afterward.
 
 ## Product direction
 
-Taskloom should borrow the useful parts of Dify, Langflow, Flowise, and Dust without becoming a generic node-canvas platform:
+PacketAgent should borrow the useful parts of Dify, Langflow, Flowise, and Dust without becoming a generic node-canvas platform:
 
 - Dust: named agents as project coworkers, reusable skills/playbooks, setup-aware tools, and durable execution records.
 - Flowise: clear separation between reasoning agent steps and deterministic tool/action steps.
 - Dify: workflow vs conversational workflow mental model, publishable artifacts, and practical run observability.
 - Langflow: a fast test loop with inspectable steps, typed inputs, and per-step output.
 
-The Taskloom-specific wedge is the task lifecycle. Agents should reason about ownership, blockers, approvals, status updates, handoffs, schedules, and run records before they expose raw automation primitives.
+The PacketAgent-specific wedge is the task lifecycle. Agents should reason about ownership, blockers, approvals, status updates, handoffs, schedules, and run records before they expose raw automation primitives.
 
 ## User-facing scope
 

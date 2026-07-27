@@ -137,7 +137,7 @@ export function isSafePath(input: string): boolean {
  */
 function defaultPrompts(): ResolvedPrompts {
   const systemPrompt = [
-    "You are Taskloom's code authoring assistant. You generate small, self-",
+    "You are PacketAgent's code authoring assistant. You generate small, self-",
     "contained web apps as a file tree. Your output runs in a Vite + React",
     "workspace under `src/`.",
     "",

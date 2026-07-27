@@ -23,7 +23,7 @@ function context(overrides: Partial<ToolContext> = {}): ToolContext {
 }
 
 function makeTempDir(): string {
-  return mkdtempSync(join(tmpdir(), "taskloom-email-sql-"));
+  return mkdtempSync(join(tmpdir(), "packetagent-email-sql-"));
 }
 
 test("email_send delivers through an injected SMTP adapter", async () => {

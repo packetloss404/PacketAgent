@@ -1,5 +1,10 @@
 # Agent/playbook sprint plan
 
+> **Status: completed historical sprint plan.** The described vertical slice
+> is present in the inherited codebase. Do not restart these sprints. Continue
+> from [`../dev/CODEX-HANDOFF.md`](../dev/CODEX-HANDOFF.md) and the active W1-W10
+> loops in [`../BACKLOG.md`](../BACKLOG.md).
+
 This plan is scoped to a shippable vertical slice: prompt-to-agent builder parity, ordered playbooks, tool approval, first-run readiness, and a trace inspector based on existing run data.
 
 ## Sprint 1: Stabilize the contract
@@ -16,7 +21,7 @@ Work:
 
 Primary files:
 
-- `src/taskloom-services.ts`
+- `src/packetagent-services.ts`
 - `src/app-routes.ts`
 - `src/server.ts`
 - `web/src/lib/types.ts`
@@ -56,8 +61,8 @@ Work:
 Primary files:
 
 - `web/src/workbench/views/agent-editor.tsx`
-- `src/taskloom-services.ts`
-- `src/taskloom-services.test.ts`
+- `src/packetagent-services.ts`
+- `src/packetagent-services.test.ts`
 
 ## Sprint 4: Trace inspector UI
 
@@ -91,10 +96,10 @@ Work:
 
 Primary files:
 
-- `src/taskloom-services.ts`
+- `src/packetagent-services.ts`
 - `src/tools/agent-loop.ts`
 - `src/tools/approval.ts`
-- `src/taskloom-services.test.ts`
+- `src/packetagent-services.test.ts`
 
 ## Sprint 6: Docs and release readiness
 

@@ -18,7 +18,7 @@ import { seedStore } from "../seed.js";
 import { openStoreDatabase } from "../sqlite-db.js";
 import type {
   RateLimitRecord,
-  TaskloomData,
+  PacketAgentData,
   WorkspaceRecordCollectionKey,
   WorkspaceRecordCollectionMap,
   WorkspaceRecordOrder,
@@ -30,7 +30,7 @@ import type { AsyncStoreBackend, StoreBackend } from "./types.js";
 // never another backend or the barrel. The `begin immediate` transaction
 // boundaries and post-commit dual-write flush are moved verbatim.
 
-type StoreCollectionKey = keyof TaskloomData;
+type StoreCollectionKey = keyof PacketAgentData;
 
 const RECORD_COLLECTIONS = [
   "users",
@@ -117,7 +117,7 @@ export function sqliteAsyncStoreBackend(dbPath: string): AsyncStoreBackend {
   };
 }
 
-export function mutateSqliteStore<T>(dbPath: string, mutator: (data: TaskloomData) => T): T {
+export function mutateSqliteStore<T>(dbPath: string, mutator: (data: PacketAgentData) => T): T {
   const db = openStoreDatabase(dbPath);
   const backendKey = `sqlite:${dbPath}`;
   incrementMutateSqliteDepth();
@@ -144,7 +144,7 @@ export function mutateSqliteStore<T>(dbPath: string, mutator: (data: TaskloomDat
   }
 }
 
-export async function mutateSqliteStoreAsync<T>(dbPath: string, mutator: (data: TaskloomData) => T | Promise<T>): Promise<T> {
+export async function mutateSqliteStoreAsync<T>(dbPath: string, mutator: (data: PacketAgentData) => T | Promise<T>): Promise<T> {
   const db = openStoreDatabase(dbPath);
   const backendKey = `sqlite:${dbPath}`;
   incrementMutateSqliteDepth();
@@ -171,7 +171,7 @@ export async function mutateSqliteStoreAsync<T>(dbPath: string, mutator: (data: 
   }
 }
 
-export function loadSqliteAppData(dbPath: string): TaskloomData | null {
+export function loadSqliteAppData(dbPath: string): PacketAgentData | null {
   const db = openStoreDatabase(dbPath);
   try {
     return loadSqliteStore(db);
@@ -180,7 +180,7 @@ export function loadSqliteAppData(dbPath: string): TaskloomData | null {
   }
 }
 
-export function persistSqliteAppData(dbPath: string, data: TaskloomData): void {
+export function persistSqliteAppData(dbPath: string, data: PacketAgentData): void {
   const db = openStoreDatabase(dbPath);
   try {
     persistSqliteStore(db, normalizeStore(data));
@@ -189,14 +189,14 @@ export function persistSqliteAppData(dbPath: string, data: TaskloomData): void {
   }
 }
 
-export function loadSqliteStore(db: DatabaseSync): TaskloomData | null {
+export function loadSqliteStore(db: DatabaseSync): PacketAgentData | null {
   const rows = db.prepare("select collection, payload from app_records order by collection, id").all() as unknown as SqliteStoreRow[];
   const rateLimits = loadSqliteRateLimitBuckets(db);
   const dedicatedCollections = loadDedicatedRelationalCollections(db);
   const hasDedicatedRows = Object.values(dedicatedCollections).some((records) => records.length > 0);
   if (rows.length === 0 && rateLimits.length === 0 && !hasDedicatedRows) return null;
 
-  const partial: Partial<TaskloomData> = { rateLimits };
+  const partial: Partial<PacketAgentData> = { rateLimits };
   for (const row of rows) {
     const payload = JSON.parse(row.payload) as unknown;
     if (MAP_COLLECTIONS.includes(row.collection as (typeof MAP_COLLECTIONS)[number])) {
@@ -212,7 +212,7 @@ export function loadSqliteStore(db: DatabaseSync): TaskloomData | null {
   return normalizeStore(partial);
 }
 
-function persistSqliteStore(db: DatabaseSync, data: TaskloomData): void {
+function persistSqliteStore(db: DatabaseSync, data: PacketAgentData): void {
   db.exec("begin immediate");
   try {
     persistSqliteStoreRows(db, data);
@@ -223,7 +223,7 @@ function persistSqliteStore(db: DatabaseSync, data: TaskloomData): void {
   }
 }
 
-export function persistSqliteStoreRows(db: DatabaseSync, data: TaskloomData): void {
+export function persistSqliteStoreRows(db: DatabaseSync, data: PacketAgentData): void {
   db.exec("delete from app_record_search");
   db.exec("delete from app_records");
   persistSqliteRateLimitBuckets(db, data.rateLimits ?? []);
@@ -404,7 +404,7 @@ function persistSqliteRateLimitBuckets(db: DatabaseSync, rateLimits: RateLimitRe
   }
 }
 
-function recordsForCollection(data: TaskloomData, collection: (typeof RECORD_COLLECTIONS)[number]): unknown[] {
+function recordsForCollection(data: PacketAgentData, collection: (typeof RECORD_COLLECTIONS)[number]): unknown[] {
   if (collection === "workspaceBriefs") return workspaceBriefEntries(data.workspaceBriefs);
   if (collection === "releaseConfirmations") return releaseConfirmationEntries(data.releaseConfirmations);
   return data[collection] as unknown[];

@@ -34,7 +34,7 @@ test("GET appends query, sends headers and signal, and returns JSON with safe he
 
   const result = await tool.handle({
     url: "https://api.example.com/v1/items?existing=1",
-    headers: { authorization: "Bearer secret-token", "x-client": "taskloom" },
+    headers: { authorization: "Bearer secret-token", "x-client": "packetagent" },
     query: { q: "search", page: 2, active: true, skip: null, tag: ["a", "b"] },
   }, ctx(ctrl.signal));
 
@@ -45,7 +45,7 @@ test("GET appends query, sends headers and signal, and returns JSON with safe he
   assert.equal(calls[0].init.signal, ctrl.signal);
   const requestHeaders = calls[0].init.headers as Headers;
   assert.equal(requestHeaders.get("authorization"), "Bearer secret-token");
-  assert.equal(requestHeaders.get("x-client"), "taskloom");
+  assert.equal(requestHeaders.get("x-client"), "packetagent");
 
   const output = result.output as {
     status: number;
@@ -165,7 +165,7 @@ test("blocks unsafe URL targets before fetch", async () => {
   const tool = createHttpFetchTool({ fetchImpl });
 
   const blockedUrls = [
-    "file:///tmp/taskloom",
+    "file:///tmp/packetagent",
     "http://localhost/status",
     "http://service.local/status",
     "http://127.0.0.1/status",

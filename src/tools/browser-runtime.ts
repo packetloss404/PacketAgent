@@ -66,7 +66,7 @@ export async function getBrowserDriver(): Promise<BrowserDriver | null> {
   cachedDriver = {
     async launchContext(): Promise<BrowserContext> {
       const context = await browser.newContext({
-        userAgent: "Taskloom/1.0 (sandboxed)",
+        userAgent: "PacketAgent/1.0 (sandboxed)",
         viewport: { width: 1280, height: 800 },
       });
       return context as unknown as BrowserContext;

@@ -1,106 +1,99 @@
-# Roadmap
+# PacketAgent roadmap
 
-This document describes where Taskloom is today and the tracks we think are most worth investing in next. It is suggestive, not a contract — real priority is set by issue activity, PRs, and what self-hosters are running into. Anything here can move, slip, or be reshaped by a better idea.
+This is the short product direction. Detailed acceptance criteria and sequencing live in [`../BACKLOG.md`](../BACKLOG.md).
 
-## Where we are
+Current active loop: **W1 - Durable Worker contract**. Repository/session state
+for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 
-Taskloom is a self-hosted, MIT-licensed app and agent workbench. The builder loop — describe an internal app or agent in plain English, review a brief and plan, inspect generated source files, preview a saved local checkpoint, iterate with scoped change prompts, then create a publish handoff — is the supported MVP and is used end-to-end. The same workbench that drafts the work also operates it: workflows, runs, integrations, operations, and settings all live behind one sign-in.
+## North star
 
-Concretely, today's surface includes:
+PacketAgent is a self-hosted runtime for creating and operating autonomous workers.
 
-- **Builder-first flow** at `/builder` for both prompt-to-app and prompt-to-agent, with diff-review on every apply, saved local previews, publish handoff metadata, and rollback to any prior checkpoint.
-- **Six ready-to-edit agent templates** in [`src/agent-templates.ts`](../src/agent-templates.ts): support inbox triage, daily workspace brief, release audit, blocker watcher, weekly release notes, research summarizer.
-- **Four model providers** routable per agent: Anthropic, OpenAI, MiniMax, Ollama. BYO keys, stored in the encrypted secrets vault.
-- **Sandboxed code execution** via `/api/app/sandbox/*` and the `/sandbox` workbench view, with a Docker driver (default) and a clearly-marked-insecure native fallback. Opt-in routing of builder smoke checks through the sandbox.
-- **Full operate surface** in the workbench: alerts, audit log, secrets vault (AES-256-GCM at rest), inbound + outbound webhooks with retry and dead-letter, persistent jobs queue with five-field cron, RBAC (viewer / member / admin / owner), rate limits, releases, backups, storage, SSE-streamed runs, command palette.
-- **Self-host quick start** with three storage modes: file-backed JSON for contributor flow, single-node SQLite (WAL, foreign keys, busy_timeout) for production single-node, and managed Postgres for horizontal app writers.
+A worker:
 
-Known limits in the current builder-first pass:
+- has a versioned objective, execution profile, tools, triggers, policies, and exit conditions;
+- wakes on a manual request, schedule, webhook, queue message, or alert;
+- plans, acts, evaluates, and retries within explicit limits;
+- checkpoints enough state to resume safely after a crash or restart;
+- stops, pauses, or requests approval instead of running without bounds; and
+- produces an auditable record of decisions, tool calls, costs, artifacts, and outcomes.
 
-- Preview is a Taskloom-served local checkpoint backed by generated files on disk, not proof of a public deployment.
-- Publish is a local package and URL handoff with validation and rollback metadata; operators still provide the runtime, network, and public host.
-- Generated source now includes a narrow React/Vite CRUD bundle, seed data, schema, API helper, and migration starter. A full browser IDE/editor surface remains future work.
-- Taskloom is self-host-first and does not claim Replit, Anything, v0, Bolt, or Lovable parity.
+"Always on" means the control plane remains available and workers can wake whenever needed. It does not mean every worker continuously consumes model tokens.
 
-Workbench screens that exist as of today (each one a file under [`web/src/workbench/views/`](../web/src/workbench/views/)): builder, agents, agent-editor, builder-agent, app-preview, run-detail, run-deep, runs, workflows, integrations, sandbox, operations, secrets, webhooks, rate-limits, releases, notifications, storage, backups, billing, roles, sso, settings, admin-controls, dashboard, activation.
+## Current foundation
 
-## What's next
+The TaskLoom codebase brought forward a strong implementation substrate:
 
-Five tracks, roughly in priority order. Each has a concrete first step that someone could pick up from an issue.
+- agent definitions, runs, SSE transcripts, and a bounded tool loop;
+- schedules, webhooks, alerts, a persistent jobs queue, retries, and dead-letter handling;
+- six BYO model providers plus local-model support;
+- tool approval tokens, encrypted secrets, RBAC, and audit records;
+- Docker/native sandbox execution and Playwright browser automation;
+- JSON, SQLite, and managed Postgres storage paths; and
+- operations, metrics, provider-call cost data, and health surfaces.
 
-### 1. App template gallery
+These pieces work, but they are not yet unified as one durable Worker lifecycle. The existing builder remains supported and becomes the worker creation studio. Prompt-to-app generation remains an inherited secondary capability.
 
-Today only the agent side has a curated template gallery. The app side has the type plumbing — [`AppDraftTemplateId`](../src/app-builder-service.ts) defines `crm`, `booking`, `internal_dashboard`, `task_tracker`, `customer_portal` — but no curated, fleshed-out app starters parallel to what `agent-templates.ts` does for agents. Self-hosters land at `/builder` and have to start from a blank prompt.
+## Now
 
-First step:
+### 1. Durable Worker contract
 
-- [ ] Define an `AppTemplate` record analogous to `AgentTemplate`, with prompt, page map, schema, seed data, acceptance checks.
-- [ ] Author the five existing IDs into full templates and surface them in the builder gallery alongside the agent templates.
-- [ ] Add at least one acceptance test per template that runs the smoke pipeline end-to-end.
+Define the canonical Worker, WorkerVersion, WorkerDeployment, WorkerRun, WorkerCheckpoint, WorkerPolicy, and WorkerTrigger records. Keep the existing agent and workflow APIs readable while introducing explicit migration/projection boundaries.
 
-### 2. Integrations marketplace expansion
+### 2. Worker persistence and activation
 
-[`src/integration-marketplace.ts`](../src/integration-marketplace.ts) and the `integrations.tsx` view exist but the registry is small and integrations are mostly opaque from the workbench. Self-hosters need a clearer "here are the integrations available, here's how I configure and test one" flow.
+Support draft, validated, deployed, active, paused, and retired deployments. Only validated immutable versions can activate. Persist version provenance and idempotency keys.
 
-First step:
+### 3. Trigger adapters
 
-- [ ] Audit the current registry and write a short README of the schema in `src/integration-marketplace.ts`.
-- [ ] Add a per-integration setup-and-test panel in `web/src/workbench/views/integrations.tsx` with a connection-test button that proves credentials before saving them to the secrets vault.
-- [ ] Expand the registry with the integrations the existing agent templates already use (mailbox, webhook out, HTTP fetch, calendar).
+Normalize manual, cron, webhook, alert, and queue activations into a single activation envelope. Deduplicate repeated delivery and record the trigger source.
 
-### 3. Per-agent and per-workflow cost tracking
+### 4. Bounded supervisor loop
 
-Provider calls are already persisted — see [`src/provider-calls-read.ts`](../src/provider-calls-read.ts) — but the workbench has no rollup that answers "how much did this agent cost last week" or "which workflow is burning my Anthropic budget". With BYO keys this is a question every operator will eventually ask.
+Build the recoverable plan-act-evaluate loop around the existing agent runtime. Enforce maximum elapsed time, iterations, cost, tool permissions, and failure count. Require explicit success, pause, approval, budget-exhausted, cancelled, or failed terminal states.
 
-First step:
+### 5. Checkpoint and recovery
 
-- [ ] Add a server-side aggregator over `provider-calls-read` that groups by agent ID, workflow ID, and time bucket, with per-provider unit-cost configuration.
-- [ ] Surface the rollup in the agent detail and workflow detail views.
-- [ ] Add a workspace-level "Cost" tile to `operations.tsx` showing month-to-date totals by provider.
+Persist run cursor, working memory, completed actions, pending approvals, artifacts, and external-effect idempotency keys. Resume interrupted runs without replaying completed side effects.
 
-### 4. Tighter builder iteration UX
+## Next
 
-Scoped change prompts already exist, but the diff-and-preview cycle could be smoother — multi-file diffs are read-only, there's no compact "what did this prompt actually change" summary, and rolling back to a checkpoint is a few clicks more than it should be.
+### 6. Permission and attention controls
 
-First step:
+Move from whole-tool approval to verb/resource-scoped capabilities. Add pause, resume, stop, revoke, approve-once, approve-for-run, and escalation routing.
 
-- [ ] Group consecutive applies into a session in the builder timeline.
-- [ ] Replace the per-file diff modal with a multi-file diff view that supports per-hunk accept/revert.
-- [ ] Add a "rollback to this checkpoint" inline action on each timeline entry (the data is already persisted by the publish-history service).
+### 7. Worker health, cost, and evidence
 
-### 5. Operator-facing observability rollup
+Roll provider calls, queue health, checkpoints, retries, approvals, and outcomes up by worker and deployment. Make "what is running, why, at what cost, and what needs me" answerable from one screen.
 
-The pieces are all there — `OperationsStatus`, subsystem health, job-metrics snapshots, alert events, rolling per-type metrics. They surface as separate tiles. A self-hoster running Taskloom on one Hetzner box still has to read several tiles to answer "is this thing healthy right now".
+### 8. PacketADE handoff
 
-First step:
+Implement the versioned deployment contract in [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md): **Deploy to PacketAgent**, **Keep running**, update, inspect, pause, and revoke. Return progress and approval events to PacketADE.
 
-- [ ] Add a single "Health" header at the top of `operations.tsx` that summarises store, scheduler, access-log, jobs queue depth, and recent alerts into one green/amber/red verdict with a one-line reason.
-- [ ] Wire the same verdict into `GET /api/app/operations/status` so external monitoring can poll one endpoint.
+### 9. PacketChat and PacketPhone routes
 
-## Considered, deferred
+Send worker summaries and approval requests to conversation and mobile surfaces after the core lifecycle and policy model are stable.
 
-Items we have looked at and explicitly chosen not to do right now. Worth revisiting later or worth a discussion issue first.
+### 10. Integrations and worker templates
 
-- **Public draft preview / anonymous "try it before installing"**. A rate-limited unsigned-in `/builder` preview would shorten the funnel from "saw the README" to "drafted my first app". Out of scope for now — the product is self-hosted and the trust boundary for prompt-to-execute is much cleaner with a real account on a real workspace. Reconsider only if there is a local demo path that preserves that boundary.
-- **App / agent marketplace between workspaces**. Workspaces are isolated by design today. Sharing apps and agents across workspaces in a single node is plausible (one writer, multiple tenants); sharing across nodes is a much larger change that bumps into trust, signing, and update flow. Not worth designing until the in-node case is well-defined.
-- **More builder modes** (test-driven, schema-first, mockup-first). The current freeform-prompt-plus-scoped-iteration is doing the job. Revisit only if a real user workflow keeps tripping over it.
+Expand connectors and ship useful worker starters only after the runtime can execute them safely and recoverably.
+
+## Later
+
+- App template gallery and deeper prompt-to-app builder polish.
+- Cross-node worker package sharing and a signed template marketplace.
+- Advanced authoring modes such as schema-first or test-driven generation.
+- Multi-region active-active operation.
 
 ## Non-goals
 
-These are the things Taskloom is **not** going to become. Worth being explicit so contributors don't spend cycles proposing them.
+- Unbounded autonomous action or endless model loops.
+- Silent elevation of tool, credential, network, or filesystem access.
+- Hosted SaaS as a prerequisite for the self-hosted product.
+- Lock-in to one model provider.
+- Telemetry or phone-home behavior.
+- Closed-source services required for core operation.
 
-- **Hosted SaaS run by us.** Taskloom is self-hosted by design. We will not run a managed Taskloom service or accept hosting funding that would tie the project to a single operator.
-- **Active-active multi-region writes.** The supported topologies are single-node SQLite and managed-Postgres horizontal app writers. Active-active writes, regional failover orchestrated by Taskloom, and distributed SQLite are explicitly out of scope.
-- **Vendor lock-in to one model provider.** Multi-provider routing (Anthropic, OpenAI, MiniMax, Ollama) is a feature, not a placeholder for picking a winner. New providers should slot into the existing routing surface.
-- **Telemetry or phone-home.** No analytics, no anonymous usage pings, no "send error reports to us" toggle. Operators run this on their own infrastructure and that infrastructure stays theirs.
-- **Closed-source companion services.** Anything that ships as part of Taskloom is MIT and lives in the repo. No proprietary cloud add-ons.
+## Decision rule
 
-## How decisions are made
-
-The roadmap above is suggestive. Real priority comes from what self-hosters are filing issues about, what PRs are landing, and what the maintainers can actually keep tested and supported. If a track on this list has been quiet for a release or two, assume it has slipped down the list.
-
-The right place to push on priority, propose new tracks, or argue against a non-goal is the issue tracker:
-
-<https://github.com/packetloss404/taskloom/issues>
-
-For larger ideas, open a discussion-style issue first — describe the problem, the proposed shape of the solution, and what success looks like — before writing code. That is much more likely to land than a surprise PR.
+Near-term work should improve at least one of these properties: bounded, permissioned, resumable, auditable, observable, or easy to deploy from another Packet product. Builder-only polish does not outrank the Worker lifecycle unless it removes a direct blocker.

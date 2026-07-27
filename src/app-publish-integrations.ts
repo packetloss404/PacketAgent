@@ -151,7 +151,7 @@ interface CheckDraft {
 
 const PROVIDER_ENV_KEYS = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OLLAMA_BASE_URL"];
 const EMAIL_ENV_KEYS = ["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_TOKEN", "SMTP_URL"];
-const DATABASE_URL_ENV_KEYS = ["DATABASE_URL", "TASKLOOM_DATABASE_URL", "TASKLOOM_MANAGED_DATABASE_URL"];
+const DATABASE_URL_ENV_KEYS = ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"];
 const STRIPE_ENV_KEYS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"];
 const GITHUB_ENV_KEYS = ["GITHUB_TOKEN", "GH_TOKEN"];
 const SLACK_WEBHOOK_ENV_KEYS = ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET", "SLACK_WEBHOOK_URL"];
@@ -273,11 +273,11 @@ function buildConnectorReadiness(
       label: "Slack/webhook",
       feature: "Slack or webhook delivery",
       category: "webhook",
-      requiredSecrets: ["TASKLOOM_PUBLIC_APP_BASE_URL", "TASKLOOM_WEBHOOK_SIGNING_SECRET"],
+      requiredSecrets: ["PACKETAGENT_PUBLIC_APP_BASE_URL", "PACKETAGENT_WEBHOOK_SIGNING_SECRET"],
       inferredRequired: /\bslack\b/i.test(sourceText) || checkByCategory.get("webhook")?.required === true,
       inferredConfigured: (
-        (hasValue(input.webhook?.publicBaseUrl) || hasAnyEnv(env, ["TASKLOOM_PUBLIC_BASE_URL", "TASKLOOM_PUBLIC_APP_BASE_URL"]))
-        && (input.webhook?.signingSecretConfigured === true || hasValue(env.TASKLOOM_WEBHOOK_SIGNING_SECRET) || hasAnyEnv(env, SLACK_WEBHOOK_ENV_KEYS))
+        (hasValue(input.webhook?.publicBaseUrl) || hasAnyEnv(env, ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL"]))
+        && (input.webhook?.signingSecretConfigured === true || hasValue(env.PACKETAGENT_WEBHOOK_SIGNING_SECRET) || hasAnyEnv(env, SLACK_WEBHOOK_ENV_KEYS))
       ) || connectedConnectors.has("slack") || connectedConnectors.has("webhook"),
       setupGuide: ["Configure Slack/webhook credentials only for generated features that send or receive those events."],
     },
@@ -454,8 +454,8 @@ function webhookCheck(
 ): CheckDraft {
   const required = input.webhook?.required === true || /\bwebhook(s)?\b|\binbound event(s)?\b/i.test(sourceText);
   const publicBaseUrlReady = hasValue(input.webhook?.publicBaseUrl)
-    || hasAnyEnv(env, ["TASKLOOM_PUBLIC_BASE_URL", "TASKLOOM_PUBLIC_APP_BASE_URL"]);
-  const signingReady = input.webhook?.signingSecretConfigured === true || hasValue(env.TASKLOOM_WEBHOOK_SIGNING_SECRET);
+    || hasAnyEnv(env, ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL"]);
+  const signingReady = input.webhook?.signingSecretConfigured === true || hasValue(env.PACKETAGENT_WEBHOOK_SIGNING_SECRET);
 
   return {
     category: "webhook",
@@ -465,10 +465,10 @@ function webhookCheck(
       ["draft:webhook", /\bwebhook(s)?\b|\binbound event(s)?\b/i.test(sourceText)],
       ["input:webhook-required", input.webhook?.required === true],
     ]),
-    requiredSecrets: ["TASKLOOM_WEBHOOK_SIGNING_SECRET"],
+    requiredSecrets: ["PACKETAGENT_WEBHOOK_SIGNING_SECRET"],
     missingSetup: [
-      ...(!publicBaseUrlReady ? ["Set TASKLOOM_PUBLIC_APP_BASE_URL or TASKLOOM_PUBLIC_BASE_URL to the HTTPS origin providers will call."] : []),
-      ...(!signingReady ? ["Set TASKLOOM_WEBHOOK_SIGNING_SECRET before accepting signed inbound webhook events."] : []),
+      ...(!publicBaseUrlReady ? ["Set PACKETAGENT_PUBLIC_APP_BASE_URL or PACKETAGENT_PUBLIC_BASE_URL to the HTTPS origin providers will call."] : []),
+      ...(!signingReady ? ["Set PACKETAGENT_WEBHOOK_SIGNING_SECRET before accepting signed inbound webhook events."] : []),
     ],
     setupGuide: [
       "Register the published HTTPS webhook URL with the upstream provider after smoke checks pass.",
@@ -547,7 +547,7 @@ function databaseCheck(
   const required = input.database?.required === true
     || hasDataModels(input.draft)
     || /\bdatabase\b|\bpostgres\b|\bsql\b|\bcrud\b|\bschema\b|\btable(s)?\b|\bmigration(s)?\b|\bpersist(s|ed|ence)?\b|\bsave records\b/i.test(sourceText);
-  const store = normalizeText(input.database?.store ?? env.TASKLOOM_STORE);
+  const store = normalizeText(input.database?.store ?? env.PACKETAGENT_STORE);
   const hasDatabaseUrl = hasAnyEnv(env, DATABASE_URL_ENV_KEYS);
   const configured = input.database?.configured ?? (hasDatabaseUrl || Boolean(store && store !== "memory"));
   const migrationsReady = input.database?.migrationsReady;
@@ -576,7 +576,7 @@ function databaseCheck(
       ...(required && store === "file" ? ["File-backed storage is acceptable for one local instance, but use Postgres for multi-instance self-hosting."] : []),
     ],
     setupGuide: [
-      "Use TASKLOOM_STORE=postgres with DATABASE_URL or TASKLOOM_DATABASE_URL for durable self-hosted publish.",
+      "Use PACKETAGENT_STORE=postgres with DATABASE_URL or PACKETAGENT_DATABASE_URL for durable self-hosted publish.",
       "Run database migration and ready checks before shifting traffic.",
     ],
   };

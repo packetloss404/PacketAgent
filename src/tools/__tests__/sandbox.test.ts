@@ -7,7 +7,7 @@ import { createSandboxedShellTool } from "../sandbox.js";
 import { executeTool } from "../executor.js";
 
 function makeTempDir(): string {
-  return mkdtempSync(join(tmpdir(), "tl-sandbox-"));
+  return mkdtempSync(join(tmpdir(), "packetagent-sandbox-"));
 }
 
 test("rejects commands not on the allowlist", async () => {

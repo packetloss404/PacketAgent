@@ -87,10 +87,10 @@ import { tryFileTreeCodegen } from "./app-builder/filetree-draft.js";
  * working exactly as before.
  *
  * Env vars:
- *  - `TASKLOOM_LEGACY_TEMPLATES=1` is the opt-out / kill switch. When set,
+ *  - `PACKETAGENT_LEGACY_TEMPLATES=1` is the opt-out / kill switch. When set,
  *    the file-tree path is skipped entirely and behaviour is identical to
  *    the pre-Track-B version (structured-tool → template).
- *  - `TASKLOOM_FILETREE_CODEGEN=1` is preserved as a documented **no-op**
+ *  - `PACKETAGENT_FILETREE_CODEGEN=1` is preserved as a documented **no-op**
  *    for backward compatibility with installs that still set it. It used
  *    to be the opt-in flag for the file-tree path; since that path is now
  *    on by default, the flag is harmless.
@@ -101,10 +101,10 @@ export async function generateAppDraftWithLLM(
   emit?: AppDraftEmit,
 ): Promise<GenerateAppDraftResult> {
   // Default-on: try the file-tree path first unless the legacy escape
-  // hatch is explicitly set. `TASKLOOM_FILETREE_CODEGEN` is preserved as a
+  // hatch is explicitly set. `PACKETAGENT_FILETREE_CODEGEN` is preserved as a
   // no-op for backward compatibility with installs that set it; we only
-  // gate on the new `TASKLOOM_LEGACY_TEMPLATES` opt-out.
-  if (process.env.TASKLOOM_LEGACY_TEMPLATES !== "1") {
+  // gate on the new `PACKETAGENT_LEGACY_TEMPLATES` opt-out.
+  if (process.env.PACKETAGENT_LEGACY_TEMPLATES !== "1") {
     const filetree = await tryFileTreeCodegen(prompt, options, emit);
     if (filetree) return filetree;
     // Orchestrator returned null (no BYOK key, model declined, etc.) —

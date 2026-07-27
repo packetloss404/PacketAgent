@@ -94,7 +94,7 @@ test("each violation has a non-empty pattern and a snippet within 80 chars", () 
 });
 
 test("runValidatorCli returns 0 for a clean file", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-validator-"));
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-validator-"));
   const file = join(dir, "clean.log");
   writeFileSync(file, '{"ts":"2026-04-26T00:00:00Z","method":"GET","status":200,"path":"/api/health"}\n');
   const originalLog = console.log;
@@ -112,7 +112,7 @@ test("runValidatorCli returns 0 for a clean file", async () => {
 });
 
 test("runValidatorCli returns 1 for a file with violations", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-validator-"));
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-validator-"));
   const file = join(dir, "dirty.log");
   writeFileSync(file, "GET /share/raw-token-abc HTTP/1.1\n");
   const originalLog = console.log;

@@ -7,27 +7,27 @@ import { Hono, type Context } from "hono";
 
 type RuntimeModules = Awaited<ReturnType<typeof loadRuntimeModules>>;
 
-const SESSION_COOKIE_NAME = "taskloom_session";
+const SESSION_COOKIE_NAME = "packetagent_session";
 
 test("SQLite store preserves critical app behavior parity", async (t) => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-parity-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-parity-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
 
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
 
   t.after(() => {
-    restoreEnv("TASKLOOM_STORE", previousStore);
-    restoreEnv("TASKLOOM_DB_PATH", previousDbPath);
+    restoreEnv("PACKETAGENT_STORE", previousStore);
+    restoreEnv("PACKETAGENT_DB_PATH", previousDbPath);
     rmSync(tempDir, { recursive: true, force: true });
   });
 
   const modules = await loadRuntimeModules();
   modules.store.resetStoreForTests();
   if (!existsSync(dbPath)) {
-    t.skip("SQLite store runtime is not wired yet: expected TASKLOOM_STORE=sqlite to create TASKLOOM_DB_PATH");
+    t.skip("SQLite store runtime is not wired yet: expected PACKETAGENT_STORE=sqlite to create PACKETAGENT_DB_PATH");
     return;
   }
 
@@ -63,19 +63,19 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   await t.test("RBAC, member listing, and invitation acceptance match JSON behavior", async () => {
     resetSqliteStore(modules);
     const app = createTestApp(modules);
-    const alpha = modules.services.login({ email: "alpha@taskloom.local", password: "demo12345" });
-    const beta = modules.services.login({ email: "beta@taskloom.local", password: "demo12345" });
+    const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
+    const beta = modules.services.login({ email: "beta@packetagent.local", password: "demo12345" });
 
     setAlphaRole(modules, "admin");
     const created = await app.request("/api/app/invitations", {
       method: "POST",
       headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
-      body: JSON.stringify({ email: "Beta@Taskloom.Local", role: "member" }),
+      body: JSON.stringify({ email: "Beta@PacketAgent.Local", role: "member" }),
     });
     const createdBody = await created.json() as { invitation: { token: string; email: string; role: string; status: string } };
 
     assert.equal(created.status, 201);
-    assert.equal(createdBody.invitation.email, "beta@taskloom.local");
+    assert.equal(createdBody.invitation.email, "beta@packetagent.local");
     assert.equal(createdBody.invitation.role, "member");
     assert.equal(createdBody.invitation.status, "pending");
     assert.ok(createdBody.invitation.token);
@@ -146,7 +146,7 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   await t.test("jobs can be enqueued, listed, and canceled", async () => {
     resetSqliteStore(modules);
     const app = createTestApp(modules);
-    const alpha = modules.services.login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
 
     const created = await app.request("/api/app/jobs", {
       method: "POST",
@@ -176,7 +176,7 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   await t.test("agent creation and manual run basics persist", async () => {
     resetSqliteStore(modules);
     const app = createTestApp(modules);
-    const alpha = modules.services.login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
 
     const created = await app.request("/api/app/agents", {
       method: "POST",
@@ -209,7 +209,7 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   await t.test("share token lifecycle and public share reads persist", async () => {
     resetSqliteStore(modules);
     const app = createTestApp(modules);
-    const alpha = modules.services.login({ email: "alpha@taskloom.local", password: "demo12345" });
+    const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
 
     const created = await app.request("/api/app/share", {
       method: "POST",
@@ -248,47 +248,47 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
 });
 
 test("JSON default and SQLite opt-in keep indexed route behavior aligned", async (t) => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-indexed-routes-"));
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const previousInvitationEmailMode = process.env.TASKLOOM_INVITATION_EMAIL_MODE;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-indexed-routes-"));
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const previousInvitationEmailMode = process.env.PACKETAGENT_INVITATION_EMAIL_MODE;
 
   t.after(() => {
-    restoreEnv("TASKLOOM_STORE", previousStore);
-    restoreEnv("TASKLOOM_DB_PATH", previousDbPath);
-    restoreEnv("TASKLOOM_INVITATION_EMAIL_MODE", previousInvitationEmailMode);
+    restoreEnv("PACKETAGENT_STORE", previousStore);
+    restoreEnv("PACKETAGENT_DB_PATH", previousDbPath);
+    restoreEnv("PACKETAGENT_INVITATION_EMAIL_MODE", previousInvitationEmailMode);
     rmSync(tempDir, { recursive: true, force: true });
   });
 
   const modules = await loadRuntimeModules();
   const jsonResult = await runIndexedRouteScenario(modules, "json");
 
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = join(tempDir, "taskloom.sqlite");
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = join(tempDir, "packetagent.sqlite");
   const sqliteResult = await runIndexedRouteScenario(modules, "sqlite");
 
   assert.deepEqual(sqliteResult, jsonResult);
 });
 
 test("JSON default and SQLite opt-in keep invitation delivery skip mode aligned", async (t) => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-db-invitation-delivery-"));
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  const previousInvitationEmailMode = process.env.TASKLOOM_INVITATION_EMAIL_MODE;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-invitation-delivery-"));
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  const previousInvitationEmailMode = process.env.PACKETAGENT_INVITATION_EMAIL_MODE;
 
   t.after(() => {
-    restoreEnv("TASKLOOM_STORE", previousStore);
-    restoreEnv("TASKLOOM_DB_PATH", previousDbPath);
-    restoreEnv("TASKLOOM_INVITATION_EMAIL_MODE", previousInvitationEmailMode);
+    restoreEnv("PACKETAGENT_STORE", previousStore);
+    restoreEnv("PACKETAGENT_DB_PATH", previousDbPath);
+    restoreEnv("PACKETAGENT_INVITATION_EMAIL_MODE", previousInvitationEmailMode);
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  process.env.TASKLOOM_INVITATION_EMAIL_MODE = "skip";
+  process.env.PACKETAGENT_INVITATION_EMAIL_MODE = "skip";
   const modules = await loadRuntimeModules();
   const jsonResult = await runInvitationDeliveryModeScenario(modules, "json");
 
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = join(tempDir, "taskloom.sqlite");
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = join(tempDir, "packetagent.sqlite");
   const sqliteResult = await runInvitationDeliveryModeScenario(modules, "sqlite");
 
   assert.deepEqual(sqliteResult, jsonResult);
@@ -296,8 +296,8 @@ test("JSON default and SQLite opt-in keep invitation delivery skip mode aligned"
 
 async function loadRuntimeModules() {
   const [store, services, appRoutesModule, workflowRoutesModule, jobRoutesModule, shareRoutesModule, rbacModule] = await Promise.all([
-    import("./taskloom-store.js"),
-    import("./taskloom-services.js"),
+    import("./packetagent-store.js"),
+    import("./packetagent-services.js"),
     import("./app-routes.js"),
     import("./workflow-routes.js"),
     import("./job-routes.js"),
@@ -352,14 +352,14 @@ function resetSqliteStore(modules: RuntimeModules) {
 
 async function runIndexedRouteScenario(modules: RuntimeModules, label: string) {
   if (label === "json") {
-    delete process.env.TASKLOOM_STORE;
-    delete process.env.TASKLOOM_DB_PATH;
+    delete process.env.PACKETAGENT_STORE;
+    delete process.env.PACKETAGENT_DB_PATH;
   }
 
   modules.appRoutesModule.resetAppRouteSecurityForTests();
   modules.store.resetStoreForTests();
   const app = createTestApp(modules);
-  const alpha = modules.services.login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const session = await app.request("/api/auth/session", { headers: authHeaders(alpha.cookieValue) });
   const sessionBody = await session.json() as { authenticated: boolean; user: { email: string }; workspace: { id: string } };
@@ -438,7 +438,7 @@ async function runIndexedRouteScenario(modules: RuntimeModules, label: string) {
     const response = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json", "x-forwarded-for": rateLimitIp },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "wrong-password" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     rateLimitAttemptStatus = response.status;
   }
@@ -495,14 +495,14 @@ async function runIndexedRouteScenario(modules: RuntimeModules, label: string) {
 
 async function runInvitationDeliveryModeScenario(modules: RuntimeModules, label: string) {
   if (label === "json") {
-    delete process.env.TASKLOOM_STORE;
-    delete process.env.TASKLOOM_DB_PATH;
+    delete process.env.PACKETAGENT_STORE;
+    delete process.env.PACKETAGENT_DB_PATH;
   }
 
   modules.appRoutesModule.resetAppRouteSecurityForTests();
   modules.store.resetStoreForTests();
   const app = createTestApp(modules);
-  const alpha = modules.services.login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const created = await app.request("/api/app/invitations", {
     method: "POST",

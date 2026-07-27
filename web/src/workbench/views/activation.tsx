@@ -16,7 +16,7 @@ export function ActivationView() {
         <div className="kicker">ONBOARDING · STAGE: {stage.toUpperCase()}</div>
         <h1 className="h1" style={{ fontSize: 32, marginTop: 6 }}>Get to first value.</h1>
         <p style={{ fontSize: 14.5, color: "var(--silver-300)", marginTop: 6, marginBottom: 22 }}>
-          Taskloom flips a workspace to <span style={{ color: "var(--green)" }}>activated</span> after the team
+          PacketAgent flips a workspace to <span style={{ color: "var(--green)" }}>activated</span> after the team
           publishes an app and configures alerts. You're {pct}% of the way there.
         </p>
 

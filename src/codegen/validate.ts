@@ -12,11 +12,11 @@
  *
  * Each diagnostic is tagged with the phase that produced it, and the
  * `ValidationResult.phases` summary lets the caller see which phase ran and
- * which failed. The same `TASKLOOM_SANDBOX_SMOKE_ENABLED` env gate controls
+ * which failed. The same `PACKETAGENT_SANDBOX_SMOKE_ENABLED` env gate controls
  * both phases — when it is off, both phases short-circuit to "skipped".
  *
  * The validator is gated on the same env switch as the sandbox smoke pipeline
- * (`TASKLOOM_SANDBOX_SMOKE_ENABLED=1`). When the gate is off, or when the
+ * (`PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`). When the gate is off, or when the
  * sandbox cannot be spawned (e.g. the Windows ENOENT issue documented in
  * sandbox notes), `validateFileTree` returns `{ ok: true, source: "skipped" }`
  * so the surrounding codegen flow never blocks on a missing sandbox.
@@ -95,7 +95,7 @@ export interface ValidateOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000;
-const SMOKE_ENV_VAR = "TASKLOOM_SANDBOX_SMOKE_ENABLED";
+const SMOKE_ENV_VAR = "PACKETAGENT_SANDBOX_SMOKE_ENABLED";
 const LOG_PREFIX = "[codegen-validate]";
 
 /**
@@ -423,7 +423,7 @@ export async function validateFileTree(
   let workspaceDir: string | null = null;
 
   try {
-    workspaceDir = await mkdtemp(join(tmpdir(), "taskloom-codegen-"));
+    workspaceDir = await mkdtemp(join(tmpdir(), "packetagent-codegen-"));
 
     // Ensure a tsconfig exists.
     const treeWithConfig = hasRootTsconfig(files)

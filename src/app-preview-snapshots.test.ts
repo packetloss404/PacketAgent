@@ -142,7 +142,7 @@ test("rollback command and result expose stable command/result shapes", () => {
 
   assert.equal(command.kind, "preview-snapshot-rollback");
   assert.match(command.commandId, /^preview_rollback_[a-f0-9]{16}$/);
-  assert.equal(command.command, "taskloom preview rollback --workspace=alpha --app=gapp_booking --from-checkpoint=ckpt-bad --to-checkpoint=ckpt-good");
+  assert.equal(command.command, "packetagent preview rollback --workspace=alpha --app=gapp_booking --from-checkpoint=ckpt-bad --to-checkpoint=ckpt-good");
   assert.equal(command.requiresConfirmation, true);
   assert.equal(command.expectedResult.restoredCheckpointId, "ckpt-good");
   assert.equal(command.expectedResult.previewUrl, "http://localhost:5173/preview/booking");

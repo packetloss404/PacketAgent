@@ -17,8 +17,8 @@ import type {
  *
  * Returns null when the orchestrator declined (no BYOK key, model gave up,
  * etc.) so the caller can fall through to the existing structured-tool /
- * template paths. The legacy `TASKLOOM_FILETREE_CODEGEN=1` opt-in flag is
- * preserved as a no-op; the opt-out is `TASKLOOM_LEGACY_TEMPLATES=1`, which
+ * template paths. The legacy `PACKETAGENT_FILETREE_CODEGEN=1` opt-in flag is
+ * preserved as a no-op; the opt-out is `PACKETAGENT_LEGACY_TEMPLATES=1`, which
  * is handled in `generateAppDraftWithLLM` before this function is called.
  *
  * Note: this code path's runtime behaviour depends on the real B1 / B2 / B3

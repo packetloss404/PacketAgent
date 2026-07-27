@@ -10,7 +10,7 @@ import {
   type AgentRunsRepository,
   type AgentRunsRepositoryDeps,
 } from "./agent-runs-repo.js";
-import type { AgentRunRecord, TaskloomData } from "../taskloom-store.js";
+import type { AgentRunRecord, PacketAgentData } from "../packetagent-store.js";
 
 function makeRecord(overrides: Partial<AgentRunRecord> & { id: string }): AgentRunRecord {
   const record: AgentRunRecord = {
@@ -37,29 +37,29 @@ function makeRecord(overrides: Partial<AgentRunRecord> & { id: string }): AgentR
 }
 
 function makeJsonRepo(): AgentRunsRepository {
-  const data = { agentRuns: [] as AgentRunRecord[] } as unknown as TaskloomData;
+  const data = { agentRuns: [] as AgentRunRecord[] } as unknown as PacketAgentData;
   const deps: AgentRunsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonAgentRunsRepository(deps);
 }
 
 function withTempSqlite(testFn: (repo: AgentRunsRepository) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-agent-runs-repo-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-agent-runs-repo-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = sqliteAgentRunsRepository({ dbPath });
     testFn(repo);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 }
@@ -328,40 +328,40 @@ test("optional fields round-trip as undefined when omitted", () => {
 });
 
 test("createAgentRunsRepository returns json impl when env is unset", () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
-    const data = { agentRuns: [] as AgentRunRecord[] } as unknown as TaskloomData;
+    delete process.env.PACKETAGENT_STORE;
+    const data = { agentRuns: [] as AgentRunRecord[] } as unknown as PacketAgentData;
     const repo = createAgentRunsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     repo.upsert(makeRecord({ id: "run_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);
     assert.equal(data.agentRuns.length, 1);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
 test("createAgentRunsRepository returns sqlite impl when env requests it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-agent-runs-factory-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-agent-runs-factory-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = createAgentRunsRepository({ dbPath });
     repo.upsert(makeRecord({ id: "run_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);
     assert.equal(repo.list("ws_a")[0]?.id, "run_1");
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 });

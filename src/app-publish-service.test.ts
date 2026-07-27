@@ -199,18 +199,18 @@ test("deriveProductionBuildStatus defaults to a pending production build gate", 
 test("derivePublishArtifactStatus records manifest details for concrete bundle handoff", () => {
   const build = deriveProductionBuildStatus({
     phase: "passed",
-    expectedArtifacts: ["web/dist", "exports/taskloom/alpha/booking/bundle"],
+    expectedArtifacts: ["web/dist", "exports/packetagent/alpha/booking/bundle"],
   });
   const status = derivePublishArtifactStatus({
-    manifestPath: "exports/taskloom/alpha/booking/publish-artifacts.json",
+    manifestPath: "exports/packetagent/alpha/booking/publish-artifacts.json",
     artifacts: [
-      { path: "exports\\taskloom\\alpha\\booking\\bundle\\", kind: "generated_bundle", source: "generated_draft", bytes: 2048 },
+      { path: "exports\\packetagent\\alpha\\booking\\bundle\\", kind: "generated_bundle", source: "generated_draft", bytes: 2048 },
       { path: "web/dist", kind: "build_output", source: "build" },
     ],
   }, build);
 
   assert.equal(status.status, "pass");
-  assert.equal(status.manifestPath, "exports/taskloom/alpha/booking/publish-artifacts.json");
-  assert.deepEqual(status.expectedArtifacts, ["exports/taskloom/alpha/booking/bundle", "web/dist"]);
+  assert.equal(status.manifestPath, "exports/packetagent/alpha/booking/publish-artifacts.json");
+  assert.deepEqual(status.expectedArtifacts, ["exports/packetagent/alpha/booking/bundle", "web/dist"]);
   assert.equal(status.observedArtifacts.find((artifact) => artifact.kind === "generated_bundle")?.bytes, 2048);
 });

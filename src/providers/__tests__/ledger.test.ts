@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { clearStoreCacheForTests, resetStoreForTests, loadStore, mutateStore, type ProviderCallRecord } from "../../taskloom-store.js";
+import { clearStoreCacheForTests, resetStoreForTests, loadStore, mutateStore, type ProviderCallRecord } from "../../packetagent-store.js";
 import {
   listProviderCalls,
   listProviderCallsAsync,
@@ -143,21 +143,21 @@ test("async provider usage readers mirror sync summaries", async () => {
 });
 
 async function withSqliteLedgerStore(testFn: (dbPath: string) => Promise<void>): Promise<void> {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-ledger-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-ledger-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
   try {
-    process.env.TASKLOOM_STORE = "sqlite";
-    process.env.TASKLOOM_DB_PATH = dbPath;
+    process.env.PACKETAGENT_STORE = "sqlite";
+    process.env.PACKETAGENT_DB_PATH = dbPath;
     clearStoreCacheForTests();
     resetStoreForTests();
     await testFn(dbPath);
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     clearStoreCacheForTests();
     rmSync(tempDir, { recursive: true, force: true });
   }

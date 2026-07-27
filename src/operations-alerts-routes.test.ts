@@ -3,8 +3,8 @@ import test from "node:test";
 import { Hono } from "hono";
 import { SESSION_COOKIE_NAME } from "./auth-utils.js";
 import { operationsAlertsRoutes } from "./operations-alerts-routes.js";
-import { login } from "./taskloom-services.js";
-import { mutateStore, resetStoreForTests } from "./taskloom-store.js";
+import { login } from "./packetagent-services.js";
+import { mutateStore, resetStoreForTests } from "./packetagent-store.js";
 
 function createApp() {
   const app = new Hono();
@@ -59,7 +59,7 @@ test("operations alerts rejects unauthenticated requests", async () => {
 
 test("operations alerts rejects members below admin role", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
     const membership = data.memberships.find(
       (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
@@ -79,7 +79,7 @@ test("operations alerts rejects members below admin role", async () => {
 
 test("operations alerts returns empty array when none exist", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createApp();
 
   const response = await app.request("/api/app/operations/alerts", {
@@ -94,7 +94,7 @@ test("operations alerts returns empty array when none exist", async () => {
 
 test("operations alerts returns alerts ordered descending by observedAt", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   seedAlerts([
     { id: "a_1", observedAt: "2026-04-19T10:00:00.000Z" },
     { id: "a_2", observedAt: "2026-04-21T10:00:00.000Z" },
@@ -114,7 +114,7 @@ test("operations alerts returns alerts ordered descending by observedAt", async 
 
 test("operations alerts filters by severity", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   seedAlerts([
     { id: "a_warn", severity: "warning", observedAt: "2026-04-19T10:00:00.000Z" },
     { id: "a_crit", severity: "critical", observedAt: "2026-04-20T10:00:00.000Z" },
@@ -133,7 +133,7 @@ test("operations alerts filters by severity", async () => {
 
 test("operations alerts rejects invalid severity with 400", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createApp();
 
   const response = await app.request("/api/app/operations/alerts?severity=banana", {
@@ -146,7 +146,7 @@ test("operations alerts rejects invalid severity with 400", async () => {
 
 test("operations alerts rejects invalid since with 400", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createApp();
 
   const response = await app.request("/api/app/operations/alerts?since=not-a-date", {
@@ -159,7 +159,7 @@ test("operations alerts rejects invalid since with 400", async () => {
 
 test("operations alerts rejects invalid until with 400", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createApp();
 
   const response = await app.request("/api/app/operations/alerts?until=junk", {
@@ -172,7 +172,7 @@ test("operations alerts rejects invalid until with 400", async () => {
 
 test("operations alerts caps response with limit", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   seedAlerts([
     { id: "a_1", observedAt: "2026-04-18T00:00:00.000Z" },
     { id: "a_2", observedAt: "2026-04-19T00:00:00.000Z" },

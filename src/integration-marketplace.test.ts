@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildIntegrationMarketplace } from "./integration-marketplace";
-import type { IntegrationReadinessSummary } from "./taskloom-services";
+import type { IntegrationReadinessSummary } from "./packetagent-services";
 
 const baseReadiness: IntegrationReadinessSummary = {
   status: "needs_setup",
@@ -72,8 +72,8 @@ test("integration marketplace marks configured providers, tools, payments, and d
       GITHUB_WEBHOOK_SECRET: "github-secret",
       STRIPE_SECRET_KEY: "sk_stripe",
       STRIPE_WEBHOOK_SECRET: "whsec_stripe",
-      DATABASE_URL: "postgres://taskloom:secret@example.test/taskloom",
-      TASKLOOM_STORE: "postgres",
+      DATABASE_URL: "postgres://packetagent:secret@example.test/packetagent",
+      PACKETAGENT_STORE: "postgres",
     },
   });
 
@@ -84,7 +84,7 @@ test("integration marketplace marks configured providers, tools, payments, and d
   assert.equal(byId["stripe-payments"].readiness.status, "ready");
   assert.equal(byId.database.readiness.status, "ready");
   assert.ok(marketplace.totals.ready >= 9);
-  assert.equal(JSON.stringify(marketplace).includes("postgres://taskloom:secret"), false);
+  assert.equal(JSON.stringify(marketplace).includes("postgres://packetagent:secret"), false);
   assert.equal(JSON.stringify(marketplace).includes("sk-test-secret"), false);
 });
 

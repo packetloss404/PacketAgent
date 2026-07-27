@@ -20,7 +20,7 @@ import type {
   JobRecord,
   JobStatus,
   ProviderCallRecord,
-  TaskloomData,
+  PacketAgentData,
 } from "./types.js";
 
 // LEAF module: dedicated relational table load/persist for the sqlite backend.
@@ -38,7 +38,7 @@ export type DedicatedRelationalCollectionKey =
   | "providerCalls"
   | "activationSignals";
 
-export type DedicatedRelationalCollections = Pick<TaskloomData, DedicatedRelationalCollectionKey>;
+export type DedicatedRelationalCollections = Pick<PacketAgentData, DedicatedRelationalCollectionKey>;
 
 // Structural mirror of the barrel's ActivationSignalUpsertInput; kept local so
 // this leaf module never imports the barrel. Only the fields read by the
@@ -60,7 +60,7 @@ export function loadDedicatedRelationalCollections(db: DatabaseSync): DedicatedR
 }
 
 export function mergeDedicatedRelationalCollections(
-  partial: Partial<TaskloomData>,
+  partial: Partial<PacketAgentData>,
   dedicatedCollections: DedicatedRelationalCollections,
 ): void {
   for (const collection of Object.keys(dedicatedCollections) as DedicatedRelationalCollectionKey[]) {
@@ -353,7 +353,7 @@ function loadDedicatedActivationSignals(db: DatabaseSync): ActivationSignalRecor
   return rows.map(activationSignalRowToRecord);
 }
 
-export function persistDedicatedRelationalRows(db: DatabaseSync, data: TaskloomData): void {
+export function persistDedicatedRelationalRows(db: DatabaseSync, data: PacketAgentData): void {
   persistDedicatedJobMetricSnapshots(db, data.jobMetricSnapshots ?? []);
   persistDedicatedAlertEvents(db, data.alertEvents ?? []);
   persistDedicatedAgentRuns(db, data.agentRuns ?? []);

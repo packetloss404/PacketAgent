@@ -89,7 +89,7 @@ import type {
 import { pushExternalToast } from "@/context/ToastContext";
 
 let lastAuthToastAt = 0;
-const CSRF_COOKIE_NAME = "taskloom_csrf";
+const CSRF_COOKIE_NAME = "packetagent_csrf";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 
 type BuilderModelRoutingPresetPayload = {

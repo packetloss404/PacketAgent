@@ -3,9 +3,9 @@ import test from "node:test";
 import { reconcileInvitationEmails } from "./reconcile-invitation-emails.js";
 import type {
   InvitationEmailDeliveryRecord,
-  TaskloomData,
+  PacketAgentData,
   WorkspaceInvitationRecord,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 import type {
   InvitationEmailReconciliationInput,
   InvitationEmailReconciliationResult,
@@ -200,17 +200,17 @@ interface StoreSeed {
   invitations: WorkspaceInvitationRecord[];
 }
 
-function makeStore(seed: StoreSeed): TaskloomData {
+function makeStore(seed: StoreSeed): PacketAgentData {
   return {
     invitationEmailDeliveries: seed.deliveries,
     workspaceInvitations: seed.invitations,
-  } as unknown as TaskloomData;
+  } as unknown as PacketAgentData;
 }
 
-function makeDeps(data: TaskloomData) {
+function makeDeps(data: PacketAgentData) {
   return {
     loadStore: () => data,
-    mutateStore: <T>(mutator: (data: TaskloomData) => T): T => mutator(data),
+    mutateStore: <T>(mutator: (data: PacketAgentData) => T): T => mutator(data),
   };
 }
 

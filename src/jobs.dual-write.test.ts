@@ -14,7 +14,7 @@ import {
   sweepStaleRunningJobs,
   updateJob,
 } from "./jobs/store.js";
-import { clearStoreCacheForTests, loadStore, resetStoreForTests, type AgentRecord, type JobRecord } from "./taskloom-store.js";
+import { clearStoreCacheForTests, loadStore, resetStoreForTests, type AgentRecord, type JobRecord } from "./packetagent-store.js";
 
 interface JobRow {
   id: string;
@@ -69,16 +69,16 @@ function findDedicatedJob(dbPath: string, id: string): JobRow | null {
 }
 
 function withSqliteEnv(dbPath: string) {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   clearStoreCacheForTests();
   return () => {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     clearStoreCacheForTests();
   };
 }
@@ -181,8 +181,8 @@ function makeAgent(overrides: Partial<AgentRecord> & { id: string }): AgentRecor
 }
 
 test("enqueueJob writes the dedicated jobs table in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -207,8 +207,8 @@ test("enqueueJob writes the dedicated jobs table in SQLite mode", () => {
 });
 
 test("updateJob writes the updated record to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -232,8 +232,8 @@ test("updateJob writes the updated record to the dedicated table", () => {
 });
 
 test("cancelJob writes the canceled record to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -258,8 +258,8 @@ test("cancelJob writes the canceled record to the dedicated table", () => {
 });
 
 test("claimNextJob claims a jobs-table-only row in SQLite mode", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -310,8 +310,8 @@ test("claimNextJob claims a jobs-table-only row in SQLite mode", async () => {
 });
 
 test("sweepStaleRunningJobs sweeps jobs-table-only rows in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -387,8 +387,8 @@ test("sweepStaleRunningJobs sweeps jobs-table-only rows in SQLite mode", () => {
 });
 
 test("enqueueRecurringJob writes a non-scheduled-agent job to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -418,8 +418,8 @@ test("enqueueRecurringJob writes a non-scheduled-agent job to the dedicated tabl
 });
 
 test("enqueueRecurringJob writes a scheduled agent job and any cancelled stale entries", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -458,8 +458,8 @@ test("enqueueRecurringJob writes a scheduled agent job and any cancelled stale e
 });
 
 test("maintainScheduledAgentJobs writes maintained records to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -485,8 +485,8 @@ test("maintainScheduledAgentJobs writes maintained records to the dedicated tabl
 });
 
 test("maintainScheduledAgentJobs writes cancellations of stale scheduled jobs to the dedicated table", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -523,15 +523,15 @@ test("maintainScheduledAgentJobs writes cancellations of stale scheduled jobs to
 });
 
 test("enqueueJob does not touch the dedicated jobs table in JSON-default mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-jobs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  delete process.env.TASKLOOM_STORE;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  delete process.env.PACKETAGENT_STORE;
   // Point the SQLite path at our temp DB so any accidental writes would land there
-  // and we can detect them; with TASKLOOM_STORE unset, JSON mode should not open this DB.
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  // and we can detect them; with PACKETAGENT_STORE unset, JSON mode should not open this DB.
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   clearStoreCacheForTests();
   resetStoreForTests();
   try {
@@ -545,10 +545,10 @@ test("enqueueJob does not touch the dedicated jobs table in JSON-default mode", 
     const after = readDedicatedJobs(dbPath);
     assert.equal(after.length, before.length, "dedicated table must remain unchanged in JSON mode");
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     clearStoreCacheForTests();
     resetStoreForTests();
     rmSync(tempDir, { recursive: true, force: true });

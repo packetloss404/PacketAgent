@@ -12,9 +12,9 @@ import {
   resolveManagedPostgresConfig,
 } from "./postgres-client.js";
 
-const managedUrl = "postgres://taskloom:super-secret@db.example.com:5432/taskloom";
-const taskloomUrl = "postgres://taskloom:taskloom-secret@taskloom.internal/taskloom";
-const databaseUrl = "postgres://taskloom:database-secret@database.internal/taskloom";
+const managedUrl = "postgres://packetagent:super-secret@db.example.com:5432/packetagent";
+const packetagentUrl = "postgres://packetagent:packetagent-secret@packetagent.internal/packetagent";
+const databaseUrl = "postgres://packetagent:database-secret@database.internal/packetagent";
 
 class FakePool implements ManagedPostgresPool {
   static instances: FakePool[] = [];
@@ -77,31 +77,31 @@ afterEach(async () => {
 
 test("resolves managed Postgres URL using the documented env priority", () => {
   const config = resolveManagedPostgresConfig({
-    TASKLOOM_MANAGED_DATABASE_URL: ` ${managedUrl} `,
-    TASKLOOM_DATABASE_URL: taskloomUrl,
+    PACKETAGENT_MANAGED_DATABASE_URL: ` ${managedUrl} `,
+    PACKETAGENT_DATABASE_URL: packetagentUrl,
     DATABASE_URL: databaseUrl,
   });
 
   assert.equal(config.configured, true);
-  assert.equal(config.source, "TASKLOOM_MANAGED_DATABASE_URL");
+  assert.equal(config.source, "PACKETAGENT_MANAGED_DATABASE_URL");
   assert.equal(config.connectionString, managedUrl);
   assert.equal(config.redactedConnectionString, "[redacted]");
-  assert.equal(config.summary, "Managed Postgres is configured from TASKLOOM_MANAGED_DATABASE_URL ([redacted]).");
+  assert.equal(config.summary, "Managed Postgres is configured from PACKETAGENT_MANAGED_DATABASE_URL ([redacted]).");
   assert.equal(config.summary.includes("super-secret"), false);
   assert.equal(config.summary.includes("db.example.com"), false);
 });
 
-test("falls back to TASKLOOM_DATABASE_URL before DATABASE_URL", () => {
+test("falls back to PACKETAGENT_DATABASE_URL before DATABASE_URL", () => {
   const config = resolveManagedPostgresConfig({
-    TASKLOOM_MANAGED_DATABASE_URL: " ",
-    TASKLOOM_DATABASE_URL: taskloomUrl,
+    PACKETAGENT_MANAGED_DATABASE_URL: " ",
+    PACKETAGENT_DATABASE_URL: packetagentUrl,
     DATABASE_URL: databaseUrl,
   });
 
   assert.equal(config.configured, true);
-  assert.equal(config.source, "TASKLOOM_DATABASE_URL");
-  assert.equal(config.connectionString, taskloomUrl);
-  assert.equal(config.summary.includes("taskloom-secret"), false);
+  assert.equal(config.source, "PACKETAGENT_DATABASE_URL");
+  assert.equal(config.connectionString, packetagentUrl);
+  assert.equal(config.summary.includes("packetagent-secret"), false);
 });
 
 test("reports an unconfigured client without constructing a Pool", () => {
@@ -118,7 +118,7 @@ test("reports an unconfigured client without constructing a Pool", () => {
 test("constructs a Pool only when the pool helper is called", () => {
   const pool = createManagedPostgresPool({
     env: { DATABASE_URL: databaseUrl },
-    poolConfig: { max: 4, application_name: "taskloom-test" },
+    poolConfig: { max: 4, application_name: "packetagent-test" },
     PoolCtor: FakePool,
   });
 
@@ -126,12 +126,12 @@ test("constructs a Pool only when the pool helper is called", () => {
   assert.equal(FakePool.instances.length, 1);
   assert.equal(FakePool.instances[0]?.poolConfig.connectionString, databaseUrl);
   assert.equal(FakePool.instances[0]?.poolConfig.max, 4);
-  assert.equal(FakePool.instances[0]?.poolConfig.application_name, "taskloom-test");
+  assert.equal(FakePool.instances[0]?.poolConfig.application_name, "packetagent-test");
 });
 
 test("client forwards query, connect, and close to the underlying pool", async () => {
   const client = createManagedPostgresClient({
-    env: { TASKLOOM_MANAGED_DATABASE_URL: managedUrl },
+    env: { PACKETAGENT_MANAGED_DATABASE_URL: managedUrl },
     PoolCtor: FakePool,
   });
 
@@ -141,7 +141,7 @@ test("client forwards query, connect, and close to the underlying pool", async (
   await client.close();
 
   const pool = FakePool.instances[0];
-  assert.equal(client.config.source, "TASKLOOM_MANAGED_DATABASE_URL");
+  assert.equal(client.config.source, "PACKETAGENT_MANAGED_DATABASE_URL");
   assert.equal(result.rows[0]?.ok, true);
   assert.deepEqual(pool?.queries, [{ queryTextOrConfig: "select $1::text as value", values: ["ready"] }]);
   assert.equal(pool?.clients[0]?.released, true);
@@ -150,11 +150,11 @@ test("client forwards query, connect, and close to the underlying pool", async (
 
 test("shared pool helper reuses and closes the lazily-created Pool", async () => {
   const first = getManagedPostgresPool({
-    env: { TASKLOOM_MANAGED_DATABASE_URL: managedUrl },
+    env: { PACKETAGENT_MANAGED_DATABASE_URL: managedUrl },
     PoolCtor: FakePool,
   });
   const second = getManagedPostgresPool({
-    env: { TASKLOOM_MANAGED_DATABASE_URL: taskloomUrl },
+    env: { PACKETAGENT_MANAGED_DATABASE_URL: packetagentUrl },
     PoolCtor: FakePool,
   });
 

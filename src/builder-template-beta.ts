@@ -3,7 +3,7 @@ import {
   type AppDraft,
   type AppDraftTemplateId,
 } from "./app-builder-service";
-import { generateAgentDraftFromPrompt, type AgentDraft } from "./taskloom-services";
+import { generateAgentDraftFromPrompt, type AgentDraft } from "./packetagent-services";
 
 export type BuilderTemplateBetaCategory =
   | "sales_crm"

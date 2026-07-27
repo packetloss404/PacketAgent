@@ -8,10 +8,10 @@ import {
   createAlertEventsRepository,
   jsonAlertEventsRepository,
 } from "../repositories/alert-events-repo.js";
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 
-function makeStore(records: AlertEventRecord[] = []): TaskloomData {
-  return { alertEvents: [...records] } as unknown as TaskloomData;
+function makeStore(records: AlertEventRecord[] = []): PacketAgentData {
+  return { alertEvents: [...records] } as unknown as PacketAgentData;
 }
 
 function makeRecord(
@@ -34,19 +34,19 @@ function makeRecord(
 }
 
 function withTempSqlite<T>(fn: (dbPath: string) => T): T {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-alert-events-read-parity-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-alert-events-read-parity-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     return fn(dbPath);
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
     rmSync(tempDir, { recursive: true, force: true });
   }
 }
@@ -137,7 +137,7 @@ test("listAlerts can be backed directly by an injected repository instance", () 
   );
 });
 
-test("listAlerts reads from the SQLite repository when TASKLOOM_STORE=sqlite", () => {
+test("listAlerts reads from the SQLite repository when PACKETAGENT_STORE=sqlite", () => {
   withTempSqlite((dbPath) => {
     const seedRecords: AlertEventRecord[] = [
       makeRecord({ id: "sqlite_a", severity: "warning", observedAt: "2026-04-26T01:00:00.000Z" }),

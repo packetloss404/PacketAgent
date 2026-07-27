@@ -1,11 +1,11 @@
 import { now } from "./auth-utils";
-import { createInvitationEmailDelivery, type InvitationEmailDeliveryRecord, type TaskloomData } from "./taskloom-store";
+import { createInvitationEmailDelivery, type InvitationEmailDeliveryRecord, type PacketAgentData } from "./packetagent-store";
 import {
   LOCAL_INVITATION_EMAIL_PROVIDER,
   resolveInvitationEmailMode,
   resolveInvitationEmailWebhookConfig,
-  TASKLOOM_INVITATION_EMAIL_MODE_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV,
+  PACKETAGENT_INVITATION_EMAIL_MODE_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV,
 } from "./invitation-email";
 import { redactedErrorMessage } from "./security/redaction.js";
 
@@ -44,14 +44,14 @@ let fetchForTests: InvitationEmailFetch | null = null;
 let recordsForTests: InvitationEmailDeliveryTestRecord[] = [];
 
 export async function deliverInvitationEmail(
-  data: TaskloomData,
+  data: PacketAgentData,
   request: InvitationEmailDeliveryRequest,
   timestamp = now(),
 ): Promise<InvitationEmailDeliveryResult> {
   const mode = resolveInvitationEmailMode();
   const skipped = mode === "skip";
   let status: InvitationEmailDeliveryRecord["status"] = skipped ? "skipped" : "sent";
-  let error: string | undefined = skipped ? `${TASKLOOM_INVITATION_EMAIL_MODE_ENV}=skip` : undefined;
+  let error: string | undefined = skipped ? `${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=skip` : undefined;
   let provider = LOCAL_INVITATION_EMAIL_PROVIDER;
 
   if (!skipped) {
@@ -117,7 +117,7 @@ async function sendInvitationEmailWebhook(
   webhook: ReturnType<typeof resolveInvitationEmailWebhookConfig>,
   fetchImplementation: InvitationEmailFetch,
 ): Promise<void> {
-  if (!webhook.url) throw new Error(`${TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV} is required when ${TASKLOOM_INVITATION_EMAIL_MODE_ENV}=webhook`);
+  if (!webhook.url) throw new Error(`${PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV} is required when ${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=webhook`);
 
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (webhook.secret) headers[webhook.secretHeader] = webhook.secret;

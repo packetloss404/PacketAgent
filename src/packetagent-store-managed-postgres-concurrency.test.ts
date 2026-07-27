@@ -8,15 +8,15 @@ import {
   type ManagedPostgresStoreClientConfig,
   type ManagedPostgresStoreQueryClient,
   type ManagedPostgresStoreQueryResult,
-  type TaskloomData,
+  type PacketAgentData,
   upsertRequirement,
-} from "./taskloom-store";
+} from "./packetagent-store";
 
 const STORE_ENV_KEYS = [
-  "TASKLOOM_STORE",
+  "PACKETAGENT_STORE",
   "DATABASE_URL",
-  "TASKLOOM_DATABASE_URL",
-  "TASKLOOM_MANAGED_DATABASE_URL",
+  "PACKETAGENT_DATABASE_URL",
+  "PACKETAGENT_MANAGED_DATABASE_URL",
 ] as const;
 
 type StoreEnvKey = (typeof STORE_ENV_KEYS)[number];
@@ -92,7 +92,7 @@ class SharedManagedPostgresDocument {
   payloadJson = JSON.stringify(createSeedStore());
   readonly events: ClientEvent[] = [];
   readonly queries: QueryLog[] = [];
-  readonly persistedPayloads: TaskloomData[] = [];
+  readonly persistedPayloads: PacketAgentData[] = [];
   blockedOnRowLock: (() => void) | null = null;
   failNextPersistWith: Error | null = null;
   private rowLockOwner: string | null = null;
@@ -133,7 +133,7 @@ class ConcurrentManagedPostgresClient implements ManagedPostgresStoreQueryClient
     this.document.queries.push({ clientId: this.id, sql, params });
     const normalized = normalizedSql(sql);
 
-    if (normalized.startsWith("create table if not exists taskloom_document_store")) {
+    if (normalized.startsWith("create table if not exists packetagent_document_store")) {
       return { rows: [] };
     }
 
@@ -151,7 +151,7 @@ class ConcurrentManagedPostgresClient implements ManagedPostgresStoreQueryClient
       return { rows: [] };
     }
 
-    if (normalized.startsWith("select payload from taskloom_document_store")) {
+    if (normalized.startsWith("select payload from packetagent_document_store")) {
       if (normalized.includes("for update")) {
         assert.equal(this.inTransaction, true, "row lock must be taken inside the transaction");
         assert.equal(this.advisoryLocked, true, "row lock must be taken after the advisory transaction lock");
@@ -166,7 +166,7 @@ class ConcurrentManagedPostgresClient implements ManagedPostgresStoreQueryClient
       };
     }
 
-    if (normalized.startsWith("insert into taskloom_document_store")) {
+    if (normalized.startsWith("insert into packetagent_document_store")) {
       assert.equal(this.inTransaction, true, "persist must use the transaction client");
       assert.equal(this.rowLocked, true, "persist must happen after the row is locked for update");
       if (this.document.failNextPersistWith) {
@@ -175,7 +175,7 @@ class ConcurrentManagedPostgresClient implements ManagedPostgresStoreQueryClient
         throw error;
       }
       this.document.payloadJson = String(params[3]);
-      this.document.persistedPayloads.push(JSON.parse(this.document.payloadJson) as TaskloomData);
+      this.document.persistedPayloads.push(JSON.parse(this.document.payloadJson) as PacketAgentData);
       this.document.events.push({ clientId: this.id, event: "persist" });
       return { rows: [] };
     }
@@ -217,7 +217,7 @@ function createClientFactory(document: SharedManagedPostgresDocument): () => Con
   };
 }
 
-function requirementIds(data: TaskloomData): string[] {
+function requirementIds(data: PacketAgentData): string[] {
   return data.requirements.map((entry) => entry.id);
 }
 
@@ -230,8 +230,8 @@ test("managed Postgres mutations serialize horizontal writers behind advisory an
   document.blockedOnRowLock = () => secondBlockedOnRowLock.resolve();
 
   await withManagedPostgresEnv({
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, createClient, async () => {
     const firstWrite = mutateStoreAsync(async (data) => {
       firstEnteredMutator.resolve();
@@ -266,7 +266,7 @@ test("managed Postgres mutations serialize horizontal writers behind advisory an
     ]);
   });
 
-  const storedIds = requirementIds(JSON.parse(document.payloadJson) as TaskloomData);
+  const storedIds = requirementIds(JSON.parse(document.payloadJson) as PacketAgentData);
   assert.equal(storedIds.includes("req_phase62_first_horizontal_writer"), true);
   assert.equal(storedIds.includes("req_phase62_second_horizontal_writer"), true);
 
@@ -281,8 +281,8 @@ test("managed Postgres rollback releases the transaction client after a failed h
   const createClient = createClientFactory(document);
 
   await withManagedPostgresEnv({
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, createClient, async () => {
     await assert.rejects(
       mutateStoreAsync((data) => {
@@ -300,7 +300,7 @@ test("managed Postgres rollback releases the transaction client after a failed h
     );
   });
 
-  const storedIds = requirementIds(JSON.parse(document.payloadJson) as TaskloomData);
+  const storedIds = requirementIds(JSON.parse(document.payloadJson) as PacketAgentData);
   assert.equal(storedIds.includes("req_phase62_rolled_back_horizontal_writer"), false);
   assert.deepEqual(document.events.map((entry) => entry.event), [
     "begin",
@@ -318,8 +318,8 @@ test("managed Postgres retries retryable transaction conflicts without duplicati
   let mutatorCalls = 0;
 
   await withManagedPostgresEnv({
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, createClient, async () => {
     const requirementId = await mutateStoreAsync((data) => {
       mutatorCalls += 1;
@@ -336,7 +336,7 @@ test("managed Postgres retries retryable transaction conflicts without duplicati
     assert.equal(requirementId, "req_phase62_retryable_conflict");
   });
 
-  const storedIds = requirementIds(JSON.parse(document.payloadJson) as TaskloomData);
+  const storedIds = requirementIds(JSON.parse(document.payloadJson) as PacketAgentData);
   assert.equal(mutatorCalls, 2);
   assert.equal(storedIds.filter((id) => id === "req_phase62_retryable_conflict").length, 1);
   assert.equal(document.persistedPayloads.length, 1);

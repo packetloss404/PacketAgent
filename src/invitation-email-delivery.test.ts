@@ -3,14 +3,14 @@ import test from "node:test";
 import { deliverInvitationEmail, resetInvitationEmailDeliveryForTests, setInvitationEmailFetchForTests, type InvitationEmailDeliveryRequest } from "./invitation-email-delivery";
 import {
   DEFAULT_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS,
-  TASKLOOM_INVITATION_EMAIL_MODE_ENV,
-  TASKLOOM_INVITATION_EMAIL_PROVIDER_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_SECRET_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_SECRET_HEADER_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV,
+  PACKETAGENT_INVITATION_EMAIL_MODE_ENV,
+  PACKETAGENT_INVITATION_EMAIL_PROVIDER_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_SECRET_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_SECRET_HEADER_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV,
 } from "./invitation-email";
-import { resetStoreForTests, type TaskloomData } from "./taskloom-store";
+import { resetStoreForTests, type PacketAgentData } from "./packetagent-store";
 
 const invitationRequest: InvitationEmailDeliveryRequest = {
   workspaceId: "alpha",
@@ -18,20 +18,20 @@ const invitationRequest: InvitationEmailDeliveryRequest = {
   invitationId: "invite_phase_13",
   email: "Invitee@Example.Com",
   token: "invite-phase-13-token",
-  subject: "You're invited to Alpha Workspace on Taskloom",
+  subject: "You're invited to Alpha Workspace on PacketAgent",
   action: "create",
 };
 
 const invitationEmailEnvVars = [
-  TASKLOOM_INVITATION_EMAIL_MODE_ENV,
-  TASKLOOM_INVITATION_EMAIL_PROVIDER_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_SECRET_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_SECRET_HEADER_ENV,
-  TASKLOOM_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV,
+  PACKETAGENT_INVITATION_EMAIL_MODE_ENV,
+  PACKETAGENT_INVITATION_EMAIL_PROVIDER_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_SECRET_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_SECRET_HEADER_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV,
 ];
 
-async function withInvitationEmailEnv(run: (store: TaskloomData) => Promise<void> | void): Promise<void> {
+async function withInvitationEmailEnv(run: (store: PacketAgentData) => Promise<void> | void): Promise<void> {
   const previous = new Map(invitationEmailEnvVars.map((key) => [key, process.env[key]]));
 
   try {
@@ -65,18 +65,18 @@ test("deliverInvitationEmail records local dev deliveries without external provi
 
 test("deliverInvitationEmail records skip mode deliveries without corrupting state", async () => {
   await withInvitationEmailEnv(async (store) => {
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "skip";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "skip";
 
     const result = await deliverInvitationEmail(store, invitationRequest, "2026-04-26T10:01:00.000Z");
     const delivery = store.invitationEmailDeliveries.at(-1);
 
     assert.equal(result.status, "skipped");
-    assert.equal(result.error, `${TASKLOOM_INVITATION_EMAIL_MODE_ENV}=skip`);
+    assert.equal(result.error, `${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=skip`);
     assert.equal(delivery?.status, "skipped");
     assert.equal(delivery?.mode, "skip");
     assert.equal(delivery?.provider, "local");
     assert.equal(delivery?.sentAt, undefined);
-    assert.equal(delivery?.error, `${TASKLOOM_INVITATION_EMAIL_MODE_ENV}=skip`);
+    assert.equal(delivery?.error, `${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=skip`);
   });
 });
 
@@ -84,11 +84,11 @@ test("deliverInvitationEmail posts webhook deliveries and records success", asyn
   await withInvitationEmailEnv(async (store) => {
     let postedUrl: string | URL | Request | undefined;
     let postedInit: RequestInit | undefined;
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
-    process.env[TASKLOOM_INVITATION_EMAIL_PROVIDER_ENV] = "mail-webhook";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_SECRET_ENV] = "secret-value";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_SECRET_HEADER_ENV] = "x-mail-secret";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
+    process.env[PACKETAGENT_INVITATION_EMAIL_PROVIDER_ENV] = "mail-webhook";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_SECRET_ENV] = "secret-value";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_SECRET_HEADER_ENV] = "x-mail-secret";
     setInvitationEmailFetchForTests(async (url, init) => {
       postedUrl = url;
       postedInit = init;
@@ -121,9 +121,9 @@ test("deliverInvitationEmail applies configured webhook timeout", async () => {
     }) as typeof AbortSignal.timeout;
 
     try {
-      process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
-      process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
-      process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV] = "2500";
+      process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
+      process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
+      process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV] = "2500";
       setInvitationEmailFetchForTests(async () => new Response(null, { status: 202, statusText: "Accepted" }));
 
       const result = await deliverInvitationEmail(store, invitationRequest, "2026-04-26T10:02:30.000Z");
@@ -146,9 +146,9 @@ test("deliverInvitationEmail falls back to default webhook timeout for invalid v
     }) as typeof AbortSignal.timeout;
 
     try {
-      process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
-      process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
-      process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV] = "0";
+      process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
+      process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
+      process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV] = "0";
       setInvitationEmailFetchForTests(async () => new Response(null, { status: 202, statusText: "Accepted" }));
 
       const result = await deliverInvitationEmail(store, invitationRequest, "2026-04-26T10:02:45.000Z");
@@ -163,9 +163,9 @@ test("deliverInvitationEmail falls back to default webhook timeout for invalid v
 
 test("deliverInvitationEmail records webhook timeout abort failures", async () => {
   await withInvitationEmailEnv(async (store) => {
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV] = "1";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_TIMEOUT_MS_ENV] = "1";
     setInvitationEmailFetchForTests((_url, init) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener("abort", () => reject(new Error("webhook request aborted")), { once: true });
     }));
@@ -185,8 +185,8 @@ test("deliverInvitationEmail records webhook timeout abort failures", async () =
 
 test("deliverInvitationEmail records webhook provider failures", async () => {
   await withInvitationEmailEnv(async (store) => {
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
-    process.env[TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
+    process.env[PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV] = "https://mail.example.test/invitations";
     setInvitationEmailFetchForTests(async () => new Response(null, { status: 503, statusText: "Unavailable" }));
 
     const result = await deliverInvitationEmail(store, invitationRequest, "2026-04-26T10:03:00.000Z");
@@ -204,17 +204,17 @@ test("deliverInvitationEmail records webhook provider failures", async () => {
 
 test("deliverInvitationEmail records missing webhook configuration as failed delivery", async () => {
   await withInvitationEmailEnv(async (store) => {
-    process.env[TASKLOOM_INVITATION_EMAIL_MODE_ENV] = "webhook";
+    process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = "webhook";
 
     const result = await deliverInvitationEmail(store, invitationRequest, "2026-04-26T10:04:00.000Z");
     const delivery = store.invitationEmailDeliveries.at(-1);
 
     assert.equal(result.status, "failed");
-    assert.equal(result.error, `${TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV} is required when ${TASKLOOM_INVITATION_EMAIL_MODE_ENV}=webhook`);
+    assert.equal(result.error, `${PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV} is required when ${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=webhook`);
     assert.equal(delivery?.status, "failed");
     assert.equal(delivery?.mode, "webhook");
     assert.equal(delivery?.provider, "webhook");
     assert.equal(delivery?.sentAt, undefined);
-    assert.equal(delivery?.error, `${TASKLOOM_INVITATION_EMAIL_WEBHOOK_URL_ENV} is required when ${TASKLOOM_INVITATION_EMAIL_MODE_ENV}=webhook`);
+    assert.equal(delivery?.error, `${PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV} is required when ${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=webhook`);
   });
 });

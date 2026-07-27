@@ -1,9 +1,9 @@
-import type { TaskloomData } from "./taskloom-store.js";
+import type { PacketAgentData } from "./packetagent-store.js";
 import {
   loadStore as defaultLoadStore,
   mutateStore as defaultMutateStore,
   recordInvitationEmailProviderStatus,
-} from "./taskloom-store.js";
+} from "./packetagent-store.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 
 export type ProviderDeliveryStatus =
@@ -119,8 +119,8 @@ export function parseInvitationEmailReconciliationBody(
 }
 
 export interface InvitationEmailReconciliationDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   now?: () => string;
 }
 

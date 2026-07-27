@@ -15,23 +15,23 @@ RUN npm prune --omit=dev
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     PORT=8484 \
-    TASKLOOM_STORE=sqlite \
-    TASKLOOM_DB_PATH=/app/data/taskloom.sqlite \
-    TASKLOOM_SANDBOX_DRIVER=docker \
-    TASKLOOM_ARTIFACT_SERVING_ENABLED=false
+    PACKETAGENT_STORE=sqlite \
+    PACKETAGENT_DB_PATH=/app/data/packetagent.sqlite \
+    PACKETAGENT_SANDBOX_DRIVER=docker \
+    PACKETAGENT_ARTIFACT_SERVING_ENABLED=false
 
 WORKDIR /app
-RUN groupadd --system taskloom \
-  && useradd --system --gid taskloom --home-dir /app taskloom \
+RUN groupadd --system packetagent \
+  && useradd --system --gid packetagent --home-dir /app packetagent \
   && mkdir -p /app/data/artifacts \
-  && chown -R taskloom:taskloom /app
+  && chown -R packetagent:packetagent /app
 
-COPY --from=build --chown=taskloom:taskloom /app/package.json /app/package-lock.json ./
-COPY --from=build --chown=taskloom:taskloom /app/node_modules ./node_modules
-COPY --from=build --chown=taskloom:taskloom /app/src ./src
-COPY --from=build --chown=taskloom:taskloom /app/web/dist ./web/dist
+COPY --from=build --chown=packetagent:packetagent /app/package.json /app/package-lock.json ./
+COPY --from=build --chown=packetagent:packetagent /app/node_modules ./node_modules
+COPY --from=build --chown=packetagent:packetagent /app/src ./src
+COPY --from=build --chown=packetagent:packetagent /app/web/dist ./web/dist
 
-USER taskloom
+USER packetagent
 EXPOSE 8484
 VOLUME ["/app/data"]
 CMD ["node", "--import", "tsx", "src/server.ts"]

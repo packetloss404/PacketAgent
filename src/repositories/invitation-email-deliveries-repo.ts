@@ -6,13 +6,13 @@ import type {
   InvitationEmailDeliveryMode,
   InvitationEmailDeliveryRecord,
   InvitationEmailDeliveryStatus,
-  TaskloomData,
-} from "../taskloom-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../taskloom-store.js";
+  PacketAgentData,
+} from "../packetagent-store.js";
+import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
-const DEFAULT_DB_FILE = "data/taskloom.sqlite";
+const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 
 export interface ListInvitationEmailDeliveriesFilter {
@@ -29,8 +29,8 @@ export interface InvitationEmailDeliveriesRepository {
 }
 
 export interface InvitationEmailDeliveriesRepositoryDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   dbPath?: string;
 }
 
@@ -44,8 +44,8 @@ export interface AsyncInvitationEmailDeliveriesRepository {
 }
 
 export interface AsyncInvitationEmailDeliveriesRepositoryDeps {
-  loadStore?: () => MaybePromise<TaskloomData>;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => MaybePromise<T>) => MaybePromise<T>;
+  loadStore?: () => MaybePromise<PacketAgentData>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => MaybePromise<T>) => MaybePromise<T>;
   repository?: InvitationEmailDeliveriesRepository;
   dbPath?: string;
 }
@@ -53,7 +53,7 @@ export interface AsyncInvitationEmailDeliveriesRepositoryDeps {
 export function createInvitationEmailDeliveriesRepository(
   deps: InvitationEmailDeliveriesRepositoryDeps = {},
 ): InvitationEmailDeliveriesRepository {
-  if (process.env.TASKLOOM_STORE === "sqlite") return sqliteInvitationEmailDeliveriesRepository(deps);
+  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteInvitationEmailDeliveriesRepository(deps);
   return jsonInvitationEmailDeliveriesRepository(deps);
 }
 
@@ -61,7 +61,7 @@ export function createAsyncInvitationEmailDeliveriesRepository(
   deps: AsyncInvitationEmailDeliveriesRepositoryDeps = {},
 ): AsyncInvitationEmailDeliveriesRepository {
   if (deps.repository) return asyncInvitationEmailDeliveriesRepositoryFromSync(deps.repository);
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     return asyncInvitationEmailDeliveriesRepositoryFromSync(
       sqliteInvitationEmailDeliveriesRepository({ dbPath: deps.dbPath }),
     );
@@ -301,7 +301,7 @@ function applyListFilter(
 
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
-  return resolve(process.cwd(), process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
 }
 
 function openDatabase(dbPath: string): DatabaseSync {

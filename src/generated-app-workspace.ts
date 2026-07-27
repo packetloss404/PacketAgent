@@ -86,7 +86,7 @@ export interface GeneratedAppWorkspaceReadResult extends GeneratedAppWorkspaceFi
   content: string;
 }
 
-const MANIFEST_RELATIVE_PATH = ".taskloom/generated-app-workspace-manifest.json";
+const MANIFEST_RELATIVE_PATH = ".packetagent/generated-app-workspace-manifest.json";
 
 export function resolveGeneratedAppWorkspacePath(
   metadata: GeneratedAppWorkspaceMetadata,
@@ -258,7 +258,7 @@ async function discoverWorkspaceFiles(workspacePath: string, prefix = ""): Promi
   const files: GeneratedAppWorkspaceFileManifestEntry[] = [];
   for (const entry of entries) {
     const relativePath = normalizeRelativePath(path.posix.join(prefix.replace(/\\/g, "/"), entry.name));
-    if (relativePath === ".taskloom" || relativePath.startsWith(".taskloom/")) continue;
+    if (relativePath === ".packetagent" || relativePath.startsWith(".packetagent/")) continue;
     const absolutePath = path.join(workspacePath, relativePath);
     if (entry.isDirectory()) {
       files.push(...await discoverWorkspaceFiles(workspacePath, relativePath));

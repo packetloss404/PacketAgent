@@ -17,7 +17,7 @@ test("integration sandbox reports deterministic runtime and preview failures wit
       },
     },
     env: {
-      DATABASE_URL: "postgres://taskloom:secret@db.example.test/taskloom",
+      DATABASE_URL: "postgres://packetagent:secret@db.example.test/packetagent",
       STRIPE_SECRET_KEY: "sk_stripe_secret_that_must_not_leak",
     },
     preview: {
@@ -37,7 +37,7 @@ test("integration sandbox reports deterministic runtime and preview failures wit
   assert.ok(report.results.every((result) => result.deterministic));
   assert.ok(report.results.every((result) => result.liveNetworkCalls === false));
   assert.equal(JSON.stringify(report).includes("sk-live-secret-that-must-not-leak"), false);
-  assert.equal(JSON.stringify(report).includes("postgres://taskloom:secret"), false);
+  assert.equal(JSON.stringify(report).includes("postgres://packetagent:secret"), false);
   assert.equal(JSON.stringify(report).includes("sk_stripe_secret_that_must_not_leak"), false);
 });
 
@@ -53,12 +53,12 @@ test("integration sandbox passes requested connectors when sandbox setup is pres
       OPENAI_API_KEY: "set",
       DATABASE_URL: "postgres://set",
       RESEND_API_KEY: "set",
-      TASKLOOM_PUBLIC_APP_BASE_URL: "https://apps.example.test",
-      TASKLOOM_WEBHOOK_SIGNING_SECRET: "set",
+      PACKETAGENT_PUBLIC_APP_BASE_URL: "https://apps.example.test",
+      PACKETAGENT_WEBHOOK_SIGNING_SECRET: "set",
       STRIPE_SECRET_KEY: "set",
       STRIPE_WEBHOOK_SECRET: "set",
       STRIPE_PRICE_ID: "price_123",
-      TASKLOOM_PREVIEW_SANDBOX: "1",
+      PACKETAGENT_PREVIEW_SANDBOX: "1",
     },
     availableTools: ["browser-use", "preview-runtime"],
     connectedConnectors: ["github"],
@@ -114,7 +114,7 @@ test("redactIntegrationSandboxValue masks common credentials and keeps safe cont
       authorization: "Bearer abcdefghijklmnopqrstuvwxyz123456",
       accept: "application/json",
     },
-    databaseUrl: "postgres://user:password@localhost/taskloom",
+    databaseUrl: "postgres://user:password@localhost/packetagent",
     previewUrl: "http://localhost:5173/preview/app-123",
     note: "safe diagnostic text",
   });
@@ -124,7 +124,7 @@ test("redactIntegrationSandboxValue masks common credentials and keeps safe cont
       authorization: "Be...[redacted]...56",
       accept: "application/json",
     },
-    databaseUrl: "po...[redacted]...om",
+    databaseUrl: "po...[redacted]...nt",
     previewUrl: "http://localhost:5173/preview/app-123",
     note: "safe diagnostic text",
   });

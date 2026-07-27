@@ -10,7 +10,7 @@ import {
   type AlertEventsRepository,
   type AlertEventsRepositoryDeps,
 } from "./alert-events-repo.js";
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 
 function makeRecord(overrides: Partial<AlertEventRecord> & { id: string; observedAt: string }): AlertEventRecord {
   const record: AlertEventRecord = {
@@ -31,29 +31,29 @@ function makeRecord(overrides: Partial<AlertEventRecord> & { id: string; observe
 }
 
 function makeJsonRepo(): AlertEventsRepository {
-  const data = { alertEvents: [] as AlertEventRecord[] } as unknown as TaskloomData;
+  const data = { alertEvents: [] as AlertEventRecord[] } as unknown as PacketAgentData;
   const deps: AlertEventsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonAlertEventsRepository(deps);
 }
 
 function withTempSqlite(testFn: (repo: AlertEventsRepository) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-alerts-repo-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-alerts-repo-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = sqliteAlertEventsRepository({ dbPath });
     testFn(repo);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 }
@@ -305,40 +305,40 @@ test("updateDeliveryStatus preserves deliveryError when patch omits it and deliv
 });
 
 test("createAlertEventsRepository selects implementation by env", () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
-    const data = { alertEvents: [] as AlertEventRecord[] } as unknown as TaskloomData;
+    delete process.env.PACKETAGENT_STORE;
+    const data = { alertEvents: [] as AlertEventRecord[] } as unknown as PacketAgentData;
     const json = createAlertEventsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     json.insertMany([makeRecord({ id: "a", observedAt: "2026-04-26T10:00:00.000Z" })]);
     assert.equal(json.count(), 1);
     assert.equal(data.alertEvents.length, 1);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
 test("createAlertEventsRepository returns sqlite impl when env requests it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-alerts-repo-factory-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-alerts-repo-factory-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = createAlertEventsRepository({ dbPath });
     repo.insertMany([makeRecord({ id: "a", observedAt: "2026-04-26T10:00:00.000Z" })]);
     assert.equal(repo.count(), 1);
     assert.equal(repo.list()[0]?.id, "a");
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 });

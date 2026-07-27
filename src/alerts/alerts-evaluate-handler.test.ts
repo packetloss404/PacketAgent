@@ -12,11 +12,11 @@ import type { AlertWebhookConfig, DeliverAlertWebhookResult } from "./alert-webh
 import type { OperationsHealthReport } from "../operations-health.js";
 import type { JobTypeMetrics } from "../jobs/scheduler-metrics.js";
 import type { EnqueueJobInput } from "../jobs/store.js";
-import type { JobRecord, TaskloomData } from "../taskloom-store.js";
+import type { JobRecord, PacketAgentData } from "../packetagent-store.js";
 import { nextAfter } from "../jobs/cron.js";
 
-function makeStore(jobs: JobRecord[] = []): TaskloomData {
-  return { jobs: [...jobs] } as unknown as TaskloomData;
+function makeStore(jobs: JobRecord[] = []): PacketAgentData {
+  return { jobs: [...jobs] } as unknown as PacketAgentData;
 }
 
 function makeJob(overrides: Partial<JobRecord> & { id: string; type: string; status: JobRecord["status"] }): JobRecord {
@@ -154,7 +154,7 @@ test("handleAlertsEvaluateJob delivers when events present and webhook configure
   const events = [makeEvent({ id: "evt_1", severity: "critical" })];
   const config: AlertWebhookConfig = {
     url: "https://example.com/hook",
-    secretHeader: "x-taskloom-alert-secret",
+    secretHeader: "x-packetagent-alert-secret",
     timeoutMs: 5000,
   };
   const { deps, deliverCalls, recordCalls, enqueueDeliverCalls } = makeDeps({
@@ -180,7 +180,7 @@ test("handleAlertsEvaluateJob records delivery failure when webhook returns ok=f
   const events = [makeEvent({ id: "evt_1" })];
   const config: AlertWebhookConfig = {
     url: "https://example.com/hook",
-    secretHeader: "x-taskloom-alert-secret",
+    secretHeader: "x-packetagent-alert-secret",
     timeoutMs: 5000,
   };
   const { deps, recordCalls } = makeDeps({
@@ -203,7 +203,7 @@ test("handleAlertsEvaluateJob enqueues a deliver retry job for each undelivered 
   ];
   const config: AlertWebhookConfig = {
     url: "https://example.com/hook",
-    secretHeader: "x-taskloom-alert-secret",
+    secretHeader: "x-packetagent-alert-secret",
     timeoutMs: 5000,
   };
   const { deps, enqueueDeliverCalls } = makeDeps({
@@ -227,18 +227,18 @@ test("handleAlertsEvaluateJob enqueues a deliver retry job for each undelivered 
   }
 });
 
-test("handleAlertsEvaluateJob honors custom TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS env knob", async () => {
+test("handleAlertsEvaluateJob honors custom PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS env knob", async () => {
   const events = [makeEvent({ id: "evt_1" })];
   const config: AlertWebhookConfig = {
     url: "https://example.com/hook",
-    secretHeader: "x-taskloom-alert-secret",
+    secretHeader: "x-packetagent-alert-secret",
     timeoutMs: 5000,
   };
   const { deps, enqueueDeliverCalls } = makeDeps({
     events,
     config,
     deliverResult: { ok: false, status: 500, error: "http 500" },
-    env: { TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS: "5" },
+    env: { PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS: "5" },
   });
   await handleAlertsEvaluateJob({}, deps);
 
@@ -250,14 +250,14 @@ test("handleAlertsEvaluateJob clamps deliver retry maxAttempts to >= 1", async (
   const events = [makeEvent({ id: "evt_1" })];
   const config: AlertWebhookConfig = {
     url: "https://example.com/hook",
-    secretHeader: "x-taskloom-alert-secret",
+    secretHeader: "x-packetagent-alert-secret",
     timeoutMs: 5000,
   };
   const { deps, enqueueDeliverCalls } = makeDeps({
     events,
     config,
     deliverResult: { ok: false, status: 500, error: "http 500" },
-    env: { TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS: "1" },
+    env: { PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS: "1" },
   });
   await handleAlertsEvaluateJob({}, deps);
 
@@ -269,7 +269,7 @@ test("handleAlertsEvaluateJob falls back to default deliver max attempts when en
   const events = [makeEvent({ id: "evt_1" })];
   const config: AlertWebhookConfig = {
     url: "https://example.com/hook",
-    secretHeader: "x-taskloom-alert-secret",
+    secretHeader: "x-packetagent-alert-secret",
     timeoutMs: 5000,
   };
   const cases = ["", "abc", "0", "-2", "1.5"];
@@ -278,7 +278,7 @@ test("handleAlertsEvaluateJob falls back to default deliver max attempts when en
       events,
       config,
       deliverResult: { ok: false, status: 500, error: "http 500" },
-      env: { TASKLOOM_ALERT_DELIVER_MAX_ATTEMPTS: value },
+      env: { PACKETAGENT_ALERT_DELIVER_MAX_ATTEMPTS: value },
     });
     await handleAlertsEvaluateJob({}, deps);
     assert.equal(enqueueDeliverCalls.length, 1, `case ${JSON.stringify(value)}`);
@@ -290,14 +290,14 @@ test("handleAlertsEvaluateJob honors workspace env override on retry jobs", asyn
   const events = [makeEvent({ id: "evt_1" })];
   const config: AlertWebhookConfig = {
     url: "https://example.com/hook",
-    secretHeader: "x-taskloom-alert-secret",
+    secretHeader: "x-packetagent-alert-secret",
     timeoutMs: 5000,
   };
   const { deps, enqueueDeliverCalls } = makeDeps({
     events,
     config,
     deliverResult: { ok: false, status: 500, error: "boom" },
-    env: { TASKLOOM_ALERT_WORKSPACE_ID: "ops-workspace" },
+    env: { PACKETAGENT_ALERT_WORKSPACE_ID: "ops-workspace" },
   });
   await handleAlertsEvaluateJob({}, deps);
 
@@ -331,8 +331,8 @@ test("handleAlertsEvaluateJob falls back to env thresholds when payload omits th
   const { deps, evaluateCalls } = makeDeps({
     events: [],
     env: {
-      TASKLOOM_ALERT_JOB_FAILURE_RATE_THRESHOLD: "0.75",
-      TASKLOOM_ALERT_JOB_FAILURE_MIN_SAMPLES: "20",
+      PACKETAGENT_ALERT_JOB_FAILURE_RATE_THRESHOLD: "0.75",
+      PACKETAGENT_ALERT_JOB_FAILURE_MIN_SAMPLES: "20",
     },
   });
   await handleAlertsEvaluateJob({}, deps);
@@ -359,7 +359,7 @@ test("handleAlertsEvaluateJob forwards retentionDays to record", async () => {
 test("handleAlertsEvaluateJob falls back to env retention when payload omits it", async () => {
   const { deps, recordCalls } = makeDeps({
     events: [makeEvent({ id: "e" })],
-    env: { TASKLOOM_ALERT_RETENTION_DAYS: "14" },
+    env: { PACKETAGENT_ALERT_RETENTION_DAYS: "14" },
   });
   await handleAlertsEvaluateJob({}, deps);
 
@@ -385,7 +385,7 @@ test("ensureAlertsCronJob returns skipped and warns when cron is invalid", () =>
   try {
     const enqueueCalls: EnqueueJobInput[] = [];
     const result = ensureAlertsCronJob({
-      env: { TASKLOOM_ALERT_EVALUATE_CRON: "this is not cron" },
+      env: { PACKETAGENT_ALERT_EVALUATE_CRON: "this is not cron" },
       loadStore: () => makeStore(),
       enqueue: (input) => {
         enqueueCalls.push(input);
@@ -412,7 +412,7 @@ test("ensureAlertsCronJob returns exists when an active recurring job is present
   });
   const enqueueCalls: EnqueueJobInput[] = [];
   const result = ensureAlertsCronJob({
-    env: { TASKLOOM_ALERT_EVALUATE_CRON: cron },
+    env: { PACKETAGENT_ALERT_EVALUATE_CRON: cron },
     loadStore: () => makeStore([existing]),
     enqueue: (input) => {
       enqueueCalls.push(input);
@@ -428,7 +428,7 @@ test("ensureAlertsCronJob enqueues with default workspaceId, retentionDays, and 
   const enqueueCalls: EnqueueJobInput[] = [];
   const before = new Date();
   const result = ensureAlertsCronJob({
-    env: { TASKLOOM_ALERT_EVALUATE_CRON: cron },
+    env: { PACKETAGENT_ALERT_EVALUATE_CRON: cron },
     loadStore: () => makeStore(),
     enqueue: (input) => {
       enqueueCalls.push(input);
@@ -454,8 +454,8 @@ test("ensureAlertsCronJob honors custom workspaceId env override", () => {
   const enqueueCalls: EnqueueJobInput[] = [];
   ensureAlertsCronJob({
     env: {
-      TASKLOOM_ALERT_EVALUATE_CRON: cron,
-      TASKLOOM_ALERT_WORKSPACE_ID: "ops-workspace",
+      PACKETAGENT_ALERT_EVALUATE_CRON: cron,
+      PACKETAGENT_ALERT_WORKSPACE_ID: "ops-workspace",
     },
     loadStore: () => makeStore(),
     enqueue: (input) => {
@@ -472,8 +472,8 @@ test("ensureAlertsCronJob honors valid custom retentionDays env override", () =>
   const enqueueCalls: EnqueueJobInput[] = [];
   ensureAlertsCronJob({
     env: {
-      TASKLOOM_ALERT_EVALUATE_CRON: cron,
-      TASKLOOM_ALERT_RETENTION_DAYS: "7",
+      PACKETAGENT_ALERT_EVALUATE_CRON: cron,
+      PACKETAGENT_ALERT_RETENTION_DAYS: "7",
     },
     loadStore: () => makeStore(),
     enqueue: (input) => {
@@ -492,8 +492,8 @@ test("ensureAlertsCronJob falls back to default retention when env value is inva
     const enqueueCalls: EnqueueJobInput[] = [];
     ensureAlertsCronJob({
       env: {
-        TASKLOOM_ALERT_EVALUATE_CRON: cron,
-        TASKLOOM_ALERT_RETENTION_DAYS: value,
+        PACKETAGENT_ALERT_EVALUATE_CRON: cron,
+        PACKETAGENT_ALERT_RETENTION_DAYS: value,
       },
       loadStore: () => makeStore(),
       enqueue: (input) => {

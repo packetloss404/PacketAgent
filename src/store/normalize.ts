@@ -3,14 +3,14 @@ import type {
   ActivationSignalRecord,
   ActivationSignalSource,
   ReleaseConfirmationCollection,
-  TaskloomData,
+  PacketAgentData,
   WorkspaceBriefCollection,
 } from "./types.js";
 
 // LEAF module: pure normalization of partial/loaded store payloads into a
-// complete TaskloomData shape. Imports only types — never a backend or barrel.
+// complete PacketAgentData shape. Imports only types — never a backend or barrel.
 
-export function normalizeStore(data: Partial<TaskloomData>): TaskloomData {
+export function normalizeStore(data: Partial<PacketAgentData>): PacketAgentData {
   return {
     users: data.users ?? [],
     sessions: data.sessions ?? [],
@@ -52,14 +52,14 @@ export function normalizeStore(data: Partial<TaskloomData>): TaskloomData {
   };
 }
 
-function normalizeWorkspaceBriefCollection(collection: Partial<TaskloomData>["workspaceBriefs"]): WorkspaceBriefCollection {
+function normalizeWorkspaceBriefCollection(collection: Partial<PacketAgentData>["workspaceBriefs"]): WorkspaceBriefCollection {
   if (!collection) return {};
   if (!Array.isArray(collection)) return collection;
   return Object.fromEntries(collection.map((entry) => [entry.workspaceId, entry]));
 }
 
 function normalizeReleaseConfirmationCollection(
-  collection: Partial<TaskloomData>["releaseConfirmations"],
+  collection: Partial<PacketAgentData>["releaseConfirmations"],
 ): ReleaseConfirmationCollection {
   if (!collection) return {};
   if (!Array.isArray(collection)) return collection;

@@ -7,11 +7,11 @@ import {
   listProviderCallsForWorkspaceIndexed,
   mutateStoreAsync,
   type ProviderCallRecord,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 import { redactedErrorMessage, redactSensitiveString } from "../security/redaction.js";
 import type { ProviderName, ProviderStreamChunk, ProviderUsage } from "./types.js";
 
-const DEFAULT_DB_FILE = "data/taskloom.sqlite";
+const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const PROVIDER_CALL_CAP = 5_000;
 let lastLedgerTimestampMs = 0;
 
@@ -55,7 +55,7 @@ async function appendCall(record: ProviderCallRecord): Promise<AppendCallResult>
 }
 
 function dualWriteProviderCall(result: AppendCallResult): void {
-  if (process.env.TASKLOOM_STORE !== "sqlite") return;
+  if (process.env.PACKETAGENT_STORE !== "sqlite") return;
 
   const repo = sqliteProviderCallsRepository({}) as ProviderCallsWriteRepository;
   if (repo.insertMany) {
@@ -73,7 +73,7 @@ function dualWriteProviderCall(result: AppendCallResult): void {
 }
 
 function deleteProviderCallRows(ids: string[]): void {
-  const dbPath = resolve(process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  const dbPath = resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
   const db = new DatabaseSync(dbPath);
   try {
     const stmt = db.prepare("delete from provider_calls where id = ?");

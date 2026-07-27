@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { loadStore as defaultLoadStore } from "./taskloom-store.js";
+import { loadStore as defaultLoadStore } from "./packetagent-store.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 
 export interface HealthRoutesOptions {

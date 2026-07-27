@@ -1,8 +1,8 @@
-// Barrel module for the Taskloom domain service layer.
+// Barrel module for the PacketAgent domain service layer.
 //
 // The implementation lives in cohesive domain modules under ./services/*.
 // This file re-exports the full public API so existing imports from
-// "./taskloom-services.js" continue to resolve unchanged.
+// "./packetagent-services.js" continue to resolve unchanged.
 
 export {
   INVITATION_EMAIL_JOB_TYPE,

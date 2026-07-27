@@ -12,7 +12,7 @@ export interface GeneratedAppPreviewRuntimeReadiness {
   live: boolean;
   status: "ready" | "missing-entrypoint";
   entrypoint: string;
-  servedBy: "taskloom-static-workspace";
+  servedBy: "packetagent-static-workspace";
   process: {
     status: GeneratedAppProcessStatus;
     cwd: string;
@@ -52,7 +52,7 @@ export function buildGeneratedAppPreviewReadiness(input: {
     live: Boolean(input.live),
     status: hasEntrypoint ? "ready" : "missing-entrypoint",
     entrypoint,
-    servedBy: "taskloom-static-workspace",
+    servedBy: "packetagent-static-workspace",
     process: {
       status: input.live ? "running" : "not_started",
       cwd: `generated://${input.workspaceId}/${input.appId}/${input.checkpointId}`,

@@ -310,13 +310,13 @@ function webhookEmailReadiness(
   const needsEmail = EMAIL_SIGNAL_PATTERN.test(combinedText);
   const needsWebhook = WEBHOOK_SIGNAL_PATTERN.test(combinedText);
   const emailReady = input.webhookEmail?.emailProviderConfigured === true
-    || hasAnyEnv(env, ["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_TOKEN", "SMTP_URL", "TASKLOOM_EMAIL_PROVIDER_READY"]);
-  const publicBaseUrlReady = hasValue(input.webhookEmail?.publicBaseUrl) || hasAnyEnv(env, ["TASKLOOM_PUBLIC_BASE_URL", "TASKLOOM_PUBLIC_APP_BASE_URL"]);
-  const signingReady = input.webhookEmail?.signingSecretConfigured === true || hasAnyEnv(env, ["TASKLOOM_WEBHOOK_SIGNING_SECRET"]);
+    || hasAnyEnv(env, ["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_TOKEN", "SMTP_URL", "PACKETAGENT_EMAIL_PROVIDER_READY"]);
+  const publicBaseUrlReady = hasValue(input.webhookEmail?.publicBaseUrl) || hasAnyEnv(env, ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL"]);
+  const signingReady = input.webhookEmail?.signingSecretConfigured === true || hasAnyEnv(env, ["PACKETAGENT_WEBHOOK_SIGNING_SECRET"]);
   const missingSetup = [
     ...(needsEmail && !emailReady ? ["Configure an email delivery provider such as RESEND_API_KEY, SENDGRID_API_KEY, POSTMARK_TOKEN, or SMTP_URL."] : []),
-    ...(needsWebhook && !publicBaseUrlReady ? ["Set TASKLOOM_PUBLIC_BASE_URL before publishing external webhook URLs."] : []),
-    ...(needsWebhook && !signingReady ? ["Configure TASKLOOM_WEBHOOK_SIGNING_SECRET for signed inbound webhook requests."] : []),
+    ...(needsWebhook && !publicBaseUrlReady ? ["Set PACKETAGENT_PUBLIC_BASE_URL before publishing external webhook URLs."] : []),
+    ...(needsWebhook && !signingReady ? ["Configure PACKETAGENT_WEBHOOK_SIGNING_SECRET for signed inbound webhook requests."] : []),
   ];
 
   return { missingSetup };
@@ -376,7 +376,7 @@ function hasModelProvider(input: AppIterationToolsInput, env: Record<string, str
     || input.providers?.openai === true
     || input.providers?.anthropic === true
     || input.providers?.localModel === true
-    || hasAnyEnv(env, ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OLLAMA_BASE_URL", "TASKLOOM_AI_PROVIDER_READY"])
+    || hasAnyEnv(env, ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OLLAMA_BASE_URL", "PACKETAGENT_AI_PROVIDER_READY"])
     || availableTools.has("openai")
     || connectors.has("openai")
     || connectors.has("anthropic");

@@ -1,4 +1,4 @@
-import { loadStore as loadDefaultStore } from "../taskloom-store.js";
+import { loadStore as loadDefaultStore } from "../packetagent-store.js";
 import type {
   ActivationSignalRecord,
   ActivityRecord,
@@ -12,7 +12,7 @@ import type {
   ReleaseConfirmationRecord,
   RequirementRecord,
   ShareTokenRecord,
-  TaskloomData,
+  PacketAgentData,
   UserRecord,
   ValidationEvidenceRecord,
   WorkflowConcernRecord,
@@ -21,7 +21,7 @@ import type {
   WorkspaceEnvVarRecord,
   WorkspaceInvitationRecord,
   WorkspaceMemberRecord,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 import type { ActivationMilestoneRecord, ActivationStatusDto } from "../activation/domain.js";
 import type { WorkspaceActivationFacts } from "../activation/adapters.js";
 import { maskSecret, redactSensitiveValue } from "../security/redaction.js";
@@ -31,7 +31,7 @@ export interface ExportWorkspaceOptions {
 }
 
 export interface ExportWorkspaceDeps {
-  loadStore: () => TaskloomData;
+  loadStore: () => PacketAgentData;
 }
 
 export interface RedactedInvitation extends Omit<WorkspaceInvitationRecord, "token"> {

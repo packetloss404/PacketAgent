@@ -2,12 +2,12 @@ import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import type { AlertEventRecord, TaskloomData } from "../taskloom-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../taskloom-store.js";
+import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
+import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 100;
 const MAX_LIST_LIMIT = 500;
-const DEFAULT_DB_FILE = "data/taskloom.sqlite";
+const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 
 export interface ListAlertsFilter {
@@ -33,8 +33,8 @@ export interface AlertEventsRepository {
 }
 
 export interface AlertEventsRepositoryDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   dbPath?: string;
 }
 
@@ -52,8 +52,8 @@ export interface AsyncAlertEventsRepository {
 }
 
 export interface AsyncAlertEventsRepositoryDeps {
-  loadStore?: () => MaybePromise<TaskloomData>;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => MaybePromise<T>) => MaybePromise<T>;
+  loadStore?: () => MaybePromise<PacketAgentData>;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => MaybePromise<T>) => MaybePromise<T>;
   repository?: AlertEventsRepository;
   dbPath?: string;
 }
@@ -61,7 +61,7 @@ export interface AsyncAlertEventsRepositoryDeps {
 export function createAlertEventsRepository(
   deps: AlertEventsRepositoryDeps = {},
 ): AlertEventsRepository {
-  if (process.env.TASKLOOM_STORE === "sqlite") return sqliteAlertEventsRepository(deps);
+  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteAlertEventsRepository(deps);
   return jsonAlertEventsRepository(deps);
 }
 
@@ -69,7 +69,7 @@ export function createAsyncAlertEventsRepository(
   deps: AsyncAlertEventsRepositoryDeps = {},
 ): AsyncAlertEventsRepository {
   if (deps.repository) return asyncAlertEventsRepositoryFromSync(deps.repository);
-  if (process.env.TASKLOOM_STORE === "sqlite") {
+  if (process.env.PACKETAGENT_STORE === "sqlite") {
     return asyncAlertEventsRepositoryFromSync(sqliteAlertEventsRepository({ dbPath: deps.dbPath }));
   }
   return asyncJsonAlertEventsRepository(deps);
@@ -483,7 +483,7 @@ function applyListFilter(
 
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
-  return resolve(process.cwd(), process.env.TASKLOOM_DB_PATH ?? DEFAULT_DB_FILE);
+  return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
 }
 
 function openDatabase(dbPath: string): DatabaseSync {

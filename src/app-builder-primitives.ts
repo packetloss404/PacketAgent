@@ -113,7 +113,7 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     generatedAppUse: "Use for generated app features that call an LLM or produce structured AI output.",
     supportedBlocks: ["chat", "completion", "classification", "extraction", "summarization"],
     requiredEnv: ["OPENAI_API_KEY or ANTHROPIC_API_KEY or OLLAMA_BASE_URL"],
-    optionalEnv: ["TASKLOOM_AI_MODEL"],
+    optionalEnv: ["PACKETAGENT_AI_MODEL"],
     draftReference: {
       primitiveId: "ai.feature",
       kind: "ai_feature",
@@ -130,7 +130,7 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     generatedAppUse: "Use for generated app drafts with data-backed list, detail, create, edit, and delete screens.",
     supportedBlocks: ["schema", "seed_data", "list", "detail", "create", "update", "delete"],
     requiredEnv: [],
-    optionalEnv: ["DATABASE_URL", "TASKLOOM_DATABASE_URL", "TASKLOOM_DB_PATH"],
+    optionalEnv: ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_DB_PATH"],
     draftReference: {
       primitiveId: "database.crud",
       kind: "database_crud",
@@ -147,7 +147,7 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     generatedAppUse: "Use for generated app drafts that need background work on a schedule.",
     supportedBlocks: ["cron", "recurring_job", "retry", "job_payload"],
     requiredEnv: [],
-    optionalEnv: ["TASKLOOM_SCHEDULER_HTTP_LEADER_URL", "TASKLOOM_SCHEDULER_COORDINATION_EVIDENCE"],
+    optionalEnv: ["PACKETAGENT_SCHEDULER_HTTP_LEADER_URL", "PACKETAGENT_SCHEDULER_COORDINATION_EVIDENCE"],
     draftReference: {
       primitiveId: "scheduled.job",
       kind: "scheduled_job",
@@ -164,7 +164,7 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     generatedAppUse: "Use for generated app drafts that receive external events from Slack, GitHub, Stripe, or custom systems.",
     supportedBlocks: ["inbound_event", "payload_validation", "signature_check", "event_response"],
     requiredEnv: [],
-    optionalEnv: ["TASKLOOM_PUBLIC_BASE_URL", "TASKLOOM_WEBHOOK_SIGNING_SECRET"],
+    optionalEnv: ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_WEBHOOK_SIGNING_SECRET"],
     draftReference: {
       primitiveId: "webhook.endpoint",
       kind: "webhook",
@@ -325,7 +325,7 @@ function buildAiReadinessEntry(
   const envReady = hasEnv(env, "OPENAI_API_KEY")
     || hasEnv(env, "ANTHROPIC_API_KEY")
     || hasEnv(env, "OLLAMA_BASE_URL")
-    || envFlag(env, "TASKLOOM_AI_PROVIDER_READY");
+    || envFlag(env, "PACKETAGENT_AI_PROVIDER_READY");
   const ready = providerReady || envReady;
   const missingSecrets = ready ? [] : ["OPENAI_API_KEY or ANTHROPIC_API_KEY or OLLAMA_BASE_URL"];
 
@@ -374,12 +374,12 @@ function buildWebhookReadinessEntry(
   input: AppBuilderPrimitiveReadinessInput,
 ): AppBuilderPrimitiveReadinessEntry {
   const env = input.env ?? {};
-  const hasPublicBaseUrl = Boolean(cleanString(input.webhook?.publicBaseUrl)) || hasEnv(env, "TASKLOOM_PUBLIC_BASE_URL");
-  const hasSigningSecret = input.webhook?.signingSecretConfigured === true || hasEnv(env, "TASKLOOM_WEBHOOK_SIGNING_SECRET");
-  const missingSecrets = hasSigningSecret ? [] : ["TASKLOOM_WEBHOOK_SIGNING_SECRET"];
+  const hasPublicBaseUrl = Boolean(cleanString(input.webhook?.publicBaseUrl)) || hasEnv(env, "PACKETAGENT_PUBLIC_BASE_URL");
+  const hasSigningSecret = input.webhook?.signingSecretConfigured === true || hasEnv(env, "PACKETAGENT_WEBHOOK_SIGNING_SECRET");
+  const missingSecrets = hasSigningSecret ? [] : ["PACKETAGENT_WEBHOOK_SIGNING_SECRET"];
   const requiredSetup = [
-    ...(!hasPublicBaseUrl ? ["Set TASKLOOM_PUBLIC_BASE_URL before publishing external webhook URLs."] : []),
-    ...(!hasSigningSecret ? ["Configure TASKLOOM_WEBHOOK_SIGNING_SECRET for signed inbound webhook blocks."] : []),
+    ...(!hasPublicBaseUrl ? ["Set PACKETAGENT_PUBLIC_BASE_URL before publishing external webhook URLs."] : []),
+    ...(!hasSigningSecret ? ["Configure PACKETAGENT_WEBHOOK_SIGNING_SECRET for signed inbound webhook blocks."] : []),
   ];
   const ready = requiredSetup.length === 0;
 

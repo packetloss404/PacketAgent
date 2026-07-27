@@ -6,8 +6,8 @@ import { appRoutes } from "./app-routes";
 import { jobRoutes } from "./job-routes";
 import { enqueueJob, findJob } from "./jobs/store";
 import { enforcePrivateAppMutationSecurity } from "./route-security";
-import { login } from "./taskloom-services";
-import { mutateStore, resetStoreForTests } from "./taskloom-store";
+import { login } from "./packetagent-services";
+import { mutateStore, resetStoreForTests } from "./packetagent-store";
 
 function createTestApp() {
   const app = new Hono();
@@ -30,14 +30,14 @@ function cookieValue(response: Response) {
 
 function csrfCookieValue(response: Response) {
   const cookie = response.headers.get("set-cookie") ?? "";
-  const match = cookie.match(/taskloom_csrf=([^;]+)/);
+  const match = cookie.match(/packetagent_csrf=([^;]+)/);
   assert.ok(match?.[1], "expected response to set a csrf cookie");
   return match[1];
 }
 
 function browserAuthHeaders(cookie: string, csrfToken: string) {
   return {
-    Cookie: `${SESSION_COOKIE_NAME}=${cookie}; taskloom_csrf=${csrfToken}`,
+    Cookie: `${SESSION_COOKIE_NAME}=${cookie}; packetagent_csrf=${csrfToken}`,
     Origin: "http://localhost",
     Host: "localhost",
     "X-CSRF-Token": csrfToken,
@@ -51,7 +51,7 @@ test("job mutations use central browser csrf and same-origin guard", async () =>
   const loginResponse = await app.request("/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "alpha@taskloom.local", password: "demo12345" }),
+    body: JSON.stringify({ email: "alpha@packetagent.local", password: "demo12345" }),
   });
   const sessionCookie = cookieValue(loginResponse);
   const csrfToken = csrfCookieValue(loginResponse);
@@ -84,7 +84,7 @@ test("job mutations use central browser csrf and same-origin guard", async () =>
   const invalidCsrf = await app.request("/api/app/jobs", {
     method: "POST",
     headers: {
-      Cookie: `${SESSION_COOKIE_NAME}=${sessionCookie}; taskloom_csrf=invalid`,
+      Cookie: `${SESSION_COOKIE_NAME}=${sessionCookie}; packetagent_csrf=invalid`,
       Origin: "http://localhost",
       Host: "localhost",
       "X-CSRF-Token": "invalid",
@@ -113,17 +113,17 @@ test("job mutations use central browser csrf and same-origin guard", async () =>
 test("job mutation origin checks only trust forwarded host when proxy trust is enabled", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const previousTrustProxy = process.env.TASKLOOM_TRUST_PROXY;
+  const previousTrustProxy = process.env.PACKETAGENT_TRUST_PROXY;
 
   try {
     const loginResponse = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "alpha@taskloom.local", password: "demo12345" }),
+      body: JSON.stringify({ email: "alpha@packetagent.local", password: "demo12345" }),
     });
     const sessionCookie = cookieValue(loginResponse);
 
-    delete process.env.TASKLOOM_TRUST_PROXY;
+    delete process.env.PACKETAGENT_TRUST_PROXY;
     const spoofedForwardedHost = await app.request("/api/app/jobs", {
       method: "POST",
       headers: {
@@ -138,7 +138,7 @@ test("job mutation origin checks only trust forwarded host when proxy trust is e
     assert.equal(spoofedForwardedHost.status, 403);
     assert.deepEqual(await spoofedForwardedHost.json(), { error: "cross-origin requests are not allowed" });
 
-    process.env.TASKLOOM_TRUST_PROXY = "true";
+    process.env.PACKETAGENT_TRUST_PROXY = "true";
     const trustedForwardedHost = await app.request("/api/app/jobs", {
       method: "POST",
       headers: {
@@ -153,15 +153,15 @@ test("job mutation origin checks only trust forwarded host when proxy trust is e
     assert.equal(trustedForwardedHost.status, 403);
     assert.deepEqual(await trustedForwardedHost.json(), { error: "invalid csrf token" });
   } finally {
-    if (previousTrustProxy === undefined) delete process.env.TASKLOOM_TRUST_PROXY;
-    else process.env.TASKLOOM_TRUST_PROXY = previousTrustProxy;
+    if (previousTrustProxy === undefined) delete process.env.PACKETAGENT_TRUST_PROXY;
+    else process.env.PACKETAGENT_TRUST_PROXY = previousTrustProxy;
   }
 });
 
 test("job detail does not expose jobs from another workspace", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const betaJob = enqueueJob({ workspaceId: "beta", type: "test.cross-workspace" });
 
   const response = await app.request(`/api/app/jobs/${betaJob.id}`, {
@@ -176,7 +176,7 @@ test("job detail does not expose jobs from another workspace", async () => {
 test("job cancel does not cancel jobs from another workspace", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const betaJob = enqueueJob({ workspaceId: "beta", type: "test.cross-workspace" });
 
   const response = await app.request(`/api/app/jobs/${betaJob.id}/cancel`, {
@@ -195,7 +195,7 @@ test("job cancel does not cancel jobs from another workspace", async () => {
 test("job creation rejects invalid scheduling fields", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const cases = [
     [{ type: "test.invalid", scheduledAt: "not-a-date" }, "scheduledAt must be a valid date"],
     [{ type: "test.invalid", cron: "not cron" }, "cron must be a valid 5-field expression"],
@@ -218,7 +218,7 @@ test("job creation rejects invalid scheduling fields", async () => {
 test("job list filters to the authenticated workspace with status and limit", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   enqueueJob({ workspaceId: "alpha", type: "test.oldest" });
   enqueueJob({ workspaceId: "beta", type: "test.beta" });
   const newestAlpha = enqueueJob({ workspaceId: "alpha", type: "test.newest" });
@@ -237,21 +237,21 @@ test("job list filters to the authenticated workspace with status and limit", as
 test("job route responses redact sensitive payloads, results, and errors", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const secret = "whk_job_route_secret";
   const job = enqueueJob({
     workspaceId: "alpha",
     type: "test.redaction",
     payload: {
       webhookToken: secret,
-      callbackUrl: `https://taskloom.local/api/public/webhooks/agents/${secret}`,
+      callbackUrl: `https://packetagent.local/api/public/webhooks/agents/${secret}`,
       nested: { authorization: "Bearer provider-secret-1234" },
     },
   });
   mutateStore((data) => {
     const stored = data.jobs.find((entry) => entry.id === job.id);
     assert.ok(stored);
-    stored.result = { shareUrl: "https://taskloom.local/share/share-secret-1234" };
+    stored.result = { shareUrl: "https://packetagent.local/share/share-secret-1234" };
     stored.error = `failed token=${secret} Authorization=provider-secret-1234`;
   });
 
@@ -271,7 +271,7 @@ test("job route responses redact sensitive payloads, results, and errors", async
 test("job management requires an admin role but job reads allow viewers", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const alphaJob = enqueueJob({ workspaceId: "alpha", type: "test.viewer" });
   mutateStore((data) => {
     const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
@@ -306,7 +306,7 @@ test("job management requires an admin role but job reads allow viewers", async 
 test("job creation stores optional scheduling fields in the authenticated workspace", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const response = await app.request("/api/app/jobs", {
     method: "POST",
@@ -333,7 +333,7 @@ test("job creation stores optional scheduling fields in the authenticated worksp
 test("job creation rejects agent runs outside the authenticated workspace", async () => {
   resetStoreForTests();
   const app = createTestApp();
-  const alpha = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const response = await app.request("/api/app/jobs", {
     method: "POST",

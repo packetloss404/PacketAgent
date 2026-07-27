@@ -5,7 +5,7 @@ import {
   mutateStoreAsync,
   type ApiKeyProvider,
   type ApiKeyRecord,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 import { decryptSecret, encryptSecret, loadMasterKey, maskSecret } from "./vault.js";
 
 export interface MaskedApiKey {

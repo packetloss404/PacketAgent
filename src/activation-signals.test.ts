@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { login, retryAgentRun } from "./taskloom-services";
-import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./taskloom-store";
+import { login, retryAgentRun } from "./packetagent-services";
+import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./packetagent-store";
 
 test("retry activation emission is idempotent for a source run", async () => {
   resetStoreForTests();
-  const auth = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "beta@packetagent.local", password: "demo12345" });
   const failed = loadStore().agentRuns.find((entry) => entry.workspaceId === "beta" && entry.status === "failed");
   assert.ok(failed, "expected a failed beta run");
 

@@ -303,7 +303,7 @@ export function createAppPreviewRollbackCommand(
     input.requestedByUserId ?? "",
   ].join(":")).slice(0, 16)}`;
   const command = [
-    "taskloom preview rollback",
+    "packetagent preview rollback",
     `--workspace=${input.current.workspaceId}`,
     `--app=${input.current.appId}`,
     `--from-checkpoint=${input.current.checkpoint.id}`,

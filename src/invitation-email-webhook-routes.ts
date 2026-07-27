@@ -4,7 +4,7 @@ import {
 } from "./invitation-email-reconciliation.js";
 import { resolveInvitationEmailReconciliationConfig } from "./invitation-email.js";
 import { redactedErrorMessage } from "./security/redaction.js";
-import { mutateStoreAsync, recordInvitationEmailProviderStatus } from "./taskloom-store.js";
+import { mutateStoreAsync, recordInvitationEmailProviderStatus } from "./packetagent-store.js";
 
 function errorResponse(c: Context, error: unknown) {
   c.status(((error as Error & { status?: number }).status ?? 500) as 500);
@@ -32,7 +32,7 @@ invitationEmailWebhookRoutes.post("/", async (c) => {
       return c.json(
         {
           error:
-            "reconciliation webhook is disabled; set TASKLOOM_INVITATION_EMAIL_RECONCILIATION_SECRET",
+            "reconciliation webhook is disabled; set PACKETAGENT_INVITATION_EMAIL_RECONCILIATION_SECRET",
         },
         503,
       );

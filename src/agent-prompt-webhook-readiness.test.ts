@@ -5,8 +5,8 @@ import { app } from "./server";
 import {
   generateAgentDraftFromPrompt,
   login,
-} from "./taskloom-services";
-import { resetStoreForTests } from "./taskloom-store";
+} from "./packetagent-services";
+import { resetStoreForTests } from "./packetagent-store";
 
 function authHeaders(cookieValue: string) {
   return {
@@ -30,7 +30,7 @@ test("prompt-generated webhook agent drafts expose trigger readiness in the draf
 
 test("agent prompt route returns webhook readiness for dry-run drafts", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const response = await app.request("/api/app/agents/generate-from-prompt", {
     method: "POST",

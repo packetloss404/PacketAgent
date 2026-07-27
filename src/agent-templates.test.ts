@@ -7,9 +7,9 @@ import {
   login,
   runAgent,
   updateAgent,
-} from "./taskloom-services";
+} from "./packetagent-services";
 import { AGENT_TEMPLATES } from "./agent-templates.js";
-import { resetStoreForTests } from "./taskloom-store";
+import { resetStoreForTests } from "./packetagent-store";
 import { listDefaultToolSummaries } from "./tools/bootstrap.js";
 
 test("agent template catalog exposes built-in templates", () => {
@@ -21,7 +21,7 @@ test("agent template catalog exposes built-in templates", () => {
 
 test("createAgentFromTemplate clones template fields and links templateId", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const { agent } = createAgentFromTemplate(auth.context, "support_triage");
 
@@ -49,13 +49,13 @@ test("agent templates only expose executable runtime tools or setup-required lab
 
 test("createAgentFromTemplate rejects unknown template", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   assert.throws(() => createAgentFromTemplate(auth.context, "nope"), /agent template not found/);
 });
 
 test("agent input schema is validated and persisted", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const { agent } = createAgent(auth.context, {
     name: "Schema agent",
@@ -89,7 +89,7 @@ test("agent input schema is validated and persisted", () => {
 
 test("runAgent validates required inputs and records logs", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const { agent } = createAgentFromTemplate(auth.context, "release_audit");
 
@@ -114,7 +114,7 @@ test("runAgent validates required inputs and records logs", async () => {
 
 test("runAgent rejects invalid url and enum inputs", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const { agent } = createAgentFromTemplate(auth.context, "release_audit");
 

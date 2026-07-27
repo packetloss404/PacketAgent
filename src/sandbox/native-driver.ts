@@ -5,7 +5,7 @@
  * supplied command via `child_process.spawn({ shell: true })` on the host
  * directly. There is NO isolation: filesystem, network, env, and process
  * trees are all shared with the host. This is clearly insecure and is only
- * intended for development boxes that opt in via TASKLOOM_SANDBOX_DRIVER=native
+ * intended for development boxes that opt in via PACKETAGENT_SANDBOX_DRIVER=native
  * or by simply having no Docker installed.
  */
 

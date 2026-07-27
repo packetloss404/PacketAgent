@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { fileLeaderLock, noopLeaderLock } from "./scheduler-lock.js";
 
 function makeTempDir(): string {
-  const dir = path.join(tmpdir(), `taskloom-leader-${randomUUID()}`);
+  const dir = path.join(tmpdir(), `packetagent-leader-${randomUUID()}`);
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -134,7 +134,7 @@ test("fileLeaderLock treats a corrupt JSON file as no-holder and acquires", asyn
 });
 
 test("fileLeaderLock acquire throws when parent directory does not exist", async () => {
-  const missing = path.join(tmpdir(), `taskloom-leader-missing-${randomUUID()}`, "scheduler.lock");
+  const missing = path.join(tmpdir(), `packetagent-leader-missing-${randomUUID()}`, "scheduler.lock");
   const lock = fileLeaderLock({ path: missing, processId: "proc-a", ttlMs: 5_000, now: () => 1_000 });
   await assert.rejects(() => lock.acquire(), /parent directory/);
 });

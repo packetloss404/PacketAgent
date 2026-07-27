@@ -187,7 +187,7 @@ test("call() parses tool_calls in non-streaming response", async () => {
               {
                 id: "call_abc",
                 type: "function",
-                function: { name: "search", arguments: '{"q":"taskloom"}' },
+                function: { name: "search", arguments: '{"q":"packetagent"}' },
               },
             ],
           },
@@ -209,7 +209,7 @@ test("call() parses tool_calls in non-streaming response", async () => {
   assert.equal(result.toolCalls?.length, 1);
   assert.equal(result.toolCalls?.[0].id, "call_abc");
   assert.equal(result.toolCalls?.[0].name, "search");
-  assert.deepEqual(result.toolCalls?.[0].input, { q: "taskloom" });
+  assert.deepEqual(result.toolCalls?.[0].input, { q: "packetagent" });
 });
 
 test("stream() aggregates split tool_call argument deltas into a parsed object", async () => {

@@ -14,8 +14,8 @@ test("builder publish dashboard is deterministic and composes preview and produc
     runtimeEnv: {
       NODE_ENV: "production",
       PORT: "8484",
-      TASKLOOM_PUBLISH_ROOT: "data/published-apps",
-      TASKLOOM_STORE: "sqlite",
+      PACKETAGENT_PUBLISH_ROOT: "data/published-apps",
+      PACKETAGENT_STORE: "sqlite",
     },
     validation: {
       build: { phase: "passed" as const },
@@ -60,8 +60,8 @@ test("builder publish dashboard reports required env and validation blockers as 
     runtimeEnv: {
       NODE_ENV: "production",
       PORT: "8484",
-      TASKLOOM_PUBLISH_ROOT: "data/published-apps",
-      TASKLOOM_STORE: "sqlite",
+      PACKETAGENT_PUBLISH_ROOT: "data/published-apps",
+      PACKETAGENT_STORE: "sqlite",
       OPENAI_API_KEY: "",
     },
     validation: {
@@ -104,8 +104,8 @@ test("builder publish dashboard summarizes integration readiness without blockin
     runtimeEnv: {
       NODE_ENV: "production",
       PORT: "8484",
-      TASKLOOM_PUBLISH_ROOT: "data/published-apps",
-      TASKLOOM_STORE: "sqlite",
+      PACKETAGENT_PUBLISH_ROOT: "data/published-apps",
+      PACKETAGENT_STORE: "sqlite",
     },
     validation: {
       build: { phase: "passed" },

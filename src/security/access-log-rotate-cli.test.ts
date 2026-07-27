@@ -33,7 +33,7 @@ test("returns 2 with a useful err message when neither --path nor env path is se
   assert.equal(code, 2);
   assert.equal(io.out.length, 0);
   assert.equal(io.err.length, 1);
-  assert.match(io.err[0], /access-log:rotate requires --path=<file> or TASKLOOM_ACCESS_LOG_PATH/);
+  assert.match(io.err[0], /access-log:rotate requires --path=<file> or PACKETAGENT_ACCESS_LOG_PATH/);
 });
 
 test("returns 0 with rotated:false when the configured path does not exist", async () => {
@@ -95,7 +95,7 @@ test("--max-files=<n> argv overrides env value and applies to multiple rotations
     let io = makeIo();
     let code = await runAccessLogRotateCli({
       argv: [`--path=${target}`, "--max-files=2"],
-      env: { TASKLOOM_ACCESS_LOG_MAX_FILES: "10" },
+      env: { PACKETAGENT_ACCESS_LOG_MAX_FILES: "10" },
       out: io.write.out,
       err: io.write.err,
     });
@@ -109,7 +109,7 @@ test("--max-files=<n> argv overrides env value and applies to multiple rotations
     io = makeIo();
     code = await runAccessLogRotateCli({
       argv: [`--path=${target}`, "--max-files=2"],
-      env: { TASKLOOM_ACCESS_LOG_MAX_FILES: "10" },
+      env: { PACKETAGENT_ACCESS_LOG_MAX_FILES: "10" },
       out: io.write.out,
       err: io.write.err,
     });
@@ -140,7 +140,7 @@ test("--max-files=<n> argv overrides env value and applies to multiple rotations
   }
 });
 
-test("TASKLOOM_ACCESS_LOG_PATH env value is honored when --path not given", async () => {
+test("PACKETAGENT_ACCESS_LOG_PATH env value is honored when --path not given", async () => {
   const dir = makeTempDir();
   try {
     const target = join(dir, "from-env.log");
@@ -148,7 +148,7 @@ test("TASKLOOM_ACCESS_LOG_PATH env value is honored when --path not given", asyn
     const io = makeIo();
     const code = await runAccessLogRotateCli({
       argv: [],
-      env: { TASKLOOM_ACCESS_LOG_PATH: target },
+      env: { PACKETAGENT_ACCESS_LOG_PATH: target },
       out: io.write.out,
       err: io.write.err,
     });
@@ -192,7 +192,7 @@ test("output line is valid JSON containing command, path, maxFiles, rotated, fro
   }
 });
 
-test("falls back to TASKLOOM_ACCESS_LOG_MAX_FILES env when argv flag absent", async () => {
+test("falls back to PACKETAGENT_ACCESS_LOG_MAX_FILES env when argv flag absent", async () => {
   const dir = makeTempDir();
   try {
     const target = join(dir, "env-max.log");
@@ -200,7 +200,7 @@ test("falls back to TASKLOOM_ACCESS_LOG_MAX_FILES env when argv flag absent", as
     const io = makeIo();
     const code = await runAccessLogRotateCli({
       argv: [`--path=${target}`],
-      env: { TASKLOOM_ACCESS_LOG_MAX_FILES: "7" },
+      env: { PACKETAGENT_ACCESS_LOG_MAX_FILES: "7" },
       out: io.write.out,
       err: io.write.err,
     });
@@ -220,7 +220,7 @@ test("ignores invalid argv max-files and falls through to env default", async ()
     const io = makeIo();
     const code = await runAccessLogRotateCli({
       argv: [`--path=${target}`, "--max-files=0"],
-      env: { TASKLOOM_ACCESS_LOG_MAX_FILES: "4" },
+      env: { PACKETAGENT_ACCESS_LOG_MAX_FILES: "4" },
       out: io.write.out,
       err: io.write.err,
     });

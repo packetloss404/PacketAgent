@@ -88,10 +88,10 @@ export interface AppPublishRuntimeConfig {
   workingDirectory: ".";
   startCommand: "npm run start";
   portEnv: "PORT";
-  storeEnv: "TASKLOOM_STORE";
-  publishRootEnv: "TASKLOOM_PUBLISH_ROOT";
-  publicBaseUrlEnv: "TASKLOOM_PUBLIC_APP_BASE_URL";
-  privateBaseUrlEnv: "TASKLOOM_PRIVATE_APP_BASE_URL";
+  storeEnv: "PACKETAGENT_STORE";
+  publishRootEnv: "PACKETAGENT_PUBLISH_ROOT";
+  publicBaseUrlEnv: "PACKETAGENT_PUBLIC_APP_BASE_URL";
+  privateBaseUrlEnv: "PACKETAGENT_PRIVATE_APP_BASE_URL";
   healthBasePath: "/api/health";
   appRouteBase: string;
   agentRouteBase: string | null;
@@ -206,45 +206,45 @@ const DEFAULT_LOCAL_PUBLISH_ROOT = "data/published-apps";
 const DEFAULT_WORKSPACE_SLUG = "workspace";
 const DEFAULT_DRAFT_SLUG = "generated-app";
 const DEFAULT_AGENT_SLUG = "generated-agent";
-const DEFAULT_PUBLIC_BASE_URL = "https://apps.taskloom.example";
+const DEFAULT_PUBLIC_BASE_URL = "https://apps.packetagent.example";
 const DEFAULT_PRIVATE_BASE_URL = "http://localhost:8484";
 const DEFAULT_PACKAGE_VERSION = "0.1.0";
 
 const BASE_REQUIRED_ENV = [
   "NODE_ENV",
   "PORT",
-  "TASKLOOM_PUBLISH_ROOT",
-  "TASKLOOM_STORE",
+  "PACKETAGENT_PUBLISH_ROOT",
+  "PACKETAGENT_STORE",
 ];
 
 const BASE_OPTIONAL_ENV = [
-  "TASKLOOM_ACCESS_LOG_MODE",
-  "TASKLOOM_PRIVATE_APP_BASE_URL",
-  "TASKLOOM_PUBLIC_APP_BASE_URL",
-  "TASKLOOM_SCHEDULER_LEADER_MODE",
+  "PACKETAGENT_ACCESS_LOG_MODE",
+  "PACKETAGENT_PRIVATE_APP_BASE_URL",
+  "PACKETAGENT_PUBLIC_APP_BASE_URL",
+  "PACKETAGENT_SCHEDULER_LEADER_MODE",
 ];
 
 const AGENT_REQUIRED_ENV = [
-  "TASKLOOM_AGENT_BUNDLE_PATH",
+  "PACKETAGENT_AGENT_BUNDLE_PATH",
 ];
 
 const AGENT_OPTIONAL_ENV = [
-  "TASKLOOM_AGENT_RUN_TIMEOUT_MS",
-  "TASKLOOM_AGENT_TOOL_ALLOWLIST",
+  "PACKETAGENT_AGENT_RUN_TIMEOUT_MS",
+  "PACKETAGENT_AGENT_TOOL_ALLOWLIST",
 ];
 
 const ENV_PURPOSES: Record<string, string> = {
   NODE_ENV: "Set to production for hosted app and agent bundles.",
   PORT: "Port exposed by the Hono server.",
-  TASKLOOM_PUBLISH_ROOT: "Root directory containing generated publish bundles.",
-  TASKLOOM_STORE: "Selects the runtime store posture for the API.",
-  TASKLOOM_ACCESS_LOG_MODE: "Controls hosted request logging.",
-  TASKLOOM_AGENT_BUNDLE_PATH: "Filesystem path for generated agent bundle metadata and prompts.",
-  TASKLOOM_AGENT_RUN_TIMEOUT_MS: "Caps generated agent execution time during smoke checks.",
-  TASKLOOM_AGENT_TOOL_ALLOWLIST: "Restricts tools exposed to generated agent bundles.",
-  TASKLOOM_PRIVATE_APP_BASE_URL: "Internal operator URL used for admin smoke checks.",
-  TASKLOOM_PUBLIC_APP_BASE_URL: "External URL handed to public users after publish.",
-  TASKLOOM_SCHEDULER_LEADER_MODE: "Coordinates background work when more than one app instance runs.",
+  PACKETAGENT_PUBLISH_ROOT: "Root directory containing generated publish bundles.",
+  PACKETAGENT_STORE: "Selects the runtime store posture for the API.",
+  PACKETAGENT_ACCESS_LOG_MODE: "Controls hosted request logging.",
+  PACKETAGENT_AGENT_BUNDLE_PATH: "Filesystem path for generated agent bundle metadata and prompts.",
+  PACKETAGENT_AGENT_RUN_TIMEOUT_MS: "Caps generated agent execution time during smoke checks.",
+  PACKETAGENT_AGENT_TOOL_ALLOWLIST: "Restricts tools exposed to generated agent bundles.",
+  PACKETAGENT_PRIVATE_APP_BASE_URL: "Internal operator URL used for admin smoke checks.",
+  PACKETAGENT_PUBLIC_APP_BASE_URL: "External URL handed to public users after publish.",
+  PACKETAGENT_SCHEDULER_LEADER_MODE: "Coordinates background work when more than one app instance runs.",
 };
 
 export function buildAppPublishReadiness(input: AppPublishReadinessInput = {}): AppPublishReadiness {
@@ -357,10 +357,10 @@ function buildRuntimeConfig(
     workingDirectory: ".",
     startCommand: "npm run start",
     portEnv: "PORT",
-    storeEnv: "TASKLOOM_STORE",
-    publishRootEnv: "TASKLOOM_PUBLISH_ROOT",
-    publicBaseUrlEnv: "TASKLOOM_PUBLIC_APP_BASE_URL",
-    privateBaseUrlEnv: "TASKLOOM_PRIVATE_APP_BASE_URL",
+    storeEnv: "PACKETAGENT_STORE",
+    publishRootEnv: "PACKETAGENT_PUBLISH_ROOT",
+    publicBaseUrlEnv: "PACKETAGENT_PUBLIC_APP_BASE_URL",
+    privateBaseUrlEnv: "PACKETAGENT_PRIVATE_APP_BASE_URL",
     healthBasePath: "/api/health",
     appRouteBase: `/app/${workspaceSlug}/${draftSlug}`,
     agentRouteBase: agentSlug ? `/agent/${workspaceSlug}/${agentSlug}` : null,
@@ -394,7 +394,7 @@ function buildPublishCommands(bundleKind: AppPublishBundleKind, localPublishPath
     },
     {
       id: "write-publish-manifest",
-      command: `taskloom internal write-publish-manifest --output ${localPublishPath}/publish-artifacts.json`,
+      command: `packetagent internal write-publish-manifest --output ${localPublishPath}/publish-artifacts.json`,
       required: true,
       produces: [`${localPublishPath}/publish-artifacts.json`],
       description: "Record the deterministic publish artifact manifest used by one-click hosting.",
@@ -402,7 +402,7 @@ function buildPublishCommands(bundleKind: AppPublishBundleKind, localPublishPath
     ...(includesAgent(bundleKind)
       ? [{
         id: "validate-agent-bundle",
-        command: `taskloom internal validate-agent-bundle --bundle ${localPublishPath}/agent`,
+        command: `packetagent internal validate-agent-bundle --bundle ${localPublishPath}/agent`,
         required: true,
         produces: [`${localPublishPath}/agent/agent-manifest.json`],
         description: "Validate generated agent prompts, tool policy, and runtime metadata before publish.",
@@ -560,21 +560,21 @@ function buildDockerComposeExport(
 ): AppPublishDockerComposeExport {
   return {
     fileName: "docker-compose.publish.yml",
-    projectName: `taskloom-${workspaceSlug}-${draftSlug}`,
+    projectName: `packetagent-${workspaceSlug}-${draftSlug}`,
     services: [
       {
-        name: "taskloom-app",
+        name: "packetagent-app",
         imageHint: "node:22-alpine",
         buildContext: ".",
         ports: ["${PORT:-8484}:8484"],
         envFile: ".env.publish",
         environment: {
-          TASKLOOM_APP_BUNDLE_PATH: `/app/${localPublishPath}/bundle`,
-          TASKLOOM_PUBLISH_MANIFEST_PATH: `/app/${localPublishPath}/publish-artifacts.json`,
-          TASKLOOM_PUBLISH_ROOT: `/app/${localPublishPath}`,
+          PACKETAGENT_APP_BUNDLE_PATH: `/app/${localPublishPath}/bundle`,
+          PACKETAGENT_PUBLISH_MANIFEST_PATH: `/app/${localPublishPath}/publish-artifacts.json`,
+          PACKETAGENT_PUBLISH_ROOT: `/app/${localPublishPath}`,
         },
         volumes: [`${localPublishPath}:/app/${localPublishPath}:ro`],
-        dependsOn: ["taskloom-db"],
+        dependsOn: ["packetagent-db"],
         healthcheck: {
           test: "CMD-SHELL curl -fsS http://localhost:${PORT:-8484}/api/health/ready || exit 1",
           interval: "10s",
@@ -583,30 +583,30 @@ function buildDockerComposeExport(
         },
       },
       {
-        name: "taskloom-db",
+        name: "packetagent-db",
         imageHint: "postgres:16-alpine",
-        volumes: ["taskloom-db-data:/var/lib/postgresql/data"],
+        volumes: ["packetagent-db-data:/var/lib/postgresql/data"],
       },
       ...(withAgent
         ? [{
-          name: "taskloom-agent",
+          name: "packetagent-agent",
           imageHint: "node:22-alpine",
           buildContext: ".",
           envFile: ".env.publish",
           volumes: [`${localPublishPath}/agent:/app/${localPublishPath}/agent:ro`],
-          dependsOn: ["taskloom-app"],
+          dependsOn: ["packetagent-app"],
         }]
         : []),
     ],
-    networks: ["taskloom-publish"],
-    volumes: ["taskloom-db-data"],
+    networks: ["packetagent-publish"],
+    volumes: ["packetagent-db-data"],
     outline: [
-      "Build taskloom-app from the repository root with Node 22 or newer.",
+      "Build packetagent-app from the repository root with Node 22 or newer.",
       `Mount ${localPublishPath} read-only; the generated app bundle is expected at ${localPublishPath}/bundle.`,
-      `Set TASKLOOM_PUBLISH_MANIFEST_PATH to ${localPublishPath}/publish-artifacts.json inside the app container.`,
+      `Set PACKETAGENT_PUBLISH_MANIFEST_PATH to ${localPublishPath}/publish-artifacts.json inside the app container.`,
       "Expose PORT from the app service and route it through the hosting load balancer.",
-      "Attach taskloom-db only when the selected TASKLOOM_STORE posture needs managed Postgres.",
-      ...(withAgent ? ["Start taskloom-agent with the same read-only generated agent bundle metadata."] : []),
+      "Attach packetagent-db only when the selected PACKETAGENT_STORE posture needs managed Postgres.",
+      ...(withAgent ? ["Start packetagent-agent with the same read-only generated agent bundle metadata."] : []),
       "Run the ready health check before shifting public traffic.",
     ],
   };
@@ -618,7 +618,7 @@ function buildRollbackPlan(localPublishPath: string): AppPublishRollbackPlan {
   return {
     strategy: "previous_publish_pointer",
     previousPointerPath,
-    command: `taskloom publish rollback --from ${localPublishPath} --to ${previousPointerPath}`,
+    command: `packetagent publish rollback --from ${localPublishPath} --to ${previousPointerPath}`,
     note: `Keep the previous publish directory until smoke checks pass; rollback by repointing hosting to the last known-good directory beside ${localPublishPath}.`,
   };
 }
@@ -630,7 +630,7 @@ function buildRuntimeAssumptions(
   return [
     {
       id: "hono-vite-runtime",
-      summary: "Existing Taskloom runtime hosts generated publishes.",
+      summary: "Existing PacketAgent runtime hosts generated publishes.",
       detail: "The publish package uses the existing Hono API/static server and Vite web build instead of introducing a separate generated-app runtime.",
     },
     {
@@ -762,7 +762,7 @@ function buildRollbackSemantics(
 ): AppPublishRollbackSemantics {
   return {
     command: previousPublishId
-      ? `taskloom publish rollback --workspace ${workspaceSlug} --app ${draftSlug} --to ${previousPublishId}`
+      ? `packetagent publish rollback --workspace ${workspaceSlug} --app ${draftSlug} --to ${previousPublishId}`
       : rollback.command,
     restores: [
       "hosting pointer",
@@ -826,8 +826,8 @@ function envChecklistItem(
 }
 
 function envSource(name: string): AppPublishEnvChecklistItem["source"] {
-  if (name.startsWith("TASKLOOM_AGENT_")) return "bundle";
-  if (name.startsWith("TASKLOOM_") || name === "NODE_ENV" || name === "PORT") return "runtime";
+  if (name.startsWith("PACKETAGENT_AGENT_")) return "bundle";
+  if (name.startsWith("PACKETAGENT_") || name === "NODE_ENV" || name === "PORT") return "runtime";
   return "operator";
 }
 

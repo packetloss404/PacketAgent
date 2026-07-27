@@ -277,7 +277,7 @@ export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinit
             accept: "application/vnd.github+json",
             authorization: `Bearer ${token}`,
             "content-type": "application/json",
-            "user-agent": "taskloom-agent-tools",
+            "user-agent": "packetagent-agent-tools",
             "x-github-api-version": "2022-11-28",
           },
           ...(requestBody ? { body: requestBody } : {}),

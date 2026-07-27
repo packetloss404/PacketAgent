@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
-import { resetStoreForTests } from "./taskloom-store";
+import { resetStoreForTests } from "./packetagent-store";
 import { workflowRoutes } from "./workflow-routes";
 
 const workflowEndpoints = [

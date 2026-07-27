@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { migrateDatabase } from "./db/cli.js";
-import { upsertAgentRun, type AgentRunRecord, type TaskloomData } from "./taskloom-store.js";
+import { upsertAgentRun, type AgentRunRecord, type PacketAgentData } from "./packetagent-store.js";
 
 interface AgentRunRow {
   id: string;
@@ -28,8 +28,8 @@ interface AgentRunRow {
   updated_at: string;
 }
 
-function makeStore(records: AgentRunRecord[] = []): TaskloomData {
-  return { agentRuns: [...records] } as unknown as TaskloomData;
+function makeStore(records: AgentRunRecord[] = []): PacketAgentData {
+  return { agentRuns: [...records] } as unknown as PacketAgentData;
 }
 
 function readDedicated(dbPath: string): AgentRunRow[] {
@@ -49,21 +49,21 @@ function readDedicated(dbPath: string): AgentRunRow[] {
 }
 
 function withSqliteEnv(dbPath: string) {
-  const previousStore = process.env.TASKLOOM_STORE;
-  const previousDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   return () => {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
-    if (previousDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = previousDbPath;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    if (previousDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = previousDbPath;
   };
 }
 
 test("upsertAgentRun dual-writes JSON-side and dedicated agent_runs table in SQLite mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-agent-runs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-agent-runs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -100,8 +100,8 @@ test("upsertAgentRun dual-writes JSON-side and dedicated agent_runs table in SQL
 });
 
 test("upsertAgentRun replaces both sides consistently when called twice with the same id", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-agent-runs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-agent-runs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -143,8 +143,8 @@ test("upsertAgentRun replaces both sides consistently when called twice with the
 });
 
 test("upsertAgentRun round-trips transcript, logs, and toolCalls through both sides", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-agent-runs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-agent-runs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
@@ -213,11 +213,11 @@ test("upsertAgentRun round-trips transcript, logs, and toolCalls through both si
 });
 
 test("upsertAgentRun is a no-op for the dedicated agent_runs table in JSON-default mode", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-agent-runs-dual-"));
-  const dbPath = join(tempDir, "taskloom.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-agent-runs-dual-"));
+  const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
-  const previousStore = process.env.TASKLOOM_STORE;
-  delete process.env.TASKLOOM_STORE;
+  const previousStore = process.env.PACKETAGENT_STORE;
+  delete process.env.PACKETAGENT_STORE;
   try {
     const data = makeStore();
     upsertAgentRun(
@@ -236,8 +236,8 @@ test("upsertAgentRun is a no-op for the dedicated agent_runs table in JSON-defau
     const dedicated = readDedicated(dbPath);
     assert.equal(dedicated.length, 0);
   } finally {
-    if (previousStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = previousStore;
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
     rmSync(tempDir, { recursive: true, force: true });
   }
 });

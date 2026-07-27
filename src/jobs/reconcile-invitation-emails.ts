@@ -3,9 +3,9 @@ import {
   mutateStore as defaultMutateStore,
   type InvitationEmailDeliveryRecord,
   type JobRecord,
-  type TaskloomData,
+  type PacketAgentData,
   type WorkspaceInvitationRecord,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 import { applyInvitationEmailReconciliation } from "../invitation-email-reconciliation.js";
 import { enqueueJob } from "./store.js";
 import { resolveInvitationEmailRetryMaxAttempts } from "../invitation-email.js";
@@ -49,8 +49,8 @@ export interface ReconcileInvitationEmailsResult {
 }
 
 export interface ReconcileInvitationEmailsDeps {
-  loadStore?: () => TaskloomData;
-  mutateStore?: <T>(mutator: (data: TaskloomData) => T) => T;
+  loadStore?: () => PacketAgentData;
+  mutateStore?: <T>(mutator: (data: PacketAgentData) => T) => T;
   apply?: typeof applyInvitationEmailReconciliation;
   enqueueRetry?: (delivery: InvitationEmailDeliveryRecord) => string;
   now?: () => string;
@@ -197,7 +197,7 @@ function reconciliationFailureDetail(
   }
 }
 
-function defaultEnqueueRetry(data: TaskloomData, delivery: InvitationEmailDeliveryRecord): string {
+function defaultEnqueueRetry(data: PacketAgentData, delivery: InvitationEmailDeliveryRecord): string {
   const invitation = findInvitation(data, delivery.invitationId, delivery.workspaceId);
   const payload: Record<string, unknown> = {
     invitationId: delivery.invitationId,
@@ -216,7 +216,7 @@ function defaultEnqueueRetry(data: TaskloomData, delivery: InvitationEmailDelive
 }
 
 function findInvitation(
-  data: TaskloomData,
+  data: PacketAgentData,
   invitationId: string,
   workspaceId: string,
 ): WorkspaceInvitationRecord | undefined {

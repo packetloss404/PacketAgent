@@ -18,15 +18,15 @@ import {
   mutateStoreAsync,
   resetStoreForTests,
   upsertRequirement,
-} from "./taskloom-store";
+} from "./packetagent-store";
 
 const STORE_ENV_KEYS = [
-  "TASKLOOM_STORE",
-  "TASKLOOM_DB_PATH",
+  "PACKETAGENT_STORE",
+  "PACKETAGENT_DB_PATH",
   "DATABASE_URL",
-  "TASKLOOM_DATABASE_URL",
-  "TASKLOOM_MANAGED_DATABASE_URL",
-  "TASKLOOM_DATABASE_TOPOLOGY",
+  "PACKETAGENT_DATABASE_URL",
+  "PACKETAGENT_MANAGED_DATABASE_URL",
+  "PACKETAGENT_DATABASE_TOPOLOGY",
 ] as const;
 
 type StoreEnvKey = (typeof STORE_ENV_KEYS)[number];
@@ -56,12 +56,12 @@ async function withStoreEnv(
 }
 
 test("JSON async load and mutate reuse the current store behavior", async () => {
-  await withStoreEnv({ TASKLOOM_STORE: "json" }, async () => {
+  await withStoreEnv({ PACKETAGENT_STORE: "json" }, async () => {
     const seeded = resetStoreForTests();
     const loaded = await loadStoreAsync();
     assert.equal(loaded, seeded);
     assert.equal(loaded.workspaces.some((entry) => entry.id === "alpha"), true);
-    assert.equal((await findUserByEmailIndexedAsync("ALPHA@TASKLOOM.LOCAL"))?.id, "user_alpha");
+    assert.equal((await findUserByEmailIndexedAsync("ALPHA@PACKETAGENT.LOCAL"))?.id, "user_alpha");
     assert.equal((await findWorkspaceMembershipIndexedAsync("alpha", "user_alpha"))?.role, "owner");
     assert.equal((await findWorkspaceBriefIndexedAsync("alpha"))?.workspaceId, "alpha");
     assert.equal((await listAgentsForWorkspaceIndexedAsync("alpha")).length > 0, true);
@@ -88,7 +88,7 @@ test("JSON async load and mutate reuse the current store behavior", async () => 
 
 test("managed and Postgres modes require a managed database URL for async wrappers", async () => {
   for (const storeMode of ["managed", "postgres", "postgresql"]) {
-    await withStoreEnv({ TASKLOOM_STORE: storeMode }, async () => {
+    await withStoreEnv({ PACKETAGENT_STORE: storeMode }, async () => {
       await assert.rejects(
         loadStoreAsync(),
         (error) => {
@@ -112,7 +112,7 @@ test("managed and Postgres modes require a managed database URL for async wrappe
 });
 
 test("synchronous JSON and SQLite APIs still return direct values", async () => {
-  await withStoreEnv({ TASKLOOM_STORE: "json" }, () => {
+  await withStoreEnv({ PACKETAGENT_STORE: "json" }, () => {
     resetStoreForTests();
     const result = mutateStore((data) => {
       upsertRequirement(data, {
@@ -130,9 +130,9 @@ test("synchronous JSON and SQLite APIs still return direct values", async () => 
     assert.equal(loadStore().requirements.some((entry) => entry.id === "req_sync_json_boundary"), true);
   });
 
-  const tempDir = mkdtempSync(join(tmpdir(), "taskloom-async-boundary-sync-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-async-boundary-sync-"));
   try {
-    await withStoreEnv({ TASKLOOM_STORE: "sqlite", TASKLOOM_DB_PATH: join(tempDir, "taskloom.sqlite") }, () => {
+    await withStoreEnv({ PACKETAGENT_STORE: "sqlite", PACKETAGENT_DB_PATH: join(tempDir, "packetagent.sqlite") }, () => {
       resetStoreForTests();
       const result = mutateStore((data) => {
         upsertRequirement(data, {
@@ -157,14 +157,14 @@ test("synchronous JSON and SQLite APIs still return direct values", async () => 
 
 test("synchronous APIs stay guarded when managed database hints are configured", async () => {
   await withStoreEnv({
-    TASKLOOM_STORE: "json",
-    DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "json",
+    DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, () => {
     assert.throws(
       () => loadStore(),
       (error) => {
         assert.ok(error instanceof ManagedDatabaseStoreBoundaryError);
-        assert.equal(error.code, "TASKLOOM_MANAGED_DATABASE_SYNC_ADAPTER_GAP");
+        assert.equal(error.code, "PACKETAGENT_MANAGED_DATABASE_SYNC_ADAPTER_GAP");
         assert.match(error.message, /DATABASE_URL/);
         return true;
       },
@@ -184,16 +184,16 @@ test("synchronous APIs stay guarded when managed database hints are configured",
 
 test("synchronous managed Postgres store stays guarded at the boundary", async () => {
   await withStoreEnv({
-    TASKLOOM_STORE: "postgres",
-    TASKLOOM_MANAGED_DATABASE_URL: "postgres://taskloom:secret@db.example.com/taskloom",
+    PACKETAGENT_STORE: "postgres",
+    PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
   }, () => {
     assert.throws(
       () => loadStore(),
       (error) => {
         assert.ok(error instanceof ManagedDatabaseStoreBoundaryError);
-        assert.equal(error.code, "TASKLOOM_MANAGED_DATABASE_SYNC_ADAPTER_GAP");
+        assert.equal(error.code, "PACKETAGENT_MANAGED_DATABASE_SYNC_ADAPTER_GAP");
         assert.equal(error.storeMode, "postgres");
-        assert.deepEqual(error.managedDatabaseUrlKeys, ["TASKLOOM_MANAGED_DATABASE_URL"]);
+        assert.deepEqual(error.managedDatabaseUrlKeys, ["PACKETAGENT_MANAGED_DATABASE_URL"]);
         return true;
       },
     );

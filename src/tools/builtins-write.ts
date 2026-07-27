@@ -5,7 +5,7 @@ import {
   upsertImplementationPlanItem,
   upsertWorkflowConcern,
   type ActivityRecord,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 import type { ToolDefinition } from "./types.js";
 
 function nowIso(): string {

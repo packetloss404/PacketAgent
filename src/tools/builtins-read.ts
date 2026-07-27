@@ -4,7 +4,7 @@ import {
   listRequirementsForWorkspace,
   listImplementationPlanItemsForWorkspace,
   listWorkflowConcernsForWorkspace,
-} from "../taskloom-store.js";
+} from "../packetagent-store.js";
 import type { ToolDefinition } from "./types.js";
 
 export const readWorkflowBriefTool: ToolDefinition = {

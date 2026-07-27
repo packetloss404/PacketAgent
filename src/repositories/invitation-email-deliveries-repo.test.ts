@@ -10,7 +10,7 @@ import {
   type InvitationEmailDeliveriesRepository,
   type InvitationEmailDeliveriesRepositoryDeps,
 } from "./invitation-email-deliveries-repo.js";
-import type { InvitationEmailDeliveryRecord, TaskloomData } from "../taskloom-store.js";
+import type { InvitationEmailDeliveryRecord, PacketAgentData } from "../packetagent-store.js";
 
 function makeRecord(
   overrides: Partial<InvitationEmailDeliveryRecord> & { id: string; createdAt: string },
@@ -38,29 +38,29 @@ function makeRecord(
 function makeJsonRepo(): InvitationEmailDeliveriesRepository {
   const data = {
     invitationEmailDeliveries: [] as InvitationEmailDeliveryRecord[],
-  } as unknown as TaskloomData;
+  } as unknown as PacketAgentData;
   const deps: InvitationEmailDeliveriesRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonInvitationEmailDeliveriesRepository(deps);
 }
 
 function withTempSqlite(testFn: (repo: InvitationEmailDeliveriesRepository) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-invitation-email-repo-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-invitation-email-repo-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = sqliteInvitationEmailDeliveriesRepository({ dbPath });
     testFn(repo);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 }
@@ -85,7 +85,7 @@ test("upsert then list returns the record verbatim", () => {
       workspaceId: "ws_a",
       invitationId: "inv_a",
       recipientEmail: "alice@example.com",
-      subject: "Welcome to Taskloom",
+      subject: "Welcome to PacketAgent",
       status: "pending",
       provider: "webhook",
       mode: "webhook",
@@ -235,42 +235,42 @@ test("optional fields round-trip undefined and populated values", () => {
 });
 
 test("createInvitationEmailDeliveriesRepository selects implementation by env", () => {
-  const prevStore = process.env.TASKLOOM_STORE;
+  const prevStore = process.env.PACKETAGENT_STORE;
   try {
-    delete process.env.TASKLOOM_STORE;
+    delete process.env.PACKETAGENT_STORE;
     const data = {
       invitationEmailDeliveries: [] as InvitationEmailDeliveryRecord[],
-    } as unknown as TaskloomData;
+    } as unknown as PacketAgentData;
     const json = createInvitationEmailDeliveriesRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: TaskloomData) => T) => mutator(data),
+      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     json.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
     assert.equal(json.count(), 1);
     assert.equal(data.invitationEmailDeliveries.length, 1);
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
   }
 });
 
 test("createInvitationEmailDeliveriesRepository returns sqlite impl when env requests it", () => {
-  const dir = mkdtempSync(join(tmpdir(), "taskloom-invitation-email-repo-factory-"));
-  const dbPath = join(dir, "taskloom.sqlite");
-  const prevStore = process.env.TASKLOOM_STORE;
-  const prevDbPath = process.env.TASKLOOM_DB_PATH;
-  process.env.TASKLOOM_STORE = "sqlite";
-  process.env.TASKLOOM_DB_PATH = dbPath;
+  const dir = mkdtempSync(join(tmpdir(), "packetagent-invitation-email-repo-factory-"));
+  const dbPath = join(dir, "packetagent.sqlite");
+  const prevStore = process.env.PACKETAGENT_STORE;
+  const prevDbPath = process.env.PACKETAGENT_DB_PATH;
+  process.env.PACKETAGENT_STORE = "sqlite";
+  process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = createInvitationEmailDeliveriesRepository({ dbPath });
     repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
     assert.equal(repo.count(), 1);
     assert.equal(repo.list({ workspaceId: "ws_a" })[0]?.id, "a");
   } finally {
-    if (prevStore === undefined) delete process.env.TASKLOOM_STORE;
-    else process.env.TASKLOOM_STORE = prevStore;
-    if (prevDbPath === undefined) delete process.env.TASKLOOM_DB_PATH;
-    else process.env.TASKLOOM_DB_PATH = prevDbPath;
+    if (prevStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = prevStore;
+    if (prevDbPath === undefined) delete process.env.PACKETAGENT_DB_PATH;
+    else process.env.PACKETAGENT_DB_PATH = prevDbPath;
     rmSync(dir, { recursive: true, force: true });
   }
 });

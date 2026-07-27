@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { login } from "./taskloom-services";
-import { loadStore, resetStoreForTests } from "./taskloom-store";
+import { login } from "./packetagent-services";
+import { loadStore, resetStoreForTests } from "./packetagent-store";
 import { getWorkflowOverview } from "./workflow-service";
 import {
   applyWorkflowTemplate,
@@ -31,7 +31,7 @@ test("generateWorkflowDraftFromPrompt extracts brief, requirements, and plan ite
 
 test("generateAndApplyWorkflowDraft writes records and bumps activation facts when apply=true", async () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const result = await generateAndApplyWorkflowDraft(auth.context, {
     prompt: "Activate new vendors with structured intake, contract validation, and release confirmation for procurement leads.",
@@ -56,7 +56,7 @@ test("generateAndApplyWorkflowDraft writes records and bumps activation facts wh
 
 test("generateAndApplyWorkflowDraft returns draft only when apply=false", async () => {
   resetStoreForTests();
-  const auth = login({ email: "beta@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "beta@packetagent.local", password: "demo12345" });
   const before = getWorkflowOverview(auth.context);
 
   const result = await generateAndApplyWorkflowDraft(auth.context, {
@@ -89,7 +89,7 @@ test("listWorkflowTemplates and getWorkflowTemplate expose the seed catalog", ()
 
 test("applyWorkflowTemplate replaces brief, requirements, and plan items", () => {
   resetStoreForTests();
-  const auth = login({ email: "gamma@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "gamma@packetagent.local", password: "demo12345" });
 
   const result = applyWorkflowTemplate(auth.context, "internal_support_triage");
   assert.equal(result.template.id, "internal_support_triage");
@@ -107,6 +107,6 @@ test("applyWorkflowTemplate replaces brief, requirements, and plan items", () =>
 
 test("applyWorkflowTemplate throws for unknown template id", () => {
   resetStoreForTests();
-  const auth = login({ email: "alpha@taskloom.local", password: "demo12345" });
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   assert.throws(() => applyWorkflowTemplate(auth.context, "unknown_template"), /not found/);
 });
