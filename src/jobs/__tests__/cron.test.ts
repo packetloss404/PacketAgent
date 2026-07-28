@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matches, nextAfter, parseCron } from "../cron.js";
+import { matches, nextAfter, nextAfterInTimezone, parseCron } from "../cron.js";
 
 test("parses */5 * * * * to fire on minutes divisible by 5", () => {
   const expr = parseCron("*/5 * * * *");
@@ -36,4 +36,32 @@ test("nextAfter returns the next matching minute", () => {
   const next = nextAfter("*/15 * * * *", new Date(2026, 0, 1, 12, 7, 30));
   assert.equal(next.getMinutes(), 15);
   assert.equal(next.getHours(), 12);
+});
+
+test("nextAfterInTimezone honors daylight-saving offsets", () => {
+  assert.equal(
+    nextAfterInTimezone(
+      "0 9 * * *",
+      new Date("2026-07-27T12:00:00.000Z"),
+      "America/Chicago",
+    ).toISOString(),
+    "2026-07-27T14:00:00.000Z",
+  );
+  assert.equal(
+    nextAfterInTimezone(
+      "0 9 * * *",
+      new Date("2026-12-01T12:00:00.000Z"),
+      "America/Chicago",
+    ).toISOString(),
+    "2026-12-01T15:00:00.000Z",
+  );
+  assert.throws(
+    () =>
+      nextAfterInTimezone(
+        "0 9 * * *",
+        new Date("2026-07-27T12:00:00.000Z"),
+        "Mars/Olympus",
+      ),
+    /invalid timezone/,
+  );
 });

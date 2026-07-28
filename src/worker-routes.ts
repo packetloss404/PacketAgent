@@ -8,6 +8,12 @@ import type {
   WorkerVersionContent,
 } from "./workers/types.js";
 import { WorkerLifecycleError } from "./workers/errors.js";
+import {
+  createWorkerActivationService,
+  workerTraceFromTraceparent,
+  type WorkerActivationService,
+} from "./workers/activation.js";
+import type { JsonObject } from "./workers/types.js";
 
 type WorkerRouteRole = "viewer" | "member" | "admin";
 
@@ -18,6 +24,7 @@ export interface AuthorizedWorkerRouteContext {
 
 export interface WorkerRoutesDependencies {
   readonly service?: WorkerLifecycleService;
+  readonly activationService?: WorkerActivationService;
   readonly authorize?: (
     context: Context,
     minimumRole: WorkerRouteRole,
@@ -27,6 +34,8 @@ export interface WorkerRoutesDependencies {
 export function createWorkerRoutes(dependencies: WorkerRoutesDependencies = {}): Hono {
   const routes = new Hono();
   const service = dependencies.service ?? createWorkerLifecycleService();
+  const activationService =
+    dependencies.activationService ?? createWorkerActivationService();
   const authorize = dependencies.authorize ?? authorizeWorkerRoute;
 
   routes.get("/definitions", async (c) => {
@@ -176,6 +185,33 @@ export function createWorkerRoutes(dependencies: WorkerRoutesDependencies = {}):
     }
   });
 
+  routes.post("/deployments/:workerDeploymentId/runs", async (c) => {
+    try {
+      const auth = await authorize(c, "member");
+      const body = await readObjectBody(c);
+      const result = await activationService.admit({
+        workspaceId: auth.workspaceId,
+        workerDeploymentId: requiredPathParameter(c, "workerDeploymentId"),
+        triggerId: optionalString(body.triggerId, "triggerId") ?? "manual",
+        source: "manual",
+        deliveryId: requireIdempotencyKey(c),
+        occurredAt: optionalTimestamp(body.occurredAt, "occurredAt"),
+        actor: auth.actor,
+        payload:
+          body.input === undefined
+            ? {}
+            : (requiredObject(body.input, "input") as JsonObject),
+        trace: workerTraceFromTraceparent(
+          c.req.header("traceparent"),
+          c.req.header("tracestate"),
+        ),
+      });
+      return c.json(result, 202);
+    } catch (error) {
+      return workerRouteError(c, error);
+    }
+  });
+
   routes.post("/deployments/:workerDeploymentId/validate", async (c) => {
     return transitionDeployment(c, service, authorize, "member", "validateDeployment");
   });
@@ -234,6 +270,23 @@ export function createWorkerRoutes(dependencies: WorkerRoutesDependencies = {}):
           auth.workspaceId,
           optionalSequence(c.req.query("afterSequence")),
         ),
+      });
+    } catch (error) {
+      return workerRouteError(c, error);
+    }
+  });
+
+  routes.get("/activations", async (c) => {
+    try {
+      const auth = await authorize(c, "viewer");
+      return c.json({
+        activations: await activationService.listInboxes(auth.workspaceId, {
+          workerDeploymentId: optionalString(
+            c.req.query("workerDeploymentId"),
+            "workerDeploymentId",
+          ),
+          limit: optionalLimit(c.req.query("limit")),
+        }),
       });
     } catch (error) {
       return workerRouteError(c, error);
@@ -365,6 +418,25 @@ function optionalString(value: unknown, name: string): string | undefined {
     throw invalidRequest(`${name} must be a non-empty string when supplied.`);
   }
   return value.trim();
+}
+
+function optionalTimestamp(value: unknown, name: string): string | undefined {
+  const timestamp = optionalString(value, name);
+  if (timestamp === undefined) return undefined;
+  const parsed = Date.parse(timestamp);
+  if (Number.isNaN(parsed) || new Date(parsed).toISOString() !== timestamp) {
+    throw invalidRequest(`${name} must be a canonical UTC ISO-8601 timestamp.`);
+  }
+  return timestamp;
+}
+
+function optionalLimit(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 500) {
+    throw invalidRequest("limit must be an integer between 1 and 500.");
+  }
+  return parsed;
 }
 
 function requiredObject(value: unknown, name: string): Record<string, unknown> {

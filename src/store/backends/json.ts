@@ -3,6 +3,7 @@ import { loadStoreFromBackend } from "../runtime.js";
 import { DATA_FILE, persistJsonStore, runSerializedJsonMutation } from "../json-io.js";
 import { normalizeStore } from "../normalize.js";
 import { seedStore } from "../seed.js";
+import { setCachedStore } from "../cache.js";
 import type { PacketAgentData } from "../types.js";
 import type { AsyncStoreBackend, StoreBackend } from "./types.js";
 
@@ -39,9 +40,14 @@ export function syncStoreAsyncBackend(backend: StoreBackend): AsyncStoreBackend 
     },
     mutate(mutator) {
       return runSerializedJsonMutation(async () => {
-        const data = loadStoreFromBackend(backend);
+        // Mutate a private snapshot so a throwing mutator cannot leak partial
+        // changes through the process cache even though the file write rolls
+        // back. This gives JSON the same transaction boundary as SQLite and
+        // managed Postgres.
+        const data = structuredClone(loadStoreFromBackend(backend));
         const result = await mutator(data);
         backend.persist(data);
+        setCachedStore(data, backend.key);
         return result;
       });
     },

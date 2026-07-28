@@ -248,6 +248,9 @@ export async function restoreSessionAsync(c: Context): Promise<AuthenticatedCont
 export async function getPrivateBootstrap(context: AuthenticatedContext) {
   const status = await syncWorkspaceActivation(context.workspace.id, false, { type: "system", id: "bootstrap" });
   const data = await loadStoreAsync();
+  const workspace =
+    data.workspaces.find((entry) => entry.id === context.workspace.id) ??
+    context.workspace;
   const onboarding = data.onboardingStates.find((entry) => entry.workspaceId === context.workspace.id);
   const activities = data.activities.filter((entry) => entry.workspaceId === context.workspace.id).slice(0, 20);
 
@@ -259,11 +262,11 @@ export async function getPrivateBootstrap(context: AuthenticatedContext) {
       timezone: context.user.timezone,
     },
     workspace: {
-      id: context.workspace.id,
-      slug: context.workspace.slug,
-      name: context.workspace.name,
-      website: context.workspace.website,
-      automationGoal: context.workspace.automationGoal,
+      id: workspace.id,
+      slug: workspace.slug,
+      name: workspace.name,
+      website: workspace.website,
+      automationGoal: workspace.automationGoal,
       role: context.role,
     },
     onboarding,

@@ -11,9 +11,9 @@ ledger without rebuilding the plan after every loop.
 
 ## Scope and authority
 
-- W1-W2 are complete. W1's decisions and verification live in
+- W1-W3 are complete. W1's decisions and verification live in
   [`worker-contract-plan.md`](worker-contract-plan.md).
-- W3-W10 are the active autonomous-Worker sequence.
+- W4-W10 are the active autonomous-Worker sequence.
 - R1-R8 below are the ordered continuation of the inherited backlog after W10.
 - Work explicitly marked "Later, not MVP" is decision-gated and is not part of
   the automatic queue.
@@ -239,6 +239,8 @@ behavior.
 Outcome: manual, cron, webhook, alert, and queue deliveries enter one durable,
 deduplicated activation path.
 
+Status: complete. Gate passed 2026-07-27.
+
 ### W3.1 - Define the envelope and inbox records
 
 - Add a versioned `WorkerActivationEnvelope` containing activation ID, source,
@@ -300,6 +302,8 @@ execution job.
 
 Outcome: a queued Worker run executes a deterministic
 plan-act-evaluate-checkpoint-decide state machine and cannot exceed its bounds.
+
+Status: active. Resume at W4.1.
 
 ### W4.1 - Isolate runtime ports
 

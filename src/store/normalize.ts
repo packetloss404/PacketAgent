@@ -54,6 +54,8 @@ export function normalizeStore(data: Partial<PacketAgentData>): PacketAgentData 
     workerDeploymentRollouts: data.workerDeploymentRollouts ?? [],
     workerCommandReceipts: data.workerCommandReceipts ?? [],
     workerEvents: data.workerEvents ?? [],
+    workerActivationInboxes: data.workerActivationInboxes ?? [],
+    workerActivationPayloads: data.workerActivationPayloads ?? [],
     activationFacts: data.activationFacts ?? {},
     activationMilestones: data.activationMilestones ?? {},
     activationReadModels: data.activationReadModels ?? {},

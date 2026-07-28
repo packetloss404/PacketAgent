@@ -12,6 +12,10 @@ import type {
   WorkerEvent,
   WorkerLifecycleCommandReceipt,
 } from "../workers/persistence-types.js";
+import type {
+  WorkerActivationInboxRecord,
+  WorkerActivationPayloadRecord,
+} from "../workers/activation-types.js";
 
 export interface UserRecord {
   id: string;
@@ -704,6 +708,8 @@ export interface PacketAgentData {
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];
+  workerActivationInboxes: WorkerActivationInboxRecord[];
+  workerActivationPayloads: WorkerActivationPayloadRecord[];
   activationFacts: Record<string, WorkspaceActivationFacts>;
   activationMilestones: Record<string, ActivationMilestoneRecord[]>;
   activationReadModels: Record<string, ActivationStatusDto>;

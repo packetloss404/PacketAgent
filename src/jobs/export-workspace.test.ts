@@ -115,6 +115,20 @@ test("exportWorkspaceData recursively redacts nested sensitive values inside job
 
 test("exportWorkspaceData includes only the selected workspace's Worker lifecycle", async () => {
   const data = makeStore();
+  data.workerActivationPayloads.push({
+    schemaVersion: "packetagent.worker-activation-payload/v1",
+    id: "payload-export-alpha",
+    reference: "worker-activation-payload:payload-export-alpha",
+    workspaceId: "alpha",
+    digest: `sha256:${"a".repeat(64)}`,
+    byteLength: 42,
+    classification: "sensitive",
+    ciphertext: "encrypted-secret-material",
+    iv: "secret-iv",
+    authTag: "secret-auth-tag",
+    createdAt: "2026-07-27T12:00:00.000Z",
+    expiresAt: "2026-08-03T12:00:00.000Z",
+  });
   const repository = createWorkerRepository({
     loadStore: () => data,
     mutateStore: (mutator) => mutator(data),
@@ -153,6 +167,21 @@ test("exportWorkspaceData includes only the selected workspace's Worker lifecycl
   assert.deepEqual(result.data.workerVersions.map((record) => record.id), ["worker-export-alpha-v1"]);
   assert.equal(result.data.workerCommandReceipts.length, 1);
   assert.equal(result.data.workerEvents.length, 1);
+  assert.deepEqual(result.data.workerActivationPayloads, [
+    {
+      schemaVersion: "packetagent.worker-activation-payload/v1",
+      id: "payload-export-alpha",
+      reference: "worker-activation-payload:payload-export-alpha",
+      workspaceId: "alpha",
+      digest: `sha256:${"a".repeat(64)}`,
+      byteLength: 42,
+      classification: "sensitive",
+      createdAt: "2026-07-27T12:00:00.000Z",
+      expiresAt: "2026-08-03T12:00:00.000Z",
+      encrypted: true,
+    },
+  ]);
+  assert.equal(JSON.stringify(result).includes("encrypted-secret-material"), false);
   assert.equal(JSON.stringify(result).includes("worker-export-beta"), false);
 });
 
@@ -442,6 +471,8 @@ function makeStore(): PacketAgentData {
     workerDeploymentRollouts: [],
     workerCommandReceipts: [],
     workerEvents: [],
+    workerActivationInboxes: [],
+    workerActivationPayloads: [],
     activationMilestones: {},
     activationReadModels: {},
   };

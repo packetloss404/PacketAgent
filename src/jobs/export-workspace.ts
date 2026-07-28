@@ -37,6 +37,11 @@ import type {
   WorkerEvent,
   WorkerLifecycleCommandReceipt,
 } from "../workers/persistence-types.js";
+import type {
+  WorkerActivationInboxRecord,
+  WorkerActivationPayloadMetadata,
+  WorkerActivationPayloadRecord,
+} from "../workers/activation-types.js";
 
 export interface ExportWorkspaceOptions {
   workspaceId: string;
@@ -99,6 +104,8 @@ export interface ExportedWorkspaceData {
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];
+  workerActivationInboxes: WorkerActivationInboxRecord[];
+  workerActivationPayloads: WorkerActivationPayloadMetadata[];
   activationFacts: WorkspaceActivationFacts | null;
   activationSignals: ActivationSignalRecord[];
   activationMilestones: ActivationMilestoneRecord[];
@@ -221,6 +228,14 @@ function buildWorkspaceExport(
   const workerDeploymentRollouts = workspaceWorkerRecords(store.workerDeploymentRollouts, workspaceId);
   const workerCommandReceipts = workspaceWorkerRecords(store.workerCommandReceipts, workspaceId);
   const workerEvents = workspaceWorkerRecords(store.workerEvents, workspaceId);
+  const workerActivationInboxes = workspaceWorkerRecords(
+    store.workerActivationInboxes,
+    workspaceId,
+  );
+  const workerActivationPayloads = workspaceWorkerRecords(
+    store.workerActivationPayloads,
+    workspaceId,
+  ).map(workerActivationPayloadMetadata);
 
   const activationFacts = store.activationFacts?.[workspaceId] ?? null;
   const activationSignals = (store.activationSignals ?? [])
@@ -263,12 +278,21 @@ function buildWorkspaceExport(
       workerDeploymentRollouts,
       workerCommandReceipts,
       workerEvents,
+      workerActivationInboxes,
+      workerActivationPayloads,
       activationFacts,
       activationSignals,
       activationMilestones,
       activationReadModel,
     },
   };
+}
+
+function workerActivationPayloadMetadata(
+  record: WorkerActivationPayloadRecord,
+): WorkerActivationPayloadMetadata {
+  const { ciphertext: _ciphertext, iv: _iv, authTag: _authTag, ...metadata } = record;
+  return { ...metadata, encrypted: true };
 }
 
 function workspaceWorkerRecords<TRecord extends { workspaceId: string }>(

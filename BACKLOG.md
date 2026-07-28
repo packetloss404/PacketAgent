@@ -53,18 +53,18 @@ Dependencies: W1.
 
 Dependencies: W1, W2.
 
-Status: active. Resume at
-[`W3.1 - Define the envelope and inbox records`](dev/worker-implementation-loops.md#w31---define-the-envelope-and-inbox-records).
-
-- [ ] Normalize manual, cron, webhook, alert, and queue inputs into one activation envelope.
-- [ ] Preserve trigger identity, delivery identity, timestamp, actor, payload reference, and trace context.
-- [ ] Deduplicate repeated deliveries without dropping legitimate repeats.
-- [ ] Route current scheduler and webhook entry points through the envelope.
-- Gate: replay and concurrency tests prove a delivery starts at most one Worker run.
+- [x] Normalize manual, cron, webhook, alert, and queue inputs into one activation envelope.
+- [x] Preserve trigger identity, delivery identity, timestamp, actor, payload reference, and trace context.
+- [x] Deduplicate repeated deliveries without dropping legitimate repeats.
+- [x] Route current scheduler and webhook entry points through the envelope.
+- Gate: passed 2026-07-27. Crash injection and concurrent two-repository replay prove one delivery commits one version-pinned queued run and execution job across JSON, SQLite, and managed Postgres; changed-content key reuse conflicts, while distinct delivery IDs remain distinct occurrences.
 
 ### W4 - Bounded autonomous supervisor
 
 Dependencies: W1-W3.
+
+Status: active. Resume at
+[`W4.1 - Isolate runtime ports`](dev/worker-implementation-loops.md#w41---isolate-runtime-ports).
 
 - [ ] Wrap the current tool-using agent loop in plan, act, evaluate, checkpoint, and decide phases.
 - [ ] Enforce elapsed-time, iteration, provider-cost, failure, and tool-call budgets.

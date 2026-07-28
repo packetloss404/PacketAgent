@@ -6,6 +6,12 @@ import { findJob } from "./jobs/store";
 import { login } from "./packetagent-services";
 import { loadStore, mutateStore, resetStoreForTests } from "./packetagent-store";
 import { agentWebhookRoutes, publicWebhookRoutes } from "./webhook-routes";
+import {
+  makeWorkerDefinition,
+  makeWorkerDeployment,
+  makeWorkerVersion,
+  makeWorkerVersionContent,
+} from "./workers/__tests__/fixtures";
 
 function createTestApp() {
   const app = new Hono();
@@ -118,4 +124,71 @@ test("public webhook ignores archived agents even when token matches", async () 
 
   assert.equal(response.status, 404);
   assert.deepEqual(body, { error: "not found" });
+});
+
+test("public Worker webhook enters the deduplicating activation inbox", async () => {
+  resetStoreForTests();
+  const app = createTestApp();
+  mutateStore((data) => {
+    const content = makeWorkerVersionContent({
+      triggers: [
+        {
+          id: "webhook",
+          kind: "webhook",
+          enabled: true,
+          adapter: "http",
+          eventType: "release",
+          webhookRef: "hook:route-test",
+        },
+      ],
+    });
+    data.workerDefinitions.push(
+      makeWorkerDefinition({
+        workspaceId: "alpha",
+        status: "active",
+        currentVersionId: "worker-version-1",
+      }),
+    );
+    data.workerVersions.push(
+      makeWorkerVersion({ workspaceId: "alpha", status: "validated", content }),
+    );
+    data.workerDeployments.push(
+      makeWorkerDeployment({ workspaceId: "alpha", status: "active" }),
+    );
+  });
+
+  const request = () =>
+    app.request("/api/public/webhooks/workers/hook:route-test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-packetagent-delivery-id": "webhook-route-delivery-1",
+      },
+      body: JSON.stringify({ release_id: "release-42" }),
+    });
+  const first = await request();
+  const replay = await request();
+  const firstBody = (await first.json()) as { runId: string };
+  const replayBody = (await replay.json()) as { runId: string };
+  const stored = loadStore();
+
+  assert.equal(first.status, 202);
+  assert.equal(replay.status, 202);
+  assert.equal(replayBody.runId, firstBody.runId);
+  assert.equal(stored.workerActivationInboxes.length, 1);
+  assert.equal(stored.workerActivationInboxes[0].duplicateCount, 1);
+  assert.equal(stored.workerRuns.length, 1);
+});
+
+test("public Worker webhook requires a stable upstream delivery ID", async () => {
+  resetStoreForTests();
+  const response = await createTestApp().request(
+    "/api/public/webhooks/workers/missing",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    },
+  );
+  assert.equal(response.status, 400);
 });

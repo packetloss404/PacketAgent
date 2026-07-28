@@ -112,11 +112,30 @@ function makeDeps(overrides: {
         updatedAt: "2026-04-26T12:00:00.000Z",
       };
     },
+    activateWorkers: () => 0,
     env: overrides.env ?? {},
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   };
   return { deps, evaluateCalls, deliverCalls, recordCalls, enqueueDeliverCalls };
 }
+
+test("Worker alert activation runs only after the alert record is durable", async () => {
+  const event = makeEvent({ id: "alert-durable-before-worker" });
+  const { deps } = makeDeps({ events: [event] });
+  let recorded = false;
+  deps.record = () => {
+    recorded = true;
+    return { stored: 1, pruned: 0 };
+  };
+  deps.activateWorkers = (events) => {
+    assert.equal(recorded, true);
+    assert.deepEqual(events, [event]);
+    return 1;
+  };
+
+  const result = await handleAlertsEvaluateJob({}, deps);
+  assert.equal(result.workerActivations, 1);
+});
 
 function captureWarn(): { restore: () => void; calls: unknown[][] } {
   const original = console.warn;

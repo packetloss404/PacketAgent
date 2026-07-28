@@ -23,6 +23,7 @@ import {
 } from "../service.js";
 import type { WorkerSourceProvenance } from "../types.js";
 import { makeWorkerVersionContent } from "./fixtures.js";
+import { createWorkerActivationService } from "../activation.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -61,12 +62,17 @@ interface BackendScenarioResult {
   readonly eventSequences: readonly number[];
   readonly exportedDefinitionIds: readonly string[];
   readonly exportedDeploymentIds: readonly string[];
+  readonly activationInboxCount: number;
+  readonly activationDuplicateCounts: readonly number[];
+  readonly workerRunJobCount: number;
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
   const service = createWorkerLifecycleService();
   await runActivationRace(service);
   await runRollback(service);
+  await runActivationAdmissionRace();
+  await runActivationQueueFailureRollback();
 
   clearStoreCacheForTests();
   const reloadedService = createWorkerLifecycleService();
@@ -81,6 +87,10 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   assert.equal(rollback.rollouts[0].kind, "rollback");
   assert.equal(exported.data.workerCommandReceipts.length, stored.workerCommandReceipts.length);
   assert.equal(exported.data.workerEvents.length, stored.workerEvents.length);
+  assert.equal(
+    exported.data.workerActivationInboxes.length,
+    stored.workerActivationInboxes.length,
+  );
 
   return {
     definitionStatuses: definitions
@@ -105,6 +115,11 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     exportedDeploymentIds: exported.data.workerDeployments
       .map((deployment) => deployment.id)
       .sort(),
+    activationInboxCount: stored.workerActivationInboxes.length,
+    activationDuplicateCounts: stored.workerActivationInboxes.map(
+      (record) => record.duplicateCount,
+    ),
+    workerRunJobCount: stored.jobs.filter((job) => job.type === "worker.run").length,
   };
 }
 
@@ -185,6 +200,83 @@ async function runActivationRace(service: WorkerLifecycleService): Promise<void>
     ),
     true,
   );
+}
+
+async function runActivationAdmissionRace(): Promise<void> {
+  const data = await loadStoreAsync();
+  const deployment = data.workerDeployments.find(
+    (record) =>
+      record.workerDefinitionId === "worker-race" && record.status === "active",
+  );
+  assert.ok(deployment);
+  const services = ["process-a", "process-b"].map((processId) => {
+    let nextId = 0;
+    return createWorkerActivationService({
+      now: () => new Date("2026-07-27T15:00:00.000Z"),
+      id: (kind) => `${kind}-${processId}-${++nextId}`,
+    });
+  });
+  const input = {
+    workspaceId: "alpha",
+    workerDeploymentId: deployment.id,
+    triggerId: "manual",
+    source: "manual" as const,
+    deliveryId: "parity-delivery-1",
+    occurredAt: "2026-07-27T14:59:00.000Z",
+    actor: ACTOR,
+    payload: { release_id: "release-parity" },
+  };
+  const results = await Promise.all([
+    services[0].admit(input),
+    services[1].admit(input),
+  ]);
+  assert.deepEqual(
+    results.map((result) => result.disposition).sort(),
+    ["accepted", "duplicate"],
+  );
+  assert.equal(results[0].runId, results[1].runId);
+}
+
+async function runActivationQueueFailureRollback(): Promise<void> {
+  const before = await loadStoreAsync();
+  const deployment = before.workerDeployments.find(
+    (record) =>
+      record.workerDefinitionId === "worker-race" && record.status === "active",
+  );
+  assert.ok(deployment);
+  const service = createWorkerActivationService({
+    now: () => new Date("2026-07-27T15:05:00.000Z"),
+    id: (kind) => `${kind}-rollback`,
+    onCommitPhase: (phase) => {
+      if (phase === "after_event_append") {
+        throw new Error("injected execution queue failure");
+      }
+    },
+  });
+  await assert.rejects(
+    service.admit({
+      workspaceId: "alpha",
+      workerDeploymentId: deployment.id,
+      triggerId: "manual",
+      source: "manual",
+      deliveryId: "parity-queue-failure",
+      actor: ACTOR,
+      payload: { release_id: "release-rollback" },
+    }),
+    /injected execution queue failure/,
+  );
+  clearStoreCacheForTests();
+  const after = await loadStoreAsync();
+  assert.equal(
+    after.workerActivationInboxes.some(
+      (record) => record.deliveryId === "parity-queue-failure",
+    ),
+    false,
+  );
+  assert.equal(after.workerActivationInboxes.length, before.workerActivationInboxes.length);
+  assert.equal(after.workerRuns.length, before.workerRuns.length);
+  assert.equal(after.jobs.length, before.jobs.length);
+  assert.equal(after.workerEvents.length, before.workerEvents.length);
 }
 
 async function runRollback(service: WorkerLifecycleService): Promise<void> {

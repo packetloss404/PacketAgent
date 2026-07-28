@@ -2,15 +2,16 @@
 
 End-to-end test plan run before cutting a release. Covers the builder loop, agent loop, workspace setup, providers, sandbox, operations, self-host publish handoff, and the backup round-trip.
 
-This plan verifies the inherited workbench and W2's durable Worker
-control-plane lifecycle. Trigger execution, checkpoint recovery, and PacketADE
-handoff cases must be added as W3-W9 ship; they are not current product claims.
+This plan verifies the inherited workbench plus W2's durable Worker lifecycle
+and W3's trigger-intake boundary. Supervisor execution, checkpoint recovery,
+and PacketADE handoff cases must be added as W4-W9 ship; they are not current
+product claims.
 
-Last automated W2 baseline (2026-07-27):
+Last automated W3 baseline (2026-07-27):
 
-- API: 1,288 passed, 1 skipped, 0 failed
+- API: 1,314 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused Worker lifecycle, route, and export checks: 54 passed, 0 failed
+- Focused Worker activation, adapter, route, scheduler, and parity checks: passed
 - Typecheck: passed
 - Production web build: passed
 - ESLint: 0 errors, 146 inherited warnings
@@ -68,6 +69,23 @@ mutations must also send the existing PacketAgent CSRF cookie/header pair.
 6. Reuse an idempotency key with changed input and submit one stale digest/revision. Confirm stable `idempotency_mismatch` and `conflict` responses.
 7. Restart PacketAgent and read the definition plus `/events`. Confirm lifecycle state and monotonically increasing event sequence persist.
 8. Repeat once with `PACKETAGENT_STORE=sqlite`; run the managed-Postgres parity test before release when that mode is supported by the deployment.
+
+## W3 Worker Activation Smoke
+
+W3 ends at durable admission. A successful delivery creates a queued
+`WorkerRun` and `worker.run` execution job; until W4 ships, the scheduler
+defers that job without consuming an attempt.
+
+1. Activate a deployment whose validated version contains enabled manual, cron, webhook, alert, and queue triggers with an input schema compatible with each test payload.
+2. Manual: `POST /api/app/workers/deployments/:deploymentId/runs` with an `Idempotency-Key`, `triggerId`, and `input`. Confirm `202`, one activation inbox record, one queued run, and one execution job.
+3. Replay that request byte-for-byte with the same key. Confirm the original run/job IDs return and `duplicateCount` increments. Change the input under the same key and confirm `idempotency_mismatch`; use a new key and confirm a distinct run.
+4. Webhook: `POST /api/public/webhooks/workers/:webhookRef` with JSON plus `X-PacketAgent-Delivery-Id`. Replay the same delivery ID, then change the body under that ID. Confirm the same duplicate/conflict behavior while the legacy `/agents/:token` webhook still works.
+5. Cron: run the Worker cron projector or wait for its minute job. Confirm one future `worker.activate.cron` job per active trigger, including its IANA timezone. Pause the deployment and confirm the projector cancels its queued occurrence.
+6. Alert: emit a matching operations alert. Confirm the `alertEvents` record exists before the Worker activation and the alert event ID becomes the activation delivery ID.
+7. Queue: call the queue adapter with the deployment, trigger, configured `queueRef`, and upstream message ID. Confirm that message ID is preserved as the delivery identity.
+8. Send a valid `traceparent`/`tracestate` on manual or webhook intake and confirm its trace/span values are retained. Omit the headers and confirm a new valid trace is generated.
+9. Include a sensitive field such as `api_key` or a payload larger than 32 KiB. Confirm the inbox and run hold an encrypted, expiring payload reference, workspace export omits ciphertext, and no raw value appears in events or jobs.
+10. Restart PacketAgent and confirm inbox, duplicate count, queued run, execution job, and payload-reference metadata reload. Repeat the automated parity scenario for JSON, SQLite, and managed Postgres before release.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

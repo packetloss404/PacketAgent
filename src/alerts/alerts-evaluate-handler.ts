@@ -8,6 +8,7 @@ import { recordAlertsAsync } from "./alert-store.js";
 import { getOperationsHealthAsync, type OperationsHealthReport } from "../operations-health.js";
 import { getJobTypeMetrics, type JobTypeMetrics } from "../jobs/scheduler-metrics.js";
 import { enqueueJob, enqueueJobAsync, type EnqueueJobInput } from "../jobs/store.js";
+import { activateWorkerAlertEvents } from "../workers/adapters.js";
 import { nextAfter } from "../jobs/cron.js";
 import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, type JobRecord, type PacketAgentData } from "../packetagent-store.js";
 
@@ -42,6 +43,7 @@ export interface AlertsEvaluateJobResult {
   storedCount: number;
   pruned: number;
   enqueuedDeliverJobs: number;
+  workerActivations: number;
 }
 
 export interface AlertsEvaluateHandlerDeps {
@@ -57,6 +59,7 @@ export interface AlertsEvaluateHandlerDeps {
     options?: { retentionDays?: number },
   ) => { stored: number; pruned: number } | Promise<{ stored: number; pruned: number }>;
   enqueueDeliverJob?: (input: EnqueueJobInput) => JobRecord | Promise<JobRecord>;
+  activateWorkers?: (events: readonly AlertEvent[]) => number | Promise<number>;
   env?: NodeJS.ProcessEnv;
   now?: () => Date;
 }
@@ -117,6 +120,7 @@ export async function handleAlertsEvaluateJob(
   const deliverFn = deps.deliver ?? deliverAlertWebhook;
   const recordFn = deps.record ?? recordAlertsAsync;
   const enqueueDeliverFn = deps.enqueueDeliverJob ?? enqueueJobAsync;
+  const activateWorkers = deps.activateWorkers ?? activateWorkerAlertEvents;
   const env = deps.env ?? process.env;
   const nowFn = deps.now ?? (() => new Date());
 
@@ -155,6 +159,7 @@ export async function handleAlertsEvaluateJob(
   }
 
   const recordResult = await recordFn(events, delivered, deliveryError, { retentionDays });
+  const workerActivations = await activateWorkers(events);
 
   let enqueuedDeliverJobs = 0;
   if (delivered === false && events.length > 0) {
@@ -181,6 +186,7 @@ export async function handleAlertsEvaluateJob(
     storedCount: recordResult.stored,
     pruned: recordResult.pruned,
     enqueuedDeliverJobs,
+    workerActivations,
   };
   if (deliveryError !== undefined) {
     result.deliveryError = deliveryError;

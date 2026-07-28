@@ -83,3 +83,73 @@ export function nextAfter(exprStr: string, after: Date): Date {
   }
   throw new Error(`cron: no match within a year for "${exprStr}"`);
 }
+
+export function nextAfterInTimezone(
+  exprStr: string,
+  after: Date,
+  timezone: string,
+): Date {
+  const expr = parseCron(exprStr);
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      weekday: "short",
+      hourCycle: "h23",
+    });
+  } catch {
+    throw new Error(`cron: invalid timezone "${timezone}"`);
+  }
+  const cursor = new Date(after.getTime() + 60_000);
+  cursor.setUTCSeconds(0, 0);
+  for (let i = 0; i < 60 * 24 * 366; i += 1) {
+    const parts = zonedParts(formatter, cursor);
+    if (
+      expr.minute.values.has(parts.minute) &&
+      expr.hour.values.has(parts.hour) &&
+      expr.dayOfMonth.values.has(parts.dayOfMonth) &&
+      expr.month.values.has(parts.month) &&
+      expr.dayOfWeek.values.has(parts.dayOfWeek)
+    ) {
+      return new Date(cursor);
+    }
+    cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
+  }
+  throw new Error(
+    `cron: no match within a year for "${exprStr}" in timezone "${timezone}"`,
+  );
+}
+
+function zonedParts(
+  formatter: Intl.DateTimeFormat,
+  date: Date,
+): {
+  minute: number;
+  hour: number;
+  dayOfMonth: number;
+  month: number;
+  dayOfWeek: number;
+} {
+  const values = Object.fromEntries(
+    formatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(
+    values.weekday,
+  );
+  if (weekday < 0) throw new Error("cron: could not resolve timezone weekday");
+  return {
+    minute: Number(values.minute),
+    hour: Number(values.hour),
+    dayOfMonth: Number(values.day),
+    month: Number(values.month),
+    dayOfWeek: weekday,
+  };
+}

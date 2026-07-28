@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Trigger and activation envelope (W3)
+
+- Added a versioned Worker activation envelope, durable deduplication inbox, and `0020_worker_activations.sql` migration across JSON, SQLite, and managed Postgres.
+- Added atomic intake that validates the active deployment, enabled trigger, and Worker input schema before committing one version-pinned queued run, audit event, and execution job.
+- Added encrypted, expiry-bound payload references for large or sensitive inputs; workspace exports include reference metadata without ciphertext.
+- Routed manual requests, timezone-aware cron occurrences, opaque Worker webhooks, durable alerts, and queue deliveries through the common intake service while preserving legacy Agent triggers.
+- Added W3C trace propagation, exact-replay receipts, changed-content delivery conflicts, JSON transaction rollback isolation, scheduler deferral until W4, crash injection, and multi-backend concurrency coverage.
+
 ### 2026-07-27 - Worker persistence, versioning, and activation (W2)
 
 - Added durable Worker definitions, versions, deployments, runs, checkpoints, rollout links, command receipts, and lifecycle events to every supported store.

@@ -24,9 +24,9 @@ This is "Fork B": self-host first, MIT licensed, no telemetry, no vendor in the 
 
 ## What's actually inside
 
-The following implemented subsystems are exercised by tests. Most are inherited and wired into `src/server.ts`; the storage-neutral Worker contract is a domain layer that persistence and routes will consume starting in W2. The durable Worker lifecycle described above is tracked separately in [the roadmap](dev/roadmap.md) and [backlog](BACKLOG.md).
+The following implemented subsystems are exercised by tests. Most are inherited and wired into `src/server.ts`; W1-W3 add the canonical Worker control plane and trigger-intake boundary. Supervisor execution and recovery remain tracked separately in [the roadmap](dev/roadmap.md) and [backlog](BACKLOG.md).
 
-- **Canonical Worker domain contract** (`src/workers/`). W1 adds versioned storage-neutral records and runtime validators for definitions, versions, deployments, triggers, policies, runs, and checkpoints; lifecycle and terminal-state guards; content digests and immutable validated-version checks; PacketADE provenance; and deterministic draft projections over existing agent/workflow records. Persistence and activation begin in W2.
+- **Canonical Worker control plane** (`src/workers/`). W1-W3 provide versioned records and runtime validators; immutable definitions, versions, and deployments; lifecycle commands and audit events; a durable activation envelope/inbox; encrypted expiring references for large or sensitive inputs; and atomic admission of one version-pinned queued run and execution job. Manual, timezone-aware cron, opaque webhook, alert, and queue deliveries share this path across JSON, SQLite, and managed Postgres.
 - **Two-phase LLM file-tree codegen** (`src/codegen/llm-author.ts`). The LLM authors whole React/Vite file trees via `write_file` tool calls: JSON plan parsing (fenced + bracket-scan fallback, one retry), token-budgeted chunked write rounds (`MAX_FILES_PER_WRITE_CHUNK=8`, `CHUNK_WRITE_THRESHOLD=10`), partial-result tolerance, and a workspace-escape `isSafePath` guard. `AppBuilderDraft` is a derived view; generated files land under `data/generated-apps/.../workspace` with sha256 manifests.
 - **Provider-agnostic router** (`src/providers/router.ts`). Route-key -> provider/model dispatch, six real BYOK clients, `preset-resolver.ts` (cheap/fast/smart/local presets walking a priority list), `ledger.ts` cost recording, and an always-present `stub` fallback so the loop runs without keys.
 - **Tool-using agent loop** (`src/tools/agent-loop.ts`). Provider-routed, cost-ledger-wrapped, registered tool execution with tool-result feedback, abort signals, and capped turns. Tool registry/executor and read/write/browser builtins under `src/tools/`.
@@ -44,7 +44,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 
 - **What self-host gives up.** No free public subdomain with auto TLS (you bring your own DNS and certificate). No pre-wired OAuth connectors (you register your own OAuth clients with each provider). No one-click App Store / Play Store submission (no managed macOS build farm). No cross-tenant user memory. No vendor-hosted credit meter. No vendor-amortized LLM key - you bring your own across any of six providers (Anthropic, OpenAI, Gemini, OpenRouter, MiniMax, or a local Ollama / vLLM / LM Studio / llama.cpp endpoint).
 - **What self-host gains.** Your data, your source code, your LLM key, and your deploy target - all on infrastructure you own. No vendor in the path between you and your customers. No per-seat pricing. No rate limits beyond what your own LLM provider imposes on your own key. The local-LLM provider can be pointed at a separate GPU box on your LAN, so the workbench laptop stays cheap while inference runs where the silicon is. Single MIT-licensed binary that runs anywhere Node 22 runs - laptop, container, VPS, homelab, behind a VPN.
-- **Honest about what is not built yet.** The inherited runtime has agents, schedules, webhooks, jobs, tools, approvals, provider cost records, and operations surfaces, but it does not yet unify them behind the durable Worker lifecycle described above. App codegen already has a bounded validation-repair loop, current generated apps have a supervised per-app SQLite runtime, and the six outbound agent tools are registered. Remaining limits include whole-tool rather than verb/resource-scoped grants, no default live SMTP transport, opt-in real sandbox validation, legacy template artifacts that may still use browser-side sql.js, and no crash-resumable Worker supervisor.
+- **Honest about what is not built yet.** Trigger delivery now creates durable canonical queued Worker runs, but those runs do not yet execute through the bounded, crash-resumable Worker supervisor. App codegen already has a bounded validation-repair loop, current generated apps have a supervised per-app SQLite runtime, and the six outbound agent tools are registered. Remaining limits include whole-tool rather than verb/resource-scoped grants, no default live SMTP transport, opt-in real sandbox validation, legacy template artifacts that may still use browser-side sql.js, and no crash-resumable Worker supervisor.
 - **Honest about the gap with hosted.** The deferred hosted-only capabilities and what a future "PacketAgent Cloud" product would need to ship them are inventoried in [CLOUD.md](CLOUD.md). That document is for strategic reference, not a roadmap commitment - self-host stays the default.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
@@ -131,7 +131,7 @@ See [docs/SELF_HOST.md](docs/SELF_HOST.md) for per-provider recipes, the local-L
 4. Review its instructions, typed inputs, trigger guidance, requested tools, and readiness blockers.
 5. Run it manually, approve risky tools explicitly, and inspect the transcript, tool calls, logs, model, and cost in Runs.
 6. Use the existing schedule or webhook surfaces only for work that fits the current capped agent-run model.
-7. Do not assume crash-resumable autonomous Workers exist yet; W1 defines the storage-neutral contract, while W2-W8 build its persistence and runtime lifecycle.
+7. Do not assume crash-resumable autonomous Workers exist yet; W1-W3 define the contract, persistence, lifecycle, and durable trigger intake, while W4-W8 build execution and recovery.
 8. To exercise the inherited prompt-to-app path, choose **Build an app** and use its generated source, preview, iteration, and publish-handoff surfaces.
 
 ### Seed accounts (development only)
@@ -249,14 +249,14 @@ Anthropic, OpenAI, and MiniMax keys can be configured per workspace under **Admi
 - **Backend.** Hono on `@hono/node-server`. `src/server.ts` mounts ~20 route groups (`app-routes`, `workflow-routes`, `webhook-routes`, `share-routes`, `sandbox-routes`, four `operations-*-routes`, and more) with access-log middleware, redacted error envelopes, `enforcePrivateAppMutationSecurity` on `/api/app/*`, cross-origin/CSRF enforcement, public webhooks, and static serving of the built web + run artifacts.
 - **LLM layer.** `ProviderRouter` route-key dispatch over six BYOK clients, `preset-resolver` priority walking, and a cost `ledger`. A `stub` provider keeps the loop runnable with zero keys.
 - **Codegen + agents.** `src/codegen/` (plan/write/chunk orchestrator, path validator, derived-draft, app-builder/iteration services, generated-app runtime/workspace, preview/snapshot/publish-readiness) and `src/tools/` (agent loop, registry/executor, read/write/browser builtins, Playwright runtime) plus `src/sandbox/`.
-- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, busy_timeout) for single-node; managed Postgres via per-entity repositories with dual-write + read-parity. 17 SQL migrations.
+- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, busy_timeout) for single-node; managed Postgres via repositories and document transactions with parity coverage. 20 SQL migrations.
 - **Jobs / ops.** Persisted queue with five-field cron, exponential retry, dead-letter, three-way scheduler leader election, an alert engine, and metrics snapshots.
 
 ## Engineering & testing
 
 PacketAgent is TypeScript ESM on Node >=22.5 with a React/Vite frontend. The code uses strict typechecking, dependency injection in many runtime boundaries, and feature directories for providers, tools, jobs, sandboxing, repositories, activation, codegen, and security. The inherited lint baseline still contains 146 warnings and is tracked as cleanup debt.
 
-The last W1 validation ran **1,271 API tests** (1,270 passed, 1 skipped) and **25 web tests** with no failures. Coverage includes the Worker contract gate, SQLite/Postgres parity, async boundaries, managed-Postgres transaction/concurrency behavior, tools, routes, and UI helpers.
+The W3 validation ran **1,315 API tests** (1,314 passed, 1 skipped) plus **25 web tests** with no failures, covering the Worker contract, lifecycle, activation replay/races, crash rollback, JSON/SQLite/managed-Postgres parity, trigger adapters, routes, jobs, tools, and UI helpers.
 
 ## Development
 
@@ -284,7 +284,7 @@ Generated `web/dist/` is gitignored; rebuild locally rather than committing it.
 
 ## Known limits
 
-- **The Worker control-plane lifecycle is durable, but execution is not unified yet.** W1-W2 provide versioned Worker records, validation, immutable versions, JSON/SQLite/managed-Postgres persistence, private lifecycle routes, idempotent commands, optimistic revisions, rollback records, and an event journal. Existing agents still run through the inherited capped tool loop; normalized trigger delivery, canonical Worker runs, checkpoint recovery, effect receipts, and runtime policy enforcement remain W3-W8 work.
+- **Worker intake is durable, but execution is not unified yet.** W1-W3 provide versioned Worker records, lifecycle routes, a durable activation inbox, normalized trigger delivery, and atomic canonical queued-run/job creation across JSON, SQLite, and managed Postgres. The execution jobs remain safely deferred until W4 installs the bounded supervisor; checkpoint recovery, effect receipts, and runtime policy enforcement remain W4-W8 work.
 - **File-tree codegen is an inherited secondary capability.** With a BYOK key, the LLM authors files through `write_file`, validates with `tsc` and Vite when real sandbox validation is enabled, and can make up to two bounded repair passes. Legacy template-shaped drafts still use their older iteration path.
 - **Per-app SQLite is current, with a compatibility caveat.** Current generated apps use the PacketAgent-served per-app SQLite API and supervised runtime processes. The legacy template/source-artifact path and older saved drafts can still contain sql.js/jsdelivr browser persistence.
 - **Outbound tools exist but are not yet Worker-grade capabilities.** `http_fetch`, `slack_post_webhook`, `github_api`, `email_send`, `sql_query`, and `shell_for_agent` are registered and tested. Approval tokens are currently whole-tool scoped, email needs an injected SMTP adapter, and durable side-effect receipts are not implemented.
@@ -305,9 +305,9 @@ npm run db:seed
 
 ## Project status
 
-PacketAgent is in its foundation transition from TaskLoom's app/agent workbench to the autonomous-worker runtime described at the top of this file. The inherited Builder and operate surfaces work; the rename and compatibility layer are committed on the current foundation branch. The canonical Worker model and W2 persistence/activation gate are complete, including private lifecycle APIs, but triggers do not yet create canonical Worker runs.
+PacketAgent is in its foundation transition from TaskLoom's app/agent workbench to the autonomous-worker runtime described at the top of this file. The inherited Builder and operate surfaces work; the rename and compatibility layer are committed on the current foundation branch. The canonical Worker model, lifecycle, and W3 trigger-intake gate are complete: current trigger sources create deduplicated, version-pinned queued Worker runs and durable execution jobs.
 
-The exact resume point is W3 in [BACKLOG.md](BACKLOG.md). New Codex projects should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived Phase 3 or legacy handoff documents.
+The exact resume point is W4 in [BACKLOG.md](BACKLOG.md). New Codex projects should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived Phase 3 or legacy handoff documents.
 
 For current product changes, see [CHANGELOG.md](CHANGELOG.md). PacketAgent does not yet have a configured GitHub `origin`, website, issue tracker, or release feed.
 

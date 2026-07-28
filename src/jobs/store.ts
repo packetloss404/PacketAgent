@@ -386,6 +386,72 @@ async function enqueueRecurringJobViaAsyncStore(job: JobRecord, scheduledAt: str
     return maintained;
   }
 
+  if (
+    job.type === "worker.activate.cron" &&
+    typeof job.payload.workerDeploymentId === "string" &&
+    typeof job.payload.triggerId === "string"
+  ) {
+    const timestamp = nowIso();
+    const outcome = await mutateStoreAsync((data) => {
+      const deployment = data.workerDeployments.find(
+        (entry) =>
+          entry.workspaceId === job.workspaceId &&
+          entry.id === job.payload.workerDeploymentId &&
+          entry.status === "active",
+      );
+      const version = deployment
+        ? data.workerVersions.find(
+            (entry) =>
+              entry.workspaceId === job.workspaceId &&
+              entry.id === deployment.workerVersionId &&
+              entry.status === "validated",
+          )
+        : undefined;
+      const trigger = version?.content.triggers.find(
+        (entry) =>
+          entry.id === job.payload.triggerId &&
+          entry.kind === "cron" &&
+          entry.enabled,
+      );
+      if (
+        !deployment ||
+        !version ||
+        !trigger ||
+        trigger.kind !== "cron" ||
+        trigger.expression !== job.cron ||
+        trigger.timezone !== job.payload.timezone
+      ) {
+        return { record: null, created: false };
+      }
+      const existing = data.jobs.find(
+        (entry) =>
+          entry.workspaceId === job.workspaceId &&
+          entry.type === job.type &&
+          (entry.status === "queued" || entry.status === "running") &&
+          entry.payload.workerDeploymentId === job.payload.workerDeploymentId &&
+          entry.payload.triggerId === job.payload.triggerId,
+      );
+      if (existing) return { record: existing, created: false };
+      const record: JobRecord = {
+        id: randomUUID(),
+        workspaceId: job.workspaceId,
+        type: job.type,
+        payload: job.payload,
+        status: "queued",
+        attempts: 0,
+        maxAttempts: job.maxAttempts,
+        scheduledAt: normalizeScheduledAt(scheduledAt) ?? timestamp,
+        ...(job.cron ? { cron: job.cron } : {}),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      data.jobs.push(record);
+      return { record, created: true };
+    });
+    if (outcome.created && outcome.record) dualWriteJobs([outcome.record]);
+    return outcome.record;
+  }
+
   return enqueueJobViaAsyncStore({
     workspaceId: job.workspaceId,
     type: job.type,

@@ -42,7 +42,7 @@ import { apiKeyRoutes } from "./api-key-routes.js";
 import { usageRoutes } from "./usage-routes.js";
 import { llmStreamRoutes } from "./llm-stream-routes.js";
 import { jobRoutes } from "./job-routes.js";
-import { JobScheduler } from "./jobs/scheduler.js";
+import { JobDeferredError, JobScheduler } from "./jobs/scheduler.js";
 import { selectSchedulerLeaderLock } from "./jobs/scheduler-leader-selection.js";
 import {
   ensureMetricsSnapshotCronJobAsync,
@@ -78,6 +78,14 @@ import {
   type AlertsDeliverJobPayload,
 } from "./alerts/alerts-deliver-handler.js";
 import { assertManagedDatabaseRuntimeSupported } from "./deployment/managed-database-runtime-guard.js";
+import { WORKER_EXECUTION_JOB_TYPE } from "./workers/activation.js";
+import {
+  WORKER_CRON_ACTIVATION_JOB_TYPE,
+  WORKER_CRON_PROJECTION_JOB_TYPE,
+  ensureWorkerCronProjectionJob,
+  handleWorkerCronActivationJob,
+  projectWorkerCronTriggers,
+} from "./workers/adapters.js";
 
 migrateLegacyDefaultDataFiles();
 registerDefaultProviders();
@@ -432,6 +440,29 @@ scheduler.register({
     return handleAlertsDeliverJob(job.payload as unknown as AlertsDeliverJobPayload);
   },
 });
+scheduler.register({
+  type: WORKER_CRON_ACTIVATION_JOB_TYPE,
+  async handle(job) {
+    return handleWorkerCronActivationJob(job);
+  },
+});
+scheduler.register({
+  type: WORKER_CRON_PROJECTION_JOB_TYPE,
+  async handle() {
+    return projectWorkerCronTriggers();
+  },
+});
+scheduler.register({
+  type: WORKER_EXECUTION_JOB_TYPE,
+  async handle() {
+    // W3 owns durable admission. W4 replaces this bounded deferral with the
+    // supervisor, while preserving every already-enqueued execution job.
+    throw new JobDeferredError(
+      "Worker supervisor is not active yet.",
+      new Date(Date.now() + 60_000),
+    );
+  },
+});
 app.use("/data/artifacts/*", async (c, next) => {
   // Gated behind an explicit opt-in flag (default OFF, even in dev) — see
   // artifactServingEnabled(). Static artifacts are not tenant-scoped here:
@@ -465,6 +496,8 @@ export function assertServerStartupRuntimeSupported(env: NodeJS.ProcessEnv = pro
 
 export async function startServer(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   assertServerStartupRuntimeSupported(env);
+  await projectWorkerCronTriggers();
+  await ensureWorkerCronProjectionJob();
   scheduler.start();
   await ensureMetricsSnapshotCronJobAsync();
   await ensureAlertsCronJobAsync();

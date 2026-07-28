@@ -5,10 +5,10 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W3 - Trigger and activation envelope**. Repository/session state
+Current active loop: **W4 - Bounded autonomous supervisor**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
-Resume at W3.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w31---define-the-envelope-and-inbox-records).
+Resume at W4.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w41---isolate-runtime-ports).
 
 ## North star
 
@@ -49,11 +49,11 @@ The storage-neutral canonical Worker, WorkerVersion, WorkerDeployment, WorkerRun
 
 Canonical Worker records persist in JSON, SQLite, and managed Postgres. Private lifecycle routes support immutable version validation plus draft, deploy, activate, pause, resume, retire, and rollback operations with durable command receipts, events, idempotent replay, and optimistic concurrency.
 
-### 3. Trigger adapters - active
+### 3. Trigger adapters - complete
 
-Normalize manual, cron, webhook, alert, and queue activations into a single activation envelope. Deduplicate repeated delivery and record the trigger source.
+Manual, cron, webhook, alert, and queue deliveries now enter one versioned activation envelope and durable inbox. Intake validates the deployed input schema, encrypts large or sensitive payloads behind expiring references, preserves W3C trace context, deduplicates delivery identity atomically, and creates one version-pinned queued run plus execution job across JSON, SQLite, and managed Postgres.
 
-### 4. Bounded supervisor loop
+### 4. Bounded supervisor loop - active
 
 Build the recoverable plan-act-evaluate loop around the existing agent runtime. Enforce maximum elapsed time, iterations, cost, tool permissions, and failure count. Require explicit success, pause, approval, budget-exhausted, cancelled, or failed terminal states.
 

@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1 and W2 are implemented as isolated changes
+in foundation commit `d60cd47`. W1-W3 are implemented as isolated changes
 on this branch. Do not reset this branch to the historical source remote.
 
 ## Product decision
@@ -57,6 +57,9 @@ Prompt-to-app generation remains a supported secondary capability.
 - Completed W2's JSON, SQLite, and managed-Postgres Worker persistence,
   immutable lifecycle commands, private RBAC routes, durable command receipts,
   event journal, rollback links, and backend parity gate.
+- Completed W3's versioned activation envelope, durable delivery inbox,
+  encrypted expiring payload references, atomic queued-run/job admission,
+  W3C traces, and manual/cron/webhook/alert/queue adapters.
 
 ## Current implementation truth
 
@@ -70,6 +73,11 @@ Implemented substrate:
 - private Worker lifecycle routes with viewer/member/admin boundaries,
   idempotent replay, stale-write conflicts, activation, pause/resume,
   retirement, and rollback;
+- one durable activation path for manual, timezone-aware cron, opaque webhook,
+  alert, and queue deliveries, with schema validation and exact-delivery
+  deduplication;
+- version-pinned queued Worker runs and execution jobs admitted atomically with
+  their inbox record and audit event;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -82,8 +90,7 @@ Implemented substrate:
 
 Not shipped:
 
-- one normalized trigger envelope;
-- trigger-driven canonical Worker run creation;
+- execution of admitted Worker runs through a bounded supervisor;
 - durable supervisor checkpoints and crash recovery;
 - external-effect idempotency receipts;
 - resource/verb-scoped capabilities;
@@ -94,18 +101,20 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Start with **W3 - Trigger and activation envelope** in
+Start with **W4 - Bounded autonomous supervisor** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W2 are complete under `src/workers/`, the store, migration, and private
+W1-W3 are complete under `src/workers/`, the store, migrations, jobs, alerts,
+webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
 storage-neutral domain model while adding the repository and control-plane
-lifecycle. It does not yet execute a Worker.
+lifecycle. W3 admits trigger deliveries and creates canonical queued runs, but
+does not execute them.
 
 The exact first slice is
-[`W3.1 - Define the envelope and inbox records`](worker-implementation-loops.md#w31---define-the-envelope-and-inbox-records).
-After each gate passes, continue through W4-W10 and then R1-R8 using that
+[`W4.1 - Isolate runtime ports`](worker-implementation-loops.md#w41---isolate-runtime-ports).
+After each gate passes, continue through W5-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
 
@@ -114,7 +123,7 @@ have been reconciled there and must not be resumed independently.
 - Product truth: [`../README.md`](../README.md)
 - Short direction: [`roadmap.md`](roadmap.md)
 - Work ledger and gates: [`../BACKLOG.md`](../BACKLOG.md)
-- W3-W10 and inherited execution map: [`worker-implementation-loops.md`](worker-implementation-loops.md)
+- W4-W10 and inherited execution map: [`worker-implementation-loops.md`](worker-implementation-loops.md)
 - PacketADE contract: [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md)
 - W1 contract plan and decisions: [`worker-contract-plan.md`](worker-contract-plan.md)
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
@@ -129,9 +138,9 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 146 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,288 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,314 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
-- focused Worker lifecycle, route, and export checks - 54 passed
+- focused Worker activation, adapter, route, scheduler, and parity checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
@@ -144,7 +153,7 @@ Known inherited quality debt:
   0 critical.
 
 Do not use `npm audit fix --force` or format the entire repository as an
-incidental part of W3. Track those cleanups separately in the backlog.
+incidental part of W4. Track those cleanups separately in the backlog.
 
 ## First commands in the new Codex project
 
@@ -160,6 +169,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W2 commit: clean. Stop if the active folder is
+Expected status after the W3 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

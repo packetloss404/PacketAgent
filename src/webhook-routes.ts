@@ -4,6 +4,10 @@ import { requirePrivateWorkspaceRole } from "./rbac.js";
 import { findAgent, loadStoreAsync, mutateStoreAsync } from "./packetagent-store.js";
 import { enqueueJobAsync } from "./jobs/store.js";
 import { redactedErrorMessage } from "./security/redaction.js";
+import { workerTraceFromTraceparent } from "./workers/activation.js";
+import { activateWorkerWebhookDelivery } from "./workers/adapters.js";
+import { WorkerLifecycleError } from "./workers/errors.js";
+import type { JsonObject } from "./workers/types.js";
 
 function errorResponse(c: Context, error: unknown) {
   c.status(((error as Error & { status?: number }).status ?? 500) as 500);
@@ -73,6 +77,62 @@ publicWebhookRoutes.post("/agents/:token", async (c) => {
       payload: { agentId: agent.id, triggerKind: "webhook", inputs: body },
     });
     return c.json({ accepted: true, jobId: job.id });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+publicWebhookRoutes.post("/workers/:webhookRef", async (c) => {
+  try {
+    const deliveryId =
+      c.req.header("x-packetagent-delivery-id")?.trim() ??
+      c.req.header("idempotency-key")?.trim() ??
+      "";
+    if (!deliveryId) {
+      throw new WorkerLifecycleError(
+        "invalid_input",
+        "X-PacketAgent-Delivery-Id or Idempotency-Key header is required.",
+      );
+    }
+    if (deliveryId.length > 512) {
+      throw new WorkerLifecycleError(
+        "invalid_input",
+        "Worker webhook delivery ID must be at most 512 characters.",
+      );
+    }
+    const contentType = c.req.header("content-type") ?? "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      throw new WorkerLifecycleError(
+        "invalid_input",
+        "Worker webhook body must be application/json.",
+      );
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      throw new WorkerLifecycleError(
+        "invalid_input",
+        "Worker webhook body must be valid JSON.",
+      );
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new WorkerLifecycleError(
+        "invalid_input",
+        "Worker webhook body must be a JSON object.",
+      );
+    }
+    const result = await activateWorkerWebhookDelivery({
+      webhookRef: c.req.param("webhookRef"),
+      deliveryId,
+      occurredAt: c.req.header("x-packetagent-occurred-at")?.trim() || undefined,
+      payload: body as JsonObject,
+      trace: workerTraceFromTraceparent(
+        c.req.header("traceparent"),
+        c.req.header("tracestate"),
+      ),
+    });
+    return c.json(result, 202);
   } catch (error) {
     return errorResponse(c, error);
   }

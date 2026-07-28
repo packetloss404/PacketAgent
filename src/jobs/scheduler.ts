@@ -8,7 +8,7 @@ import {
   sweepStaleRunningJobsAsync,
   updateJobAsync,
 } from "./store.js";
-import { nextAfter } from "./cron.js";
+import { nextAfter, nextAfterInTimezone } from "./cron.js";
 import { redactedErrorMessage } from "../security/redaction.js";
 import type { SchedulerLeaderLock } from "./scheduler-lock.js";
 import { noopLeaderLock } from "./scheduler-lock.js";
@@ -23,6 +23,16 @@ export interface JobHandlerContext {
 export interface JobHandler {
   type: string;
   handle(job: JobRecord, ctx: JobHandlerContext): Promise<unknown>;
+}
+
+export class JobDeferredError extends Error {
+  readonly retryAt: string;
+
+  constructor(message: string, retryAt: Date) {
+    super(message);
+    this.name = "JobDeferredError";
+    this.retryAt = retryAt.toISOString();
+  }
 }
 
 const BACKOFF_BASE_MS = 30_000;
@@ -165,7 +175,14 @@ export class JobScheduler {
       if (job.cron) {
         let next: Date;
         try {
-          next = nextAfter(job.cron, new Date());
+          const timezone =
+            job.type === "worker.activate.cron" &&
+            typeof job.payload.timezone === "string"
+              ? job.payload.timezone
+              : undefined;
+          next = timezone
+            ? nextAfterInTimezone(job.cron, new Date(), timezone)
+            : nextAfter(job.cron, new Date());
         } catch (cronError) {
           // Invalid cron expression: stop recurring (terminal, not transient).
           console.warn(`scheduler: stopping recurrence for job ${job.id}; invalid cron expression (${redactedErrorMessage(cronError)})`);
@@ -185,6 +202,16 @@ export class JobScheduler {
       // unhandledRejection=throw) crash the scheduler process. Guard them so a
       // store error while handling a job failure can never escape.
       try {
+        if (error instanceof JobDeferredError) {
+          await updateJobAsync(job.id, {
+            status: "queued",
+            attempts: Math.max(0, job.attempts - 1),
+            error: undefined,
+            scheduledAt: error.retryAt,
+            startedAt: undefined,
+          });
+          return;
+        }
         const fresh = await findJobAsync(job.id);
         if (fresh?.cancelRequested || ctrl.signal.aborted) {
           recordTerminal("canceled");

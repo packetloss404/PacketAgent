@@ -13,6 +13,10 @@ import type {
   WorkerLifecycleCommandReceipt,
 } from "../workers/persistence-types.js";
 import type {
+  WorkerActivationInboxRecord,
+  WorkerActivationPayloadRecord,
+} from "../workers/activation-types.js";
+import type {
   ActivationSignalKind,
   ActivationSignalOrigin,
   ActivationSignalRecord,
@@ -56,7 +60,9 @@ export type DedicatedRelationalCollectionKey =
   | "workerCheckpoints"
   | "workerDeploymentRollouts"
   | "workerCommandReceipts"
-  | "workerEvents";
+  | "workerEvents"
+  | "workerActivationInboxes"
+  | "workerActivationPayloads";
 
 export type DedicatedRelationalCollections = Pick<PacketAgentData, DedicatedRelationalCollectionKey>;
 
@@ -107,6 +113,14 @@ export function loadDedicatedRelationalCollections(db: DatabaseSync): DedicatedR
     workerEvents: loadWorkerPayloads<WorkerEvent>(
       db,
       "select payload from worker_events order by workspace_id, sequence",
+    ),
+    workerActivationInboxes: loadWorkerPayloads<WorkerActivationInboxRecord>(
+      db,
+      "select payload from worker_activation_inbox order by workspace_id, first_seen_at, id",
+    ),
+    workerActivationPayloads: loadWorkerPayloads<WorkerActivationPayloadRecord>(
+      db,
+      "select payload from worker_activation_payloads order by workspace_id, expires_at, id",
     ),
   };
 }
@@ -424,6 +438,8 @@ export function persistDedicatedRelationalRows(db: DatabaseSync, data: PacketAge
 
 function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData): void {
   db.exec(`
+    delete from worker_activation_inbox;
+    delete from worker_activation_payloads;
     delete from worker_events;
     delete from worker_command_receipts;
     delete from worker_deployment_rollouts;
@@ -505,6 +521,53 @@ function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData):
       record.status,
       record.attempt,
       record.updatedAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const activationPayloadStatement = db.prepare(`
+    insert into worker_activation_payloads (
+      workspace_id, id, reference, digest, classification,
+      byte_length, expires_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerActivationPayloads ?? []) {
+    activationPayloadStatement.run(
+      record.workspaceId,
+      record.id,
+      record.reference,
+      record.digest,
+      record.classification,
+      record.byteLength,
+      record.expiresAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const activationInboxStatement = db.prepare(`
+    insert into worker_activation_inbox (
+      workspace_id, id, worker_deployment_id, worker_version_id,
+      trigger_id, source, delivery_id, request_digest, disposition,
+      worker_run_id, execution_job_id, first_seen_at, last_seen_at,
+      duplicate_count, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerActivationInboxes ?? []) {
+    activationInboxStatement.run(
+      record.workspaceId,
+      record.id,
+      record.workerDeploymentId,
+      record.workerVersionId,
+      record.triggerId,
+      record.source,
+      record.deliveryId,
+      record.requestDigest,
+      record.disposition,
+      record.workerRunId,
+      record.executionJobId,
+      record.firstSeenAt,
+      record.lastSeenAt,
+      record.duplicateCount,
       JSON.stringify(record),
     );
   }

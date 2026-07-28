@@ -5,7 +5,7 @@ import { createAgent, createWorkspaceInvitation, handleInvitationEmailJob, INVIT
 import { PACKETAGENT_INVITATION_EMAIL_MODE_ENV, PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV } from "../../invitation-email.js";
 import { resetInvitationEmailDeliveryForTests, setInvitationEmailFetchForTests } from "../../invitation-email-delivery.js";
 import { defaultJobSchedulerStorage, enqueueJob, enqueueRecurringJob, findJob, listJobs, maintainScheduledAgentJobs, updateJob } from "../store.js";
-import { JobScheduler } from "../scheduler.js";
+import { JobDeferredError, JobScheduler } from "../scheduler.js";
 import type { SchedulerLeaderLock } from "../scheduler-lock.js";
 import { __resetSchedulerMetricsForTests, getJobTypeMetrics } from "../scheduler-metrics.js";
 import { __resetSchedulerHeartbeatForTests, getSchedulerHeartbeat } from "../scheduler-heartbeat.js";
@@ -164,6 +164,39 @@ test("scheduler marks no-handler job as failed", async () => {
   const fresh = findJob(job.id);
   assert.equal(fresh?.status, "failed");
   assert.match(fresh?.error ?? "", /no handler/);
+});
+
+test("scheduler deferral returns a job to the queue without consuming an attempt", async () => {
+  resetStoreForTests();
+  const scheduler = new JobScheduler({ pollIntervalMs: 30 });
+  scheduler.register({
+    type: "test.deferred",
+    async handle() {
+      throw new JobDeferredError(
+        "waiting for a supervisor",
+        new Date(Date.now() + 10 * 60 * 1000),
+      );
+    },
+  });
+  const job = enqueueJob({ workspaceId: "alpha", type: "test.deferred" });
+  scheduler.start();
+  for (let i = 0; i < 40; i += 1) {
+    const fresh = findJob(job.id);
+    if (
+      fresh?.status === "queued" &&
+      fresh.attempts === 0 &&
+      Date.parse(fresh.scheduledAt) > Date.now() + 60_000
+    ) {
+      break;
+    }
+    await wait(30);
+  }
+  await scheduler.stop();
+  const fresh = findJob(job.id);
+  assert.equal(fresh?.status, "queued");
+  assert.equal(fresh?.attempts, 0);
+  assert.equal(fresh?.error, undefined);
+  assert.ok(Date.parse(fresh?.scheduledAt ?? "") > Date.now() + 60_000);
 });
 
 test("listJobs returns workspace jobs newest-first with limit", () => {

@@ -6,6 +6,8 @@ import { createWorkerRoutes, type AuthorizedWorkerRouteContext } from "./worker-
 import { WorkerLifecycleError } from "./workers/errors.js";
 import { createWorkerRepository } from "./workers/repository.js";
 import { createWorkerLifecycleService } from "./workers/service.js";
+import { createWorkerActivationRepository } from "./workers/activation-repository.js";
+import { createWorkerActivationService } from "./workers/activation.js";
 import type { WorkerSourceProvenance, WorkerVersionContent } from "./workers/types.js";
 import { makeWorkerVersionContent } from "./workers/__tests__/fixtures.js";
 
@@ -118,6 +120,79 @@ test("Worker routes scope reads to the authorized workspace", async () => {
   assert.equal(((await hidden.json()) as { code: string }).code, "not_found");
 });
 
+test("manual Worker run routes use the canonical activation inbox", async () => {
+  const harness = createRouteHarness("admin");
+  const created = await createDefinitionThroughRoutes(harness);
+  const version = created.version as { id: string; contentDigest: string };
+  await postJson(
+    harness.routes,
+    `/versions/${version.id}/validate`,
+    { expectedContentDigest: version.contentDigest },
+    "manual-validate-version",
+  );
+  const deploymentResponse = await postJson(
+    harness.routes,
+    "/deployments",
+    {
+      deploymentId: "manual-route-deployment",
+      workerVersionId: version.id,
+    },
+    "manual-create-deployment",
+  );
+  let deployment = (
+    (await deploymentResponse.json()) as {
+      deployment: { id: string; revision: number };
+    }
+  ).deployment;
+  for (const [action, key] of [
+    ["validate", "manual-validate-deployment"],
+    ["deploy", "manual-deploy"],
+    ["activate", "manual-activate"],
+  ] as const) {
+    const response = await postJson(
+      harness.routes,
+      `/deployments/${deployment.id}/${action}`,
+      { expectedRevision: deployment.revision },
+      key,
+    );
+    deployment = (
+      (await response.json()) as {
+        deployment: { id: string; revision: number };
+      }
+    ).deployment;
+  }
+
+  const first = await postJson(
+    harness.routes,
+    `/deployments/${deployment.id}/runs`,
+    { input: { release_id: "release-route" } },
+    "manual-occurrence-1",
+  );
+  const replay = await postJson(
+    harness.routes,
+    `/deployments/${deployment.id}/runs`,
+    { input: { release_id: "release-route" } },
+    "manual-occurrence-1",
+  );
+  assert.equal(first.status, 202);
+  assert.equal(replay.status, 202);
+  assert.equal(
+    ((await first.json()) as { runId: string }).runId,
+    ((await replay.json()) as { runId: string }).runId,
+  );
+  assert.equal(harness.data.workerRuns.length, 1);
+  assert.equal(harness.data.workerActivationInboxes[0].duplicateCount, 1);
+
+  const listed = await harness.routes.request(
+    `/activations?workerDeploymentId=${deployment.id}`,
+  );
+  assert.equal(listed.status, 200);
+  assert.equal(
+    ((await listed.json()) as { activations: unknown[] }).activations.length,
+    1,
+  );
+});
+
 test("Worker route errors redact secret-shaped values", async () => {
   const harness = createRouteHarness("admin");
   const service = {
@@ -184,6 +259,22 @@ function createRouteHarness(role: WorkerRouteRole): RouteHarness {
     now: () => new Date(Date.UTC(2026, 6, 27, 13, 0, tick++)),
     id: (kind) => `${kind}-route-${++id}`,
   });
+  const activationRepository = createWorkerActivationRepository({
+    loadStore: () => data,
+    mutateStore: <T>(mutator: (store: PacketAgentData) => T | Promise<T>) => {
+      const result = mutationChain.then(() => mutator(data));
+      mutationChain = result.then(
+        () => undefined,
+        () => undefined,
+      );
+      return result;
+    },
+  });
+  const activationService = createWorkerActivationService({
+    repository: activationRepository,
+    now: () => new Date(Date.UTC(2026, 6, 27, 14, 0, tick++)),
+    id: (kind) => `${kind}-route-${++id}`,
+  });
   const auth = { workspaceId: "alpha", role };
   const roles: WorkerRouteRole[] = [];
   const authorize = async (
@@ -208,7 +299,7 @@ function createRouteHarness(role: WorkerRouteRole): RouteHarness {
   return {
     data,
     service,
-    routes: createWorkerRoutes({ service, authorize }),
+    routes: createWorkerRoutes({ service, activationService, authorize }),
     auth,
     roles,
     authorize,

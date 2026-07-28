@@ -275,6 +275,8 @@ function makeStore(): PacketAgentData {
     workerDeploymentRollouts: [],
     workerCommandReceipts: [],
     workerEvents: [],
+    workerActivationInboxes: [],
+    workerActivationPayloads: [],
     workspaceInvitations: [],
     invitationEmailDeliveries: [],
     activationMilestones: {},
