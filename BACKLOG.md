@@ -115,14 +115,14 @@ rolling reservation, effect preparation, or external I/O.
 Dependencies: W4-W6.
 
 Status: active. Resume at
-[`W7.3 - Integrate supervisor attention`](dev/worker-implementation-loops.md#w73---integrate-supervisor-attention).
+[`W7.4 - Add independent operator APIs`](dev/worker-implementation-loops.md#w74---add-independent-operator-apis).
 
 - [x] Define and persist version-bound attention requests, approval grants,
       control commands, and notification delivery references with durable replay
       identities across JSON, SQLite, and managed Postgres.
 - [x] Add pause, resume, stop, revoke, approve once, approve for run, and reject actions.
-- [ ] Persist pending attention state across restarts.
-- [ ] Add escalation deadlines and notification route references.
+- [x] Persist pending attention state across restarts.
+- [x] Add escalation deadlines and notification route references.
 - [ ] Make kill and revoke controls available independently of the authoring UI.
 - Gate: an operator can stop a running Worker and revoke future activation even if its originating Packet application is closed.
 

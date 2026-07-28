@@ -369,6 +369,13 @@ async function runRuntimePersistence(): Promise<void> {
       record.workspaceId === admittedRun.workspaceId && record.id === admittedRun.workerVersionId,
   );
   assert.ok(admittedVersion);
+  const admittedDeployment = data.workerDeployments.find(
+    (record) =>
+      record.workspaceId === admittedRun.workspaceId &&
+      record.id === admittedRun.workerDeploymentId,
+  );
+  assert.ok(admittedDeployment?.compiledPolicy);
+  const admittedPolicy = admittedDeployment.compiledPolicy;
   const controlAt = new Date("2026-07-27T15:00:30.000Z");
   let nextControlId = 0;
   const controls = createWorkerControlService({
@@ -400,6 +407,7 @@ async function runRuntimePersistence(): Promise<void> {
         ...controlBinding,
         id: "attention-parity",
         requestKey: "parity:iteration-1:action-approval",
+        policyDigest: admittedPolicy.policyDigest,
         notificationRouteIds: [notificationRoute.id],
         requestedAt: "2026-07-27T15:00:10.000Z",
         escalatesAt: "2026-07-27T15:30:00.000Z",

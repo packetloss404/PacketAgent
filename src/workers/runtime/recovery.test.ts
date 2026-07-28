@@ -67,6 +67,20 @@ test("expired Worker work is requeued once and resumes the exact action cursor",
     },
     tools: {
       definitions: () => [],
+      async authorize(input) {
+        return {
+          allowed: true,
+          code: "allowed",
+          tool: input.call.name,
+          verb: "GET",
+          effect: "read",
+          operationDigest: `sha256:${"a".repeat(64)}`,
+          resourceCount: 1,
+          resourceSchemes: ["https"],
+          policyDigest: `sha256:${"b".repeat(64)}`,
+          capabilityId: "release-read",
+        };
+      },
       async execute(input): Promise<WorkerRuntimeToolResult> {
         toolCalls += 1;
         return {
@@ -85,6 +99,11 @@ test("expired Worker work is requeued once and resumes the exact action cursor",
     events: harness.runtime,
     leases: harness.runtime,
     cancellation: harness.runtime,
+    attention: {
+      async resolve() {
+        throw new Error("Recovered operation did not require approval.");
+      },
+    },
     runs: harness.runtime,
   };
   const completed = await runWorkerSupervisor({

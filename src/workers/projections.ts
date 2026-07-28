@@ -55,6 +55,11 @@ export const LEGACY_PROJECTION_POLICY: WorkerPolicy = {
     default: "deny",
     allowedCapabilityIds: [],
   },
+  attention: {
+    approvalTimeoutMs: 15 * 60 * 1_000,
+    escalationAfterMs: 5 * 60 * 1_000,
+    onExpiration: "pause",
+  },
 };
 
 export interface LegacyAgentProjectionOptions {
@@ -101,6 +106,7 @@ function policyWithCapabilities(
     ...policy,
     budgets: { ...policy.budgets },
     retry: { ...policy.retry },
+    attention: { ...policy.attention },
     permissions: {
       default: "deny",
       allowedCapabilityIds: tools.map((tool) => tool.id),

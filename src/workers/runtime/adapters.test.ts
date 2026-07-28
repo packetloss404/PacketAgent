@@ -367,7 +367,106 @@ test("Worker policy denial precedes credential, budget, effect, and network boun
   assert.deepEqual(order, ["deny"]);
 });
 
-function compiledPolicy(verb: "GET" | "POST", effect: "read" | "write"): WorkerCompiledPolicy {
+test("Worker tool adapter accepts only exact operation-bound approval evidence", async () => {
+  const registry = new ToolRegistry();
+  let handled = 0;
+  registry.register({
+    name: "http_fetch",
+    description: "Reads an approved external target.",
+    inputSchema: {},
+    side: "read",
+    authorization: {
+      describe: (input) => ({
+        verb: "GET",
+        effect: "read",
+        resources: [String(input.url ?? "")],
+      }),
+    },
+    async handle() {
+      handled += 1;
+      return { ok: true };
+    },
+  });
+  const port = createWorkerToolPort(registry);
+  const policy = compiledPolicy("GET", "read", "always");
+  const base = {
+    workspaceId: "workspace-1",
+    workerDefinitionId: "worker-1",
+    workerRunId: "run-1",
+    workerVersionId: "worker-version-1",
+    workerVersionContentDigest: policy.workerVersionContentDigest,
+    declaredCredentialRefs: [] as string[],
+    workerDeploymentId: "deployment-1",
+    workerDeploymentRevision: 1,
+    compiledPolicy: policy,
+    budgetUsage: budgetUsage(),
+    actor: { type: "system" as const, id: "test-supervisor" },
+    call: {
+      id: "call-approved",
+      name: "http_fetch",
+      input: { url: "https://releases.example.test/api" },
+    },
+    authorizedAt: new Date("2026-07-27T12:00:00.000Z"),
+    signal: new AbortController().signal,
+  };
+  const denied = await port.authorize(base);
+  assert.equal(denied.code, "approval_required");
+  const approval = {
+    grantId: "approval-1",
+    attentionRequestId: "attention-1",
+    actionId: base.call.id,
+    capabilityId: denied.capabilityId!,
+    operationDigest: denied.operationDigest,
+    policyDigest: denied.policyDigest!,
+    scope: "once" as const,
+    expiresAt: "2026-07-27T12:30:00.000Z",
+  };
+  const allowed = await port.authorize({ ...base, approval });
+  assert.equal(allowed.allowed, true);
+  assert.equal(allowed.approvalGrantId, "approval-1");
+
+  const result = await port.execute({
+    ...base,
+    approval,
+    budgetPolicy: makeWorkerVersionContent().policy.budgets,
+    iteration: 1,
+    fencingToken: 1,
+    reservedAt: new Date("2026-07-27T12:00:00.000Z"),
+    recordPolicyDecision: async () => undefined,
+  });
+  assert.equal(result.status, "ok");
+  assert.equal(handled, 1);
+
+  const mismatched = await port.authorize({
+    ...base,
+    approval: {
+      ...approval,
+      operationDigest: `sha256:${"f".repeat(64)}`,
+    },
+  });
+  assert.equal(mismatched.code, "approval_required");
+
+  const expired = await port.execute({
+    ...base,
+    approval: {
+      ...approval,
+      expiresAt: "2026-07-27T11:59:59.000Z",
+    },
+    budgetPolicy: makeWorkerVersionContent().policy.budgets,
+    iteration: 1,
+    fencingToken: 1,
+    reservedAt: new Date("2026-07-27T12:00:00.000Z"),
+    recordPolicyDecision: async () => undefined,
+  });
+  assert.equal(expired.status, "error");
+  assert.equal(handled, 1);
+});
+
+function compiledPolicy(
+  verb: "GET" | "POST",
+  effect: "read" | "write",
+  approval: "never" | "always" = "never",
+): WorkerCompiledPolicy {
   const content: WorkerVersionContent = makeWorkerVersionContent({
     tools: [
       {
@@ -376,7 +475,7 @@ function compiledPolicy(verb: "GET" | "POST", effect: "read" | "write"): WorkerC
         verbs: [verb],
         resources: ["https://releases.example.test/api"],
         effect,
-        approval: "never",
+        approval,
       },
     ],
     policy: {

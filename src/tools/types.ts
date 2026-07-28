@@ -35,6 +35,7 @@ export interface WorkerToolContext {
   readonly capability?: {
     readonly id: string;
   };
+  readonly approval?: WorkerToolApprovalEvidence;
   readonly budget: WorkerBudgetUsage;
   readonly effect?: {
     readonly classification: WorkerToolEffectClassification;
@@ -44,6 +45,17 @@ export interface WorkerToolContext {
   readonly actor: WorkerActorReference;
   readonly services?: WorkerToolRuntimeServices;
   readonly recordPolicyDecision: (decision: ToolPolicyDecision) => Promise<void>;
+}
+
+export interface WorkerToolApprovalEvidence {
+  readonly grantId: string;
+  readonly attentionRequestId: string;
+  readonly actionId: string;
+  readonly capabilityId: string;
+  readonly operationDigest: string;
+  readonly policyDigest: string;
+  readonly scope: "once" | "run";
+  readonly expiresAt: string;
 }
 
 export interface ToolAuthorizationDescriptor {
@@ -71,6 +83,8 @@ export interface ToolPolicyDecision {
   readonly resourceSchemes: readonly string[];
   readonly policyDigest?: string;
   readonly capabilityId?: string;
+  readonly approvalGrantId?: string;
+  readonly attentionRequestId?: string;
 }
 
 export interface ToolResult {

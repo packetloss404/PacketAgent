@@ -121,6 +121,34 @@ test("WorkerPolicy validates explicit rolling ceilings and accepts legacy omissi
   }
 });
 
+test("WorkerPolicy requires a bounded explicit attention expiration policy", () => {
+  const missing = structuredClone(makeWorkerVersionContent());
+  delete (missing.policy as { attention?: unknown }).attention;
+  const missingResult = validateWorkerVersion(
+    makeWorkerVersion({ content: missing }),
+  );
+  assert.equal(missingResult.ok, false);
+
+  const invalid = structuredClone(makeWorkerVersionContent());
+  const mutableAttention = invalid.policy.attention as {
+    approvalTimeoutMs: number;
+    escalationAfterMs?: number;
+  };
+  mutableAttention.approvalTimeoutMs = 10_000;
+  mutableAttention.escalationAfterMs = 10_000;
+  const invalidResult = validateWorkerVersion(
+    makeWorkerVersion({ content: invalid }),
+  );
+  assert.equal(invalidResult.ok, false);
+  if (!invalidResult.ok) {
+    assert.ok(
+      invalidResult.issues.some(
+        (issue) => issue.code === "attention.escalation_order",
+      ),
+    );
+  }
+});
+
 test("WorkerTrigger rejects ambiguous kind-specific fields", () => {
   const result = validateWorkerTrigger({
     id: "mixed-trigger",

@@ -122,10 +122,19 @@ export interface WorkerPermissionPolicy {
   readonly allowedCapabilityIds: readonly string[];
 }
 
+export type WorkerAttentionExpirationDisposition = "pause" | "reject";
+
+export interface WorkerAttentionPolicy {
+  readonly approvalTimeoutMs: number;
+  readonly escalationAfterMs?: number;
+  readonly onExpiration: WorkerAttentionExpirationDisposition;
+}
+
 export interface WorkerPolicy {
   readonly budgets: WorkerBudgetPolicy;
   readonly retry: WorkerRetryPolicy;
   readonly permissions: WorkerPermissionPolicy;
+  readonly attention: WorkerAttentionPolicy;
 }
 
 interface WorkerTriggerBase {
@@ -304,6 +313,8 @@ export type WorkerRunTerminalReason =
   | "tool_call_limit"
   | "rolling_provider_cost"
   | "rolling_billable_actions"
+  | "approval_rejected"
+  | "approval_expired"
   | "operator_cancelled"
   | "deployment_revoked"
   | "lease_lost"

@@ -1,4 +1,5 @@
-import type { ToolPolicyDecision } from "../../tools/types.js";
+import type { ToolPolicyDecision, WorkerToolApprovalEvidence } from "../../tools/types.js";
+import type { WorkerAttentionRequest } from "../control-types.js";
 import type { WorkerRollingBudgetPort } from "../budget-types.js";
 import type {
   JsonObject,
@@ -89,6 +90,7 @@ export interface WorkerToolPort {
   definitions(
     capabilities: readonly WorkerCompiledCapability[],
   ): readonly WorkerRuntimeToolDefinition[];
+  authorize(input: WorkerRuntimeToolAuthorizationInput): Promise<ToolPolicyDecision>;
   execute(input: {
     readonly workspaceId: string;
     readonly workerDefinitionId: string;
@@ -106,9 +108,28 @@ export interface WorkerToolPort {
     readonly fencingToken: number;
     readonly reservedAt: Date;
     readonly call: WorkerRuntimeToolCall;
+    readonly approval?: WorkerToolApprovalEvidence;
     readonly recordPolicyDecision: (decision: ToolPolicyDecision) => Promise<void>;
     readonly signal: AbortSignal;
   }): Promise<WorkerRuntimeToolResult>;
+}
+
+export interface WorkerRuntimeToolAuthorizationInput {
+  readonly workspaceId: string;
+  readonly workerDefinitionId: string;
+  readonly workerRunId: string;
+  readonly workerVersionId: string;
+  readonly workerVersionContentDigest: string;
+  readonly declaredCredentialRefs: readonly string[];
+  readonly workerDeploymentId: string;
+  readonly workerDeploymentRevision: number;
+  readonly compiledPolicy?: WorkerCompiledPolicy;
+  readonly budgetUsage: WorkerBudgetUsage;
+  readonly actor: WorkerActorReference;
+  readonly call: WorkerRuntimeToolCall;
+  readonly approval?: WorkerToolApprovalEvidence;
+  readonly authorizedAt: Date;
+  readonly signal: AbortSignal;
 }
 
 export interface WorkerClockPort {
@@ -214,6 +235,36 @@ export interface WorkerRunPort {
   }): Promise<WorkerRun>;
 }
 
+export interface WorkerAttentionResolutionInput extends WorkerCheckpointWrite {
+  readonly context: WorkerRuntimeContext;
+  readonly actionId: string;
+  readonly policyDecision: ToolPolicyDecision;
+  readonly requestedAt: Date;
+}
+
+export type WorkerAttentionResolution =
+  | {
+      readonly disposition: "approved";
+      readonly approval: WorkerToolApprovalEvidence;
+    }
+  | {
+      readonly disposition: "waiting";
+      readonly attention: WorkerAttentionRequest;
+      readonly run: WorkerRun;
+      readonly checkpointId: string;
+      readonly checkpointSequence: number;
+      readonly runRevision: number;
+    }
+  | {
+      readonly disposition: "halted";
+      readonly attention: WorkerAttentionRequest;
+      readonly run: WorkerRun;
+    };
+
+export interface WorkerAttentionPort {
+  resolve(input: WorkerAttentionResolutionInput): Promise<WorkerAttentionResolution>;
+}
+
 export interface WorkerSupervisorPorts {
   readonly provider: WorkerProviderPort;
   readonly tools: WorkerToolPort;
@@ -222,6 +273,7 @@ export interface WorkerSupervisorPorts {
   readonly events: WorkerEventPort;
   readonly leases: WorkerLeasePort;
   readonly cancellation: WorkerCancellationPort;
+  readonly attention: WorkerAttentionPort;
   readonly runs: WorkerRunPort;
   readonly budgets: WorkerRollingBudgetPort;
 }

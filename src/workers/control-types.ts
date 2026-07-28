@@ -1,4 +1,8 @@
-import type { WorkerActorReference, WorkerNotificationRouteReference } from "./types.js";
+import type {
+  WorkerActorReference,
+  WorkerAttentionExpirationDisposition,
+  WorkerNotificationRouteReference,
+} from "./types.js";
 
 export const WORKER_ATTENTION_REQUEST_SCHEMA_VERSION =
   "packetagent.worker-attention-request/v1" as const;
@@ -31,6 +35,8 @@ export interface WorkerAttentionRequest extends WorkerControlRunBinding {
   readonly status: WorkerAttentionRequestStatus;
   readonly capabilityId: string;
   readonly operationDigest: string;
+  readonly policyDigest: string;
+  readonly expirationDisposition: WorkerAttentionExpirationDisposition;
   readonly requestedBy: WorkerActorReference;
   readonly requestedAt: string;
   readonly escalatesAt?: string;
@@ -50,6 +56,7 @@ export interface WorkerApprovalGrant extends WorkerControlRunBinding {
   readonly attentionRequestId: string;
   readonly capabilityId: string;
   readonly operationDigest: string;
+  readonly policyDigest: string;
   readonly scope: WorkerApprovalScope;
   readonly status: WorkerApprovalGrantStatus;
   readonly nonceDigest: string;
@@ -140,6 +147,8 @@ export function assertValidWorkerAttentionRequest(record: WorkerAttentionRequest
     !["open", "approved", "rejected", "expired", "cancelled"].includes(record.status) ||
     !isNonEmpty(record.capabilityId) ||
     !isDigest(record.operationDigest) ||
+    !isDigest(record.policyDigest) ||
+    !["pause", "reject"].includes(record.expirationDisposition) ||
     !isActor(record.requestedBy) ||
     !isTimestamp(record.requestedAt) ||
     !isTimestamp(record.expiresAt) ||
@@ -185,6 +194,7 @@ export function assertValidWorkerApprovalGrant(record: WorkerApprovalGrant): voi
     !isNonEmpty(record.attentionRequestId) ||
     !isNonEmpty(record.capabilityId) ||
     !isDigest(record.operationDigest) ||
+    !isDigest(record.policyDigest) ||
     !["once", "run"].includes(record.scope) ||
     !["active", "consumed", "revoked", "expired"].includes(record.status) ||
     !isDigest(record.nonceDigest) ||

@@ -146,6 +146,27 @@ export function evaluateWorkerToolPolicy(input: {
     };
   }
   const approvalRequired = matches.find(([, candidate]) => candidate.approval === "always");
+  const approval = input.worker.approval;
+  if (
+    approvalRequired &&
+    approval &&
+    approval.capabilityId === approvalRequired[0] &&
+    approval.operationDigest === base.operationDigest &&
+    approval.policyDigest === policyDigest
+  ) {
+    return {
+      operation,
+      decision: {
+        ...base,
+        allowed: true,
+        code: "allowed",
+        policyDigest,
+        capabilityId: approvalRequired[0],
+        approvalGrantId: approval.grantId,
+        attentionRequestId: approval.attentionRequestId,
+      },
+    };
+  }
   return {
     operation,
     decision: {

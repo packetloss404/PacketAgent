@@ -411,7 +411,7 @@ function applyResume(input: {
   const run = input.target.run!;
   const conflict = runRevisionConflict(input.pending, run);
   if (conflict) return reject(input.data, input.pending, input.timestamp, conflict);
-  if (run.status !== "paused") {
+  if (run.status !== "paused" && run.status !== "waiting_for_approval") {
     return reject(input.data, input.pending, input.timestamp, "run_not_paused");
   }
   if (input.target.deployment.status !== "active") {
@@ -426,6 +426,12 @@ function applyResume(input: {
     )
   ) {
     return reject(input.data, input.pending, input.timestamp, "run_attention_pending");
+  }
+  if (
+    run.status === "waiting_for_approval" &&
+    !hasResumableApproval(input.data, input.target, run, input.timestamp)
+  ) {
+    return reject(input.data, input.pending, input.timestamp, "approval_not_resumable");
   }
   const next: WorkerRun = {
     ...run,
@@ -526,6 +532,14 @@ function applyApproval(
   const run = input.target.run!;
   const rejection = attentionCommandRejection(input, attention, run);
   if (rejection) return reject(input.data, input.pending, input.timestamp, rejection);
+  if (
+    !input.target.deployment.compiledPolicy ||
+    input.target.deployment.compiledPolicy.policyDigest !== attention.policyDigest ||
+    input.target.deployment.compiledPolicy.workerVersionContentDigest !==
+      attention.workerVersionContentDigest
+  ) {
+    return reject(input.data, input.pending, input.timestamp, "attention_policy_mismatch");
+  }
 
   const expiresAt = input.request.expiresAt ?? attention.expiresAt;
   if (
@@ -551,6 +565,7 @@ function applyApproval(
     workerVersionContentDigest: attention.workerVersionContentDigest,
     capabilityId: attention.capabilityId,
     operationDigest: attention.operationDigest,
+    policyDigest: attention.policyDigest,
     scope,
     status: "active",
     nonceDigest: digestString(approvalNonce),
@@ -588,7 +603,10 @@ function applyAttentionRejection(input: {
     resolvedBy: input.pending.actor,
     resolutionCommandId: input.pending.id,
   });
-  const command = apply(input.data, input.pending, input.timestamp, run.revision);
+  const nextRun = rejectApprovalRun(run, input.timestamp);
+  replaceRun(input.data, nextRun);
+  cancelExecutionJobs(input.data, run.workspaceId, [run.id], input.timestamp, true);
+  const command = apply(input.data, input.pending, input.timestamp, nextRun.revision);
   return { command, affectedRunIds: [run.id] };
 }
 
@@ -620,6 +638,57 @@ function attentionCommandRejection(
 
 function runRevisionConflict(command: WorkerControlCommand, run: WorkerRun): string | null {
   return run.revision === command.expectedRevision ? null : "revision_conflict";
+}
+
+function hasResumableApproval(
+  data: PacketAgentData,
+  target: ResolvedControlTarget,
+  run: WorkerRun,
+  timestamp: string,
+): boolean {
+  const checkpoint = run.latestCheckpointId
+    ? data.workerCheckpoints.find(
+        (record) =>
+          record.workspaceId === run.workspaceId &&
+          record.workerRunId === run.id &&
+          record.id === run.latestCheckpointId,
+      )
+    : undefined;
+  if (
+    !checkpoint ||
+    !target.deployment.compiledPolicy ||
+    target.deployment.compiledPolicy.workerVersionContentDigest !== target.version.contentDigest
+  ) {
+    return false;
+  }
+  return checkpoint.pendingApprovalIds.some((attentionRequestId) => {
+    const attention = data.workerAttentionRequests.find(
+      (record) =>
+        record.workspaceId === run.workspaceId &&
+        record.id === attentionRequestId &&
+        record.workerRunId === run.id &&
+        record.workerVersionId === run.workerVersionId &&
+        record.workerVersionContentDigest === target.version.contentDigest &&
+        record.workerDeploymentId === run.workerDeploymentId &&
+        record.status === "approved" &&
+        record.policyDigest === target.deployment.compiledPolicy!.policyDigest,
+    );
+    if (!attention) return false;
+    return data.workerApprovalGrants.some(
+      (grant) =>
+        grant.workspaceId === run.workspaceId &&
+        grant.attentionRequestId === attention.id &&
+        grant.workerRunId === run.id &&
+        grant.workerVersionId === run.workerVersionId &&
+        grant.workerVersionContentDigest === target.version.contentDigest &&
+        grant.workerDeploymentId === run.workerDeploymentId &&
+        grant.capabilityId === attention.capabilityId &&
+        grant.operationDigest === attention.operationDigest &&
+        grant.policyDigest === attention.policyDigest &&
+        ["active", "consumed"].includes(grant.status) &&
+        Date.parse(grant.expiresAt) > Date.parse(timestamp),
+    );
+  });
 }
 
 function apply(
@@ -669,6 +738,22 @@ function terminalizeRun(
     status: "cancelled",
     revision: run.revision + 1,
     terminalReason,
+    updatedAt: timestamp,
+    completedAt: timestamp,
+    ...(run.startedAt ? {} : { startedAt: timestamp }),
+  };
+  assertWorkerRunUpdate(run, next);
+  return next;
+}
+
+function rejectApprovalRun(run: WorkerRun, timestamp: string): WorkerRun {
+  const { runtimeLease: _lease, ...withoutLease } = run;
+  const next: WorkerRun = {
+    ...withoutLease,
+    status: "failed",
+    revision: run.revision + 1,
+    terminalReason: "approval_rejected",
+    error: "Worker operation approval was rejected.",
     updatedAt: timestamp,
     completedAt: timestamp,
     ...(run.startedAt ? {} : { startedAt: timestamp }),

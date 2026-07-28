@@ -378,6 +378,9 @@ test("worker.run job handler executes the canonical supervisor and persists term
       },
       tools: {
         definitions: () => [],
+        async authorize() {
+          throw new Error("no tool should authorize");
+        },
         async execute() {
           throw new Error("no tool should execute");
         },

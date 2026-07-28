@@ -86,7 +86,7 @@ const TERMINAL_REASONS_BY_STATUS: Readonly<
   waiting_for_approval: [],
   paused: [],
   completed: ["objective_satisfied", "exit_predicate_matched"],
-  failed: ["failure_limit", "unhandled_error"],
+  failed: ["failure_limit", "unhandled_error", "approval_rejected", "approval_expired"],
   budget_exhausted: [
     "elapsed_time",
     "iteration_limit",
@@ -664,6 +664,40 @@ function validatePolicy(
       }
     });
   }
+
+  const attention = recordAt(policy.attention, `${path}.attention`, issues);
+  if (attention) {
+    const approvalTimeoutMs = numberAt(
+      attention,
+      "approvalTimeoutMs",
+      `${path}.attention`,
+      issues,
+      {
+        integer: true,
+        exclusiveMinimum: 0,
+      },
+    );
+    const escalationAfterMs =
+      attention.escalationAfterMs === undefined
+        ? undefined
+        : numberAt(attention, "escalationAfterMs", `${path}.attention`, issues, {
+            integer: true,
+            exclusiveMinimum: 0,
+          });
+    enumAt(attention, "onExpiration", ["pause", "reject"], `${path}.attention`, issues);
+    if (
+      approvalTimeoutMs !== undefined &&
+      escalationAfterMs !== undefined &&
+      escalationAfterMs >= approvalTimeoutMs
+    ) {
+      issue(
+        issues,
+        `${path}.attention.escalationAfterMs`,
+        "attention.escalation_order",
+        "must be less than approvalTimeoutMs",
+      );
+    }
+  }
 }
 
 function validateRollingBudgetLimit(
@@ -1230,6 +1264,8 @@ export function validateWorkerRun(value: unknown): WorkerContractValidation<Work
       "tool_call_limit",
       "rolling_provider_cost",
       "rolling_billable_actions",
+      "approval_rejected",
+      "approval_expired",
       "operator_cancelled",
       "deployment_revoked",
       "lease_lost",

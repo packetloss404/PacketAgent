@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { recordedCall } from "../../providers/ledger.js";
 import { getDefaultRouter, type ProviderRouter } from "../../providers/router.js";
 import type { ProviderName, ProviderToolDef } from "../../providers/types.js";
@@ -23,6 +24,7 @@ import type {
   WorkerProviderPort,
   WorkerRuntimeProviderRequest,
   WorkerRuntimeToolDefinition,
+  WorkerRuntimeToolAuthorizationInput,
   WorkerRuntimeToolResult,
   WorkerToolPort,
 } from "./ports.js";
@@ -113,6 +115,40 @@ export function createWorkerToolPort(
       }
       return definitions;
     },
+    async authorize(input) {
+      const tool = registry.get(input.call.name);
+      if (!tool) {
+        return {
+          allowed: false,
+          code: "capability_not_granted",
+          tool: input.call.name,
+          verb: "UNKNOWN",
+          effect: "execute",
+          operationDigest: `sha256:${createHash("sha256")
+            .update(
+              JSON.stringify({
+                tool: input.call.name,
+                verb: "UNKNOWN",
+                effect: "execute",
+                resources: [],
+              }),
+            )
+            .digest("hex")}`,
+          resourceCount: 0,
+          resourceSchemes: [],
+        };
+      }
+      const context = workerToolBaseContext(input, runtimeServices, async () => undefined);
+      const preflight = preflightWorkerToolPolicy({
+        tool,
+        toolInput: { ...input.call.input },
+        context: { ...context, signal: input.signal },
+      });
+      if (!preflight) {
+        throw new Error("Worker tool authorization did not produce a policy decision.");
+      }
+      return preflight.decision;
+    },
     async execute(input) {
       const tool = registry.get(input.call.name);
       if (!tool) {
@@ -128,45 +164,7 @@ export function createWorkerToolPort(
         };
       }
       const descriptor = describeToolEffect(tool, input.call.input);
-      const baseContext: Omit<ToolContext, "signal"> = {
-        workspaceId: input.workspaceId,
-        userId: "packetagent.worker-supervisor",
-        runId: input.workerRunId,
-        agentId: input.workerDefinitionId,
-        worker: {
-          run: { id: input.workerRunId },
-          deployment: {
-            id: input.workerDeploymentId,
-            revision: input.workerDeploymentRevision,
-            ...(input.compiledPolicy ? { compiledPolicy: input.compiledPolicy } : {}),
-          },
-          version: {
-            id: input.workerVersionId,
-            contentDigest: input.workerVersionContentDigest,
-            declaredCredentialRefs: input.declaredCredentialRefs,
-          },
-          budget: input.budgetUsage,
-          actor: input.actor,
-          services: {
-            credentials: {
-              use(reference, expectedKinds, consumer) {
-                return runtimeServices.credentials.use(
-                  {
-                    workspaceId: input.workspaceId,
-                    reference,
-                    declaredCredentialRefs: input.declaredCredentialRefs,
-                    expectedKinds,
-                  },
-                  consumer,
-                );
-              },
-            },
-            network: runtimeServices.network,
-            sandbox: runtimeServices.sandbox,
-          },
-          recordPolicyDecision: input.recordPolicyDecision,
-        },
-      };
+      const baseContext = workerToolBaseContext(input, runtimeServices, input.recordPolicyDecision);
       const preflightContext: ToolContext = { ...baseContext, signal: input.signal };
       const preflight = preflightWorkerToolPolicy({
         tool,
@@ -273,6 +271,60 @@ export interface WorkerToolAdapterServices {
   readonly credentials: WorkerCredentialService;
   readonly network: WorkerNetworkPort;
   readonly sandbox: WorkerSandboxPort;
+}
+
+function workerToolBaseContext(
+  input: WorkerRuntimeToolAuthorizationInput | Parameters<WorkerToolPort["execute"]>[0],
+  services: WorkerToolAdapterServices,
+  recordPolicyDecision: NonNullable<ToolContext["worker"]>["recordPolicyDecision"],
+): Omit<ToolContext, "signal"> {
+  const approvalTime =
+    "reservedAt" in input ? input.reservedAt : input.authorizedAt;
+  const approval =
+    input.approval?.actionId === input.call.id &&
+    Date.parse(input.approval.expiresAt) > approvalTime.getTime()
+      ? input.approval
+      : undefined;
+  return {
+    workspaceId: input.workspaceId,
+    userId: "packetagent.worker-supervisor",
+    runId: input.workerRunId,
+    agentId: input.workerDefinitionId,
+    worker: {
+      run: { id: input.workerRunId },
+      deployment: {
+        id: input.workerDeploymentId,
+        revision: input.workerDeploymentRevision,
+        ...(input.compiledPolicy ? { compiledPolicy: input.compiledPolicy } : {}),
+      },
+      version: {
+        id: input.workerVersionId,
+        contentDigest: input.workerVersionContentDigest,
+        declaredCredentialRefs: input.declaredCredentialRefs,
+      },
+      ...(approval ? { approval } : {}),
+      budget: input.budgetUsage,
+      actor: input.actor,
+      services: {
+        credentials: {
+          use(reference, expectedKinds, consumer) {
+            return services.credentials.use(
+              {
+                workspaceId: input.workspaceId,
+                reference,
+                declaredCredentialRefs: input.declaredCredentialRefs,
+                expectedKinds,
+              },
+              consumer,
+            );
+          },
+        },
+        network: services.network,
+        sandbox: services.sandbox,
+      },
+      recordPolicyDecision,
+    },
+  };
 }
 
 function createDefaultWorkerToolAdapterServices(): WorkerToolAdapterServices {

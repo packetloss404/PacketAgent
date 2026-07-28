@@ -79,6 +79,10 @@ import {
 } from "./alerts/alerts-deliver-handler.js";
 import { assertManagedDatabaseRuntimeSupported } from "./deployment/managed-database-runtime-guard.js";
 import { WORKER_EXECUTION_JOB_TYPE } from "./workers/activation.js";
+import {
+  WORKER_ATTENTION_DEADLINE_JOB_TYPE,
+  createWorkerAttentionDeadlineJobHandler,
+} from "./workers/attention-service.js";
 import { createWorkerExecutionJobHandler } from "./workers/runtime/job-handler.js";
 import { createWorkerRecoveryCoordinator } from "./workers/runtime/recovery.js";
 import {
@@ -385,6 +389,7 @@ app.route("/api/app/workers", workerRoutes);
 
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
 const workerExecutionJobHandler = createWorkerExecutionJobHandler();
+const workerAttentionDeadlineJobHandler = createWorkerAttentionDeadlineJobHandler();
 const workerRecoveryCoordinator = createWorkerRecoveryCoordinator();
 scheduler.registerReconciler({
   name: "worker-recovery",
@@ -467,6 +472,12 @@ scheduler.register({
   type: WORKER_EXECUTION_JOB_TYPE,
   async handle(job, context) {
     return workerExecutionJobHandler.handle(job, context);
+  },
+});
+scheduler.register({
+  type: WORKER_ATTENTION_DEADLINE_JOB_TYPE,
+  async handle(job) {
+    return workerAttentionDeadlineJobHandler.handle(job);
   },
 });
 app.use("/data/artifacts/*", async (c, next) => {

@@ -9,6 +9,7 @@ export * from "./credential-types.js";
 export * from "./credentials.js";
 export * from "./control-types.js";
 export * from "./control-service.js";
+export * from "./attention-service.js";
 export * from "./persistence-types.js";
 export * from "./repository.js";
 export * from "./service.js";

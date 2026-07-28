@@ -21,6 +21,7 @@ import { restoreWorkerSupervisorState, snapshotWorkerSupervisorState } from "./c
 import { WorkerEffectInterruptionError, WorkerUnsafeReplayError } from "../effects.js";
 import { resolveWorkerRollingBudgetPolicy } from "../budget-types.js";
 import { WorkerRollingBudgetExceededError } from "../rolling-budget.js";
+import type { ToolPolicyDecision, WorkerToolApprovalEvidence } from "../../tools/types.js";
 
 export const WORKER_SCHEDULER_SHUTDOWN_REASON = "packetagent.scheduler_shutdown";
 export const WORKER_OPERATOR_CANCEL_REASON = "packetagent.operator_cancelled";
@@ -284,6 +285,37 @@ export async function runWorkerSupervisor(
     await refreshControl();
   };
 
+  const appendPolicyDecision = async (decision: ToolPolicyDecision): Promise<void> => {
+    await ports.events.append({
+      context,
+      fencingToken: lease.fencingToken,
+      event: {
+        type: decision.allowed ? "worker.policy.allowed" : "worker.policy.denied",
+        phase: state.phase,
+        cursor: state.cursor,
+        summary: decision.allowed
+          ? `Worker policy allowed ${decision.tool}.`
+          : `Worker policy denied ${decision.tool}.`,
+        data: {
+          decision: decision.allowed ? "allow" : "deny",
+          code: decision.code,
+          tool: decision.tool,
+          verb: decision.verb,
+          effect: decision.effect,
+          operationDigest: decision.operationDigest,
+          resourceCount: decision.resourceCount,
+          resourceSchemes: [...decision.resourceSchemes],
+          ...(decision.policyDigest ? { policyDigest: decision.policyDigest } : {}),
+          ...(decision.capabilityId ? { capabilityId: decision.capabilityId } : {}),
+          ...(decision.approvalGrantId ? { approvalGrantId: decision.approvalGrantId } : {}),
+          ...(decision.attentionRequestId
+            ? { attentionRequestId: decision.attentionRequestId }
+            : {}),
+        },
+      },
+    });
+  };
+
   const failPhase = async (error: unknown): Promise<void> => {
     const message = error instanceof Error ? error.message : String(error);
     state = reduceWorkerSupervisor(state, { type: "phase.failed", error: message });
@@ -399,9 +431,80 @@ export async function runWorkerSupervisor(
           });
           continue;
         }
-        state = reduceWorkerSupervisor(state, { type: "tool.reserve" });
-        if (state.terminal) continue;
         try {
+          const authorizationInput = {
+            workspaceId: context.run.workspaceId,
+            workerDefinitionId: context.run.workerDefinitionId,
+            workerRunId: context.run.id,
+            workerVersionId: context.run.workerVersionId,
+            workerVersionContentDigest: context.version.contentDigest,
+            declaredCredentialRefs: context.version.content.credentialRefs,
+            workerDeploymentId: context.run.workerDeploymentId,
+            workerDeploymentRevision: context.deployment.revision,
+            ...(context.deployment.compiledPolicy
+              ? { compiledPolicy: context.deployment.compiledPolicy }
+              : {}),
+            budgetUsage: state.usage,
+            actor: WORKER_TOOL_ACTOR,
+            call,
+            authorizedAt: ports.clock.now(),
+            signal,
+          };
+          let approval: WorkerToolApprovalEvidence | undefined;
+          let decision = await awaitBounded((operationSignal) =>
+            ports.tools.authorize({
+              ...authorizationInput,
+              signal: operationSignal,
+            }),
+          );
+          if (decision.code === "approval_required") {
+            await appendPolicyDecision(decision);
+            const resolution = await ports.attention.resolve({
+              context,
+              workspaceId: context.run.workspaceId,
+              workerRunId: context.run.id,
+              workerVersionId: context.run.workerVersionId,
+              expectedRunRevision: runRevision,
+              expectedCheckpointSequence: checkpointSequence,
+              fencingToken: lease.fencingToken,
+              cursor: state.cursor,
+              budgetUsage: state.usage,
+              workingMemory: snapshotWorkerSupervisorState(state),
+              completedActionIds: state.completedActionIds,
+              pendingApprovalIds: state.pendingApprovalIds,
+              artifactRefs: state.artifactRefs,
+              effectReceiptIds: state.effectReceiptIds,
+              actionId: call.id,
+              policyDecision: decision,
+              requestedAt: ports.clock.now(),
+            });
+            if (resolution.disposition !== "approved") {
+              state = {
+                ...state,
+                pendingApprovalIds: [
+                  ...new Set([...state.pendingApprovalIds, resolution.attention.id]),
+                ],
+              };
+              return { state, run: resolution.run };
+            }
+            approval = resolution.approval;
+            decision = await awaitBounded((operationSignal) =>
+              ports.tools.authorize({
+                ...authorizationInput,
+                approval,
+                signal: operationSignal,
+              }),
+            );
+          }
+          if (!decision.allowed) {
+            await appendPolicyDecision(decision);
+            await failPhase(
+              new Error(`Worker policy denied tool "${call.name}" (${decision.code}).`),
+            );
+            continue;
+          }
+          state = reduceWorkerSupervisor(state, { type: "tool.reserve" });
+          if (state.terminal) continue;
           const result = await awaitBounded((operationSignal) =>
             ports.tools.execute({
               workspaceId: context.run.workspaceId,
@@ -422,32 +525,8 @@ export async function runWorkerSupervisor(
               fencingToken: lease.fencingToken,
               reservedAt: ports.clock.now(),
               call,
-              recordPolicyDecision: async (decision) => {
-                await ports.events.append({
-                  context,
-                  fencingToken: lease.fencingToken,
-                  event: {
-                    type: decision.allowed ? "worker.policy.allowed" : "worker.policy.denied",
-                    phase: state.phase,
-                    cursor: state.cursor,
-                    summary: decision.allowed
-                      ? `Worker policy allowed ${decision.tool}.`
-                      : `Worker policy denied ${decision.tool}.`,
-                    data: {
-                      decision: decision.allowed ? "allow" : "deny",
-                      code: decision.code,
-                      tool: decision.tool,
-                      verb: decision.verb,
-                      effect: decision.effect,
-                      operationDigest: decision.operationDigest,
-                      resourceCount: decision.resourceCount,
-                      resourceSchemes: [...decision.resourceSchemes],
-                      ...(decision.policyDigest ? { policyDigest: decision.policyDigest } : {}),
-                      ...(decision.capabilityId ? { capabilityId: decision.capabilityId } : {}),
-                    },
-                  },
-                });
-              },
+              ...(approval ? { approval } : {}),
+              recordPolicyDecision: appendPolicyDecision,
               signal: operationSignal,
             }),
           );
@@ -456,6 +535,14 @@ export async function runWorkerSupervisor(
           if (result.status !== "ok") {
             await failPhase(new Error(result.error ?? `Tool ${result.toolName} failed.`));
             continue;
+          }
+          if (approval) {
+            state = {
+              ...state,
+              pendingApprovalIds: state.pendingApprovalIds.filter(
+                (id) => id !== approval.attentionRequestId,
+              ),
+            };
           }
           state = reduceWorkerSupervisor(state, {
             type: "tool.succeeded",

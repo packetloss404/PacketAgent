@@ -110,6 +110,11 @@ export function makeWorkerVersionContent(
         default: "deny",
         allowedCapabilityIds: ["release-read"],
       },
+      attention: {
+        approvalTimeoutMs: 30 * 60 * 1_000,
+        escalationAfterMs: 10 * 60 * 1_000,
+        onExpiration: "pause",
+      },
     },
     exitPredicates: [
       {
@@ -289,6 +294,8 @@ export function makeWorkerAttentionRequest(
     status: "open",
     capabilityId: "release-read",
     operationDigest: `sha256:${"e".repeat(64)}`,
+    policyDigest: `sha256:${"f".repeat(64)}`,
+    expirationDisposition: "pause",
     requestedBy: { type: "system", id: "packetagent.worker-supervisor" },
     requestedAt: TEST_NOW,
     escalatesAt: "2026-07-27T12:30:00.000Z",
@@ -313,6 +320,7 @@ export function makeWorkerApprovalGrant(
     workerVersionContentDigest: `sha256:${"d".repeat(64)}`,
     capabilityId: "release-read",
     operationDigest: `sha256:${"e".repeat(64)}`,
+    policyDigest: `sha256:${"f".repeat(64)}`,
     scope: "once",
     status: "active",
     nonceDigest: `sha256:${"9".repeat(64)}`,

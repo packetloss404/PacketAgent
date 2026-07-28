@@ -5,6 +5,7 @@ import { JobDeferredError, JobReleasedError } from "../../jobs/scheduler.js";
 import type { JobRecord } from "../../packetagent-store.js";
 import { redactedErrorMessage } from "../../security/redaction.js";
 import { createWorkerActivationService, type WorkerActivationService } from "../activation.js";
+import { createWorkerAttentionService, type WorkerAttentionService } from "../attention-service.js";
 import type { WorkerRollingBudgetPort } from "../budget-types.js";
 import { createWorkerRollingBudgetService } from "../rolling-budget.js";
 import type { JsonObject } from "../types.js";
@@ -22,8 +23,9 @@ export interface WorkerExecutionJobHandlerDependencies {
   readonly activationService?: WorkerActivationService;
   readonly ports?: Omit<
     WorkerSupervisorPorts,
-    "checkpoints" | "events" | "leases" | "cancellation" | "runs" | "budgets"
+    "checkpoints" | "events" | "leases" | "cancellation" | "attention" | "runs" | "budgets"
   >;
+  readonly attention?: WorkerAttentionService;
   readonly budgets?: WorkerRollingBudgetPort;
   readonly ownerId?: (job: JobRecord) => string;
 }
@@ -36,6 +38,7 @@ export function createWorkerExecutionJobHandler(
   const repository = dependencies.repository ?? createWorkerRuntimeRepository();
   const activationService = dependencies.activationService ?? createWorkerActivationService();
   const budgets = dependencies.budgets ?? createWorkerRollingBudgetService();
+  const attention = dependencies.attention ?? createWorkerAttentionService();
   const runtimePorts =
     dependencies.ports ??
     ({
@@ -111,6 +114,7 @@ export function createWorkerExecutionJobHandler(
         events: repository,
         leases: repository,
         cancellation: repository,
+        attention,
         runs: repository,
         budgets,
       };

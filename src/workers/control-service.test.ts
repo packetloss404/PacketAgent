@@ -285,6 +285,8 @@ test("approve for run and reject attention preserve scope and actor-bound resolu
   assert.equal(rejected.disposition, "applied");
   assert.equal(rejected.attentionRequest?.status, "rejected");
   assert.deepEqual(rejected.attentionRequest?.resolvedBy, ACTOR);
+  assert.equal(rejected.run?.status, "failed");
+  assert.equal(rejected.run?.terminalReason, "approval_rejected");
   assert.equal(rejectionHarness.data.workerApprovalGrants.length, 0);
 });
 
@@ -435,6 +437,7 @@ function createControlStore(options: ControlHarnessOptions): PacketAgentData {
     data.workerAttentionRequests.push(
       makeWorkerAttentionRequest({
         workerVersionContentDigest: version.contentDigest,
+        policyDigest: compilation.policy.policyDigest,
       }),
     );
   }

@@ -530,7 +530,7 @@ committed budget.
 Outcome: approvals and operator commands are durable, independently available,
 audited, and safe across restarts and replay.
 
-Status: active. W7.1-W7.2 are complete; resume at W7.3.
+Status: active. W7.1-W7.3 are complete; resume at W7.4.
 
 ### W7.1 - Add durable control records
 
@@ -578,7 +578,15 @@ and
 
 ### W7.3 - Integrate supervisor attention
 
-Status: active. This is the exact resume point after W7.2.
+Status: complete. Approval-required operations now atomically persist the exact
+action cursor and pending request, transition the run to
+`waiting_for_approval`, enqueue requested/escalated notification references,
+and schedule durable escalation and expiration work. Resume requires the
+pinned version, compiled policy, operation digest, unexpired grant, and latest
+pending checkpoint to match. One-time grants are replayable only for their
+original action; run-scoped grants remain bound to the same operation. The
+executor rechecks approval at the final tool boundary, and declared pause or
+reject expiration never approves implicitly.
 
 - A missing required approval creates an attention request, checkpoints, emits
   an event, and transitions to `waiting_for_approval`.
@@ -588,6 +596,8 @@ Status: active. This is the exact resume point after W7.2.
   declared reject/pause policy and never silently approves.
 
 ### W7.4 - Add independent operator APIs
+
+Status: active. This is the exact resume point after W7.3.
 
 - Mount Worker control routes outside the Builder route module.
 - Apply RBAC separately to inspect, run control, deployment control, and

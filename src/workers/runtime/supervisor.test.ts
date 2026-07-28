@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  makeWorkerAttentionRequest,
   makeWorkerDefinition,
   makeWorkerDeployment,
   makeWorkerRun,
@@ -312,10 +313,7 @@ test("rolling billable-action exhaustion prevents tool execution", async () => {
           },
         ],
       }),
-    toolError: new WorkerRollingBudgetExceededError(
-      "billable_action",
-      "deployment",
-    ),
+    toolError: new WorkerRollingBudgetExceededError("billable_action", "deployment"),
   });
 
   const result = await runWorkerSupervisor(harness.input);
@@ -340,6 +338,65 @@ test("a provider cannot invoke an undeclared or approval-required tool", async (
   assert.equal(result.run.terminalReason, "failure_limit");
   assert.equal(harness.providerCalls, 1);
   assert.equal(harness.toolCalls, 0);
+});
+
+test("approval-required work returns a durable waiting run without a tool or terminal write", async () => {
+  const harness = runtimeHarness({
+    attentionResolution: "waiting",
+    provider: async () =>
+      providerResult({
+        toolCalls: [
+          {
+            id: "call-approval",
+            name: "http_fetch",
+            input: { url: "https://releases.example.test/latest" },
+          },
+        ],
+      }),
+  });
+
+  const result = await runWorkerSupervisor(harness.input);
+
+  assert.equal(result.run.status, "waiting_for_approval");
+  assert.equal(harness.attentionCalls, 1);
+  assert.equal(harness.toolCalls, 0);
+  assert.equal(harness.finalizations, 0);
+  assert.equal(harness.events.filter((event) => event.type === "worker.policy.denied").length, 1);
+});
+
+test("an exact approval is rechecked at execution and completes the pending tool", async () => {
+  const harness = runtimeHarness({
+    attentionResolution: "approved",
+    provider: async (request) =>
+      request.phase === "plan"
+        ? providerResult({
+            toolCalls: [
+              {
+                id: "call-approval",
+                name: "http_fetch",
+                input: {
+                  url: "https://releases.example.test/latest",
+                },
+              },
+            ],
+          })
+        : providerResult({
+            content: '{"predicateId":"release-decision","matched":true,"evidence":"approved"}',
+          }),
+  });
+
+  const result = await runWorkerSupervisor(harness.input);
+
+  assert.equal(result.run.status, "completed");
+  assert.equal(harness.attentionCalls, 1);
+  assert.equal(harness.toolCalls, 1);
+  assert.equal(
+    harness.events.some(
+      (event) =>
+        event.type === "worker.policy.allowed" && event.data?.approvalGrantId === "approval-1",
+    ),
+    true,
+  );
 });
 
 for (const phase of [
@@ -472,13 +529,23 @@ interface RuntimeHarnessOptions {
   readonly loseLeaseAfterRenewals?: number;
   readonly rollingBudgets?: WorkerRollingBudgetPort;
   readonly toolError?: Error;
+  readonly attentionResolution?: "waiting" | "approved";
 }
 
 function runtimeHarness(options: RuntimeHarnessOptions = {}) {
   const clock = createSystemWorkerClock();
   const budgets = options.budgets ?? DEFAULT_BUDGETS;
   const retry = options.retry ?? DEFAULT_RETRY;
+  const baseContent = makeWorkerVersionContent();
   const content = makeWorkerVersionContent({
+    ...(options.attentionResolution
+      ? {
+          tools: baseContent.tools.map((capability) => ({
+            ...capability,
+            approval: "always" as const,
+          })),
+        }
+      : {}),
     policy: {
       budgets,
       retry,
@@ -486,6 +553,7 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
         default: "deny",
         allowedCapabilityIds: ["release-read"],
       },
+      attention: baseContent.policy.attention,
     },
   });
   const now = clock.now();
@@ -501,6 +569,7 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
   let cancelled = false;
   let providerCalls = 0;
   let toolCalls = 0;
+  let attentionCalls = 0;
   let checkpoints = 0;
   let renewals = 0;
   let finalizations = 0;
@@ -568,9 +637,41 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
           inputSchema: {},
         }));
       },
+      async authorize(input) {
+        const matched = input.compiledPolicy?.capabilities.find(
+          (entry) => entry.tool === input.call.name,
+        );
+        const capability =
+          matched?.approval === "never" ||
+          (matched?.approval === "always" &&
+            input.approval?.capabilityId === matched.capabilityId &&
+            input.approval.operationDigest === `sha256:${"a".repeat(64)}` &&
+            input.approval.policyDigest === input.compiledPolicy?.policyDigest)
+            ? matched
+            : undefined;
+        return {
+          allowed: Boolean(capability),
+          code: capability
+            ? "allowed"
+            : matched?.approval === "always"
+              ? "approval_required"
+              : "capability_not_granted",
+          tool: input.call.name,
+          verb: matched?.verb ?? "UNKNOWN",
+          effect: matched?.effect ?? "execute",
+          operationDigest: `sha256:${"a".repeat(64)}`,
+          resourceCount: 1,
+          resourceSchemes: ["https"],
+          ...(input.compiledPolicy ? { policyDigest: input.compiledPolicy.policyDigest } : {}),
+          ...(matched ? { capabilityId: matched.capabilityId } : {}),
+        };
+      },
       async execute(input): Promise<WorkerRuntimeToolResult> {
         const capability = input.compiledPolicy?.capabilities.find(
-          (entry) => entry.tool === input.call.name && entry.approval === "never",
+          (entry) =>
+            entry.tool === input.call.name &&
+            (entry.approval === "never" ||
+              (entry.approval === "always" && input.approval?.capabilityId === entry.capabilityId)),
         );
         await input.recordPolicyDecision({
           allowed: Boolean(capability),
@@ -583,6 +684,12 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
           resourceSchemes: ["https"],
           ...(input.compiledPolicy ? { policyDigest: input.compiledPolicy.policyDigest } : {}),
           ...(capability ? { capabilityId: capability.capabilityId } : {}),
+          ...(input.approval
+            ? {
+                approvalGrantId: input.approval.grantId,
+                attentionRequestId: input.approval.attentionRequestId,
+              }
+            : {}),
         });
         const timestamp = clock.now().toISOString();
         if (!capability) {
@@ -614,6 +721,48 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
         return cancelled
           ? { kind: options.cancellationKind ?? ("operator_cancelled" as const) }
           : { kind: "active" as const };
+      },
+    },
+    attention: {
+      async resolve(input) {
+        attentionCalls += 1;
+        if (options.attentionResolution === "approved") {
+          return {
+            disposition: "approved" as const,
+            approval: {
+              grantId: "approval-1",
+              attentionRequestId: "attention-1",
+              actionId: input.actionId,
+              capabilityId: input.policyDecision.capabilityId!,
+              operationDigest: input.policyDecision.operationDigest,
+              policyDigest: input.policyDecision.policyDigest!,
+              scope: "once" as const,
+              expiresAt: new Date(clock.now().getTime() + 30_000).toISOString(),
+            },
+          };
+        }
+        if (options.attentionResolution === "waiting") {
+          const { runtimeLease: _lease, ...withoutLease } = context.run;
+          return {
+            disposition: "waiting" as const,
+            attention: makeWorkerAttentionRequest({
+              workerVersionContentDigest: context.version.contentDigest,
+              policyDigest: context.deployment.compiledPolicy!.policyDigest,
+              operationDigest: input.policyDecision.operationDigest,
+              capabilityId: input.policyDecision.capabilityId!,
+            }),
+            run: {
+              ...withoutLease,
+              status: "waiting_for_approval" as const,
+              revision: context.run.revision + 1,
+              updatedAt: clock.now().toISOString(),
+            },
+            checkpointId: "checkpoint-attention",
+            checkpointSequence: 0,
+            runRevision: context.run.revision + 1,
+          };
+        }
+        throw new Error("No approval attention was expected in this harness.");
       },
     },
     leases: {
@@ -699,6 +848,9 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
     },
     get finalizations() {
       return finalizations;
+    },
+    get attentionCalls() {
+      return attentionCalls;
     },
   };
 }

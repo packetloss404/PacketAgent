@@ -8,12 +8,13 @@ recovery, and effect-safety boundary, W6.1's capability compilation, W6.2's
 immediate runtime policy enforcement, W6.3's credential/network/process
 hardening, W6.4's atomic rolling budgets, W6.5's adversarial bypass gate, and
 W7.1's durable control records plus W7.2's atomic control service. Supervisor
-attention, independent operator API, restart/kill, and PacketADE handoff cases
-must be added as W7.3-W9 ship; they are not current product claims.
+attention and deadline enforcement are covered by W7.3. Independent operator
+API, restart/kill, and PacketADE handoff cases must be added as W7.4-W9 ship;
+they are not current product claims.
 
-Last automated W7.2 baseline (2026-07-27):
+Last automated W7.3 baseline (2026-07-27):
 
-- API: 1,409 passed, 1 skipped, 0 failed
+- API: 1,419 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -24,7 +25,9 @@ Last automated W7.2 baseline (2026-07-27):
   denial, Docker-only execution, capability compilation/narrowing, activation,
   supervisor, checkpoint-chain, effect-replay, atomic control-command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
-  paused-job draining,
+  approval-required checkpointing, exact one-time/run grant consumption,
+  final-boundary grant rechecks, escalation deduplication, pause/reject
+  expiration, paused-job draining,
   recovery/quarantine, lease/revision, scheduler, and JSON/SQLite/managed-Postgres
   parity checks: passed
 - Typecheck: passed
@@ -280,6 +283,38 @@ and executes that job through the bounded supervisor.
    write to encounter the control revision. Confirm the supervisor releases
    without another tool call or terminal write and a paused job is consumed
    without restarting execution.
+
+## W7.3 Supervisor Approval Attention Smoke
+
+1. Validate immutable attention policy with positive approval and escalation
+   timeouts, escalation strictly before expiration, and an explicit `pause` or
+   `reject` expiration disposition. Confirm invalid bounds fail version
+   validation.
+2. Request an `approval=always` tool operation. Confirm authorization denies it
+   before budget, effect, credential, handler, or I/O work and atomically
+   creates the exact pending-action checkpoint, open attention request, initial
+   notification-delivery references, escalation/expiration jobs, audit event,
+   and `waiting_for_approval` run state.
+3. Restart and resume the run. Confirm resume is rejected until the latest
+   checkpoint's exact attention is approved and its version, deployment,
+   compiled policy, capability, operation, and expiration still match.
+4. Approve once and replay the original action. Confirm the grant is consumed
+   by that action and remains replayable only for that action. Approve for run
+   and confirm reuse is limited to the same normalized operation. Confirm no
+   raw nonce is persisted.
+5. At the tool executor boundary, alter the action, capability, operation,
+   policy digest, or expiration. Confirm the final recheck denies execution and
+   the handler is never invoked.
+6. Process the escalation deadline twice. Confirm at most one delivery
+   reference exists per route and escalation stage and no duplicate escalation
+   event is emitted.
+7. Expire attention under both dispositions. Confirm `pause` preserves the
+   checkpoint and budgets, while `reject` terminalizes with
+   `approval_expired`; neither implicitly approves. Reject manually and confirm
+   `approval_rejected` plus queued execution cancellation.
+8. Repeat persistence and graph validation across JSON, SQLite, and managed
+   Postgres. Send malformed or cross-workspace deadline work and confirm it
+   fails closed without changing another workspace.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

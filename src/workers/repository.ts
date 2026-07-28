@@ -608,6 +608,7 @@ function validateCoreReferences(data: PacketAgentData): void {
       attention.workerRunId !== grant.workerRunId ||
       attention.capabilityId !== grant.capabilityId ||
       attention.operationDigest !== grant.operationDigest ||
+      attention.policyDigest !== grant.policyDigest ||
       attention.status !== "approved" ||
       !data.workerControlCommands.some(
         (record) =>

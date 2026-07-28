@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Supervisor approval attention (W7.3)
+
+- Added an immutable Worker attention policy with bounded approval and
+  escalation windows plus an explicit pause-or-reject expiration disposition.
+- Approval-required tool operations now atomically persist their action cursor,
+  pending attention request, notification references, deadline jobs, audit
+  event, budget, and `waiting_for_approval` run state.
+- Added scheduler-backed escalation and expiration processing with deduplicated
+  requested/escalated delivery keys and fail-closed pause or
+  `approval_expired` outcomes.
+- Resume now requires an approved request from the latest checkpoint plus a
+  matching version, deployment, compiled-policy digest, capability, operation,
+  and unexpired grant.
+- One-time grants are replay-safe only for the same action; run-scoped grants
+  stay operation-bound. Approval evidence is rechecked immediately before the
+  tool handler, including expiry, without persisting the raw nonce.
+- Human attention rejection now terminalizes the bound run as
+  `approval_rejected`, cancels execution work, and records the applied run
+  revision atomically.
+- The W7.3 baseline covers 1,420 API tests (1,419 passed and 1 intentionally
+  skipped) plus 25 web tests with zero lint errors.
+
 ### 2026-07-27 - Atomic Worker control service (W7.2)
 
 - Added one atomic service for pause, resume, stop, deployment revoke,
