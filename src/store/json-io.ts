@@ -10,6 +10,9 @@ import type { PacketAgentData } from "./types.js";
 export const DATA_FILE = resolve(process.cwd(), "data", "packetagent.json");
 
 let jsonTmpFileCounter = 0;
+const TRANSIENT_RENAME_CODES = new Set(["EACCES", "EBUSY", "EPERM"]);
+const RENAME_RETRY_DELAYS_MS = [5, 10, 20, 40, 80] as const;
+const renameWaitCell = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
 
 export function persistJsonStore(data: PacketAgentData): void {
   mkdirSync(dirname(DATA_FILE), { recursive: true });
@@ -23,7 +26,7 @@ export function persistJsonStore(data: PacketAgentData): void {
   const tmpFile = `${DATA_FILE}.${process.pid}.${jsonTmpFileCounter}.tmp`;
   try {
     writeFileSync(tmpFile, serialized);
-    renameSync(tmpFile, DATA_FILE);
+    renameStoreFile(tmpFile);
   } catch (error) {
     try {
       rmSync(tmpFile, { force: true });
@@ -31,6 +34,22 @@ export function persistJsonStore(data: PacketAgentData): void {
       // Best-effort cleanup; surface the original write/rename failure below.
     }
     throw error;
+  }
+}
+
+function renameStoreFile(tmpFile: string): void {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      renameSync(tmpFile, DATA_FILE);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const delayMs = RENAME_RETRY_DELAYS_MS[attempt];
+      if (!code || !TRANSIENT_RENAME_CODES.has(code) || delayMs === undefined) {
+        throw error;
+      }
+      Atomics.wait(renameWaitCell, 0, 0, delayMs);
+    }
   }
 }
 
