@@ -83,10 +83,9 @@ Dependencies: W4.
 
 Dependencies: W1, W4.
 
-Status: active. Resume at
-[`W6.5 - Close the bypass gate`](dev/worker-implementation-loops.md#w65---close-the-bypass-gate).
+Status: complete.
 
-W6.1-W6.4 are complete: validated versions compile normalized
+W6.1-W6.5 are complete: validated versions compile normalized
 tool/verb/resource tuples, deployments persist only version-bounded narrowed
 grants, and every production Worker tool call is authorized again in
 `executeTool` immediately before its handler. Opaque, workspace-scoped
@@ -95,16 +94,28 @@ validated public DNS answers and deny redirects; autonomous command execution
 requires the no-network Docker sandbox. Provider cost and externally billable
 actions reserve workspace/deployment rolling capacity atomically before the
 call, settle actual usage, and release abandoned holds after lease expiry.
+Production registry entries now expose one-shot executor-guarded handlers, and
+the adversarial matrix proves policy denial before credential resolution,
+rolling reservation, effect preparation, or external I/O.
 
 - [x] Replace whole-tool grants with verb/resource-scoped capabilities.
 - [x] Resolve credentials by reference at execution time; never embed secret values in Worker packages.
 - [x] Add per-run and rolling cost ceilings.
 - [x] Default network, filesystem, shell, and external-write access to deny.
-- Gate: runtime enforcement rejects policy bypass at every tool boundary, not only at launch.
+- Gate: passed 2026-07-27. Every production registry entry is covered through
+  both executor and direct-access paths; direct Worker handler access and
+  permit reuse fail closed. Redirects, alternate IP notation, DNS rebinding,
+  linked/case-aliased host paths, hostile command arguments, credential
+  mismatch, stale/tampered policy, policy-before-effect ordering, and
+  concurrent rolling reservations are covered without an undeclared action or
+  over-budget call.
 
 ### W7 - Attention, approval, and kill controls
 
 Dependencies: W4-W6.
+
+Status: active. Resume at
+[`W7.1 - Add durable control records`](dev/worker-implementation-loops.md#w71---add-durable-control-records).
 
 - [ ] Add pause, resume, stop, revoke, approve once, approve for run, and reject actions.
 - [ ] Persist pending attention state across restarts.

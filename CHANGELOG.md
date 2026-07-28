@@ -6,6 +6,20 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Worker permission bypass gate (W6.5)
+
+- Guarded every production registry handler with a one-shot, tool-bound permit
+  issued only by `executeTool` after compiled-policy approval; direct registry
+  calls and nested permit reuse now fail closed for Worker contexts.
+- Exported the production tool catalog for exhaustive gate coverage while
+  preserving the existing default-registry bootstrap.
+- Added catalog-wide executor/direct-access tests plus adversarial stale-policy,
+  denial-ordering, redirect, alternate-address, DNS-rebinding,
+  linked/case-aliased path, hostile command-argument, credential-mismatch, and
+  concurrent rolling-budget coverage.
+- The W6.5 baseline passes 1,390 API tests, 1 skipped API test, and 25 web tests
+  with zero lint errors and 145 inherited warnings.
+
 ### 2026-07-27 - Atomic Worker rolling budgets (W6.4)
 
 - Added durable workspace/deployment rolling windows for provider cost and externally billable HTTP, Slack, and GitHub actions, with finite compatibility defaults for older Worker versions.

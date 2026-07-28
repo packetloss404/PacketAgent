@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHttpFetchTool } from "../../tools/http-fetch.js";
 import { ToolRegistry } from "../../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import type { ToolPolicyDecision } from "../../tools/types.js";
@@ -141,12 +142,17 @@ test("Worker tool adapter denies a mutation declared through a read capability",
       return await permissive.reserve(input);
     },
   };
-  const port = createWorkerToolPort(registry, {
-    async execute(input) {
-      coordinated += 1;
-      return await input.execute();
+  const port = createWorkerToolPort(
+    registry,
+    {
+      async execute(input) {
+        coordinated += 1;
+        return await input.execute();
+      },
     },
-  }, undefined, budgets);
+    undefined,
+    budgets,
+  );
   const policy = compiledPolicy("GET", "read");
   const decisions: ToolPolicyDecision[] = [];
 
@@ -274,6 +280,91 @@ test("Worker tool adapter refuses a billable action when rolling reservation is 
   );
   assert.equal(coordinated, 0);
   assert.equal(handled, 0);
+});
+
+test("Worker policy denial precedes credential, budget, effect, and network boundaries", async () => {
+  const registry = new ToolRegistry();
+  registry.register(createHttpFetchTool());
+  const order: string[] = [];
+  const permissive = createPermissiveWorkerBudgetPort();
+  const port = createWorkerToolPort(
+    registry,
+    {
+      async execute(input) {
+        order.push("effect");
+        return await input.execute();
+      },
+    },
+    {
+      credentials: {
+        async list() {
+          throw new Error("credential list must not run");
+        },
+        async upsert() {
+          throw new Error("credential upsert must not run");
+        },
+        async remove() {
+          throw new Error("credential removal must not run");
+        },
+        async use() {
+          order.push("credential");
+          throw new Error("credential resolution must not run");
+        },
+      },
+      network: {
+        async request() {
+          order.push("network");
+          throw new Error("network must not run");
+        },
+      },
+      sandbox: {
+        async execute() {
+          throw new Error("sandbox must not run");
+        },
+      },
+    },
+    {
+      ...permissive,
+      async reserve(input) {
+        order.push("budget");
+        return await permissive.reserve(input);
+      },
+    },
+  );
+  const policy = compiledPolicy("GET", "read");
+
+  const result = await port.execute({
+    workspaceId: "workspace-1",
+    workerDefinitionId: "worker-1",
+    workerRunId: "run-1",
+    workerVersionId: "worker-version-1",
+    workerVersionContentDigest: policy.workerVersionContentDigest,
+    declaredCredentialRefs: ["vault:release-api"],
+    workerDeploymentId: "deployment-1",
+    workerDeploymentRevision: 1,
+    compiledPolicy: policy,
+    budgetUsage: budgetUsage(),
+    budgetPolicy: makeWorkerVersionContent().policy.budgets,
+    actor: { type: "system", id: "test-supervisor" },
+    iteration: 1,
+    fencingToken: 1,
+    reservedAt: new Date("2026-07-27T12:00:00.000Z"),
+    call: {
+      id: "call-1",
+      name: "http_fetch",
+      input: {
+        url: "https://admin.example.test/api",
+        credentialRef: "vault:release-api",
+      },
+    },
+    recordPolicyDecision: async (decision) => {
+      order.push(decision.allowed ? "allow" : "deny");
+    },
+    signal: new AbortController().signal,
+  });
+
+  assert.equal(result.status, "error");
+  assert.deepEqual(order, ["deny"]);
 });
 
 function compiledPolicy(verb: "GET" | "POST", effect: "read" | "write"): WorkerCompiledPolicy {

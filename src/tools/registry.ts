@@ -1,14 +1,15 @@
 import type { ToolDefinition } from "./types.js";
+import { guardRegisteredTool } from "./execution-guard.js";
 
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition>();
 
   register(tool: ToolDefinition): void {
-    this.tools.set(tool.name, tool);
+    this.tools.set(tool.name, guardRegisteredTool(tool));
   }
 
   registerMany(tools: ToolDefinition[]): void {
-    for (const tool of tools) this.tools.set(tool.name, tool);
+    for (const tool of tools) this.register(tool);
   }
 
   get(name: string): ToolDefinition | undefined {
@@ -20,7 +21,9 @@ export class ToolRegistry {
   }
 
   filter(names: string[]): ToolDefinition[] {
-    return names.map((name) => this.tools.get(name)).filter((tool): tool is ToolDefinition => Boolean(tool));
+    return names
+      .map((name) => this.tools.get(name))
+      .filter((tool): tool is ToolDefinition => Boolean(tool));
   }
 
   hasName(name: string): boolean {

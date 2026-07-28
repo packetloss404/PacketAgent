@@ -422,7 +422,7 @@ Outcome: the W1 policy becomes an enforceable, deny-by-default runtime boundary
 for every provider, tool, credential, network, filesystem, shell, and external
 write action.
 
-Status: active. W6.1-W6.4 are complete; resume at W6.5.
+Status: complete. W6.1-W6.5 passed on 2026-07-27.
 
 ### W6.1 - Compile typed capabilities
 
@@ -510,7 +510,11 @@ was replaced.
 
 ### W6.5 - Close the bypass gate
 
-Status: active. This is the exact resume point after W6.4.
+Status: complete. Production registry handlers now require a one-shot,
+tool-bound permit issued by `executeTool` only after compiled-policy approval.
+The gate exercises every registered tool through executor and direct-registry
+paths and proves denial ordering before credential, budget, effect, handler,
+and external-I/O boundaries.
 
 - Test calls made through every registered tool, direct registry access,
   redirects, alternate IP notation, DNS changes, path links/case aliases,
@@ -526,7 +530,11 @@ committed budget.
 Outcome: approvals and operator commands are durable, independently available,
 audited, and safe across restarts and replay.
 
+Status: active. Resume at W7.1.
+
 ### W7.1 - Add durable control records
+
+Status: active. This is the exact resume point after W6.
 
 - Define and persist attention requests, approval grants, control commands, and
   notification delivery references.

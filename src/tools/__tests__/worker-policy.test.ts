@@ -145,7 +145,7 @@ test("Worker credentials resolve only after policy approval and immediately befo
   assert.doesNotMatch(JSON.stringify(allowed), /resolved-secret/);
 });
 
-test("executeTool fails closed for a missing descriptor or tampered compiled policy", async () => {
+test("executeTool fails closed for a missing descriptor or stale or tampered compiled policy", async () => {
   let handled = 0;
   const policy = policyFor("https://releases.example.test/api/*");
   const withoutDescriptor: ToolDefinition = {
@@ -168,6 +168,33 @@ test("executeTool fails closed for a missing descriptor or tampered compiled pol
   });
   assert.equal(missing.status, "error");
   assert.equal(missingDecisions[0].code, "missing_authorization_descriptor");
+
+  const staleDecisions: ToolPolicyDecision[] = [];
+  const stale = await executeTool({
+    tool: workerHttpTool(async () => {
+      handled += 1;
+      return { ok: true };
+    }),
+    input: { url: "https://releases.example.test/api/releases" },
+    context: {
+      ...workerContext(policy, async (decision) => {
+        staleDecisions.push(decision);
+      }),
+      worker: {
+        ...workerContext(policy, async () => {}).worker!,
+        version: {
+          id: "worker-version-2",
+          contentDigest: `sha256:${"f".repeat(64)}`,
+          declaredCredentialRefs: ["vault:release-api"],
+        },
+        recordPolicyDecision: async (decision) => {
+          staleDecisions.push(decision);
+        },
+      },
+    },
+  });
+  assert.equal(stale.status, "error");
+  assert.equal(staleDecisions[0].code, "stale_policy");
 
   const tamperedDecisions: ToolPolicyDecision[] = [];
   const tampered = await executeTool({

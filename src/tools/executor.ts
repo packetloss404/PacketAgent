@@ -4,6 +4,7 @@ import {
   type WorkerToolPolicyEvaluation,
 } from "../workers/policy-enforcement.js";
 import type { WorkerCapabilityEffect } from "../workers/types.js";
+import { authorizeRegisteredWorkerToolExecution } from "./execution-guard.js";
 import type { ToolCallRecord, ToolContext, ToolDefinition, ToolEffectDescriptor } from "./types.js";
 
 export interface ExecuteToolParams {
@@ -107,6 +108,7 @@ export async function executeTool({
           },
         },
       };
+      authorizeRegisteredWorkerToolExecution(ctx, tool.name);
     }
     const result = await tool.handle(input, ctx);
     return {

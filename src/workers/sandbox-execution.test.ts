@@ -102,3 +102,38 @@ test("Worker sandbox uses Docker with no environment, no network, bounded time, 
     env: {},
   });
 });
+
+test("Worker sandbox passes adversarial arguments as quoted data without shell interpolation", async () => {
+  let request: SandboxExecRequest | undefined;
+  const service: WorkerSandboxService = {
+    resolveDriver: async () => driver("docker"),
+    async startExec(input) {
+      request = input;
+      return record(input, { status: "running" });
+    },
+    async waitForExec() {
+      return record(request!, { status: "success" });
+    },
+    cancelExec: async () => null,
+  };
+
+  await createWorkerSandboxPort(service).execute({
+    workspaceId: "alpha",
+    command: "node",
+    args: [
+      "$(touch /tmp/packetagent-pwned)",
+      "; rm -rf /",
+      "single'quote",
+      "line\nbreak",
+      '"double quoted"',
+    ],
+    timeoutMs: 2_500,
+    signal: new AbortController().signal,
+    network: "none",
+  });
+
+  assert.equal(
+    request?.command,
+    `'node' '$(touch /tmp/packetagent-pwned)' '; rm -rf /' 'single'"'"'quote' 'line\nbreak' '"double quoted"'`,
+  );
+});

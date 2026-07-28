@@ -6,19 +6,22 @@ This plan verifies the inherited workbench plus W2's durable Worker lifecycle,
 W3's trigger-intake boundary, W4's bounded supervisor, W5's checkpoint,
 recovery, and effect-safety boundary, W6.1's capability compilation, W6.2's
 immediate runtime policy enforcement, W6.3's credential/network/process
-hardening, and W6.4's atomic rolling budgets. Attention and PacketADE handoff
+hardening, W6.4's atomic rolling budgets, and W6.5's adversarial bypass gate.
+Attention and PacketADE handoff
 cases must be added as W7-W9 ship; they are not current product claims.
 
-Last automated W6.4 baseline (2026-07-27):
+Last automated W6.5 baseline (2026-07-27):
 
-- API: 1,384 passed, 1 skipped, 0 failed
+- API: 1,390 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused atomic rolling-budget concurrency, provider/action reservation
-  ordering, idempotent settlement/release, lease-expiry reconciliation,
-  Worker credential isolation, policy-before-secret ordering, A/AAAA
-  and connected-address validation, redirect denial, Docker-only execution,
-  production tool catalog coverage, capability compilation/narrowing,
-  activation, supervisor, checkpoint-chain, effect-replay,
+- Focused production-catalog executor/direct-access guards,
+  denial-before-credential/budget/effect/network ordering, linked and
+  case-aliased host paths, hostile command arguments, stale/tampered policy,
+  atomic rolling-budget concurrency, provider/action reservation ordering,
+  idempotent settlement/release, lease-expiry reconciliation, Worker
+  credential isolation, A/AAAA and connected-address validation, redirect
+  denial, Docker-only execution, capability compilation/narrowing, activation,
+  supervisor, checkpoint-chain, effect-replay,
   recovery/quarantine, lease/revision, scheduler, and JSON/SQLite/managed-Postgres
   parity checks: passed
 - Typecheck: passed
@@ -141,9 +144,10 @@ and executes that job through the bounded supervisor.
 4. Exercise HTTP, GitHub, SQL, workspace, browser, Slack, email, and command adapters. Confirm they expose the expected verb/effect plus normalized URL, repository target, database, destination/recipient, command, and working-directory resources before authorization.
 5. Inspect the allowed handler context. Confirm it contains the run, deployment revision and policy, version/content digest, matched capability, current budget usage, effect classification/operation, and system actor.
 6. Inspect allow/deny event data. Confirm it contains only decision code, tool, verb, effect, policy/capability identifiers, resource schemes/count, and an operation digest; raw URLs, query values, selectors, commands, recipients, message bodies, SQL, and secrets must be absent.
-7. Attempt execution through the production Worker adapter and the default registry catalog. Confirm both reach `executeTool`; direct handler calls remain limited to explicit unit tests.
-8. Stop before claiming the W6 permission gate. W6.5 still owns the
-   adversarial bypass matrix.
+7. Attempt execution through the production Worker adapter and the default
+   registry catalog. Confirm both reach `executeTool`; direct Worker handler
+   calls through registered definitions fail closed.
+8. Continue through the W6.5 smoke before claiming the W6 permission gate.
 
 ## W6.3 Credential, Network, and Process Boundary Smoke
 
@@ -197,6 +201,30 @@ and executes that job through the bounded supervisor.
 8. Repeat reserve/settle/release/export/reload against JSON, SQLite, and managed
    Postgres. Confirm equivalent reservation status and no lost concurrent
    update.
+
+## W6.5 Permission Bypass Gate Smoke
+
+1. Iterate the complete production tool catalog through `executeTool` with no
+   compiled policy. Confirm each call records one denial and no handler runs.
+2. Invoke every registered handler directly with a Worker context. Confirm
+   each refuses execution without recording policy, resolving credentials, or
+   performing I/O.
+3. Execute an allowed registered tool, then attempt a nested direct call with
+   its handler context. Confirm the one-shot permit is bound to the tool and
+   has already been consumed.
+4. Deny a credential-bearing HTTP call through the Worker adapter. Confirm the
+   order contains only the policy denial: no rolling reservation, effect
+   preparation, credential resolution, or network request occurs.
+5. Repeat the W6.3 alternate-IP, mixed A/AAAA, DNS-rebinding, redirect,
+   undeclared/wrong-kind credential, and native-sandbox cases.
+6. Pass real linked and case-aliased host `cwd` values to both Worker command
+   tools. Confirm both reject the host path before the sandbox port runs.
+7. Pass shell substitutions, separators, quotes, and newlines as command
+   arguments. Confirm each is encoded as quoted data in the no-network Docker
+   request.
+8. Repeat stale/tampered policy and concurrent rolling-reservation races.
+   Confirm no registered path performs an undeclared action or exceeds a
+   committed budget.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

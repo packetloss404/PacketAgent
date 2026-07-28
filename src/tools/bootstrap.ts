@@ -7,6 +7,7 @@ import { httpFetchTool } from "./http-fetch.js";
 import { slackPostWebhookTool, githubApiTool } from "./slack-github.js";
 import { emailSendTool, sqlQueryTool } from "./email-sql.js";
 import { shellForAgentTool } from "./shell-agent.js";
+import type { ToolDefinition } from "./types.js";
 
 let registered = false;
 
@@ -19,7 +20,7 @@ const AGENT_CATALOG_TOOLS = [
   shellForAgentTool,
 ];
 
-function defaultTools() {
+export function listDefaultTools(): ToolDefinition[] {
   return [
     ...READ_TOOLS,
     ...WRITE_TOOLS,
@@ -34,7 +35,7 @@ export function listDefaultToolSummaries(): Array<{
   description: string;
   side: "read" | "write" | "exec";
 }> {
-  return defaultTools().map((tool) => ({
+  return listDefaultTools().map((tool) => ({
     name: tool.name,
     description: tool.description,
     side: tool.side,
@@ -42,7 +43,7 @@ export function listDefaultToolSummaries(): Array<{
 }
 
 export function listDefaultWorkerAuthorizationGaps(): string[] {
-  return defaultTools()
+  return listDefaultTools()
     .filter((tool) => !tool.authorization)
     .map((tool) => tool.name)
     .sort();
@@ -50,7 +51,7 @@ export function listDefaultWorkerAuthorizationGaps(): string[] {
 
 export function registerDefaultTools(): void {
   if (registered) return;
-  const tools = defaultTools();
+  const tools = listDefaultTools();
   const authorizationGaps = tools.filter((tool) => !tool.authorization).map((tool) => tool.name);
   if (authorizationGaps.length > 0) {
     throw new Error(

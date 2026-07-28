@@ -5,12 +5,13 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W6 - Permission and budget policy**. Repository/session state
+Current active loop: **W7 - Attention, approval, and kill controls**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
-complete. Resume at W6.5 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w65---close-the-bypass-gate).
+complete. W6.5 closes the adversarial bypass gate across every registered tool.
+Resume at W7.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w71---add-durable-control-records).
 
 ## North star
 
@@ -65,7 +66,7 @@ Digest-chained immutable snapshots persist the run cursor, full working memory, 
 
 ## Next
 
-### 6. Permission and budget policy - active
+### 6. Permission and budget policy - complete
 
 Version-digest-bound verb/resource capability compilation, deployment narrowing,
 normalized operation descriptors, immediate pre-handler enforcement, and
@@ -74,11 +75,16 @@ credentials, pinned public network destinations, redirect denial, fail-closed
 external adapters, and Docker-only autonomous command execution are also
 complete. Provider cost and externally billable actions now reserve and settle
 durable workspace/deployment rolling capacity before execution, with
-lease-expiry reconciliation. Next, close the policy bypass gate.
+lease-expiry reconciliation. Production registry handlers require a one-shot
+executor permit, and the adversarial matrix covers direct access, network,
+filesystem, command, credential, stale-policy, effect-ordering, and concurrent
+budget bypasses.
 
-### 7. Attention and operator controls
+### 7. Attention and operator controls - active
 
-Add pause, resume, stop, revoke, approve-once, approve-for-run, and escalation routing.
+First add durable attention requests, approval grants, control commands, and
+notification-delivery references. Then add pause, resume, stop, revoke,
+approve-once, approve-for-run, and escalation routing.
 
 ### 8. Worker health, cost, and evidence
 
