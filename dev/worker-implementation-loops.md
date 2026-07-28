@@ -530,7 +530,7 @@ committed budget.
 Outcome: approvals and operator commands are durable, independently available,
 audited, and safe across restarts and replay.
 
-Status: active. W7.1-W7.4 are complete; resume at W7.5.
+Status: complete. W7.1-W7.5 and the W7 gate are complete.
 
 ### W7.1 - Add durable control records
 
@@ -615,7 +615,15 @@ approval nonce is returned with no-store headers and is absent on replay.
 
 ### W7.5 - Close the restart/kill gate
 
-Status: active. This is the exact resume point after W7.4.
+Status: complete. The adversarial integration gate reconstructs approval,
+runtime, control, and operator-route services from durable state; replays an
+approval callback without returning or creating another nonce/grant; exercises
+both approve/reject orderings; stops through the real control service at plan,
+act, evaluate, checkpoint, and decide; and exercises both activation/revoke
+orderings. Every ordering leaves one valid outcome, no post-stop event/action,
+no runnable work after revoke, and future activation denied. Headless operator
+routes stop and revoke from durable state without a Builder or PacketADE
+service.
 
 - Restart while waiting for approval, replay approval callbacks, race
   approve/reject, stop during each supervisor phase, and revoke while new
@@ -631,7 +639,11 @@ without relying on the authoring UI.
 Outcome: one API and one UI surface answer what is running, why, at what cost,
 from which version, at which checkpoint, and what needs attention.
 
+Status: active. Resume at W8.1.
+
 ### W8.1 - Formalize the event and evidence model
+
+Status: active. This is the exact resume point after the W7 gate.
 
 - Version Worker event envelopes and assign monotonic sequence within a
   deployment/run stream.

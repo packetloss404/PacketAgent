@@ -5,15 +5,14 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W7 - Attention, approval, and kill controls**. Repository/session state
+Current active loop: **W8 - Worker observability, cost, and evidence**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
 complete. W6.5 closes the adversarial bypass gate across every registered tool.
-W7.1's durable records, W7.2's atomic control service, W7.3's supervisor
-attention flow, and W7.4's independent operator API are also complete. Resume
-at W7.5 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w75---close-the-restartkill-gate).
+W7's durable attention, atomic controls, supervisor integration, independent
+operator API, and restart/kill race gate are also complete. Resume at W8.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w81---formalize-the-event-and-evidence-model).
 
 ## North star
 
@@ -82,7 +81,7 @@ executor permit, and the adversarial matrix covers direct access, network,
 filesystem, command, credential, stale-policy, effect-ordering, and concurrent
 budget bypasses.
 
-### 7. Attention and operator controls - active
+### 7. Attention and operator controls - complete
 
 Durable attention requests, approval grants, control commands, and
 notification-delivery references are implemented across all storage modes.
@@ -94,9 +93,11 @@ attention, consume exact unexpired grants at the execution boundary, and apply
 the version's explicit pause/reject expiration disposition. Independently
 mounted operator routes now authorize inspect, run-control,
 deployment-control, and approval actions separately and return concise,
-redacted state. Next close the restart/kill race gate.
+redacted state. Fresh-process approval replay, approve/reject races, stop at
+every supervisor phase, activation/revoke races, and headless route controls
+pass without later work.
 
-### 8. Worker health, cost, and evidence
+### 8. Worker health, cost, and evidence - active
 
 Roll provider calls, queue health, checkpoints, retries, approvals, and outcomes up by worker and deployment. Make "what is running, why, at what cost, and what needs me" answerable from one screen.
 

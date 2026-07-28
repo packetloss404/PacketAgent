@@ -9,12 +9,13 @@ immediate runtime policy enforcement, W6.3's credential/network/process
 hardening, W6.4's atomic rolling budgets, W6.5's adversarial bypass gate, and
 W7.1's durable control records plus W7.2's atomic control service. Supervisor
 attention and deadline enforcement are covered by W7.3. Independent operator
-API coverage is added by W7.4. Restart/kill and PacketADE handoff cases must be
-added as W7.5-W9 ship; they are not current product claims.
+API coverage is added by W7.4, and W7.5 closes the restart/kill gate.
+Consolidated evidence and PacketADE handoff cases must be added as W8-W9
+ship; they are not current product claims.
 
-Last automated W7.4 baseline (2026-07-27):
+Last automated W7.5 baseline (2026-07-27):
 
-- API: 1,426 passed, 1 skipped, 0 failed
+- API: 1,437 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -29,7 +30,9 @@ Last automated W7.4 baseline (2026-07-27):
   final-boundary grant rechecks, escalation deduplication, pause/reject
   expiration, independent operator RBAC, redacted projections, strict mutation
   inputs, no-store first-use approval nonces, workspace isolation,
-  paused-job draining,
+  fresh-process approval resume, callback replay, both approve/reject and
+  activation/revoke race orderings, stop at every supervisor phase, headless
+  operator reconstruction, paused-job draining,
   recovery/quarantine, lease/revision, scheduler, and JSON/SQLite/managed-Postgres
   parity checks: passed
 - Typecheck: passed
@@ -352,6 +355,27 @@ Use authenticated requests under `/api/app/workers`. Every mutation requires
    reads return not found or an empty collection and controls cannot discover
    or change the other workspace's run, deployment, attention, grants, jobs,
    or commands.
+
+## W7.5 Restart and Kill Gate Smoke
+
+1. Create an approval wait, persist it, reconstruct the services from the
+   durable store, approve it, replay the callback, and resume. Confirm only the
+   exact pending action runs and replay returns no raw nonce or additional
+   grant.
+2. Race approve and reject at the same revision in both orderings. Confirm one
+   command applies, one is rejected, and the attention, grant, run, event, and
+   job graph remains consistent.
+3. Stop through the real control service while the supervisor is in plan, act,
+   evaluate, checkpoint, and decide. Confirm no event or tool action is written
+   after the stop boundary.
+4. Race activation and revoke in both orderings. Confirm the deployment ends
+   revoked, any admitted run is canceled, queued work is canceled, and future
+   activation is denied.
+5. Reconstruct only the operator routes and their control dependencies from the
+   durable store. Without Builder or PacketADE services, stop a run and revoke
+   its deployment successfully.
+6. Repeat the relevant restart and control persistence paths against JSON,
+   SQLite, and managed Postgres and confirm equivalent terminal records.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

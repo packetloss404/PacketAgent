@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W6 and W7.1-W7.4 are implemented as
+in foundation commit `d60cd47`. W1-W7 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -105,6 +105,12 @@ Prompt-to-app generation remains a supported secondary capability.
   are distinct; mutation bodies are allowlisted and revision/idempotency bound;
   projections omit raw run/event/control internals; and a first-use approval
   nonce is returned with no-store headers and never appears on replay.
+- Completed W7.5's restart and kill gate. Fresh processes resume only the exact
+  approved action, callback replay creates no additional nonce or grant,
+  approve/reject and activation/revoke races are deterministic in both
+  orderings, durable stop is observed at every supervisor phase with no later
+  action, and operator routes reconstructed from durable state can stop runs
+  and revoke deployments without an authoring service.
 
 ## Current implementation truth
 
@@ -165,6 +171,8 @@ Implemented substrate:
 - independently mounted Worker operator routes with explicit inspect,
   run-control, deployment-control, and approval permissions plus concise
   redacted run, attention, command, grant, and deployment projections;
+- an adversarial restart/kill gate covering approval callback replay, competing
+  controls, every supervisor phase, and headless operator independence;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -179,18 +187,18 @@ Not shipped:
 
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
-- external notification transports, the W7 restart/kill gate, consolidated
-  Worker-level evidence, and cost rollups; and
+- external notification transports, consolidated Worker-level evidence, and
+  cost rollups; and
 - PacketADE-to-PacketAgent deployment endpoints.
 
 Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W7 - Attention, approval, and kill controls** in
+Continue **W8 - Evidence, cost, retention, and operations UI** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W6 and W7.1-W7.4 are complete under `src/workers/`, the store, migrations,
+W1-W7 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -225,10 +233,14 @@ rechecks the grant at the final tool boundary. W7.4 exposes the control service
 through an independently mounted API with per-action permissions, strict
 revision/idempotency inputs, workspace isolation, redacted state, and
 first-response-only approval nonces.
+W7.5 closes the gate with fresh-process approval resume and callback replay,
+both approve/reject and activation/revoke race orderings, durable stop at every
+supervisor phase with no subsequent action, and headless operator controls
+reconstructed from durable state.
 
 The exact next slice is
-[`W7.5 - Close the restart/kill gate`](worker-implementation-loops.md#w75---close-the-restartkill-gate).
-After each gate passes, continue through W7-W10 and then R1-R8 using that
+[`W8.1 - Formalize the event and evidence model`](worker-implementation-loops.md#w81---formalize-the-event-and-evidence-model).
+After each gate passes, continue through W8-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
 
@@ -252,7 +264,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,426 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,437 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -260,7 +272,10 @@ handoff, the roadmap, or the backlog.
   final-boundary grant rechecks, escalation deduplication, pause/reject
   expiration, independent operator RBAC, redacted control projections, strict
   mutation inputs, no-store approval nonce delivery, workspace isolation,
-  supervisor fencing, paused-job draining, export-isolation, and
+  fresh-process approval resume, callback replay, both approve/reject and
+  activation/revoke race orderings, stop at every supervisor phase, headless
+  operator reconstruction, supervisor fencing, paused-job draining,
+  export-isolation, and
   JSON/SQLite/managed-Postgres parity checks; production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked/case-aliased
   host paths, hostile command arguments, stale/tampered policy, atomic
@@ -299,6 +314,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W7.4 commit: clean. Stop if the active folder is
+Expected status after the W7.5 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

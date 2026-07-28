@@ -114,8 +114,8 @@ rolling reservation, effect preparation, or external I/O.
 
 Dependencies: W4-W6.
 
-Status: active. Resume at
-[`W7.5 - Close the restart/kill gate`](dev/worker-implementation-loops.md#w75---close-the-restartkill-gate).
+Status: complete. Resume at
+[`W8.1 - Formalize the event and evidence model`](dev/worker-implementation-loops.md#w81---formalize-the-event-and-evidence-model).
 
 - [x] Define and persist version-bound attention requests, approval grants,
       control commands, and notification delivery references with durable replay
@@ -124,11 +124,18 @@ Status: active. Resume at
 - [x] Persist pending attention state across restarts.
 - [x] Add escalation deadlines and notification route references.
 - [x] Make kill and revoke controls available independently of the authoring UI.
-- Gate: an operator can stop a running Worker and revoke future activation even if its originating Packet application is closed.
+- Gate: passed 2026-07-27. Fresh-process approval resume and callback replay,
+  both approve/reject and activation/revoke orderings, durable stop at every
+  supervisor phase, and newly constructed headless operator routes leave no
+  later action or runnable work. An operator can stop a run and revoke future
+  activation without an authoring application.
 
 ### W8 - Worker observability, cost, and evidence
 
 Dependencies: W2-W7.
+
+Status: active. Resume at
+[`W8.1 - Formalize the event and evidence model`](dev/worker-implementation-loops.md#w81---formalize-the-event-and-evidence-model).
 
 - [ ] Add one Worker health/attention summary.
 - [ ] Roll provider calls, tool calls, retries, queue time, approvals, and outcome quality up by Worker version and deployment.

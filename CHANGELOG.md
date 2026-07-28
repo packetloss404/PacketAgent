@@ -6,6 +6,25 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Worker restart and kill gate (W7.5)
+
+- Added a fresh-process approval test that reconstructs runtime, attention, and
+  control services from durable state, resumes the exact waiting action, and
+  replays the approval callback without another nonce or grant.
+- Exercised both approve-first/reject-second and reject-first/approve-second
+  atomic orderings. Exactly one command applies and the resulting
+  attention/run/grant graph remains consistent.
+- Stopped a live Worker through the real durable control service at plan, act,
+  evaluate, checkpoint, and decide. No runtime event or action occurs after
+  the stop is observed.
+- Exercised both activation-first/revoke-second and revoke-first/activation-
+  second orderings. The deployment remains revoked, admitted work is
+  terminalized and canceled, and all future activation fails.
+- Reconstructed the independent operator routes using only a durable store and
+  proved stop and revoke do not depend on Builder or PacketADE services.
+- W7's gate now passes. The W7.5 baseline covers 1,438 API tests (1,437 passed
+  and 1 intentionally skipped) plus 25 web tests with zero lint errors.
+
 ### 2026-07-27 - Independent Worker operator API (W7.4)
 
 - Mounted a dedicated Worker operator route module beside the lifecycle API,
