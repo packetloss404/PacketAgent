@@ -2,7 +2,7 @@
 
 Status: canonical execution map for W2-W10 and the inherited backlog.
 
-Last updated: 2026-07-27.
+Last updated: 2026-07-28.
 
 [`../BACKLOG.md`](../BACKLOG.md) remains the status ledger and source of gate
 truth. This document supplies the dependency order, implementation slices,
@@ -734,7 +734,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: active. Resume at W9.5.
+Status: complete as of 2026-07-28. Resume at W10.1.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -810,6 +810,15 @@ managed Postgres; opening SSE never mutates durable delivery state.
   connection the source of durability.
 
 ### W9.5 - Close the handoff gate
+
+Status: complete as of 2026-07-28. A checked serialized PacketADE scenario
+drives the real HTTP contract through validation, deployment, activation,
+client disconnect, durable-store serialization, new service instances,
+cursor/evidence reconnect, inspection, update, pause/resume, rollback, and
+revoke. The queued run, immutable version, acknowledgement, and evidence
+survive reconstruction. A bounded real-network validation test is registered
+and skips unless an operator explicitly supplies the endpoint, workspace, and
+PacketADE bearer credential.
 
 - Run contract tests from serialized PacketADE fixtures through validate,
   deploy, activate, disconnect, process restart, reconnect, inspect, update,

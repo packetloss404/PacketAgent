@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "packetagent.packetade-handoff-scenario/v1",
+  "workspaceId": "alpha",
+  "subjectId": "packetade:handoff-gate",
+  "acceptedCapabilityIds": ["release-read"],
+  "capabilityGrants": [
+    {
+      "capabilityId": "release-read",
+      "verbs": ["GET"],
+      "resources": ["https://releases.example.test/stable"],
+      "approval": "never"
+    }
+  ],
+  "activation": {
+    "idempotencyKey": "packetade:handoff:activate-v1",
+    "input": {
+      "release_id": "release-handoff-42"
+    }
+  },
+  "update": {
+    "packageVersion": 2,
+    "idempotencyKey": "packetade:flight-42:release-watcher:v2",
+    "instructions": "Inspect the supplied evidence, report blockers, record a bounded v2 readiness decision, and stop.",
+    "statusReason": "PacketADE accepted the bounded v2 rollout."
+  },
+  "controls": {
+    "pauseIdempotencyKey": "packetade:handoff:pause-v2",
+    "resumeIdempotencyKey": "packetade:handoff:resume-v2",
+    "rollbackIdempotencyKey": "packetade:handoff:rollback-v1",
+    "revokeIdempotencyKey": "packetade:handoff:revoke-v1"
+  },
+  "expectedEventTypes": [
+    "worker.deployed",
+    "worker.activated",
+    "worker.deployment.paused",
+    "worker.deployment.revoked"
+  ]
+}

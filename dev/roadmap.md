@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W9.5 - close the PacketADE handoff gate**. Repository/session state
+Current active loop: **W10.1 - add a notification outbox**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -27,8 +27,11 @@ bindings, atomic forward rollouts, and JSON/SQLite/managed Postgres parity.
 W9.4 projects W8 evidence events through versioned JSON and bounded SSE,
 supports stable `Last-Event-ID` reconnect, exposes retention-window recovery,
 and persists explicit idempotent cursor acknowledgements behind strong ETags.
-Resume at W9.5 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w95---close-the-handoff-gate).
+W9.5 closes the local handoff gate through serialized package/command
+fixtures, client disconnect, durable-store serialization, fresh-process
+reconstruction, reconnect, evidence, update, pause/resume, rollback, and
+revoke. Resume at W10.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w101---add-a-notification-outbox).
 
 ## North star
 
@@ -127,7 +130,7 @@ evidence. One server-side read model now makes "what is running, why, at what
 cost, and what needs me" answerable from the accessible canonical Worker
 list/detail workbench without client-side raw-table joins.
 
-### 9. PacketADE handoff - active
+### 9. PacketADE handoff - complete
 
 WorkerPackage v1 now freezes the strict W1-aligned envelope, canonical digest
 bytes, artifact references, compatibility fixtures, and optional DSSE
@@ -136,12 +139,15 @@ workspace-bound PacketADE service actors, narrows package capabilities through
 local policy, persists token-safe integrity/idempotency receipts, composes the
 canonical deployment/control services, and projects reconnectable progress,
 approval, completion, failure, and budget events with durable acknowledgements.
-The remaining W9.5 gate exercises the serialized PacketADE handoff through
-disconnect and process restart.
+The serialized W9.5 gate now proves those records, a queued version-pinned run,
+and its evidence survive client disconnect and service reconstruction before
+later update, pause/resume, rollback, and revoke operations.
 
-### 10. PacketChat and PacketPhone routes
+### 10. PacketChat and PacketPhone routes - active
 
-Send worker summaries and approval requests to conversation and mobile surfaces after the core lifecycle and policy model are stable.
+Next, add the channel-neutral notification outbox, then send worker summaries
+and approval requests to conversation and mobile surfaces without weakening
+W7 controls.
 
 ### 11. Integrations and worker templates
 

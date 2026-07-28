@@ -1,7 +1,8 @@
 # PacketADE to PacketAgent handoff
 
-Status: W9 contract record. W9.1 is implemented; deployment trust and endpoints
-remain W9.2-W9.5 work. The exact executable slices are in
+Status: W9 contract and completed handoff-gate record. W9.1-W9.5 are
+implemented; PacketChat/PacketPhone delivery continues in W10. The exact
+executable slices are in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#w9---packetade-deployment-handoff).
 
 The normative executable v1 contract is
@@ -148,6 +149,9 @@ Checked compatibility fixtures:
   is the canonical accepted v1 example.
 - [`worker-package-v2.unsupported.json`](../src/workers/package/fixtures/worker-package-v2.unsupported.json)
   proves unknown major versions fail closed.
+- [`packetade-handoff-v1.valid.json`](../src/workers/package/fixtures/packetade-handoff-v1.valid.json)
+  supplies the local capability decision, activation input, update, controls,
+  and expected events for the disconnect/restart W9.5 gate.
 
 The v1 fixture digest is
 `sha256:fcea4fc3eb7cf0598c8d2312b1374bddd1a07c953380bd7a15792e35422e143d`.
@@ -309,7 +313,7 @@ W9.2 implements the receiving side under `src/workers/package/`:
   conflicting writes. Authorization values are never placed in records or
   workspace exports; credential exports omit even the stored digest.
 
-W9.3 must call this boundary for every package/control write and require the
+W9.3 calls this boundary for every package/control write and requires the
 stored receipt before it invokes W2/W3/W7 lifecycle services. Transport TLS is
 an operator/deployment requirement; PacketAgent must not imply that a bearer
 token makes plaintext transport safe.
@@ -321,6 +325,21 @@ deployment. Inspect/list authenticate through W9.2; lifecycle writes authorize
 their exact operation; manual activation uses W3; revoke uses W7. Migration
 `0024_worker_package_deployments.sql` persists the binding with referential
 constraints, and workspace exports include the secret-free record.
+
+W9.4 implements the deployment/run event pages, bounded SSE routes, evidence
+reads, and explicit cursor writes. Migration
+`0025_packet_product_event_acknowledgements.sql` persists acknowledgement
+identity and revision without coupling retention to source-event foreign keys.
+
+W9.5 closes the local handoff gate with the checked scenario above. The test
+aborts a real SSE response, serializes the complete durable store, constructs
+new service and route instances, and proves the receipt, active deployment,
+queued immutable-version run, acknowledgement, and evidence reconnect before
+update, pause/resume, rollback, and revoke. A separate bounded live validation
+test runs only when
+`PACKETAGENT_PACKETADE_INTEROP_BASE_URL`,
+`PACKETAGENT_PACKETADE_INTEROP_TOKEN`, and
+`PACKETAGENT_PACKETADE_INTEROP_WORKSPACE_ID` are all explicitly configured.
 
 ## Delivery order
 

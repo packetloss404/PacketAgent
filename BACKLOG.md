@@ -134,7 +134,7 @@ Status: complete.
 Dependencies: W2-W7.
 
 Status: complete. Resume at
-[`W9.5 - Close the handoff gate`](dev/worker-implementation-loops.md#w95---close-the-handoff-gate).
+[`W10.1 - Add a notification outbox`](dev/worker-implementation-loops.md#w101---add-a-notification-outbox).
 
 - [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
@@ -156,8 +156,8 @@ Status: complete. Resume at
 
 Dependencies: W1-W7. Contract design may proceed earlier.
 
-Status: active. Resume at
-[`W9.5 - Close the handoff gate`](dev/worker-implementation-loops.md#w95---close-the-handoff-gate).
+Status: complete. Resume at
+[`W10.1 - Add a notification outbox`](dev/worker-implementation-loops.md#w101---add-a-notification-outbox).
 
 - [x] Implement the WorkerPackage contract in [`dev/packetade-packetagent-handoff.md`](dev/packetade-packetagent-handoff.md).
 - [x] Add validate, deploy, update, activate, inspect, list-runs, pause, resume,
@@ -169,11 +169,20 @@ Status: active. Resume at
       PacketADE through versioned pages and bounded SSE, with stable opaque
       IDs, `Last-Event-ID`, retention-window errors, and durable idempotent
       cursor acknowledgements.
-- Gate: a PacketADE task can choose **Keep running**, close PacketADE, and later reconnect to the same durable Worker deployment and evidence trail.
+- Gate: passed 2026-07-28. A serialized PacketADE scenario exercises
+  validation, deployment, activation, client disconnect, durable-store
+  serialization, fresh service reconstruction, cursor/evidence reconnect,
+  inspection, update, pause/resume, rollback, and revoke without changing the
+  pinned run or losing evidence. The real-network validation check is present
+  and remains conditionally skipped until an operator supplies an endpoint,
+  workspace, and PacketADE credential.
 
 ### W10 - PacketChat and PacketPhone routes
 
 Dependencies: W7-W9.
+
+Status: active. Resume at
+[`W10.1 - Add a notification outbox`](dev/worker-implementation-loops.md#w101---add-a-notification-outbox).
 
 - [ ] Deliver concise Worker updates into PacketChat.
 - [ ] Deliver approval and kill controls to PacketPhone.

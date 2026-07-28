@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W8 and W9.1-W9.4 are implemented as
+in foundation commit `d60cd47`. W1-W9 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -257,6 +257,12 @@ Implemented substrate:
   inspect/list-runs/pause/resume/rollback/revoke routes, immutable
   package-to-deployment bindings, deterministic Worker IDs, atomic forward
   rollouts, W3 manual admission, and W7 revocation;
+- versioned PacketADE deployment/run event pages and bounded SSE with stable
+  cursor IDs, evidence links, explicit trace gaps, retention recovery, and
+  durable idempotent ETag-guarded acknowledgements;
+- a serialized PacketADE disconnect/restart handoff gate through fresh service
+  reconstruction, evidence reconnect, update, pause/resume, rollback, and
+  revoke, plus an opt-in real-network validation check;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -278,10 +284,10 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W9.5 - close the PacketADE handoff gate** in
+Continue **W10.1 - add a notification outbox** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W8 and W9.1-W9.4 are complete under `src/workers/`, the store, migrations,
+W1-W9 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -374,10 +380,17 @@ explicit trace gaps. JSON pages and bounded SSE support opaque cursor and
 `Last-Event-ID` resume, heartbeat/close frames, and recoverable retention
 windows. Durable cursor advancement is an explicit idempotent write guarded by
 a strong ETag; opening or closing SSE never acknowledges delivery.
+W9.5 drives checked serialized PacketADE package and command fixtures through
+the real HTTP boundary, aborts the event connection, serializes the durable
+store, and constructs new trust/lifecycle/activation/control/read/event route
+instances. The same receipt, deployment, queued version-pinned run,
+acknowledgement, and evidence reconnect before update, pause/resume, rollback,
+and revoke complete. A bounded live validation test is registered but skips
+unless an operator supplies all endpoint credentials.
 
 The exact next slice is
-[`W9.5 - Close the handoff gate`](worker-implementation-loops.md#w95---close-the-handoff-gate).
-After each gate passes, continue through W9-W10 and then R1-R8 using that
+[`W10.1 - Add a notification outbox`](worker-implementation-loops.md#w101---add-a-notification-outbox).
+After each gate passes, continue through W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
 
@@ -402,7 +415,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,479 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,480 passed, 2 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -468,6 +481,12 @@ handoff, the roadmap, or the backlog.
   acknowledgement, strong ETag conflicts, restart reconstruction,
   stream-bound cursors, retention-window recovery, secret isolation, and
   JSON/SQLite/managed-Postgres parity checks - passed
+- focused W9.5 serialized validate/deploy/activate, real SSE abort, token-free
+  durable-store round trip, fresh service reconstruction, acknowledged
+  reconnect, pinned queued-run/job preservation, evidence resolution, update,
+  pause/resume, rollback, revoke, and transition-event projection - passed;
+  live network validation is registered and conditionally skipped because no
+  endpoint credentials are configured
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 

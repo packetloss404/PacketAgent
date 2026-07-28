@@ -23,11 +23,12 @@ capability acceptance, durable pre-deployment receipts, rate limiting,
 token-safe audit, and three-backend parity. W9.3 adds receipt-bound
 deployment/control routes, and W9.4 adds reconnectable event streams plus
 durable cursor acknowledgement. The serialized disconnect/process-restart
-gate remains W9.5 work and is not yet a current product claim.
+gate passes in W9.5. PacketChat/PacketPhone delivery remains W10 work and is
+not yet a current product claim.
 
-Last automated W9.4 baseline (2026-07-28):
+Last automated W9.5 baseline (2026-07-28):
 
-- API: 1,479 passed, 1 skipped, 0 failed
+- API: 1,480 passed, 2 skipped, 0 failed
 - Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -94,6 +95,12 @@ Last automated W9.4 baseline (2026-07-28):
   cursor acknowledgement, ETag conflicts, restart reconstruction,
   stream-bound cursors, retention-window recovery, secret isolation, and
   JSON/SQLite/managed-Postgres parity: passed
+- Focused serialized validate/deploy/activate, real SSE abort, token-free
+  durable-store round trip, fresh service reconstruction, acknowledged
+  reconnect, pinned queued-run/job preservation, evidence resolution, update,
+  pause/resume, rollback, revoke, and transition-event projection: passed
+- Live PacketADE network validation: conditionally skipped because no endpoint,
+  workspace, or credential is configured
 - Signed-in browser pass for the canonical `/runs` empty state, accessible
   labels and filters, `/activity` preservation and two-way navigation, missing
   Worker detail error state, and console warnings/errors: passed
@@ -647,6 +654,13 @@ it in a URL, package, log, event, or evidence payload.
 8. Repeat receipt, binding, event acknowledgement, reload, and export checks
    through JSON, SQLite, and managed Postgres. Confirm the bearer secret and
    stored token digest are absent from every export and response.
+9. Run
+   `node --import tsx --test src/worker-package-handoff-gate.test.ts` and
+   confirm the serialized disconnect/restart scenario passes. To opt into the
+   real-network validation case, set
+   `PACKETAGENT_PACKETADE_INTEROP_BASE_URL`,
+   `PACKETAGENT_PACKETADE_INTEROP_TOKEN`, and
+   `PACKETAGENT_PACKETADE_INTEROP_WORKSPACE_ID`; use HTTPS except for loopback.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

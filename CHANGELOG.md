@@ -6,6 +6,25 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - PacketADE handoff gate (W9.5)
+
+- Added a checked serialized PacketADE scenario covering local capability
+  acceptance, activation input, v2 update, pause/resume, v1 rollback, revoke,
+  and expected deployment events.
+- Added an HTTP-level gate that validates and deploys the package, activates a
+  version-pinned queued run, aborts the event connection, serializes the
+  durable store, constructs fresh service/route instances, and reconnects the
+  same receipt, deployment, run, acknowledgement, and evidence.
+- The reconstructed client then updates, pauses, resumes, rolls back, and
+  revokes through the canonical W2/W3/W7/W8/W9 boundaries without broadening
+  local grants or losing the original run.
+- Added a bounded live-network validation test that requires an explicit HTTPS
+  (or loopback) endpoint, workspace, and PacketADE bearer credential; it stays
+  skipped when those operator-controlled values are unavailable.
+- W9's local gate passes. W10 PacketChat/PacketPhone notification and control
+  routes remain active, so the unified cross-product lifecycle is not yet a
+  shipped claim.
+
 ### 2026-07-28 - PacketADE reconnectable events (W9.4)
 
 - Added versioned PacketADE deployment/run event projections over the W8
