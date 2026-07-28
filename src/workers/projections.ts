@@ -33,6 +33,17 @@ export const LEGACY_PROJECTION_POLICY: WorkerPolicy = {
     maxProviderCostUsd: 1,
     maxConsecutiveFailures: 3,
     maxToolCalls: 32,
+    rolling: {
+      windowMs: 24 * 60 * 60 * 1_000,
+      workspace: {
+        maxProviderCostUsd: 100,
+        maxBillableActions: 3_200,
+      },
+      deployment: {
+        maxProviderCostUsd: 100,
+        maxBillableActions: 3_200,
+      },
+    },
   },
   retry: {
     maxAttempts: 2,

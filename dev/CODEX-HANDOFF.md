@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W5 and W6.1-W6.3 are implemented as
+in foundation commit `d60cd47`. W1-W5 and W6.1-W6.4 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -77,6 +77,9 @@ Prompt-to-app generation remains a supported secondary capability.
   policy-before-secret resolution, public A/AAAA and pinned connected-address
   validation, redirect denial, fail-closed external adapters, scrubbed process
   environments, and Docker-only no-network Worker command execution.
+- Completed W6.4's durable workspace/deployment rolling windows, atomic
+  provider-cost and billable-action reservations, actual-cost settlement,
+  retry/fence idempotency, and lease-expiry release reconciliation.
 
 ## Current implementation truth
 
@@ -121,6 +124,10 @@ Implemented substrate:
 - Docker-only Worker command execution with no network or host secrets,
   non-root/read-only containers, dropped capabilities, no-new-privileges, and
   CPU, memory, and PID limits;
+- durable rolling-budget reservation records that atomically hold the
+  maximum permitted provider charge or one externally billable action before
+  execution, settle actual usage, and release abandoned holds once without
+  double credit;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -133,7 +140,7 @@ Implemented substrate:
 
 Not shipped:
 
-- Worker rolling-budget enforcement and the final adversarial W6 bypass gate;
+- the final adversarial W6 bypass gate;
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
 - Worker-level attention, evidence, and cost rollups; and
@@ -146,7 +153,7 @@ Do not describe those missing Worker features as implemented.
 Continue **W6 - Permission and budget policy** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W5 and W6.1-W6.3 are complete under `src/workers/`, the store, migrations, jobs, alerts,
+W1-W5 and W6.1-W6.4 are complete under `src/workers/`, the store, migrations, jobs, alerts,
 webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -164,9 +171,13 @@ preflights it before mutation receipt preparation, re-authorizes it in
 event. W6.3 binds opaque encrypted credentials to the immutable version,
 resolves them only after that decision, pins public network destinations, and
 requires the isolated no-network Docker driver for Worker commands.
+W6.4 keeps checkpointed per-run counters authoritative while atomically
+reserving workspace/deployment rolling capacity before provider or billable
+tool execution, settling actual usage, and reconciling abandoned holds after
+lease expiry.
 
 The exact next slice is
-[`W6.4 - Add per-run and rolling budgets`](worker-implementation-loops.md#w64---add-per-run-and-rolling-budgets).
+[`W6.5 - Close the bypass gate`](worker-implementation-loops.md#w65---close-the-bypass-gate).
 After each gate passes, continue through W6-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -191,9 +202,11 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,372 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,384 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
-- focused Worker credential isolation, policy-before-secret ordering, public
+- focused atomic rolling-budget concurrency, worst-case provider reservation,
+  billable-action ordering, idempotent settlement/release, lease-expiry
+  reconciliation, Worker credential isolation, policy-before-secret ordering, public
   A/AAAA and connected-address validation, redirect denial, Docker-only
   execution, production tool catalog coverage, capability compilation/narrowing,
   activation, supervisor, checkpoint-chain, effect replay,
@@ -227,6 +240,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W6.3 commit: clean. Stop if the active folder is
+Expected status after the W6.4 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

@@ -107,6 +107,7 @@ export interface WorkerBudgetPolicy {
   readonly maxProviderCostUsd: number;
   readonly maxConsecutiveFailures: number;
   readonly maxToolCalls: number;
+  readonly rolling?: import("./budget-types.js").WorkerRollingBudgetPolicy;
 }
 
 export interface WorkerRetryPolicy {
@@ -301,6 +302,8 @@ export type WorkerRunTerminalReason =
   | "iteration_limit"
   | "provider_cost"
   | "tool_call_limit"
+  | "rolling_provider_cost"
+  | "rolling_billable_actions"
   | "operator_cancelled"
   | "deployment_revoked"
   | "lease_lost"

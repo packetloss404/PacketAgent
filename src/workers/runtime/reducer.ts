@@ -62,7 +62,12 @@ export type WorkerSupervisorEvent =
       readonly type: "bound.reached";
       readonly reason: Extract<
         WorkerRunTerminalReason,
-        "elapsed_time" | "iteration_limit" | "provider_cost" | "tool_call_limit"
+        | "elapsed_time"
+        | "iteration_limit"
+        | "provider_cost"
+        | "tool_call_limit"
+        | "rolling_provider_cost"
+        | "rolling_billable_actions"
       >;
     }
   | {

@@ -8,11 +8,12 @@ import {
 import { inputAuthorization, workspaceAuthorization } from "./authorization.js";
 import type { ToolDefinition } from "./types.js";
 
-function readOnlyEffect(operation: string) {
+function readOnlyEffect(operation: string, billableAction = false) {
   return {
     describe: () => ({
       classification: "read_only" as const,
       operation,
+      ...(billableAction ? { billableAction: true } : {}),
     }),
   };
 }
@@ -180,7 +181,7 @@ export const httpGetTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "read",
-  effect: readOnlyEffect("http.get"),
+  effect: readOnlyEffect("http.get", true),
   authorization: inputAuthorization((input: { url?: unknown }) => ({
     verb: "GET",
     effect: "read",

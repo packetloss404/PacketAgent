@@ -9,6 +9,7 @@ import {
   makeWorkerVersion,
   TEST_NOW,
 } from "../__tests__/fixtures.js";
+import { createPermissiveWorkerBudgetPort } from "../__tests__/budget-port.js";
 import { createWorkerRuntimeRepository } from "./repository.js";
 import { createWorkerExecutionJobHandler } from "./job-handler.js";
 import { createSystemWorkerClock } from "./adapters.js";
@@ -272,6 +273,7 @@ test("worker.run job handler executes the canonical supervisor and persists term
   const harness = repositoryHarness({ now: () => clock.now() });
   const handler = createWorkerExecutionJobHandler({
     repository: harness.repository,
+    budgets: createPermissiveWorkerBudgetPort(),
     ports: {
       clock,
       provider: {

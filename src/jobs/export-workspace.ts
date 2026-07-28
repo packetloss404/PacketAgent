@@ -107,6 +107,7 @@ export interface ExportedWorkspaceData {
   workerRuns: WorkerRun[];
   workerCheckpoints: WorkerCheckpoint[];
   workerEffectReceipts: WorkerEffectReceipt[];
+  workerBudgetReservations: import("../workers/budget-types.js").WorkerBudgetReservationRecord[];
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];
@@ -239,6 +240,10 @@ function buildWorkspaceExport(
     store.workerEffectReceipts,
     workspaceId,
   );
+  const workerBudgetReservations = workspaceWorkerRecords(
+    store.workerBudgetReservations,
+    workspaceId,
+  );
   const workerDeploymentRollouts = workspaceWorkerRecords(store.workerDeploymentRollouts, workspaceId);
   const workerCommandReceipts = workspaceWorkerRecords(store.workerCommandReceipts, workspaceId);
   const workerEvents = workspaceWorkerRecords(store.workerEvents, workspaceId);
@@ -291,6 +296,7 @@ function buildWorkspaceExport(
       workerRuns,
       workerCheckpoints,
       workerEffectReceipts,
+      workerBudgetReservations,
       workerDeploymentRollouts,
       workerCommandReceipts,
       workerEvents,

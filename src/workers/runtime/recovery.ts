@@ -6,6 +6,8 @@ import {
 } from "../../packetagent-store.js";
 import { redactedErrorMessage } from "../../security/redaction.js";
 import { assertWorkerEffectResultDigest } from "../effects.js";
+import type { WorkerRollingBudgetPort } from "../budget-types.js";
+import { createWorkerRollingBudgetService } from "../rolling-budget.js";
 import { WORKER_EVENT_SCHEMA_VERSION, type WorkerEvent } from "../persistence-types.js";
 import { assertWorkerRunUpdate } from "../transitions.js";
 import type { WorkerCheckpoint, WorkerRun, WorkerVersion } from "../types.js";
@@ -27,6 +29,7 @@ export interface WorkerRecoveryDependencies {
   ) => MaybePromise<T>;
   readonly id?: (kind: "job" | "event") => string;
   readonly now?: () => Date;
+  readonly budgets?: WorkerRollingBudgetPort;
 }
 
 export interface WorkerRecoveryResult {
@@ -46,11 +49,17 @@ export function createWorkerRecoveryCoordinator(
   const mutateStore = dependencies.mutateStore ?? defaultMutateStore;
   const id = dependencies.id ?? ((kind: "job" | "event") => `${kind}_${randomUUID()}`);
   const now = dependencies.now ?? (() => new Date());
+  const budgets =
+    dependencies.budgets ??
+    createWorkerRollingBudgetService({
+      mutateStore,
+      now,
+    });
 
   return {
     async recoverExpired() {
-      return await mutateStore((data) => {
-        const timestamp = now();
+      const timestamp = now();
+      const result = await mutateStore((data) => {
         const requeuedRunIds: string[] = [];
         const quarantinedRunIds: string[] = [];
         const unchangedRunIds: string[] = [];
@@ -96,6 +105,8 @@ export function createWorkerRecoveryCoordinator(
           unchangedRunIds,
         };
       });
+      await budgets.reconcile(timestamp);
+      return result;
     },
   };
 }

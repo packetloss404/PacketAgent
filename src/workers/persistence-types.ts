@@ -86,6 +86,7 @@ export interface WorkerPersistenceCollections {
   readonly workerRuns: readonly WorkerRun[];
   readonly workerCheckpoints: readonly WorkerCheckpoint[];
   readonly workerEffectReceipts: readonly WorkerEffectReceipt[];
+  readonly workerBudgetReservations: readonly import("./budget-types.js").WorkerBudgetReservationRecord[];
   readonly workerDeploymentRollouts: readonly WorkerDeploymentRollout[];
   readonly workerCommandReceipts: readonly WorkerLifecycleCommandReceipt[];
   readonly workerEvents: readonly WorkerEvent[];

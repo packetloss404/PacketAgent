@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Atomic Worker rolling budgets (W6.4)
+
+- Added durable workspace/deployment rolling windows for provider cost and externally billable HTTP, Slack, and GitHub actions, with finite compatibility defaults for older Worker versions.
+- Provider calls atomically reserve their maximum remaining per-run cost before execution, settle actual usage, and terminate without calling the provider when workspace or deployment capacity is unavailable.
+- Authorized billable tools reserve after policy approval but before effect preparation or I/O; policy denials create no budget hold.
+- Added fence- and retry-bound deterministic reservation keys, idempotent settle/release behavior, and recovery reconciliation that releases terminal, expired-lease, or replaced-lease holds without double credit.
+- Persisted and exported redacted budget reservation records across JSON, SQLite, and managed Postgres.
+- Added concurrency, independent workspace/deployment ceiling, worst-case provider, billable-action ordering, rolling exhaustion, window expiry, idempotency, recovery, validation, and backend parity coverage; the W6.4 baseline passes 1,384 API tests, 1 skipped API test, and 25 web tests.
+
 ### 2026-07-27 - Worker credential, network, and process hardening (W6.3)
 
 - Added encrypted workspace-scoped Worker credentials for API keys, bearer tokens, webhook URLs, SMTP configuration, and opaque values. Public service and workspace-export results contain metadata only.

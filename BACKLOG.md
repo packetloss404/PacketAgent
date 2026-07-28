@@ -84,19 +84,21 @@ Dependencies: W4.
 Dependencies: W1, W4.
 
 Status: active. Resume at
-[`W6.4 - Add per-run and rolling budgets`](dev/worker-implementation-loops.md#w64---add-per-run-and-rolling-budgets).
+[`W6.5 - Close the bypass gate`](dev/worker-implementation-loops.md#w65---close-the-bypass-gate).
 
-W6.1-W6.3 are complete: validated versions compile normalized
+W6.1-W6.4 are complete: validated versions compile normalized
 tool/verb/resource tuples, deployments persist only version-bounded narrowed
 grants, and every production Worker tool call is authorized again in
 `executeTool` immediately before its handler. Opaque, workspace-scoped
 credentials resolve only after that decision; Worker network calls pin
 validated public DNS answers and deny redirects; autonomous command execution
-requires the no-network Docker sandbox.
+requires the no-network Docker sandbox. Provider cost and externally billable
+actions reserve workspace/deployment rolling capacity atomically before the
+call, settle actual usage, and release abandoned holds after lease expiry.
 
 - [x] Replace whole-tool grants with verb/resource-scoped capabilities.
 - [x] Resolve credentials by reference at execution time; never embed secret values in Worker packages.
-- [ ] Add per-run and rolling cost ceilings.
+- [x] Add per-run and rolling cost ceilings.
 - [x] Default network, filesystem, shell, and external-write access to deny.
 - Gate: runtime enforcement rejects policy bypass at every tool boundary, not only at launch.
 

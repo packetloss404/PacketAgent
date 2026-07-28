@@ -5,10 +5,19 @@ import { executeTool, preflightWorkerToolPolicy } from "../../tools/executor.js"
 import { getDefaultToolRegistry, type ToolRegistry } from "../../tools/registry.js";
 import type { ToolContext, ToolDefinition, ToolResult } from "../../tools/types.js";
 import type { JsonObject, JsonValue } from "../types.js";
+import {
+  resolveWorkerRollingBudgetPolicy,
+  type WorkerBudgetReservationRecord,
+  type WorkerRollingBudgetPort,
+} from "../budget-types.js";
 import { createWorkerEffectCoordinator, type WorkerEffectCoordinator } from "../effects.js";
 import { createWorkerCredentialService, type WorkerCredentialService } from "../credentials.js";
 import { createWorkerNetworkClient, type WorkerNetworkPort } from "../network.js";
 import { createWorkerSandboxPort, type WorkerSandboxPort } from "../sandbox-execution.js";
+import {
+  createWorkerRollingBudgetService,
+  WorkerRollingBudgetExceededError,
+} from "../rolling-budget.js";
 import type {
   WorkerClockPort,
   WorkerProviderPort,
@@ -83,8 +92,10 @@ export function createWorkerProviderPort(
 export function createWorkerToolPort(
   registry: ToolRegistry = getDefaultToolRegistry(),
   effects: WorkerEffectCoordinator = createWorkerEffectCoordinator(),
-  services: WorkerToolAdapterServices = createDefaultWorkerToolAdapterServices(),
+  services: WorkerToolAdapterServices | undefined = createDefaultWorkerToolAdapterServices(),
+  budgets: WorkerRollingBudgetPort = createWorkerRollingBudgetService(),
 ): WorkerToolPort {
+  const runtimeServices = services ?? createDefaultWorkerToolAdapterServices();
   return {
     definitions(capabilities) {
       const definitions: WorkerRuntimeToolDefinition[] = [];
@@ -139,7 +150,7 @@ export function createWorkerToolPort(
           services: {
             credentials: {
               use(reference, expectedKinds, consumer) {
-                return services.credentials.use(
+                return runtimeServices.credentials.use(
                   {
                     workspaceId: input.workspaceId,
                     reference,
@@ -150,8 +161,8 @@ export function createWorkerToolPort(
                 );
               },
             },
-            network: services.network,
-            sandbox: services.sandbox,
+            network: runtimeServices.network,
+            sandbox: runtimeServices.sandbox,
           },
           recordPolicyDecision: input.recordPolicyDecision,
         },
@@ -182,7 +193,9 @@ export function createWorkerToolPort(
           },
         },
       };
+      let billableActionAttempted = false;
       const execute = async (effectKey?: string): Promise<WorkerRuntimeToolResult> => {
+        billableActionAttempted = true;
         const record = await executeTool({
           tool,
           input: { ...input.call.input },
@@ -196,6 +209,7 @@ export function createWorkerToolPort(
       };
       const reconcile = tool.effect?.reconcile
         ? async (effectKey: string) => {
+            billableActionAttempted = true;
             const reconciled = await tool.effect!.reconcile!(
               { ...input.call.input },
               {
@@ -211,20 +225,46 @@ export function createWorkerToolPort(
             };
           }
         : undefined;
-      return await effects.execute({
-        workspaceId: input.workspaceId,
-        workerRunId: input.workerRunId,
-        workerVersionId: input.workerVersionId,
-        workerDeploymentId: input.workerDeploymentId,
-        fencingToken: input.fencingToken,
-        iteration: input.iteration,
-        capabilityId: preflight.decision.capabilityId,
-        call: input.call,
-        classification: descriptor.classification,
-        operation: descriptor.operation,
-        execute,
-        ...(reconcile ? { reconcile } : {}),
-      });
+      const reservation = descriptor.billableAction
+        ? await reserveBillableAction(budgets, input)
+        : undefined;
+      try {
+        const result = await effects.execute({
+          workspaceId: input.workspaceId,
+          workerRunId: input.workerRunId,
+          workerVersionId: input.workerVersionId,
+          workerDeploymentId: input.workerDeploymentId,
+          fencingToken: input.fencingToken,
+          iteration: input.iteration,
+          capabilityId: preflight.decision.capabilityId,
+          call: input.call,
+          classification: descriptor.classification,
+          operation: descriptor.operation,
+          execute,
+          ...(reconcile ? { reconcile } : {}),
+        });
+        if (reservation) {
+          await finalizeBillableActionReservation(
+            budgets,
+            reservation,
+            input,
+            billableActionAttempted,
+            budgetCompletionTime(input.reservedAt),
+          );
+        }
+        return result;
+      } catch (error) {
+        if (reservation) {
+          await finalizeBillableActionReservation(
+            budgets,
+            reservation,
+            input,
+            billableActionAttempted,
+            budgetCompletionTime(input.reservedAt),
+          );
+        }
+        throw error;
+      }
     },
   };
 }
@@ -324,6 +364,7 @@ function describeToolEffect(
     | "reconcilable_mutation"
     | "non_replayable_mutation";
   operation: string;
+  billableAction?: boolean;
 } {
   const described = tool.effect?.describe({ ...input });
   if (described) return described;
@@ -331,6 +372,70 @@ function describeToolEffect(
     classification: tool.side === "read" ? "read_only" : "non_replayable_mutation",
     operation: tool.name,
   };
+}
+
+async function reserveBillableAction(
+  budgets: WorkerRollingBudgetPort,
+  input: Parameters<WorkerToolPort["execute"]>[0],
+): Promise<WorkerBudgetReservationRecord> {
+  const result = await budgets.reserve({
+    workspaceId: input.workspaceId,
+    workerDeploymentId: input.workerDeploymentId,
+    workerRunId: input.workerRunId,
+    workerVersionId: input.workerVersionId,
+    fencingToken: input.fencingToken,
+    reservationKey: [
+      input.workerRunId,
+      input.fencingToken,
+      "tool",
+      input.iteration,
+      input.call.id,
+      input.budgetUsage.consecutiveFailures,
+    ].join(":"),
+    kind: "billable_action",
+    amount: 1,
+    policy: resolveWorkerRollingBudgetPolicy(input.budgetPolicy),
+    now: input.reservedAt,
+  });
+  if (!result.allowed) {
+    throw new WorkerRollingBudgetExceededError(
+      "billable_action",
+      result.code === "workspace_limit" ? "workspace" : "deployment",
+    );
+  }
+  return result.reservation;
+}
+
+async function finalizeBillableActionReservation(
+  budgets: WorkerRollingBudgetPort,
+  reservation: WorkerBudgetReservationRecord,
+  input: Parameters<WorkerToolPort["execute"]>[0],
+  attempted: boolean,
+  now: Date,
+): Promise<void> {
+  if (attempted) {
+    await budgets.settle({
+      workspaceId: input.workspaceId,
+      workerRunId: input.workerRunId,
+      fencingToken: input.fencingToken,
+      reservationId: reservation.id,
+      actualAmount: 1,
+      now,
+    });
+    return;
+  }
+  await budgets.release({
+    workspaceId: input.workspaceId,
+    workerRunId: input.workerRunId,
+    fencingToken: input.fencingToken,
+    reservationId: reservation.id,
+    reason: "call_not_attempted",
+    now,
+  });
+}
+
+function budgetCompletionTime(reservedAt: Date): Date {
+  return new Date(Math.max(Date.now(), reservedAt.getTime()));
 }
 
 function runtimeResultFromToolResult(

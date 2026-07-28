@@ -94,6 +94,7 @@ export interface ToolDefinition<TInput = Record<string, unknown>> {
 export interface ToolEffectDescriptor {
   classification: WorkerToolEffectClassification;
   operation: string;
+  billableAction?: boolean;
 }
 
 export type ToolEffectReconciliation =

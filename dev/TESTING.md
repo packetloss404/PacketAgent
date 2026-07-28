@@ -5,15 +5,17 @@ End-to-end test plan run before cutting a release. Covers the builder loop, agen
 This plan verifies the inherited workbench plus W2's durable Worker lifecycle,
 W3's trigger-intake boundary, W4's bounded supervisor, W5's checkpoint,
 recovery, and effect-safety boundary, W6.1's capability compilation, W6.2's
-immediate runtime policy enforcement, and W6.3's credential/network/process
-hardening. Attention and PacketADE handoff cases must be added as W7-W9 ship;
-they are not current product claims.
+immediate runtime policy enforcement, W6.3's credential/network/process
+hardening, and W6.4's atomic rolling budgets. Attention and PacketADE handoff
+cases must be added as W7-W9 ship; they are not current product claims.
 
-Last automated W6.3 baseline (2026-07-27):
+Last automated W6.4 baseline (2026-07-27):
 
-- API: 1,372 passed, 1 skipped, 0 failed
+- API: 1,384 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused Worker credential isolation, policy-before-secret ordering, A/AAAA
+- Focused atomic rolling-budget concurrency, provider/action reservation
+  ordering, idempotent settlement/release, lease-expiry reconciliation,
+  Worker credential isolation, policy-before-secret ordering, A/AAAA
   and connected-address validation, redirect denial, Docker-only execution,
   production tool catalog coverage, capability compilation/narrowing,
   activation, supervisor, checkpoint-chain, effect-replay,
@@ -140,7 +142,8 @@ and executes that job through the bounded supervisor.
 5. Inspect the allowed handler context. Confirm it contains the run, deployment revision and policy, version/content digest, matched capability, current budget usage, effect classification/operation, and system actor.
 6. Inspect allow/deny event data. Confirm it contains only decision code, tool, verb, effect, policy/capability identifiers, resource schemes/count, and an operation digest; raw URLs, query values, selectors, commands, recipients, message bodies, SQL, and secrets must be absent.
 7. Attempt execution through the production Worker adapter and the default registry catalog. Confirm both reach `executeTool`; direct handler calls remain limited to explicit unit tests.
-8. Stop before claiming the W6 permission gate. W6.4-W6.5 still own rolling budgets and the adversarial bypass matrix.
+8. Stop before claiming the W6 permission gate. W6.5 still owns the
+   adversarial bypass matrix.
 
 ## W6.3 Credential, Network, and Process Boundary Smoke
 
@@ -166,6 +169,34 @@ and executes that job through the bounded supervisor.
 5. Attempt Worker browser, SMTP, or SQL execution. Confirm those adapters fail
    closed until a hardened Worker-specific driver is configured; legacy
    interactive Agent behavior remains unchanged.
+
+## W6.4 Rolling Budget Smoke
+
+1. Configure positive per-run limits plus explicit workspace and deployment
+   rolling windows for provider cost and externally billable actions. Confirm
+   legacy versions without the rolling object resolve to a finite bounded
+   compatibility policy.
+2. Start concurrent runs in one deployment with less rolling capacity than
+   their combined maximum remaining provider cost. Confirm exactly one atomic
+   reservation succeeds and no denied provider call starts.
+3. Settle the successful provider hold below its reserved maximum. Confirm the
+   unused capacity becomes immediately available while checkpointed per-run
+   usage records the actual cost.
+4. Repeat across two deployments. Confirm deployment limits isolate one
+   deployment and the workspace limit aggregates both deployments.
+5. Run allowed external HTTP, Slack, and GitHub operations. Confirm policy
+   approval is recorded before one billable-action reservation, and that the
+   reservation precedes effect preparation and network I/O. Denied policy
+   operations must create no budget reservation.
+6. Retry reserve, settle, and release with the same reservation key and amount.
+   Confirm reserve reuses the active hold, repeated settlement is stable, and
+   release never credits capacity twice.
+7. Stop a process after reserve but before settlement, expire or replace its
+   fenced lease, and run recovery twice. Confirm the first pass releases the
+   abandoned hold with a reason and the second pass makes no change.
+8. Repeat reserve/settle/release/export/reload against JSON, SQLite, and managed
+   Postgres. Confirm equivalent reservation status and no lost concurrent
+   update.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

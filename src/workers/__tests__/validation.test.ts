@@ -9,6 +9,7 @@ import {
   assertValidWorkerTrigger,
   assertValidWorkerVersion,
   validateWorkerRecordSet,
+  validateWorkerPolicy,
   validateWorkerRun,
   validateWorkerTrigger,
   validateWorkerVersion,
@@ -84,6 +85,38 @@ test("WorkerPolicy rejects zero and unbounded limits", () => {
     assert.ok(
       result.issues.filter((entry) => entry.path.startsWith("$.content.policy.budgets.")).length >=
         5,
+    );
+  }
+});
+
+test("WorkerPolicy validates explicit rolling ceilings and accepts legacy omission", () => {
+  const legacyContent = structuredClone(makeWorkerVersionContent());
+  delete (legacyContent.policy.budgets as { rolling?: unknown }).rolling;
+  assert.equal(validateWorkerVersion(makeWorkerVersion({ content: legacyContent })).ok, true);
+
+  const content = structuredClone(makeWorkerVersionContent());
+  const mutableBudgets = content.policy.budgets as unknown as {
+    rolling: typeof content.policy.budgets.rolling;
+  };
+  mutableBudgets.rolling = {
+    windowMs: 0,
+    workspace: {
+      maxProviderCostUsd: Number.POSITIVE_INFINITY,
+      maxBillableActions: 0,
+    },
+    deployment: {
+      maxProviderCostUsd: 0,
+      maxBillableActions: 0,
+    },
+  };
+  const result = validateWorkerPolicy(content.policy, content.tools);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(
+      result.issues.filter((entry) =>
+        entry.path.startsWith("$.budgets.rolling"),
+      ).length,
+      5,
     );
   }
 });

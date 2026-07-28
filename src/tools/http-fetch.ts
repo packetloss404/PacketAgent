@@ -122,6 +122,7 @@ export function createHttpFetchTool(
                 ? ("idempotent_mutation" as const)
                 : ("non_replayable_mutation" as const),
           operation: `http.${method.toLowerCase()}`,
+          billableAction: true,
         };
       },
     },

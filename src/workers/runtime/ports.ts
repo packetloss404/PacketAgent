@@ -1,4 +1,5 @@
 import type { ToolPolicyDecision } from "../../tools/types.js";
+import type { WorkerRollingBudgetPort } from "../budget-types.js";
 import type {
   JsonObject,
   JsonValue,
@@ -99,9 +100,11 @@ export interface WorkerToolPort {
     readonly workerDeploymentRevision: number;
     readonly compiledPolicy?: WorkerCompiledPolicy;
     readonly budgetUsage: WorkerBudgetUsage;
+    readonly budgetPolicy: WorkerBudgetPolicy;
     readonly actor: WorkerActorReference;
     readonly iteration: number;
     readonly fencingToken: number;
+    readonly reservedAt: Date;
     readonly call: WorkerRuntimeToolCall;
     readonly recordPolicyDecision: (decision: ToolPolicyDecision) => Promise<void>;
     readonly signal: AbortSignal;
@@ -219,6 +222,7 @@ export interface WorkerSupervisorPorts {
   readonly leases: WorkerLeasePort;
   readonly cancellation: WorkerCancellationPort;
   readonly runs: WorkerRunPort;
+  readonly budgets: WorkerRollingBudgetPort;
 }
 
 export interface WorkerEvaluationRecord {

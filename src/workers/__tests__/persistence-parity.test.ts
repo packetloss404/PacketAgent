@@ -30,6 +30,8 @@ import { createWorkerEffectRepository } from "../effects.js";
 import { createWorkerRecoveryCoordinator } from "../runtime/recovery.js";
 import { WORKER_MEMORY_SCHEMA_VERSION } from "../runtime/checkpoint.js";
 import { createWorkerCredentialService } from "../credentials.js";
+import { resolveWorkerRollingBudgetPolicy } from "../budget-types.js";
+import { createWorkerRollingBudgetService } from "../rolling-budget.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -79,6 +81,8 @@ interface BackendScenarioResult {
   readonly runRevisions: readonly number[];
   readonly workerCredentialRefs: readonly string[];
   readonly exportedWorkerCredentialRefs: readonly string[];
+  readonly budgetReservationStatuses: readonly string[];
+  readonly exportedBudgetReservationCount: number;
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -119,6 +123,10 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   assert.equal(
     exported.data.workerEffectReceipts.length,
     stored.workerEffectReceipts.length,
+  );
+  assert.equal(
+    exported.data.workerBudgetReservations.length,
+    stored.workerBudgetReservations.length,
   );
   assert.equal(
     exported.data.workerActivationInboxes.length,
@@ -176,6 +184,13 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     exportedWorkerCredentialRefs: exported.data.workerCredentials
       .map((credential) => `${credential.workspaceId}:${credential.reference}:${credential.kind}`)
       .sort(),
+    budgetReservationStatuses: stored.workerBudgetReservations
+      .map(
+        (reservation) =>
+          `${reservation.kind}:${reservation.status}:${reservation.settledAmount ?? reservation.releaseReason ?? "held"}`,
+      )
+      .sort(),
+    exportedBudgetReservationCount: exported.data.workerBudgetReservations.length,
   };
 }
 
@@ -358,6 +373,45 @@ async function runRuntimePersistence(): Promise<void> {
     now: () => acquiredAt,
     id: (kind) => `${kind}-parity-${++nextRuntimeId}`,
   });
+  const budgets = createWorkerRollingBudgetService();
+  const rollingPolicy = resolveWorkerRollingBudgetPolicy(
+    acquisition.context.version.content.policy.budgets,
+  );
+  const settledBudget = await budgets.reserve({
+    workspaceId: run.workspaceId,
+    workerDeploymentId: run.workerDeploymentId,
+    workerRunId: run.id,
+    workerVersionId: run.workerVersionId,
+    fencingToken: acquisition.lease.fencingToken,
+    reservationKey: "parity-billable-action",
+    kind: "billable_action",
+    amount: 1,
+    policy: rollingPolicy,
+    now: acquiredAt,
+  });
+  assert.equal(settledBudget.allowed, true);
+  if (!settledBudget.allowed) return;
+  await budgets.settle({
+    workspaceId: run.workspaceId,
+    workerRunId: run.id,
+    fencingToken: acquisition.lease.fencingToken,
+    reservationId: settledBudget.reservation.id,
+    actualAmount: 1,
+    now: acquiredAt,
+  });
+  const abandonedBudget = await budgets.reserve({
+    workspaceId: run.workspaceId,
+    workerDeploymentId: run.workerDeploymentId,
+    workerRunId: run.id,
+    workerVersionId: run.workerVersionId,
+    fencingToken: acquisition.lease.fencingToken,
+    reservationKey: "parity-abandoned-provider",
+    kind: "provider_cost_usd",
+    amount: 0.5,
+    policy: rollingPolicy,
+    now: acquiredAt,
+  });
+  assert.equal(abandonedBudget.allowed, true);
   const prepared = await effects.prepare({
     workspaceId: run.workspaceId,
     workerRunId: run.id,

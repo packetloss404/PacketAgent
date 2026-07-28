@@ -6,12 +6,16 @@ import type { ToolPolicyDecision } from "../../tools/types.js";
 import { compileWorkerCapabilityPolicy } from "../capabilities.js";
 import type { WorkerEffectCoordinator, WorkerEffectExecutionInput } from "../effects.js";
 import { makeWorkerVersionContent } from "../__tests__/fixtures.js";
+import { createPermissiveWorkerBudgetPort } from "../__tests__/budget-port.js";
+import type { WorkerRollingBudgetPort } from "../budget-types.js";
+import { WorkerRollingBudgetExceededError } from "../rolling-budget.js";
 import type { WorkerCompiledPolicy, WorkerVersionContent } from "../types.js";
 import { computeWorkerVersionContentDigest } from "../validation.js";
 import { createWorkerToolPort } from "./adapters.js";
 
 test("Worker tool adapter routes mutations through the effect coordinator", async () => {
   const registry = new ToolRegistry();
+  const order: string[] = [];
   let receivedEffectKey: string | undefined;
   const tool: ToolDefinition = {
     name: "http_fetch",
@@ -22,6 +26,7 @@ test("Worker tool adapter routes mutations through the effect coordinator", asyn
       describe: () => ({
         classification: "idempotent_mutation",
         operation: "test_target.set",
+        billableAction: true,
       }),
     },
     authorization: {
@@ -32,6 +37,7 @@ test("Worker tool adapter routes mutations through the effect coordinator", asyn
       }),
     },
     async handle(_input, context) {
+      order.push("tool");
       receivedEffectKey = context.effectKey;
       return { ok: true, output: { applied: true } };
     },
@@ -40,11 +46,24 @@ test("Worker tool adapter routes mutations through the effect coordinator", asyn
   let coordinated: WorkerEffectExecutionInput | undefined;
   const effects: WorkerEffectCoordinator = {
     async execute(input) {
+      order.push("effect");
       coordinated = input;
       return await input.execute("sha256:test-effect-key");
     },
   };
-  const port = createWorkerToolPort(registry, effects);
+  const permissive = createPermissiveWorkerBudgetPort();
+  const budgets: WorkerRollingBudgetPort = {
+    ...permissive,
+    async reserve(input) {
+      order.push("budget.reserve");
+      return await permissive.reserve(input);
+    },
+    async settle(input) {
+      order.push("budget.settle");
+      return await permissive.settle(input);
+    },
+  };
+  const port = createWorkerToolPort(registry, effects, undefined, budgets);
   const policy = compiledPolicy("POST", "write");
   const decisions: ToolPolicyDecision[] = [];
 
@@ -59,9 +78,11 @@ test("Worker tool adapter routes mutations through the effect coordinator", asyn
     workerDeploymentRevision: 1,
     compiledPolicy: policy,
     budgetUsage: budgetUsage(),
+    budgetPolicy: makeWorkerVersionContent().policy.budgets,
     actor: { type: "system", id: "test-supervisor" },
     iteration: 2,
     fencingToken: 7,
+    reservedAt: new Date("2026-07-27T12:00:00.000Z"),
     call: {
       id: "call-1",
       name: tool.name,
@@ -80,6 +101,7 @@ test("Worker tool adapter routes mutations through the effect coordinator", asyn
   assert.equal(decisions.length, 1);
   assert.equal(decisions[0].allowed, true);
   assert.equal(decisions[0].capabilityId, "test-capability");
+  assert.deepEqual(order, ["budget.reserve", "effect", "tool", "budget.settle"]);
 });
 
 test("Worker tool adapter denies a mutation declared through a read capability", async () => {
@@ -94,6 +116,7 @@ test("Worker tool adapter denies a mutation declared through a read capability",
       describe: () => ({
         classification: "non_replayable_mutation",
         operation: "test_target.append",
+        billableAction: true,
       }),
     },
     authorization: {
@@ -109,12 +132,21 @@ test("Worker tool adapter denies a mutation declared through a read capability",
     },
   });
   let coordinated = 0;
+  let budgetReservations = 0;
+  const permissive = createPermissiveWorkerBudgetPort();
+  const budgets: WorkerRollingBudgetPort = {
+    ...permissive,
+    async reserve(input) {
+      budgetReservations += 1;
+      return await permissive.reserve(input);
+    },
+  };
   const port = createWorkerToolPort(registry, {
     async execute(input) {
       coordinated += 1;
       return await input.execute();
     },
-  });
+  }, undefined, budgets);
   const policy = compiledPolicy("GET", "read");
   const decisions: ToolPolicyDecision[] = [];
 
@@ -129,9 +161,11 @@ test("Worker tool adapter denies a mutation declared through a read capability",
     workerDeploymentRevision: 1,
     compiledPolicy: policy,
     budgetUsage: budgetUsage(),
+    budgetPolicy: makeWorkerVersionContent().policy.budgets,
     actor: { type: "system", id: "test-supervisor" },
     iteration: 1,
     fencingToken: 1,
+    reservedAt: new Date("2026-07-27T12:00:00.000Z"),
     call: {
       id: "call-1",
       name: "http_fetch",
@@ -150,6 +184,96 @@ test("Worker tool adapter denies a mutation declared through a read capability",
   assert.equal(decisions.length, 1);
   assert.equal(decisions[0].allowed, false);
   assert.equal(decisions[0].code, "capability_not_granted");
+  assert.equal(budgetReservations, 0);
+});
+
+test("Worker tool adapter refuses a billable action when rolling reservation is denied", async () => {
+  const registry = new ToolRegistry();
+  let handled = 0;
+  registry.register({
+    name: "http_fetch",
+    description: "Reads an external test target.",
+    inputSchema: {},
+    side: "read",
+    effect: {
+      describe: () => ({
+        classification: "read_only",
+        operation: "test_target.read",
+        billableAction: true,
+      }),
+    },
+    authorization: {
+      describe: (input) => ({
+        verb: "GET",
+        effect: "read",
+        resources: [String(input.url ?? "")],
+      }),
+    },
+    async handle() {
+      handled += 1;
+      return { ok: true };
+    },
+  });
+  let coordinated = 0;
+  const permissive = createPermissiveWorkerBudgetPort();
+  const budgets: WorkerRollingBudgetPort = {
+    ...permissive,
+    async reserve(input) {
+      return {
+        allowed: false,
+        code: "deployment_limit",
+        kind: input.kind,
+        requestedAmount: input.amount,
+        reservedAndSettledAmount: 1,
+        limit: 1,
+      };
+    },
+  };
+  const port = createWorkerToolPort(
+    registry,
+    {
+      async execute(input) {
+        coordinated += 1;
+        return await input.execute();
+      },
+    },
+    undefined,
+    budgets,
+  );
+  const policy = compiledPolicy("GET", "read");
+
+  await assert.rejects(
+    port.execute({
+      workspaceId: "workspace-1",
+      workerDefinitionId: "worker-1",
+      workerRunId: "run-1",
+      workerVersionId: "worker-version-1",
+      workerVersionContentDigest: policy.workerVersionContentDigest,
+      declaredCredentialRefs: [],
+      workerDeploymentId: "deployment-1",
+      workerDeploymentRevision: 1,
+      compiledPolicy: policy,
+      budgetUsage: budgetUsage(),
+      budgetPolicy: makeWorkerVersionContent().policy.budgets,
+      actor: { type: "system", id: "test-supervisor" },
+      iteration: 1,
+      fencingToken: 1,
+      reservedAt: new Date("2026-07-27T12:00:00.000Z"),
+      call: {
+        id: "call-1",
+        name: "http_fetch",
+        input: { url: "https://releases.example.test/api" },
+      },
+      recordPolicyDecision: async () => undefined,
+      signal: new AbortController().signal,
+    }),
+    (error) =>
+      error instanceof WorkerRollingBudgetExceededError &&
+      error.kind === "billable_action" &&
+      error.scope === "deployment",
+  );
+  assert.equal(coordinated, 0);
+  assert.equal(handled, 0);
 });
 
 function compiledPolicy(verb: "GET" | "POST", effect: "read" | "write"): WorkerCompiledPolicy {

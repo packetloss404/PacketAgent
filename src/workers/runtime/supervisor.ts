@@ -19,6 +19,8 @@ import {
 } from "./reducer.js";
 import { restoreWorkerSupervisorState, snapshotWorkerSupervisorState } from "./checkpoint.js";
 import { WorkerEffectInterruptionError, WorkerUnsafeReplayError } from "../effects.js";
+import { resolveWorkerRollingBudgetPolicy } from "../budget-types.js";
+import { WorkerRollingBudgetExceededError } from "../rolling-budget.js";
 
 export const WORKER_SCHEDULER_SHUTDOWN_REASON = "packetagent.scheduler_shutdown";
 export const WORKER_OPERATOR_CANCEL_REASON = "packetagent.operator_cancelled";
@@ -59,6 +61,13 @@ class WorkerProviderPhaseError extends Error {
     super(`Worker provider ${phase} phase ended with ${result.finishReason}.`);
     this.name = "WorkerProviderPhaseError";
     this.result = result;
+  }
+}
+
+class WorkerPerRunProviderBudgetExceededError extends Error {
+  constructor() {
+    super("Worker per-run provider budget has no remaining reservable amount.");
+    this.name = "WorkerPerRunProviderBudgetExceededError";
   }
 }
 
@@ -274,6 +283,27 @@ export async function runWorkerSupervisor(
     await refreshControl();
   };
 
+  const applyBudgetExhaustion = (error: unknown): boolean => {
+    if (error instanceof WorkerPerRunProviderBudgetExceededError) {
+      state = reduceWorkerSupervisor(state, {
+        type: "bound.reached",
+        reason: "provider_cost",
+      });
+      return true;
+    }
+    if (error instanceof WorkerRollingBudgetExceededError) {
+      state = reduceWorkerSupervisor(state, {
+        type: "bound.reached",
+        reason:
+          error.kind === "provider_cost_usd"
+            ? "rolling_provider_cost"
+            : "rolling_billable_actions",
+      });
+      return true;
+    }
+    return false;
+  };
+
   try {
     await emit("worker.run.started", "Worker supervisor started.");
     if (input.startupError) {
@@ -296,7 +326,15 @@ export async function runWorkerSupervisor(
           await persistState();
         }
         try {
-          const result = await callProvider(ports, context, state, "plan", signal, awaitBounded);
+          const result = await callProvider(
+            ports,
+            context,
+            state,
+            lease.fencingToken,
+            "plan",
+            signal,
+            awaitBounded,
+          );
           state = reduceWorkerSupervisor(state, {
             type: "provider.plan_succeeded",
             result,
@@ -322,6 +360,7 @@ export async function runWorkerSupervisor(
             });
             continue;
           }
+          if (applyBudgetExhaustion(error)) continue;
           if (error instanceof WorkerAwaitDeadlineError) {
             observeElapsed();
           } else {
@@ -364,9 +403,11 @@ export async function runWorkerSupervisor(
                 ? { compiledPolicy: context.deployment.compiledPolicy }
                 : {}),
               budgetUsage: state.usage,
+              budgetPolicy: context.version.content.policy.budgets,
               actor: WORKER_TOOL_ACTOR,
               iteration: state.cursor.iteration,
               fencingToken: lease.fencingToken,
+              reservedAt: ports.clock.now(),
               call,
               recordPolicyDecision: async (decision) => {
                 await ports.events.append({
@@ -430,6 +471,7 @@ export async function runWorkerSupervisor(
             });
             continue;
           }
+          if (applyBudgetExhaustion(error)) continue;
           if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
           else {
             if (error instanceof WorkerProviderPhaseError) {
@@ -451,6 +493,7 @@ export async function runWorkerSupervisor(
             ports,
             context,
             state,
+            lease.fencingToken,
             "evaluate",
             signal,
             awaitBounded,
@@ -497,6 +540,7 @@ export async function runWorkerSupervisor(
           ) {
             throw error;
           }
+          if (applyBudgetExhaustion(error)) continue;
           if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
           else await failPhase(error);
         }
@@ -592,12 +636,64 @@ async function callProvider(
   ports: WorkerSupervisorPorts,
   context: WorkerRuntimeContext,
   state: WorkerSupervisorState,
+  fencingToken: number,
   phase: "plan" | "evaluate",
   parentSignal: AbortSignal,
   awaitBounded: <T>(operation: (signal: AbortSignal) => Promise<T>) => Promise<T>,
 ): Promise<WorkerRuntimeProviderResult> {
+  const reservableAmount =
+    state.limits.maxProviderCostUsd - state.usage.providerCostUsd;
+  if (!Number.isFinite(reservableAmount) || reservableAmount <= 0) {
+    throw new WorkerPerRunProviderBudgetExceededError();
+  }
+  const reservationResult = await ports.budgets.reserve({
+    workspaceId: context.run.workspaceId,
+    workerDeploymentId: context.run.workerDeploymentId,
+    workerRunId: context.run.id,
+    workerVersionId: context.run.workerVersionId,
+    fencingToken,
+    reservationKey: [
+      context.run.id,
+      fencingToken,
+      "provider",
+      phase,
+      state.cursor.iteration,
+      state.usage.consecutiveFailures,
+    ].join(":"),
+    kind: "provider_cost_usd",
+    amount: reservableAmount,
+    policy: resolveWorkerRollingBudgetPolicy(state.limits),
+    now: ports.clock.now(),
+  });
+  if (!reservationResult.allowed) {
+    throw new WorkerRollingBudgetExceededError(
+      "provider_cost_usd",
+      reservationResult.code === "workspace_limit" ? "workspace" : "deployment",
+    );
+  }
   const request = providerRequest(context, state, phase, parentSignal, ports);
-  const result = await awaitBounded((signal) => ports.provider.call({ ...request, signal }));
+  let result: WorkerRuntimeProviderResult;
+  try {
+    result = await awaitBounded((signal) => ports.provider.call({ ...request, signal }));
+  } catch (error) {
+    await ports.budgets.release({
+      workspaceId: context.run.workspaceId,
+      workerRunId: context.run.id,
+      fencingToken,
+      reservationId: reservationResult.reservation.id,
+      reason: "call_failed_before_result",
+      now: ports.clock.now(),
+    });
+    throw error;
+  }
+  await ports.budgets.settle({
+    workspaceId: context.run.workspaceId,
+    workerRunId: context.run.id,
+    fencingToken,
+    reservationId: reservationResult.reservation.id,
+    actualAmount: Math.max(0, result.usage.costUsd),
+    now: ports.clock.now(),
+  });
   if (result.finishReason === "error" || result.finishReason === "length") {
     throw new WorkerProviderPhaseError(phase, result);
   }

@@ -5,6 +5,8 @@ import { JobDeferredError, JobReleasedError } from "../../jobs/scheduler.js";
 import type { JobRecord } from "../../packetagent-store.js";
 import { redactedErrorMessage } from "../../security/redaction.js";
 import { createWorkerActivationService, type WorkerActivationService } from "../activation.js";
+import type { WorkerRollingBudgetPort } from "../budget-types.js";
+import { createWorkerRollingBudgetService } from "../rolling-budget.js";
 import type { JsonObject } from "../types.js";
 import {
   createSystemWorkerClock,
@@ -20,8 +22,9 @@ export interface WorkerExecutionJobHandlerDependencies {
   readonly activationService?: WorkerActivationService;
   readonly ports?: Omit<
     WorkerSupervisorPorts,
-    "checkpoints" | "events" | "leases" | "cancellation" | "runs"
+    "checkpoints" | "events" | "leases" | "cancellation" | "runs" | "budgets"
   >;
+  readonly budgets?: WorkerRollingBudgetPort;
   readonly ownerId?: (job: JobRecord) => string;
 }
 
@@ -32,6 +35,7 @@ export function createWorkerExecutionJobHandler(
 } {
   const repository = dependencies.repository ?? createWorkerRuntimeRepository();
   const activationService = dependencies.activationService ?? createWorkerActivationService();
+  const budgets = dependencies.budgets ?? createWorkerRollingBudgetService();
   const runtimePorts =
     dependencies.ports ??
     ({
@@ -101,6 +105,7 @@ export function createWorkerExecutionJobHandler(
         leases: repository,
         cancellation: repository,
         runs: repository,
+        budgets,
       };
       try {
         const result = await runWorkerSupervisor({

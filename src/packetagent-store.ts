@@ -241,6 +241,7 @@ export type {
   WorkspaceRole,
 } from "./store/types.js";
 export type { WorkerCredentialRecord } from "./workers/credential-types.js";
+export type { WorkerBudgetReservationRecord } from "./workers/budget-types.js";
 export {
   ManagedDatabaseStoreBoundaryError,
   ManagedPostgresStoreConfigurationError,

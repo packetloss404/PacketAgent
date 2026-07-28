@@ -189,6 +189,7 @@ export function createSlackPostWebhookTool(
       describe: () => ({
         classification: "non_replayable_mutation",
         operation: "slack.webhook.post",
+        billableAction: true,
       }),
     },
     authorization: inputAuthorization((input: SlackPostWebhookInput) => {
@@ -344,6 +345,7 @@ export function createGithubApiTool(
             ? ("non_replayable_mutation" as const)
             : ("read_only" as const),
         operation: `github.${input.operation ?? "unknown"}`,
+        billableAction: true,
       }),
     },
     authorization: inputAuthorization((input: GithubApiInput) => {

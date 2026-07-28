@@ -7,6 +7,8 @@ import {
   makeWorkerVersion,
   makeWorkerVersionContent,
 } from "../__tests__/fixtures.js";
+import { createPermissiveWorkerBudgetPort } from "../__tests__/budget-port.js";
+import type { WorkerRollingBudgetPort } from "../budget-types.js";
 import { compileWorkerCapabilityPolicy } from "../capabilities.js";
 import type {
   JsonObject,
@@ -30,6 +32,7 @@ import {
   reduceWorkerSupervisor,
 } from "./reducer.js";
 import { runWorkerSupervisor, WorkerRuntimeReleasedError } from "./supervisor.js";
+import { WorkerRollingBudgetExceededError } from "../rolling-budget.js";
 
 const DEFAULT_BUDGETS: WorkerBudgetPolicy = {
   maxElapsedMs: 1_000,
@@ -237,6 +240,91 @@ test("provider cost is charged before any subsequent phase can execute", async (
   assert.equal(harness.toolCalls, 0);
 });
 
+test("provider calls reserve the worst-case remaining run cost before execution", async () => {
+  const calls: string[] = [];
+  const reservedAmounts: number[] = [];
+  const settledAmounts: number[] = [];
+  const permissive = createPermissiveWorkerBudgetPort();
+  const rollingBudgets: WorkerRollingBudgetPort = {
+    ...permissive,
+    async reserve(input) {
+      calls.push("reserve");
+      reservedAmounts.push(input.amount);
+      return await permissive.reserve(input);
+    },
+    async settle(input) {
+      calls.push("settle");
+      settledAmounts.push(input.actualAmount);
+      return await permissive.settle(input);
+    },
+  };
+  const harness = runtimeHarness({
+    budgets: { ...DEFAULT_BUDGETS, maxProviderCostUsd: 0.5 },
+    rollingBudgets,
+    provider: async () => {
+      calls.push("provider");
+      return providerResult({ costUsd: 0.1 });
+    },
+  });
+
+  await runWorkerSupervisor(harness.input);
+
+  assert.deepEqual(calls.slice(0, 3), ["reserve", "provider", "settle"]);
+  assert.equal(reservedAmounts[0], 0.5);
+  assert.equal(settledAmounts[0], 0.1);
+});
+
+test("rolling provider exhaustion prevents the provider call", async () => {
+  const permissive = createPermissiveWorkerBudgetPort();
+  const rollingBudgets: WorkerRollingBudgetPort = {
+    ...permissive,
+    async reserve(input) {
+      return {
+        allowed: false,
+        code: "workspace_limit",
+        kind: input.kind,
+        requestedAmount: input.amount,
+        reservedAndSettledAmount: input.policy.workspace.maxProviderCostUsd,
+        limit: input.policy.workspace.maxProviderCostUsd,
+      };
+    },
+  };
+  const harness = runtimeHarness({ rollingBudgets });
+
+  const result = await runWorkerSupervisor(harness.input);
+
+  assert.equal(result.run.status, "budget_exhausted");
+  assert.equal(result.run.terminalReason, "rolling_provider_cost");
+  assert.equal(harness.providerCalls, 0);
+  assert.equal(harness.toolCalls, 0);
+});
+
+test("rolling billable-action exhaustion prevents tool execution", async () => {
+  const harness = runtimeHarness({
+    provider: async () =>
+      providerResult({
+        toolCalls: [
+          {
+            id: "billable-call",
+            name: "http_fetch",
+            input: { url: "https://test" },
+          },
+        ],
+      }),
+    toolError: new WorkerRollingBudgetExceededError(
+      "billable_action",
+      "deployment",
+    ),
+  });
+
+  const result = await runWorkerSupervisor(harness.input);
+
+  assert.equal(result.run.status, "budget_exhausted");
+  assert.equal(result.run.terminalReason, "rolling_billable_actions");
+  assert.equal(harness.providerCalls, 1);
+  assert.equal(harness.toolCalls, 0);
+});
+
 test("a provider cannot invoke an undeclared or approval-required tool", async () => {
   const harness = runtimeHarness({
     provider: async () =>
@@ -338,6 +426,8 @@ interface RuntimeHarnessOptions {
   readonly cancelAtPhase?: WorkerSupervisorPhase;
   readonly cancellationKind?: "operator_cancelled" | "deployment_revoked";
   readonly loseLeaseAfterRenewals?: number;
+  readonly rollingBudgets?: WorkerRollingBudgetPort;
+  readonly toolError?: Error;
 }
 
 function runtimeHarness(options: RuntimeHarnessOptions = {}) {
@@ -411,6 +501,7 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
   };
 
   const ports: WorkerSupervisorPorts = {
+    budgets: options.rollingBudgets ?? createPermissiveWorkerBudgetPort(),
     clock,
     provider: {
       async call(request) {
@@ -458,6 +549,7 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
             completedAt: timestamp,
           };
         }
+        if (options.toolError) throw options.toolError;
         toolCalls += 1;
         return {
           callId: input.call.id,

@@ -87,7 +87,14 @@ const TERMINAL_REASONS_BY_STATUS: Readonly<
   paused: [],
   completed: ["objective_satisfied", "exit_predicate_matched"],
   failed: ["failure_limit", "unhandled_error"],
-  budget_exhausted: ["elapsed_time", "iteration_limit", "provider_cost", "tool_call_limit"],
+  budget_exhausted: [
+    "elapsed_time",
+    "iteration_limit",
+    "provider_cost",
+    "tool_call_limit",
+    "rolling_provider_cost",
+    "rolling_billable_actions",
+  ],
   cancelled: ["operator_cancelled", "deployment_revoked", "lease_lost"],
   quarantined: ["unsafe_replay"],
 };
@@ -582,6 +589,32 @@ function validatePolicy(
       integer: true,
       exclusiveMinimum: 0,
     });
+    if (budgets.rolling !== undefined) {
+      const rolling = recordAt(
+        budgets.rolling,
+        `${path}.budgets.rolling`,
+        issues,
+      );
+      if (rolling) {
+        numberAt(
+          rolling,
+          "windowMs",
+          `${path}.budgets.rolling`,
+          issues,
+          { integer: true, exclusiveMinimum: 0 },
+        );
+        validateRollingBudgetLimit(
+          rolling.workspace,
+          `${path}.budgets.rolling.workspace`,
+          issues,
+        );
+        validateRollingBudgetLimit(
+          rolling.deployment,
+          `${path}.budgets.rolling.deployment`,
+          issues,
+        );
+      }
+    }
   }
 
   const retry = recordAt(policy.retry, `${path}.retry`, issues);
@@ -631,6 +664,22 @@ function validatePolicy(
       }
     });
   }
+}
+
+function validateRollingBudgetLimit(
+  value: unknown,
+  path: string,
+  issues: IssueCollector,
+): void {
+  const limit = recordAt(value, path, issues);
+  if (!limit) return;
+  numberAt(limit, "maxProviderCostUsd", path, issues, {
+    exclusiveMinimum: 0,
+  });
+  numberAt(limit, "maxBillableActions", path, issues, {
+    integer: true,
+    exclusiveMinimum: 0,
+  });
 }
 
 function unexpectedKeys(
@@ -1179,6 +1228,8 @@ export function validateWorkerRun(value: unknown): WorkerContractValidation<Work
       "iteration_limit",
       "provider_cost",
       "tool_call_limit",
+      "rolling_provider_cost",
+      "rolling_billable_actions",
       "operator_cancelled",
       "deployment_revoked",
       "lease_lost",

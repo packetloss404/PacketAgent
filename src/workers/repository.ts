@@ -6,6 +6,7 @@ import {
 import { WorkerLifecycleError } from "./errors.js";
 import { assertWorkerDeploymentPolicyIntegrity } from "./capabilities.js";
 import { assertValidWorkerCredentialRecord } from "./credential-types.js";
+import { assertValidWorkerBudgetReservationRecord } from "./budget-types.js";
 import {
   WORKER_COMMAND_SCHEMA_VERSION,
   WORKER_EVENT_SCHEMA_VERSION,
@@ -356,6 +357,7 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     data.workerRuns.forEach(assertValidWorkerRun);
     data.workerCheckpoints.forEach(assertValidWorkerCheckpoint);
     data.workerEffectReceipts.forEach(assertValidWorkerEffectReceipt);
+    data.workerBudgetReservations.forEach(assertValidWorkerBudgetReservationRecord);
 
     assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(
@@ -384,6 +386,14 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
       data.workerEffectReceipts,
       (record) =>
         `${record.workspaceId}:${record.workerRunId}:${record.iteration}:${record.actionId}`,
+    );
+    assertUnique(
+      data.workerBudgetReservations,
+      (record) => `${record.workspaceId}:${record.id}`,
+    );
+    assertUnique(
+      data.workerBudgetReservations,
+      (record) => `${record.workspaceId}:${record.reservationKey}`,
     );
     assertUnique(
       data.workerCommandReceipts,
@@ -520,6 +530,22 @@ function validateCoreReferences(data: PacketAgentData): void {
     ) {
       throw new Error(
         `WorkerEffectReceipt ${receipt.id} references an inconsistent run, version, or deployment.`,
+      );
+    }
+  }
+  for (const reservation of data.workerBudgetReservations) {
+    const run = data.workerRuns.find(
+      (record) =>
+        record.workspaceId === reservation.workspaceId &&
+        record.id === reservation.workerRunId,
+    );
+    if (
+      !run ||
+      run.workerVersionId !== reservation.workerVersionId ||
+      run.workerDeploymentId !== reservation.workerDeploymentId
+    ) {
+      throw new Error(
+        `Worker budget reservation ${reservation.id} references an inconsistent run, version, or deployment.`,
       );
     }
   }

@@ -709,6 +709,7 @@ const STORE_COMPARISON_COLLECTIONS = [
   "workerRuns",
   "workerCheckpoints",
   "workerEffectReceipts",
+  "workerBudgetReservations",
   "workerDeploymentRollouts",
   "workerCommandReceipts",
   "workerEvents",

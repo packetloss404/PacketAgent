@@ -78,6 +78,17 @@ export function makeWorkerVersionContent(
         maxProviderCostUsd: 2,
         maxConsecutiveFailures: 3,
         maxToolCalls: 20,
+        rolling: {
+          windowMs: 24 * 60 * 60 * 1_000,
+          workspace: {
+            maxProviderCostUsd: 200,
+            maxBillableActions: 2_000,
+          },
+          deployment: {
+            maxProviderCostUsd: 200,
+            maxBillableActions: 2_000,
+          },
+        },
       },
       retry: {
         maxAttempts: 2,

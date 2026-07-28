@@ -710,6 +710,7 @@ export interface PacketAgentData {
   workerRuns: WorkerRun[];
   workerCheckpoints: WorkerCheckpoint[];
   workerEffectReceipts: WorkerEffectReceipt[];
+  workerBudgetReservations: import("../workers/budget-types.js").WorkerBudgetReservationRecord[];
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];

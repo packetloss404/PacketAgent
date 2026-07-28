@@ -8,6 +8,7 @@ import {
   makeWorkerRun,
   makeWorkerVersion,
 } from "../__tests__/fixtures.js";
+import { createPermissiveWorkerBudgetPort } from "../__tests__/budget-port.js";
 import { initialWorkerSupervisorState, reduceWorkerSupervisor } from "./reducer.js";
 import { snapshotWorkerSupervisorState } from "./checkpoint.js";
 import { createWorkerRuntimeRepository, type WorkerLeaseAcquisition } from "./repository.js";
@@ -54,6 +55,7 @@ test("expired Worker work is requeued once and resumes the exact action cursor",
   let evaluationCalls = 0;
   let toolCalls = 0;
   const ports: WorkerSupervisorPorts = {
+    budgets: createPermissiveWorkerBudgetPort(),
     provider: {
       async call(request) {
         if (request.phase === "plan") planCalls += 1;

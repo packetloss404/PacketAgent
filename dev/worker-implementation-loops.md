@@ -422,7 +422,7 @@ Outcome: the W1 policy becomes an enforceable, deny-by-default runtime boundary
 for every provider, tool, credential, network, filesystem, shell, and external
 write action.
 
-Status: active. W6.1-W6.3 are complete; resume at W6.4.
+Status: active. W6.1-W6.4 are complete; resume at W6.5.
 
 ### W6.1 - Compile typed capabilities
 
@@ -492,6 +492,15 @@ origin isolation remain in R5.
 
 ### W6.4 - Add per-run and rolling budgets
 
+Status: complete. Per-run counters remain checkpoint-authoritative. Provider
+calls reserve the run's maximum remaining permitted cost against durable
+workspace/deployment windows before execution and settle actual usage.
+Authorized external HTTP, Slack, and GitHub actions reserve one billable action
+before effect preparation. Reservation keys include the run fence and retry
+cursor; atomic store mutations serialize concurrent holds, and recovery
+releases only unresolved holds whose run is terminal or whose lease expired or
+was replaced.
+
 - Keep W4's per-run counters authoritative.
 - Add workspace/deployment rolling windows for provider cost and externally
   billable actions with atomic reserve/settle/release entries.
@@ -500,6 +509,8 @@ origin isolation remain in R5.
 - Reconcile abandoned reservations after lease expiry without double credit.
 
 ### W6.5 - Close the bypass gate
+
+Status: active. This is the exact resume point after W6.4.
 
 - Test calls made through every registered tool, direct registry access,
   redirects, alternate IP notation, DNS changes, path links/case aliases,
