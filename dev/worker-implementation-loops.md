@@ -734,7 +734,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: complete as of 2026-07-28. Resume at W10.1.
+Status: complete as of 2026-07-28. Resume at W10.2.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -836,12 +836,34 @@ Packet surfaces without weakening W7 policy or audit guarantees.
 
 ### W10.1 - Add a notification outbox
 
+Status: complete as of 2026-07-28. Resume at W10.2.
+
 - Define a versioned, channel-neutral notification envelope for attention,
   progress summaries, and terminal outcomes.
 - Persist an outbox item and source Worker event atomically; deliver with
   bounded retry, idempotency key, expiry, and dead-letter state.
 - Store notification route references and redacted delivery metadata, never
   endpoint secrets.
+
+Implementation record:
+
+- `packetagent.worker-notification-envelope/v1` uses stable
+  source/id/type/subject/time fields compatible with the
+  [CloudEvents 1.0 core model](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md),
+  while retaining PacketAgent's immutable Worker, version, event, evidence,
+  and thread bindings.
+- `packetagent.worker-notification-outbox/v1` coexists with legacy W7 delivery
+  references, stores one stable idempotency key, explicit attempt/expiry
+  bounds, opaque route references, and allowlisted redacted delivery metadata.
+- Attention, checkpoint progress, and terminal journal writes enqueue their
+  matching outbox item and retry job in the same store transaction. Pending
+  items pin W8 source evidence; terminal items may be compacted only behind a
+  digest-bound retention tombstone.
+- Delivery claims use a bounded attempt lease and retry backoff. A restart can
+  resend only with the same idempotency key, consistent with
+  [RFC 9110 section 9.2.2](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2)'s
+  requirement not to retry non-idempotent requests without independent
+  idempotency semantics.
 
 ### W10.2 - Implement PacketChat delivery
 

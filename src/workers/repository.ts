@@ -12,6 +12,7 @@ import {
 import { assertValidWorkerCredentialRecord } from "./credential-types.js";
 import { assertValidWorkerBudgetReservationRecord } from "./budget-types.js";
 import {
+  WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION,
   assertValidWorkerApprovalGrant,
   assertValidWorkerAttentionRequest,
   assertValidWorkerControlCommand,
@@ -462,6 +463,12 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
       (record) => `${record.workspaceId}:${record.deliveryKey}`,
     );
     assertUnique(
+      data.workerNotificationDeliveries.filter(
+        (record) => record.schemaVersion === WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION,
+      ),
+      (record) => `${record.workspaceId}:${record.idempotencyKey}`,
+    );
+    assertUnique(
       data.workerCommandReceipts,
       (record) => `${record.workspaceId}:${record.idempotencyKey}`,
     );
@@ -891,6 +898,35 @@ function validateCoreReferences(data: PacketAgentData): void {
         `Worker notification delivery ${delivery.id} references an inconsistent notification route.`,
       );
     }
+    if (delivery.schemaVersion === WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION) {
+      const sourceEvent = data.workerEvents.find(
+        (record) =>
+          record.workspaceId === delivery.workspaceId && record.id === delivery.sourceEventId,
+      );
+      const evidence = data.workerEvidenceEntries.find(
+        (record) =>
+          record.workspaceId === delivery.workspaceId && record.id === delivery.envelope.evidenceId,
+      );
+      const sourceRetainedByTombstone =
+        ["delivered", "dead_letter", "expired"].includes(delivery.status) &&
+        hasWorkerEventRetentionTombstone(data, delivery.sourceEventId, delivery.sourceEventDigest);
+      if (
+        (!sourceRetainedByTombstone &&
+          (!sourceEvent ||
+            sourceEvent.schemaVersion !== WORKER_EVENT_SCHEMA_VERSION ||
+            sourceEvent.eventDigest !== delivery.sourceEventDigest ||
+            sourceEvent.evidenceId !== delivery.envelope.evidenceId ||
+            sourceEvent.workerRunId !== delivery.workerRunId ||
+            !evidence ||
+            evidence.sourceEventId !== sourceEvent.id ||
+            evidence.sourceEventDigest !== sourceEvent.eventDigest)) ||
+        (sourceRetainedByTombstone && (sourceEvent !== undefined || evidence !== undefined))
+      ) {
+        throw new Error(
+          `Worker notification outbox item ${delivery.id} references inconsistent source evidence.`,
+        );
+      }
+    }
     if (
       delivery.attentionRequestId &&
       !data.workerAttentionRequests.some(
@@ -918,6 +954,24 @@ function validateCoreReferences(data: PacketAgentData): void {
       );
     }
   }
+}
+
+function hasWorkerEventRetentionTombstone(
+  data: PacketAgentData,
+  sourceEventId: string,
+  sourceEventDigest: string,
+): boolean {
+  const resourceIdDigest = `sha256:${createHash("sha256")
+    .update(canonicalWorkerJson({ resourceId: sourceEventId }))
+    .digest("hex")}`;
+  return data.workerEvents.some(
+    (event) =>
+      event.type.startsWith("worker.retention.") &&
+      event.data?.resourceKind === "worker_event" &&
+      event.data.contentDigest === sourceEventDigest &&
+      Array.isArray(event.data.resourceIdDigests) &&
+      event.data.resourceIdDigests.includes(resourceIdDigest),
+  );
 }
 
 function assertControlRunBinding(

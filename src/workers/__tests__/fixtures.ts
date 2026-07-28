@@ -20,7 +20,7 @@ import {
   type WorkerApprovalGrant,
   type WorkerAttentionRequest,
   type WorkerControlCommand,
-  type WorkerNotificationDeliveryReference,
+  type LegacyWorkerNotificationDeliveryReference,
 } from "../control-types.js";
 
 export const TEST_NOW = "2026-07-27T12:00:00.000Z";
@@ -356,8 +356,8 @@ export function makeWorkerControlCommand(
 }
 
 export function makeWorkerNotificationDelivery(
-  overrides: Partial<WorkerNotificationDeliveryReference> = {},
-): WorkerNotificationDeliveryReference {
+  overrides: Partial<LegacyWorkerNotificationDeliveryReference> = {},
+): LegacyWorkerNotificationDeliveryReference {
   return {
     schemaVersion: WORKER_NOTIFICATION_DELIVERY_SCHEMA_VERSION,
     id: "notification-1",

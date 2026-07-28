@@ -13,6 +13,8 @@ import {
   createWorkerAttentionService,
   WORKER_ATTENTION_DEADLINE_JOB_TYPE,
 } from "./attention-service.js";
+import { WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION } from "./control-types.js";
+import { WORKER_NOTIFICATION_DELIVERY_JOB_TYPE } from "./notifications.js";
 import { compileWorkerCapabilityPolicy } from "./capabilities.js";
 import { createWorkerControlService } from "./control-service.js";
 import { initialWorkerSupervisorState, reduceWorkerSupervisor } from "./runtime/reducer.js";
@@ -43,13 +45,26 @@ test("missing approval atomically checkpoints one attention request and its dead
   assert.equal(waiting.attention.status, "open");
   assert.equal(waiting.attention.policyDigest, harness.compiledPolicyDigest);
   assert.deepEqual(harness.data.workerCheckpoints[0]?.pendingApprovalIds, [waiting.attention.id]);
-  assert.equal(
-    harness.data.workerNotificationDeliveries.filter(
-      (record) =>
-        record.attentionRequestId === waiting.attention.id &&
-        record.deliveryKey.endsWith(":requested"),
-    ).length,
-    1,
+  const delivery = harness.data.workerNotificationDeliveries.find(
+    (record) =>
+      record.attentionRequestId === waiting.attention.id &&
+      record.deliveryKey.endsWith(":requested"),
+  );
+  assert.ok(delivery);
+  assert.equal(delivery.schemaVersion, WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION);
+  if (delivery.schemaVersion !== WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION) return;
+  const sourceEvent = harness.data.workerEvents.find(
+    (event) => event.id === delivery.sourceEventId,
+  );
+  assert.equal(sourceEvent?.type, "worker.attention.requested");
+  assert.equal(sourceEvent?.schemaVersion, "packetagent.worker-event/v2");
+  assert.equal(delivery.sourceEventDigest, sourceEvent?.eventDigest);
+  assert.ok(
+    harness.data.jobs.some(
+      (job) =>
+        job.type === WORKER_NOTIFICATION_DELIVERY_JOB_TYPE &&
+        job.payload.outboxItemId === delivery.id,
+    ),
   );
   assert.deepEqual(
     harness.data.jobs

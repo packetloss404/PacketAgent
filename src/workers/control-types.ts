@@ -1,4 +1,5 @@
 import type {
+  JsonObject,
   WorkerActorReference,
   WorkerAttentionExpirationDisposition,
   WorkerNotificationRouteReference,
@@ -11,6 +12,10 @@ export const WORKER_CONTROL_COMMAND_SCHEMA_VERSION =
   "packetagent.worker-control-command/v1" as const;
 export const WORKER_NOTIFICATION_DELIVERY_SCHEMA_VERSION =
   "packetagent.worker-notification-delivery/v1" as const;
+export const WORKER_NOTIFICATION_ENVELOPE_SCHEMA_VERSION =
+  "packetagent.worker-notification-envelope/v1" as const;
+export const WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION =
+  "packetagent.worker-notification-outbox/v1" as const;
 
 export interface WorkerControlRunBinding {
   readonly workspaceId: string;
@@ -113,9 +118,12 @@ export type WorkerNotificationDeliveryStatus =
   | "sending"
   | "delivered"
   | "failed"
-  | "dead_letter";
+  | "dead_letter"
+  | "expired";
 
-export interface WorkerNotificationDeliveryReference extends WorkerControlRunBinding {
+export type WorkerNotificationEvent = "attention" | "progress" | "terminal";
+
+export interface LegacyWorkerNotificationDeliveryReference extends WorkerControlRunBinding {
   readonly schemaVersion: typeof WORKER_NOTIFICATION_DELIVERY_SCHEMA_VERSION;
   readonly id: string;
   readonly deliveryKey: string;
@@ -134,6 +142,65 @@ export interface WorkerNotificationDeliveryReference extends WorkerControlRunBin
   readonly deliveryReference?: string;
   readonly lastFailureCode?: string;
 }
+
+export interface WorkerNotificationEnvelope extends WorkerControlRunBinding {
+  readonly schemaVersion: typeof WORKER_NOTIFICATION_ENVELOPE_SCHEMA_VERSION;
+  readonly id: string;
+  readonly specversion: "1.0";
+  readonly source: string;
+  readonly type:
+    | "com.packetagent.worker.attention.v1"
+    | "com.packetagent.worker.progress.v1"
+    | "com.packetagent.worker.terminal.v1";
+  readonly subject: string;
+  readonly time: string;
+  readonly event: WorkerNotificationEvent;
+  readonly sourceEventId: string;
+  readonly sourceEventDigest: string;
+  readonly evidenceId: string;
+  readonly threadKey: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly data: JsonObject;
+}
+
+export interface WorkerNotificationDeliveryMetadata {
+  readonly provider: string;
+  readonly responseCode?: number;
+  readonly latencyMs?: number;
+}
+
+export interface WorkerNotificationOutboxItem extends WorkerControlRunBinding {
+  readonly schemaVersion: typeof WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION;
+  readonly id: string;
+  readonly deliveryKey: string;
+  readonly idempotencyKey: string;
+  readonly event: WorkerNotificationEvent;
+  readonly attentionRequestId?: string;
+  readonly controlCommandId?: string;
+  readonly sourceEventId: string;
+  readonly sourceEventDigest: string;
+  readonly notificationRouteId: string;
+  readonly notificationRouteKind: WorkerNotificationRouteReference["kind"];
+  readonly notificationRouteReference: string;
+  readonly envelope: WorkerNotificationEnvelope;
+  readonly status: WorkerNotificationDeliveryStatus;
+  readonly attemptCount: number;
+  readonly maxAttempts: number;
+  readonly scheduledAt: string;
+  readonly expiresAt: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly lastAttemptAt?: string;
+  readonly deliveredAt?: string;
+  readonly deliveryReference?: string;
+  readonly deliveryMetadata?: WorkerNotificationDeliveryMetadata;
+  readonly lastFailureCode?: string;
+}
+
+export type WorkerNotificationDeliveryReference =
+  | LegacyWorkerNotificationDeliveryReference
+  | WorkerNotificationOutboxItem;
 
 export function assertValidWorkerAttentionRequest(record: WorkerAttentionRequest): void {
   assertRunBinding(record, "Worker attention request");
@@ -348,6 +415,10 @@ export function assertValidWorkerControlCommand(record: WorkerControlCommand): v
 export function assertValidWorkerNotificationDeliveryReference(
   record: WorkerNotificationDeliveryReference,
 ): void {
+  if (record.schemaVersion === WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION) {
+    assertValidWorkerNotificationOutboxItem(record);
+    return;
+  }
   assertRunBinding(record, "Worker notification delivery");
   assertBaseRecord(
     record.schemaVersion === WORKER_NOTIFICATION_DELIVERY_SCHEMA_VERSION,
@@ -396,6 +467,142 @@ export function assertValidWorkerNotificationDeliveryReference(
   }
 }
 
+export function assertValidWorkerNotificationEnvelope(record: WorkerNotificationEnvelope): void {
+  assertRunBinding(record, "Worker notification envelope");
+  assertBaseRecord(
+    record.schemaVersion === WORKER_NOTIFICATION_ENVELOPE_SCHEMA_VERSION,
+    record.id,
+    "Worker notification envelope",
+  );
+  const expectedType = {
+    attention: "com.packetagent.worker.attention.v1",
+    progress: "com.packetagent.worker.progress.v1",
+    terminal: "com.packetagent.worker.terminal.v1",
+  }[record.event];
+  if (
+    record.specversion !== "1.0" ||
+    !isSafeSource(record.source) ||
+    record.type !== expectedType ||
+    !isNonEmpty(record.subject) ||
+    !isTimestamp(record.time) ||
+    !isNonEmpty(record.sourceEventId) ||
+    !isDigest(record.sourceEventDigest) ||
+    !isNonEmpty(record.evidenceId) ||
+    !isNonEmpty(record.threadKey) ||
+    !isBoundedText(record.title, 240) ||
+    !isBoundedText(record.summary, 2_000) ||
+    !isJsonObject(record.data)
+  ) {
+    throw new Error("Worker notification envelope is invalid.");
+  }
+}
+
+export function assertValidWorkerNotificationOutboxItem(
+  record: WorkerNotificationOutboxItem,
+): void {
+  assertRunBinding(record, "Worker notification outbox item");
+  assertBaseRecord(
+    record.schemaVersion === WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION,
+    record.id,
+    "Worker notification outbox item",
+  );
+  assertValidWorkerNotificationEnvelope(record.envelope);
+  if (
+    !isNonEmpty(record.deliveryKey) ||
+    !isNonEmpty(record.idempotencyKey) ||
+    !["attention", "progress", "terminal"].includes(record.event) ||
+    (record.event === "attention" && !isNonEmpty(record.attentionRequestId)) ||
+    !isNonEmpty(record.sourceEventId) ||
+    !isDigest(record.sourceEventDigest) ||
+    !isNonEmpty(record.notificationRouteId) ||
+    !["packetagent", "packetchat", "packetphone", "webhook", "email"].includes(
+      record.notificationRouteKind,
+    ) ||
+    !isSafeRouteReference(record.notificationRouteReference) ||
+    !["queued", "sending", "delivered", "failed", "dead_letter", "expired"].includes(
+      record.status,
+    ) ||
+    !Number.isSafeInteger(record.attemptCount) ||
+    record.attemptCount < 0 ||
+    !Number.isSafeInteger(record.maxAttempts) ||
+    record.maxAttempts < 1 ||
+    record.attemptCount > record.maxAttempts ||
+    !isTimestamp(record.scheduledAt) ||
+    !isTimestamp(record.expiresAt) ||
+    !isTimestamp(record.createdAt) ||
+    !isTimestamp(record.updatedAt) ||
+    Date.parse(record.expiresAt) <= Date.parse(record.createdAt) ||
+    Date.parse(record.updatedAt) < Date.parse(record.createdAt) ||
+    record.sourceEventId !== record.envelope.sourceEventId ||
+    record.sourceEventDigest !== record.envelope.sourceEventDigest ||
+    record.event !== record.envelope.event ||
+    !hasSameRunBinding(record, record.envelope)
+  ) {
+    throw new Error("Worker notification outbox item is invalid.");
+  }
+  const attempted = record.attemptCount > 0;
+  if (
+    attempted !== (record.lastAttemptAt !== undefined) ||
+    (record.lastAttemptAt !== undefined &&
+      (!isTimestamp(record.lastAttemptAt) ||
+        Date.parse(record.lastAttemptAt) < Date.parse(record.createdAt)))
+  ) {
+    throw new Error("Worker notification outbox attempt state is invalid.");
+  }
+  if (
+    record.status === "queued" &&
+    (record.attemptCount !== 0 ||
+      record.deliveredAt !== undefined ||
+      record.deliveryReference !== undefined ||
+      record.deliveryMetadata !== undefined ||
+      record.lastFailureCode !== undefined)
+  ) {
+    throw new Error("Queued Worker notification outbox item has terminal delivery fields.");
+  }
+  if (
+    record.status === "sending" &&
+    (!attempted ||
+      record.deliveredAt !== undefined ||
+      record.deliveryReference !== undefined ||
+      record.deliveryMetadata !== undefined)
+  ) {
+    throw new Error("Sending Worker notification outbox item has invalid delivery state.");
+  }
+  if (
+    record.status === "delivered" &&
+    (!isTimestamp(record.deliveredAt) ||
+      Date.parse(record.deliveredAt) < Date.parse(record.createdAt) ||
+      !isNonEmpty(record.deliveryReference) ||
+      !isValidDeliveryMetadata(record.deliveryMetadata) ||
+      record.lastFailureCode !== undefined)
+  ) {
+    throw new Error("Delivered Worker notification outbox item requires delivery evidence.");
+  }
+  if (
+    record.status !== "delivered" &&
+    (record.deliveredAt !== undefined ||
+      record.deliveryReference !== undefined ||
+      record.deliveryMetadata !== undefined)
+  ) {
+    throw new Error(
+      "Undelivered Worker notification outbox item cannot contain delivery evidence.",
+    );
+  }
+  if (
+    ["failed", "dead_letter"].includes(record.status) &&
+    (!isNonEmpty(record.lastFailureCode) || !attempted)
+  ) {
+    throw new Error("Failed Worker notification outbox item requires a bounded failure.");
+  }
+  if (
+    record.status === "expired" &&
+    (record.lastFailureCode !== "expired" ||
+      Date.parse(record.updatedAt) < Date.parse(record.expiresAt))
+  ) {
+    throw new Error("Expired Worker notification outbox item requires expiry evidence.");
+  }
+}
+
 function assertRunBinding(record: WorkerControlRunBinding, label: string): void {
   if (
     !isNonEmpty(record.workspaceId) ||
@@ -423,6 +630,65 @@ function isDigest(value: unknown): value is string {
 
 function isTimestamp(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function isBoundedText(value: unknown, maximumLength: number): value is string {
+  return isNonEmpty(value) && value.length <= maximumLength;
+}
+
+function isSafeSource(value: unknown): value is string {
+  return (
+    isBoundedText(value, 512) &&
+    (value.startsWith("urn:packetagent:") || value.startsWith("/packetagent/"))
+  );
+}
+
+function isSafeRouteReference(value: unknown): value is string {
+  return (
+    isBoundedText(value, 512) &&
+    !value.includes("://") &&
+    !/[?&](?:token|access_token|api[_-]?key|secret)=/i.test(value) &&
+    !/\b(?:bearer|authorization|password|secret)\b/i.test(value)
+  );
+}
+
+function hasSameRunBinding(left: WorkerControlRunBinding, right: WorkerControlRunBinding): boolean {
+  return (
+    left.workspaceId === right.workspaceId &&
+    left.workerDefinitionId === right.workerDefinitionId &&
+    left.workerDeploymentId === right.workerDeploymentId &&
+    left.workerRunId === right.workerRunId &&
+    left.workerVersionId === right.workerVersionId &&
+    left.workerVersionContentDigest === right.workerVersionContentDigest
+  );
+}
+
+function isValidDeliveryMetadata(value: WorkerNotificationDeliveryMetadata | undefined): boolean {
+  return (
+    value !== undefined &&
+    isBoundedText(value.provider, 100) &&
+    (value.responseCode === undefined ||
+      (Number.isSafeInteger(value.responseCode) &&
+        value.responseCode >= 100 &&
+        value.responseCode <= 599)) &&
+    (value.latencyMs === undefined ||
+      (Number.isSafeInteger(value.latencyMs) && value.latencyMs >= 0))
+  );
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return isJsonValue(value, 0) && !Array.isArray(value) && value !== null;
+}
+
+function isJsonValue(value: unknown, depth: number): boolean {
+  if (depth > 32) return false;
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every((entry) => isJsonValue(entry, depth + 1));
+  if (!value || typeof value !== "object") return false;
+  return Object.values(value).every(
+    (entry) => entry !== undefined && isJsonValue(entry, depth + 1),
+  );
 }
 
 function isActor(value: unknown): value is WorkerActorReference {

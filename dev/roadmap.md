@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W10.1 - add a notification outbox**. Repository/session state
+Current active loop: **W10.2 - implement PacketChat delivery**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -30,8 +30,11 @@ and persists explicit idempotent cursor acknowledgements behind strong ETags.
 W9.5 closes the local handoff gate through serialized package/command
 fixtures, client disconnect, durable-store serialization, fresh-process
 reconstruction, reconnect, evidence, update, pause/resume, rollback, and
-revoke. Resume at W10.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w101---add-a-notification-outbox).
+revoke. W10.1 now adds the versioned channel-neutral outbox, atomic
+event/evidence binding, stable idempotency, bounded scheduler retry/expiry,
+dead-letter state, and retention-safe provenance across all three storage
+modes. Resume at W10.2 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w102---implement-packetchat-delivery).
 
 ## North star
 
@@ -145,8 +148,9 @@ later update, pause/resume, rollback, and revoke operations.
 
 ### 10. PacketChat and PacketPhone routes - active
 
-Next, add the channel-neutral notification outbox, then send worker summaries
-and approval requests to conversation and mobile surfaces without weakening
+The channel-neutral notification outbox is complete. Next, deliver bounded
+threaded Worker summaries and authenticated inspect/open callbacks to
+PacketChat, then add PacketPhone approval and kill controls without weakening
 W7 controls.
 
 ### 11. Integrations and worker templates

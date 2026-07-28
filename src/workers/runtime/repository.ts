@@ -6,7 +6,11 @@ import {
 } from "../../packetagent-store.js";
 import { WorkerLifecycleError } from "../errors.js";
 import type { WorkerEventV2 } from "../persistence-types.js";
-import { appendWorkerJournalEntry, workerEventCorrelation } from "../observability/journal.js";
+import { workerEventCorrelation } from "../observability/journal.js";
+import {
+  appendWorkerEventWithNotifications,
+  type WorkerNotificationRequest,
+} from "../notifications.js";
 import { validateWorkerPersistence } from "../repository.js";
 import { assertWorkerRunUpdate, isTerminalWorkerRunStatus } from "../transitions.js";
 import {
@@ -552,22 +556,57 @@ function appendRuntimeEvent(
   run: WorkerRun,
   input: Pick<WorkerEventV2, "type" | "summary" | "data" | "occurredAt">,
 ): void {
-  appendWorkerJournalEntry(data, {
-    id: eventId,
-    workspaceId: run.workspaceId,
-    type: input.type,
-    source: workerRuntimeEventSource(input.type),
-    workerDefinitionId: run.workerDefinitionId,
-    workerVersionId: run.workerVersionId,
-    workerDeploymentId: run.workerDeploymentId,
-    workerRunId: run.id,
-    actor: RUNTIME_ACTOR,
-    summary: input.summary,
-    ...(input.data ? { data: input.data } : {}),
-    ...(run.trace ? { trace: run.trace } : {}),
-    correlation: workerEventCorrelation(input.data),
-    occurredAt: input.occurredAt,
+  const notification = runtimeNotification(run, input);
+  appendWorkerEventWithNotifications(data, {
+    journal: {
+      id: eventId,
+      workspaceId: run.workspaceId,
+      type: input.type,
+      source: workerRuntimeEventSource(input.type),
+      workerDefinitionId: run.workerDefinitionId,
+      workerVersionId: run.workerVersionId,
+      workerDeploymentId: run.workerDeploymentId,
+      workerRunId: run.id,
+      actor: RUNTIME_ACTOR,
+      summary: input.summary,
+      ...(input.data ? { data: input.data } : {}),
+      ...(run.trace ? { trace: run.trace } : {}),
+      correlation: workerEventCorrelation(input.data),
+      occurredAt: input.occurredAt,
+    },
+    ...(notification ? { notification } : {}),
   });
+}
+
+function runtimeNotification(
+  run: WorkerRun,
+  input: Pick<WorkerEventV2, "type" | "summary" | "data" | "occurredAt">,
+): WorkerNotificationRequest | undefined {
+  if (input.type === "worker.run.terminal") {
+    return {
+      event: "terminal",
+      title: `Worker run ${run.status}`,
+      data: {
+        runStatus: run.status,
+        ...(run.terminalReason ? { terminalReason: run.terminalReason } : {}),
+        ...(run.latestCheckpointId ? { checkpointId: run.latestCheckpointId } : {}),
+        budgetUsage: { ...run.budgetUsage },
+      },
+    };
+  }
+  if (input.type === "worker.run.started" || input.type === "worker.checkpoint.persisted") {
+    return {
+      event: "progress",
+      title:
+        input.type === "worker.run.started" ? "Worker run started" : "Worker progress checkpointed",
+      data: {
+        runStatus: run.status,
+        ...(run.latestCheckpointId ? { checkpointId: run.latestCheckpointId } : {}),
+        budgetUsage: { ...run.budgetUsage },
+      },
+    };
+  }
+  return undefined;
 }
 
 function workerRuntimeEventSource(

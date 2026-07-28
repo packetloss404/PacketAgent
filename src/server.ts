@@ -92,6 +92,10 @@ import {
   WORKER_ATTENTION_DEADLINE_JOB_TYPE,
   createWorkerAttentionDeadlineJobHandler,
 } from "./workers/attention-service.js";
+import {
+  WORKER_NOTIFICATION_DELIVERY_JOB_TYPE,
+  createWorkerNotificationDeliveryJobHandler,
+} from "./workers/notifications.js";
 import { createWorkerExecutionJobHandler } from "./workers/runtime/job-handler.js";
 import { createWorkerRecoveryCoordinator } from "./workers/runtime/recovery.js";
 import {
@@ -403,6 +407,7 @@ app.route("/api", workerPackageEventRoutes);
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
 const workerExecutionJobHandler = createWorkerExecutionJobHandler();
 const workerAttentionDeadlineJobHandler = createWorkerAttentionDeadlineJobHandler();
+const workerNotificationDeliveryJobHandler = createWorkerNotificationDeliveryJobHandler();
 const workerRetentionJobHandler = createWorkerRetentionJobHandler();
 const workerRecoveryCoordinator = createWorkerRecoveryCoordinator();
 scheduler.registerReconciler({
@@ -492,6 +497,12 @@ scheduler.register({
   type: WORKER_ATTENTION_DEADLINE_JOB_TYPE,
   async handle(job) {
     return workerAttentionDeadlineJobHandler.handle(job);
+  },
+});
+scheduler.register({
+  type: WORKER_NOTIFICATION_DELIVERY_JOB_TYPE,
+  async handle(job, context) {
+    return workerNotificationDeliveryJobHandler.handle(job, context);
   },
 });
 scheduler.register({

@@ -854,12 +854,12 @@ function validateNotificationRoutes(value: unknown, path: string, issues: IssueC
       unique: true,
     });
     events.forEach((event, eventIndex) => {
-      if (event !== "attention" && event !== "terminal") {
+      if (event !== "attention" && event !== "progress" && event !== "terminal") {
         issue(
           issues,
           `${routePath}.events[${eventIndex}]`,
           "enum",
-          "must be attention or terminal",
+          "must be attention, progress, or terminal",
         );
       }
     });

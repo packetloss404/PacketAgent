@@ -24,11 +24,14 @@ token-safe audit, and three-backend parity. W9.3 adds receipt-bound
 deployment/control routes, and W9.4 adds reconnectable event streams plus
 durable cursor acknowledgement. The serialized disconnect/process-restart
 gate passes in W9.5. PacketChat/PacketPhone delivery remains W10 work and is
-not yet a current product claim.
+not yet a current product claim. W10.1 adds the channel-neutral notification
+outbox, atomic event/evidence binding, stable idempotency, bounded
+retry/expiry/dead-letter handling, scheduler integration, redaction, and
+retention-safe provenance; external delivery begins at W10.2.
 
-Last automated W9.5 baseline (2026-07-28):
+Last automated W10.1 baseline (2026-07-28):
 
-- API: 1,480 passed, 2 skipped, 0 failed
+- API: 1,485 passed, 2 skipped, 0 failed
 - Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -99,6 +102,12 @@ Last automated W9.5 baseline (2026-07-28):
   durable-store round trip, fresh service reconstruction, acknowledged
   reconnect, pinned queued-run/job preservation, evidence resolution, update,
   pause/resume, rollback, revoke, and transition-event projection: passed
+- Focused notification event/evidence/outbox/job atomicity and rollback,
+  legacy delivery compatibility, stable retry idempotency, bounded attempt
+  leases and backoff, expiry, dead-letter state, opaque route references,
+  redacted delivery metadata, pending-evidence retention pinning, terminal
+  digest tombstones, attention/progress/terminal production paths, scheduler
+  registration, and JSON/SQLite/managed-Postgres parity: passed
 - Live PacketADE network validation: conditionally skipped because no endpoint,
   workspace, or credential is configured
 - Signed-in browser pass for the canonical `/runs` empty state, accessible

@@ -6,6 +6,26 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - Channel-neutral Worker notification outbox (W10.1)
+
+- Added versioned attention, progress, and terminal notification envelopes
+  bound to immutable Worker/version/run identity plus the exact source event,
+  evidence ID, and event digest.
+- Added durable outbox items with stable idempotency keys, attempt leases,
+  bounded exponential retry, expiry, dead-letter outcomes, opaque route
+  references, and allowlisted delivery metadata.
+- Attention requests, progress checkpoints, and terminal outcomes now enqueue
+  their matching delivery job atomically with the source journal/evidence
+  write. The scheduler handles local PacketAgent delivery and leaves external
+  PacketChat/PacketPhone adapters fail-closed for later loops.
+- Pending outbox items pin their W8 source evidence. Terminal delivery records
+  permit compaction only after a digest-bound retention tombstone preserves
+  provenance.
+- JSON, SQLite, and managed-Postgres parity plus retry, expiry, redaction,
+  rollback, retention, and idempotent replay tests pass. W10.2 PacketChat
+  delivery remains active, so the unified cross-product lifecycle is not yet a
+  shipped claim.
+
 ### 2026-07-28 - PacketADE handoff gate (W9.5)
 
 - Added a checked serialized PacketADE scenario covering local capability

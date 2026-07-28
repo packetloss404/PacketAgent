@@ -8,13 +8,15 @@ import type { WorkerToolApprovalEvidence } from "../tools/types.js";
 import {
   WORKER_APPROVAL_GRANT_SCHEMA_VERSION,
   WORKER_ATTENTION_REQUEST_SCHEMA_VERSION,
-  WORKER_NOTIFICATION_DELIVERY_SCHEMA_VERSION,
   type WorkerApprovalGrant,
   type WorkerAttentionRequest,
-  type WorkerNotificationDeliveryReference,
 } from "./control-types.js";
 import { WorkerLifecycleError } from "./errors.js";
-import { appendWorkerJournalEntry, workerEventCorrelation } from "./observability/journal.js";
+import { workerEventCorrelation } from "./observability/journal.js";
+import {
+  appendWorkerEventWithNotifications,
+  type WorkerNotificationRequest,
+} from "./notifications.js";
 import { validateWorkerPersistence } from "./repository.js";
 import { assertWorkerRunUpdate, isTerminalWorkerRunStatus } from "./transitions.js";
 import {
@@ -158,7 +160,6 @@ export function createWorkerAttentionService(
           timestamp,
         );
         data.workerAttentionRequests.push(attention);
-        queueAttentionDeliveries(data, attention, version, "requested", timestamp, id);
         queueDeadlineJobs(data, attention, version, timestamp, id);
         const waiting = persistWaitingRun(data, input, attention, version, id);
         validateWorkerPersistence(data);
@@ -179,13 +180,12 @@ export function createWorkerAttentionService(
           if (
             attention.status === "open" &&
             attention.escalatesAt &&
-            Date.parse(timestamp) >= Date.parse(attention.escalatesAt)
+            Date.parse(timestamp) >= Date.parse(attention.escalatesAt) &&
+            Date.parse(timestamp) < Date.parse(attention.expiresAt) &&
+            hasUnqueuedAttentionDeliveries(data, attention, version, "escalated")
           ) {
             queuedDeliveryIds.push(
-              ...queueAttentionDeliveries(data, attention, version, "escalated", timestamp, id),
-            );
-            if (queuedDeliveryIds.length > 0) {
-              appendAttentionEvent(
+              ...appendAttentionEvent(
                 data,
                 id("event"),
                 run,
@@ -193,9 +193,11 @@ export function createWorkerAttentionService(
                 "Worker approval attention reached its escalation deadline.",
                 attention,
                 timestamp,
-                { queuedDeliveryIds },
-              );
-            }
+                {},
+                attentionNotification(attention, "escalated"),
+                id,
+              ),
+            );
           }
           validateWorkerPersistence(data);
           return clone({ attention, run, queuedDeliveryIds });
@@ -618,6 +620,8 @@ function persistWaitingRun(
       operationDigest: attention.operationDigest,
       policyDigest: attention.policyDigest,
     },
+    attentionNotification(attention, "requested"),
+    id,
   );
   return {
     disposition: "waiting",
@@ -717,52 +721,46 @@ function rejectRun(
   return next;
 }
 
-function queueAttentionDeliveries(
+function hasUnqueuedAttentionDeliveries(
   data: PacketAgentData,
   attention: WorkerAttentionRequest,
   version: WorkerVersion,
   stage: "requested" | "escalated",
-  timestamp: string,
-  id: WorkerAttentionIdFactory,
-): string[] {
-  const queued: string[] = [];
-  for (const routeId of attention.notificationRouteIds) {
+): boolean {
+  return attention.notificationRouteIds.some((routeId) => {
     const route = version.content.notificationRoutes.find((record) => record.id === routeId);
-    if (!route || !route.events.includes("attention")) continue;
+    if (!route || !route.events.includes("attention")) return false;
     const deliveryKey = `${attention.id}:${route.id}:${stage}`;
-    if (
-      data.workerNotificationDeliveries.some(
-        (record) =>
-          record.workspaceId === attention.workspaceId && record.deliveryKey === deliveryKey,
-      )
-    ) {
-      continue;
-    }
-    const delivery: WorkerNotificationDeliveryReference = {
-      schemaVersion: WORKER_NOTIFICATION_DELIVERY_SCHEMA_VERSION,
-      id: id("delivery"),
-      deliveryKey,
-      workspaceId: attention.workspaceId,
-      workerDefinitionId: attention.workerDefinitionId,
-      workerDeploymentId: attention.workerDeploymentId,
-      workerRunId: attention.workerRunId,
-      workerVersionId: attention.workerVersionId,
-      workerVersionContentDigest: attention.workerVersionContentDigest,
-      event: "attention",
-      attentionRequestId: attention.id,
-      notificationRouteId: route.id,
-      notificationRouteKind: route.kind,
-      notificationRouteReference: route.reference,
-      status: "queued",
-      attemptCount: 0,
-      scheduledAt: timestamp,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    data.workerNotificationDeliveries.push(delivery);
-    queued.push(delivery.id);
-  }
-  return queued;
+    return !data.workerNotificationDeliveries.some(
+      (record) =>
+        record.workspaceId === attention.workspaceId && record.deliveryKey === deliveryKey,
+    );
+  });
+}
+
+function attentionNotification(
+  attention: WorkerAttentionRequest,
+  stage: "requested" | "escalated",
+): WorkerNotificationRequest {
+  return {
+    event: "attention",
+    title: stage === "requested" ? "Worker approval required" : "Worker approval still required",
+    deduplicationKey: attention.id,
+    deliveryKeySuffix: stage,
+    attentionRequestId: attention.id,
+    routeIds: attention.notificationRouteIds,
+    expiresAt: attention.expiresAt,
+    data: {
+      attentionStage: stage,
+      capabilityId: attention.capabilityId,
+      operationDigest: attention.operationDigest,
+      policyDigest: attention.policyDigest,
+      expirationDisposition: attention.expirationDisposition,
+      ...(attention.escalatesAt ? { escalatesAt: attention.escalatesAt } : {}),
+      expiresAt: attention.expiresAt,
+      requiredAction: "approve_or_reject",
+    },
+  };
 }
 
 function queueDeadlineJobs(
@@ -893,28 +891,39 @@ function appendAttentionEvent(
   attention: WorkerAttentionRequest,
   occurredAt: string,
   eventData: Record<string, unknown>,
-): void {
+  notification?: WorkerNotificationRequest,
+  id?: WorkerAttentionIdFactory,
+): string[] {
   const dataValue = {
     workerRunId: run.id,
     attentionRequestId: attention.id,
     ...eventData,
   };
-  appendWorkerJournalEntry(data, {
-    id: eventId,
-    workspaceId: run.workspaceId,
-    type,
-    source: "approval",
-    workerDefinitionId: run.workerDefinitionId,
-    workerVersionId: run.workerVersionId,
-    workerDeploymentId: run.workerDeploymentId,
-    workerRunId: run.id,
-    actor: ATTENTION_SYSTEM_ACTOR,
-    summary,
-    data: dataValue,
-    ...(run.trace ? { trace: run.trace } : {}),
-    correlation: workerEventCorrelation(dataValue),
-    occurredAt,
+  const result = appendWorkerEventWithNotifications(data, {
+    journal: {
+      id: eventId,
+      workspaceId: run.workspaceId,
+      type,
+      source: "approval",
+      workerDefinitionId: run.workerDefinitionId,
+      workerVersionId: run.workerVersionId,
+      workerDeploymentId: run.workerDeploymentId,
+      workerRunId: run.id,
+      actor: ATTENTION_SYSTEM_ACTOR,
+      summary,
+      data: dataValue,
+      ...(run.trace ? { trace: run.trace } : {}),
+      correlation: workerEventCorrelation(dataValue),
+      occurredAt,
+    },
+    ...(notification ? { notification } : {}),
+    ...(id
+      ? {
+          id: (kind) => id(kind === "outbox" ? "delivery" : "job"),
+        }
+      : {}),
   });
+  return result.outboxItems.map((record) => record.id);
 }
 
 function replaceRun(data: PacketAgentData, next: WorkerRun): void {

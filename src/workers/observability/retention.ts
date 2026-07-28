@@ -5,6 +5,7 @@ import {
   type PacketAgentData,
 } from "../../packetagent-store.js";
 import { validateWorkerActivationPersistence } from "../activation-repository.js";
+import { WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION } from "../control-types.js";
 import type { WorkerEffectRetentionTombstone } from "../effect-types.js";
 import { appendWorkerJournalEntry, isWorkerEventV2 } from "./journal.js";
 import type { WorkerEvent } from "../persistence-types.js";
@@ -517,6 +518,16 @@ function eventCandidate(
       );
       if (eventIndex < 0) return "skipped";
       const current = data.workerEvents[eventIndex];
+      if (
+        data.workerNotificationDeliveries.some(
+          (delivery) =>
+            delivery.schemaVersion === WORKER_NOTIFICATION_OUTBOX_SCHEMA_VERSION &&
+            delivery.sourceEventId === current.id &&
+            ["queued", "sending", "failed"].includes(delivery.status),
+        )
+      ) {
+        return "skipped";
+      }
       const evidence = isWorkerEventV2(current)
         ? data.workerEvidenceEntries.find(
             (record) =>

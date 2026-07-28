@@ -205,7 +205,7 @@ export interface WorkerNotificationRouteReference {
   readonly id: string;
   readonly kind: "packetagent" | "packetchat" | "packetphone" | "webhook" | "email";
   readonly reference: string;
-  readonly events: readonly ("attention" | "terminal")[];
+  readonly events: readonly ("attention" | "progress" | "terminal")[];
 }
 
 export type WorkerDefinitionStatus = "draft" | "active" | "retired";

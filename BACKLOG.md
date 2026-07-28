@@ -134,7 +134,7 @@ Status: complete.
 Dependencies: W2-W7.
 
 Status: complete. Resume at
-[`W10.1 - Add a notification outbox`](dev/worker-implementation-loops.md#w101---add-a-notification-outbox).
+[`W10.2 - Implement PacketChat delivery`](dev/worker-implementation-loops.md#w102---implement-packetchat-delivery).
 
 - [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
@@ -157,7 +157,7 @@ Status: complete. Resume at
 Dependencies: W1-W7. Contract design may proceed earlier.
 
 Status: complete. Resume at
-[`W10.1 - Add a notification outbox`](dev/worker-implementation-loops.md#w101---add-a-notification-outbox).
+[`W10.2 - Implement PacketChat delivery`](dev/worker-implementation-loops.md#w102---implement-packetchat-delivery).
 
 - [x] Implement the WorkerPackage contract in [`dev/packetade-packetagent-handoff.md`](dev/packetade-packetagent-handoff.md).
 - [x] Add validate, deploy, update, activate, inspect, list-runs, pause, resume,
@@ -182,8 +182,13 @@ Status: complete. Resume at
 Dependencies: W7-W9.
 
 Status: active. Resume at
-[`W10.1 - Add a notification outbox`](dev/worker-implementation-loops.md#w101---add-a-notification-outbox).
+[`W10.2 - Implement PacketChat delivery`](dev/worker-implementation-loops.md#w102---implement-packetchat-delivery).
 
+- [x] Add a versioned channel-neutral notification outbox with atomic
+      event/evidence binding, stable idempotency, bounded retry/expiry,
+      dead-letter state, opaque route references, redacted delivery metadata,
+      scheduler delivery, retention pinning, and JSON/SQLite/managed-Postgres
+      parity.
 - [ ] Deliver concise Worker updates into PacketChat.
 - [ ] Deliver approval and kill controls to PacketPhone.
 - [ ] Authenticate callback actions and prevent stale or replayed approvals.

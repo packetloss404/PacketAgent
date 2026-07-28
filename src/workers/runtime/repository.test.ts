@@ -109,6 +109,17 @@ test("runtime repository fences leases and run revisions atomically", async () =
     harness.data.workerEvents.some((event) => event.type === "worker.run.terminal"),
     true,
   );
+  const terminalOutbox = harness.data.workerNotificationDeliveries.find(
+    (record) => record.event === "terminal" && record.workerRunId === terminal.id,
+  );
+  assert.ok(terminalOutbox);
+  assert.ok(
+    harness.data.jobs.some(
+      (job) =>
+        job.type === "worker.notification.deliver" &&
+        job.payload.outboxItemId === terminalOutbox.id,
+    ),
+  );
 });
 
 test("runtime finalization observes an operator-terminalized run idempotently", async () => {

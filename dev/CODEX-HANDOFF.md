@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W9 are implemented as
+in foundation commit `d60cd47`. W1-W9 and W10.1 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -284,10 +284,10 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W10.1 - add a notification outbox** in
+Continue **W10.2 - implement PacketChat delivery** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W9 are complete under `src/workers/`, the store, migrations,
+W1-W9 and W10.1 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -387,9 +387,17 @@ instances. The same receipt, deployment, queued version-pinned run,
 acknowledgement, and evidence reconnect before update, pause/resume, rollback,
 and revoke complete. A bounded live validation test is registered but skips
 unless an operator supplies all endpoint credentials.
+W10.1 upgrades W7 notification references to a legacy-compatible, versioned
+channel-neutral outbox. Attention, progress checkpoint, and terminal
+event/evidence writes atomically enqueue stable-idempotency delivery jobs with
+attempt leases, bounded retry/expiry, dead-letter state, opaque route
+references, and allowlisted redacted delivery metadata. Pending deliveries pin
+their W8 source evidence; terminal delivery state permits compaction only
+behind a digest-bound tombstone. The local PacketAgent transport is registered;
+external PacketChat and PacketPhone transports remain fail-closed.
 
 The exact next slice is
-[`W10.1 - Add a notification outbox`](worker-implementation-loops.md#w101---add-a-notification-outbox).
+[`W10.2 - Implement PacketChat delivery`](worker-implementation-loops.md#w102---implement-packetchat-delivery).
 After each gate passes, continue through W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -415,7 +423,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,480 passed, 2 skipped, 0 failed
+- `npm run test:api` - 1,485 passed, 2 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -487,6 +495,12 @@ handoff, the roadmap, or the backlog.
   pause/resume, rollback, revoke, and transition-event projection - passed;
   live network validation is registered and conditionally skipped because no
   endpoint credentials are configured
+- focused W10.1 event/evidence/outbox/job atomicity and rollback, legacy
+  delivery compatibility, stable idempotency across retries, attempt
+  exhaustion, expiry, dead-letter state, scheduler registration, metadata and
+  secret redaction, pending-evidence retention pinning, terminal tombstones,
+  attention/progress/terminal production paths, and
+  JSON/SQLite/managed-Postgres parity checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
