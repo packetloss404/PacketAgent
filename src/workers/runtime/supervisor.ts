@@ -1,4 +1,9 @@
-import type { JsonObject, WorkerRetryPolicy, WorkerRun, WorkerToolCapability } from "../types.js";
+import type {
+  JsonObject,
+  WorkerCompiledCapability,
+  WorkerRetryPolicy,
+  WorkerRun,
+} from "../types.js";
 import type {
   WorkerLease,
   WorkerRuntimeContext,
@@ -17,6 +22,11 @@ import { WorkerEffectInterruptionError, WorkerUnsafeReplayError } from "../effec
 
 export const WORKER_SCHEDULER_SHUTDOWN_REASON = "packetagent.scheduler_shutdown";
 export const WORKER_OPERATOR_CANCEL_REASON = "packetagent.operator_cancelled";
+const WORKER_TOOL_ACTOR = {
+  type: "system" as const,
+  id: "packetagent.worker-supervisor",
+  displayName: "PacketAgent Worker Supervisor",
+};
 
 export class WorkerRuntimeReleasedError extends Error {
   readonly reason: "scheduler_shutdown" | "lease_lost";
@@ -339,26 +349,50 @@ export async function runWorkerSupervisor(
         }
         state = reduceWorkerSupervisor(state, { type: "tool.reserve" });
         if (state.terminal) continue;
-        const capability = executableCapabilities(context).find(
-          (entry) => entry.tool === call.name,
-        );
-        if (!capability) {
-          await failPhase(
-            new Error(`Tool ${call.name} is not permitted for unattended Worker execution.`),
-          );
-          continue;
-        }
         try {
           const result = await awaitBounded((operationSignal) =>
             ports.tools.execute({
               workspaceId: context.run.workspaceId,
+              workerDefinitionId: context.run.workerDefinitionId,
               workerRunId: context.run.id,
               workerVersionId: context.run.workerVersionId,
+              workerVersionContentDigest: context.version.contentDigest,
               workerDeploymentId: context.run.workerDeploymentId,
+              workerDeploymentRevision: context.deployment.revision,
+              ...(context.deployment.compiledPolicy
+                ? { compiledPolicy: context.deployment.compiledPolicy }
+                : {}),
+              budgetUsage: state.usage,
+              actor: WORKER_TOOL_ACTOR,
               iteration: state.cursor.iteration,
               fencingToken: lease.fencingToken,
               call,
-              capability,
+              recordPolicyDecision: async (decision) => {
+                await ports.events.append({
+                  context,
+                  fencingToken: lease.fencingToken,
+                  event: {
+                    type: decision.allowed ? "worker.policy.allowed" : "worker.policy.denied",
+                    phase: state.phase,
+                    cursor: state.cursor,
+                    summary: decision.allowed
+                      ? `Worker policy allowed ${decision.tool}.`
+                      : `Worker policy denied ${decision.tool}.`,
+                    data: {
+                      decision: decision.allowed ? "allow" : "deny",
+                      code: decision.code,
+                      tool: decision.tool,
+                      verb: decision.verb,
+                      effect: decision.effect,
+                      operationDigest: decision.operationDigest,
+                      resourceCount: decision.resourceCount,
+                      resourceSchemes: [...decision.resourceSchemes],
+                      ...(decision.policyDigest ? { policyDigest: decision.policyDigest } : {}),
+                      ...(decision.capabilityId ? { capabilityId: decision.capabilityId } : {}),
+                    },
+                  },
+                });
+              },
               signal: operationSignal,
             }),
           );
@@ -620,10 +654,13 @@ function providerRequest(
   };
 }
 
-function executableCapabilities(context: WorkerRuntimeContext): readonly WorkerToolCapability[] {
-  const allowedIds = new Set(context.version.content.policy.permissions.allowedCapabilityIds);
-  return context.version.content.tools.filter(
-    (capability) => allowedIds.has(capability.id) && capability.approval === "never",
+function executableCapabilities(
+  context: WorkerRuntimeContext,
+): readonly WorkerCompiledCapability[] {
+  return (
+    context.deployment.compiledPolicy?.capabilities.filter(
+      (capability) => capability.approval === "never",
+    ) ?? []
   );
 }
 

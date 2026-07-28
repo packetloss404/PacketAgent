@@ -422,7 +422,7 @@ Outcome: the W1 policy becomes an enforceable, deny-by-default runtime boundary
 for every provider, tool, credential, network, filesystem, shell, and external
 write action.
 
-Status: active. W6.1 is complete; resume at W6.2.
+Status: active. W6.1-W6.2 are complete; resume at W6.3.
 
 ### W6.1 - Compile typed capabilities
 
@@ -442,6 +442,13 @@ Worker version digest.
   capabilities are an upper bound; deployment grants may only narrow them.
 
 ### W6.2 - Enforce immediately before execution
+
+Status: complete. All production-registered tools expose typed operation
+descriptors, the Worker adapter preflights them before effect preparation, and
+`executeTool` independently fails closed against the pinned deployment policy
+immediately before the handler. The full run/deployment/version/capability,
+budget, effect, and actor context reaches an allowed handler; redacted,
+operation-digest-based allow/deny decisions persist as Worker events.
 
 - Extend `ToolContext` with run, deployment, version, capability, budget,
   effect, and actor context.

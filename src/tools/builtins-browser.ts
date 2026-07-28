@@ -1,12 +1,14 @@
 import { resolve as resolvePath } from "node:path";
-import { closeBrowserSession, ensureArtifactDir, getOrCreateBrowserSession } from "./browser-runtime.js";
+import {
+  closeBrowserSession,
+  ensureArtifactDir,
+  getOrCreateBrowserSession,
+} from "./browser-runtime.js";
+import { browserAuthorization, inputAuthorization } from "./authorization.js";
 import type { ToolDefinition } from "./types.js";
 
 function browserEffect(
-  classification:
-    | "read_only"
-    | "idempotent_mutation"
-    | "non_replayable_mutation",
+  classification: "read_only" | "idempotent_mutation" | "non_replayable_mutation",
   operation: string,
 ) {
   return {
@@ -22,8 +24,11 @@ function ensureRunId(runId: string | undefined): string | null {
 
 function ensureSafeUrl(url: string): { ok: true; url: URL } | { ok: false; error: string } {
   let parsed: URL;
-  try { parsed = new URL(url); }
-  catch { return { ok: false, error: `invalid url: ${url}` }; }
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { ok: false, error: `invalid url: ${url}` };
+  }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return { ok: false, error: `protocol ${parsed.protocol} not allowed; must be http or https` };
   }
@@ -35,27 +40,44 @@ function ensureSafeUrl(url: string): { ok: true; url: URL } | { ok: false; error
 
 export const browserGotoTool: ToolDefinition = {
   name: "browser_goto",
-  description: "Navigate the run's headless browser to a URL. Subsequent browser_* tools operate on this page.",
+  description:
+    "Navigate the run's headless browser to a URL. Subsequent browser_* tools operate on this page.",
   inputSchema: {
     type: "object",
     properties: {
       url: { type: "string", format: "uri" },
-      waitUntil: { type: "string", enum: ["load", "domcontentloaded", "networkidle"], default: "domcontentloaded" },
+      waitUntil: {
+        type: "string",
+        enum: ["load", "domcontentloaded", "networkidle"],
+        default: "domcontentloaded",
+      },
     },
     required: ["url"],
     additionalProperties: false,
   },
   side: "exec",
   effect: browserEffect("non_replayable_mutation", "browser.navigate"),
+  authorization: inputAuthorization((input: Record<string, unknown>) => ({
+    verb: "NAVIGATE",
+    effect: "execute",
+    resources: [typeof input.url === "string" ? input.url : ""],
+  })),
   timeoutMs: 30_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId on the tool context" };
-    const { url, waitUntil = "domcontentloaded" } = input as { url: string; waitUntil?: "load" | "domcontentloaded" | "networkidle" };
+    const { url, waitUntil = "domcontentloaded" } = input as {
+      url: string;
+      waitUntil?: "load" | "domcontentloaded" | "networkidle";
+    };
     const guard = ensureSafeUrl(url);
     if (!guard.ok) return { ok: false, error: guard.error };
     const session = await getOrCreateBrowserSession(runId);
-    if (!session) return { ok: false, error: "Playwright is not installed or failed to launch. Install playwright + browsers." };
+    if (!session)
+      return {
+        ok: false,
+        error: "Playwright is not installed or failed to launch. Install playwright + browsers.",
+      };
     try {
       await session.page.goto(guard.url.toString(), { waitUntil });
       const title = await session.page.title();
@@ -77,6 +99,7 @@ export const browserClickTool: ToolDefinition = {
   },
   side: "exec",
   effect: browserEffect("non_replayable_mutation", "browser.click"),
+  authorization: browserAuthorization("CLICK", "execute"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -107,6 +130,7 @@ export const browserFillTool: ToolDefinition = {
   },
   side: "exec",
   effect: browserEffect("non_replayable_mutation", "browser.fill"),
+  authorization: browserAuthorization("FILL", "execute"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -137,6 +161,7 @@ export const browserExtractTool: ToolDefinition = {
   },
   side: "exec",
   effect: browserEffect("read_only", "browser.extract"),
+  authorization: browserAuthorization("EXTRACT", "read"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -157,7 +182,8 @@ export const browserExtractTool: ToolDefinition = {
 
 export const browserScreenshotTool: ToolDefinition = {
   name: "browser_screenshot",
-  description: "Capture a PNG screenshot of the current browser page; saves to the run's artifact dir and returns the relative path.",
+  description:
+    "Capture a PNG screenshot of the current browser page; saves to the run's artifact dir and returns the relative path.",
   inputSchema: {
     type: "object",
     properties: {
@@ -168,6 +194,7 @@ export const browserScreenshotTool: ToolDefinition = {
   },
   side: "exec",
   effect: browserEffect("non_replayable_mutation", "browser.screenshot"),
+  authorization: browserAuthorization("CAPTURE", "execute"),
   timeoutMs: 30_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -194,10 +221,12 @@ export const browserScreenshotTool: ToolDefinition = {
 
 export const browserCloseSessionTool: ToolDefinition = {
   name: "browser_close",
-  description: "Close the run's browser session. Sessions auto-close at run end; only call this if you need to free memory mid-run.",
+  description:
+    "Close the run's browser session. Sessions auto-close at run end; only call this if you need to free memory mid-run.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   side: "exec",
   effect: browserEffect("idempotent_mutation", "browser.close"),
+  authorization: browserAuthorization("CLOSE", "execute"),
   async handle(_input, ctx) {
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId" };

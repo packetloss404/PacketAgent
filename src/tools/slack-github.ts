@@ -1,3 +1,4 @@
+import { inputAuthorization, stringInput } from "./authorization.js";
 import type { ToolDefinition } from "./types.js";
 
 export type FetchImpl = (input: string | URL, init?: RequestInit) => Promise<Response>;
@@ -73,15 +74,23 @@ function redactUnknown(value: unknown, secrets: Array<string | undefined>): unkn
   if (Array.isArray(value)) return value.map((item) => redactUnknown(item, secrets));
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, nested]) => [key, redactUnknown(nested, secrets)]),
+    Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
+      key,
+      redactUnknown(nested, secrets),
+    ]),
   );
 }
 
 function truncate(text: string): string {
-  return text.length > MAX_RESPONSE_TEXT ? `${text.slice(0, MAX_RESPONSE_TEXT)}\n...[truncated]` : text;
+  return text.length > MAX_RESPONSE_TEXT
+    ? `${text.slice(0, MAX_RESPONSE_TEXT)}\n...[truncated]`
+    : text;
 }
 
-async function readResponseBody(response: Response, secrets: Array<string | undefined>): Promise<unknown> {
+async function readResponseBody(
+  response: Response,
+  secrets: Array<string | undefined>,
+): Promise<unknown> {
   const raw = await response.text();
   if (!raw) return "";
 
@@ -126,7 +135,11 @@ function parseWebhookUrl(value: string): URL | { error: string } {
   }
 }
 
-function githubUrl(apiBaseUrl: string, segments: string[], searchParams?: Record<string, string | undefined>): string {
+function githubUrl(
+  apiBaseUrl: string,
+  segments: string[],
+  searchParams?: Record<string, string | undefined>,
+): string {
   const url = new URL(apiBaseUrl);
   const basePath = url.pathname.replace(/\/+$/, "");
   const path = segments.map((segment) => encodeURIComponent(segment)).join("/");
@@ -138,15 +151,19 @@ function githubUrl(apiBaseUrl: string, segments: string[], searchParams?: Record
 }
 
 function githubIssueNumber(input: GithubApiInput): number | { error: string } {
-  if (input.issueNumber !== undefined) return requiredPositiveInteger(input.issueNumber, "issueNumber");
+  if (input.issueNumber !== undefined)
+    return requiredPositiveInteger(input.issueNumber, "issueNumber");
   return requiredPositiveInteger(input.pullNumber, "pullNumber or issueNumber");
 }
 
-export function createSlackPostWebhookTool(options: SlackPostWebhookOptions = {}): ToolDefinition<SlackPostWebhookInput> {
+export function createSlackPostWebhookTool(
+  options: SlackPostWebhookOptions = {},
+): ToolDefinition<SlackPostWebhookInput> {
   const fetchImpl = resolveFetch(options.fetchImpl);
   return {
     name: "slack_post_webhook",
-    description: "Post a message to Slack using an incoming webhook URL supplied by input or SLACK_WEBHOOK_URL.",
+    description:
+      "Post a message to Slack using an incoming webhook URL supplied by input or SLACK_WEBHOOK_URL.",
     inputSchema: {
       type: "object",
       properties: {
@@ -167,11 +184,20 @@ export function createSlackPostWebhookTool(options: SlackPostWebhookOptions = {}
         operation: "slack.webhook.post",
       }),
     },
+    authorization: inputAuthorization((input: SlackPostWebhookInput) => {
+      const channel = stringInput(input.channel).replace(/^#/, "");
+      return {
+        verb: "POST",
+        effect: "write",
+        resources: [channel ? `slack:channel/${channel}` : "slack:webhook"],
+      };
+    }),
     timeoutMs: 15_000,
     async handle(input, ctx) {
       const env = resolveEnv(options.env);
       const webhookUrl = valueOrEnv(input.webhookUrl, env, ["SLACK_WEBHOOK_URL"]);
-      if (!webhookUrl) return { ok: false, error: "webhookUrl is required or SLACK_WEBHOOK_URL must be set" };
+      if (!webhookUrl)
+        return { ok: false, error: "webhookUrl is required or SLACK_WEBHOOK_URL must be set" };
 
       const parsed = parseWebhookUrl(webhookUrl);
       if ("error" in parsed) return { ok: false, error: parsed.error };
@@ -198,7 +224,10 @@ export function createSlackPostWebhookTool(options: SlackPostWebhookOptions = {}
           return {
             ok: false,
             output,
-            error: redactText(`Slack webhook POST failed: HTTP ${response.status}${responseDetail(body)}`, [webhookUrl]),
+            error: redactText(
+              `Slack webhook POST failed: HTTP ${response.status}${responseDetail(body)}`,
+              [webhookUrl],
+            ),
           };
         }
         return { ok: true, output };
@@ -212,19 +241,25 @@ export function createSlackPostWebhookTool(options: SlackPostWebhookOptions = {}
   };
 }
 
-export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinition<GithubApiInput> {
+export function createGithubApiTool(
+  options: GithubApiOptions = {},
+): ToolDefinition<GithubApiInput> {
   const fetchImpl = resolveFetch(options.fetchImpl);
   const apiBaseUrl = options.apiBaseUrl ?? DEFAULT_GITHUB_API_BASE_URL;
   return {
     name: "github_api",
-    description: "Call selected GitHub REST API operations with a PAT from input, GITHUB_TOKEN, or GITHUB_PAT.",
+    description:
+      "Call selected GitHub REST API operations with a PAT from input, GITHUB_TOKEN, or GITHUB_PAT.",
     inputSchema: {
       type: "object",
       properties: {
         token: { type: "string" },
         owner: { type: "string", minLength: 1 },
         repo: { type: "string", minLength: 1 },
-        operation: { type: "string", enum: ["list_prs", "get_pr", "get_comments", "create_comment"] },
+        operation: {
+          type: "string",
+          enum: ["list_prs", "get_pr", "get_comments", "create_comment"],
+        },
         pullNumber: { type: "number", minimum: 1 },
         issueNumber: { type: "number", minimum: 1 },
         body: { type: "string", minLength: 1 },
@@ -243,11 +278,32 @@ export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinit
         operation: `github.${input.operation ?? "unknown"}`,
       }),
     },
+    authorization: inputAuthorization((input: GithubApiInput) => {
+      const operation = String(input.operation ?? "").toUpperCase();
+      const owner = stringInput(input.owner);
+      const repo = stringInput(input.repo);
+      const issueNumber = input.issueNumber ?? input.pullNumber;
+      const suffix =
+        input.operation === "list_prs"
+          ? "pulls"
+          : input.operation === "get_pr"
+            ? `pulls/${String(input.pullNumber ?? "")}`
+            : `issues/${String(issueNumber ?? "")}/comments`;
+      return {
+        verb: operation,
+        effect: input.operation === "create_comment" ? "write" : "read",
+        resources: [`github:${owner}/${repo}/${suffix}`],
+      };
+    }),
     timeoutMs: 20_000,
     async handle(input, ctx) {
       const env = resolveEnv(options.env);
       const token = valueOrEnv(input.token, env, ["GITHUB_TOKEN", "GITHUB_PAT"]);
-      if (!token) return { ok: false, error: "GitHub token is required via token, GITHUB_TOKEN, or GITHUB_PAT" };
+      if (!token)
+        return {
+          ok: false,
+          error: "GitHub token is required via token, GITHUB_TOKEN, or GITHUB_PAT",
+        };
 
       const owner = requiredString(input.owner, "owner");
       if (typeof owner !== "string") return { ok: false, error: owner.error };
@@ -255,8 +311,14 @@ export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinit
       if (typeof repo !== "string") return { ok: false, error: repo.error };
 
       const operation = input.operation;
-      if (!operation || !["list_prs", "get_pr", "get_comments", "create_comment"].includes(operation)) {
-        return { ok: false, error: "operation must be one of list_prs, get_pr, get_comments, create_comment" };
+      if (
+        !operation ||
+        !["list_prs", "get_pr", "get_comments", "create_comment"].includes(operation)
+      ) {
+        return {
+          ok: false,
+          error: "operation must be one of list_prs, get_pr, get_comments, create_comment",
+        };
       }
 
       let method = "GET";
@@ -265,7 +327,8 @@ export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinit
 
       if (operation === "list_prs") {
         const state = input.state ?? "open";
-        if (!["open", "closed", "all"].includes(state)) return { ok: false, error: "state must be open, closed, or all" };
+        if (!["open", "closed", "all"].includes(state))
+          return { ok: false, error: "state must be open, closed, or all" };
         url = githubUrl(apiBaseUrl, ["repos", owner, repo, "pulls"], { state });
       } else if (operation === "get_pr") {
         const pullNumber = requiredPositiveInteger(input.pullNumber, "pullNumber");
@@ -274,7 +337,14 @@ export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinit
       } else if (operation === "get_comments") {
         const issueNumber = githubIssueNumber(input);
         if (typeof issueNumber !== "number") return { ok: false, error: issueNumber.error };
-        url = githubUrl(apiBaseUrl, ["repos", owner, repo, "issues", String(issueNumber), "comments"]);
+        url = githubUrl(apiBaseUrl, [
+          "repos",
+          owner,
+          repo,
+          "issues",
+          String(issueNumber),
+          "comments",
+        ]);
       } else {
         const issueNumber = githubIssueNumber(input);
         if (typeof issueNumber !== "number") return { ok: false, error: issueNumber.error };
@@ -282,7 +352,14 @@ export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinit
         if (typeof body !== "string") return { ok: false, error: body.error };
         method = "POST";
         requestBody = JSON.stringify({ body });
-        url = githubUrl(apiBaseUrl, ["repos", owner, repo, "issues", String(issueNumber), "comments"]);
+        url = githubUrl(apiBaseUrl, [
+          "repos",
+          owner,
+          repo,
+          "issues",
+          String(issueNumber),
+          "comments",
+        ]);
       }
 
       try {
@@ -304,7 +381,10 @@ export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinit
           return {
             ok: false,
             output,
-            error: redactText(`GitHub API ${operation} failed: HTTP ${response.status}${responseDetail(body)}`, [token]),
+            error: redactText(
+              `GitHub API ${operation} failed: HTTP ${response.status}${responseDetail(body)}`,
+              [token],
+            ),
           };
         }
         return { ok: true, output };

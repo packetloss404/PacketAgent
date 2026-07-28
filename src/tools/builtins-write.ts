@@ -6,13 +6,11 @@ import {
   upsertWorkflowConcern,
   type ActivityRecord,
 } from "../packetagent-store.js";
+import { workspaceAuthorization } from "./authorization.js";
 import type { ToolDefinition } from "./types.js";
 
 function mutationEffect(
-  classification:
-    | "idempotent_mutation"
-    | "reconcilable_mutation"
-    | "non_replayable_mutation",
+  classification: "idempotent_mutation" | "reconcilable_mutation" | "non_replayable_mutation",
   operation: string,
 ) {
   return {
@@ -27,7 +25,12 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-async function recordToolActivity(workspaceId: string, userId: string, event: string, data: Record<string, string | number | boolean | null | undefined>): Promise<void> {
+async function recordToolActivity(
+  workspaceId: string,
+  userId: string,
+  event: string,
+  data: Record<string, string | number | boolean | null | undefined>,
+): Promise<void> {
   await mutateStoreAsync((store) => {
     const entry: ActivityRecord = {
       id: randomUUID(),
@@ -58,9 +61,18 @@ export const createPlanItemTool: ToolDefinition = {
   },
   side: "write",
   effect: mutationEffect("non_replayable_mutation", "plan_item.create"),
+  authorization: workspaceAuthorization("CREATE", "write"),
   async handle(input, ctx) {
-    const { title, description = "", status = "todo", requirementIds = [] } = input as {
-      title: string; description?: string; status?: "todo" | "in_progress" | "blocked" | "done"; requirementIds?: string[];
+    const {
+      title,
+      description = "",
+      status = "todo",
+      requirementIds = [],
+    } = input as {
+      title: string;
+      description?: string;
+      status?: "todo" | "in_progress" | "blocked" | "done";
+      requirementIds?: string[];
     };
     const created = await mutateStoreAsync((data) => {
       const existingMax = data.implementationPlanItems
@@ -75,7 +87,10 @@ export const createPlanItemTool: ToolDefinition = {
         order: existingMax + 1,
       });
     });
-    await recordToolActivity(ctx.workspaceId, ctx.userId, "tool.plan_item.created", { id: created.id, title: created.title });
+    await recordToolActivity(ctx.workspaceId, ctx.userId, "tool.plan_item.created", {
+      id: created.id,
+      title: created.title,
+    });
     return { ok: true, output: { planItem: created } };
   },
 };
@@ -94,24 +109,34 @@ export const updatePlanItemStatusTool: ToolDefinition = {
   },
   side: "write",
   effect: mutationEffect("idempotent_mutation", "plan_item.status.set"),
+  authorization: workspaceAuthorization("UPDATE", "write"),
   async handle(input, ctx) {
-    const { planItemId, status } = input as { planItemId: string; status: "todo" | "in_progress" | "blocked" | "done" };
+    const { planItemId, status } = input as {
+      planItemId: string;
+      status: "todo" | "in_progress" | "blocked" | "done";
+    };
     const updated = await mutateStoreAsync((data) => {
-      const entry = data.implementationPlanItems.find((p) => p.id === planItemId && p.workspaceId === ctx.workspaceId);
+      const entry = data.implementationPlanItems.find(
+        (p) => p.id === planItemId && p.workspaceId === ctx.workspaceId,
+      );
       if (!entry) return null;
       entry.status = status;
       entry.updatedAt = nowIso();
       return entry;
     });
     if (!updated) return { ok: false, error: `plan item ${planItemId} not found in workspace` };
-    await recordToolActivity(ctx.workspaceId, ctx.userId, "tool.plan_item.status_updated", { id: planItemId, status });
+    await recordToolActivity(ctx.workspaceId, ctx.userId, "tool.plan_item.status_updated", {
+      id: planItemId,
+      status,
+    });
     return { ok: true, output: { planItem: updated } };
   },
 };
 
 export const createBlockerTool: ToolDefinition = {
   name: "create_blocker",
-  description: "Open a new workflow blocker or question to capture a concern that needs resolution.",
+  description:
+    "Open a new workflow blocker or question to capture a concern that needs resolution.",
   inputSchema: {
     type: "object",
     properties: {
@@ -125,9 +150,18 @@ export const createBlockerTool: ToolDefinition = {
   },
   side: "write",
   effect: mutationEffect("non_replayable_mutation", "workflow_concern.create"),
+  authorization: workspaceAuthorization("CREATE", "write"),
   async handle(input, ctx) {
-    const { title, detail = "", kind = "blocker", severity = "medium" } = input as {
-      title: string; detail?: string; kind?: "blocker" | "open_question"; severity?: "low" | "medium" | "high" | "critical";
+    const {
+      title,
+      detail = "",
+      kind = "blocker",
+      severity = "medium",
+    } = input as {
+      title: string;
+      detail?: string;
+      kind?: "blocker" | "open_question";
+      severity?: "low" | "medium" | "high" | "critical";
     };
     const created = await mutateStoreAsync((data) =>
       upsertWorkflowConcern(data, {
@@ -139,7 +173,10 @@ export const createBlockerTool: ToolDefinition = {
         status: "open",
       }),
     );
-    await recordToolActivity(ctx.workspaceId, ctx.userId, `tool.${kind}.opened`, { id: created.id, title: created.title });
+    await recordToolActivity(ctx.workspaceId, ctx.userId, `tool.${kind}.opened`, {
+      id: created.id,
+      title: created.title,
+    });
     return { ok: true, output: { concern: created } };
   },
 };
@@ -158,9 +195,13 @@ export const logNoteTool: ToolDefinition = {
   },
   side: "write",
   effect: mutationEffect("non_replayable_mutation", "activity_note.append"),
+  authorization: workspaceAuthorization("APPEND", "write"),
   async handle(input, ctx) {
     const { title, body = "" } = input as { title: string; body?: string };
-    await recordToolActivity(ctx.workspaceId, ctx.userId, "tool.note", { title: title.trim(), body });
+    await recordToolActivity(ctx.workspaceId, ctx.userId, "tool.note", {
+      title: title.trim(),
+      body,
+    });
     return { ok: true, output: { note: { title: title.trim(), body } } };
   },
 };

@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve as resolvePath } from "node:path";
 import type { Readable } from "node:stream";
+import { pathToFileURL } from "node:url";
+import { inputAuthorization, stringInput } from "./authorization.js";
 import type { ToolContext, ToolDefinition, ToolResult } from "./types.js";
 
 type AgentChildProcess = ChildProcessByStdio<null, Readable, Readable>;
@@ -103,14 +105,26 @@ const NPM_NETWORK_SUBCOMMANDS = new Set([
   "x",
 ]);
 
-export function createShellForAgentTool(options: ShellForAgentToolOptions = {}): ToolDefinition<ShellForAgentInput> {
+export function createShellForAgentTool(
+  options: ShellForAgentToolOptions = {},
+): ToolDefinition<ShellForAgentInput> {
   const projectRoot = resolvePath(options.projectRoot ?? process.cwd());
-  const artifactRoot = resolvePath(options.artifactRoot ?? resolvePath(projectRoot, "data", "artifacts"));
+  const artifactRoot = resolvePath(
+    options.artifactRoot ?? resolvePath(projectRoot, "data", "artifacts"),
+  );
   const cwdRoots = uniqueResolved([projectRoot, artifactRoot, ...(options.cwdRoots ?? [])]);
   const allowedCommands = new Set(options.allowedCommands ?? DEFAULT_ALLOWED_COMMANDS);
   const maxTimeoutMs = clampInteger(options.maxTimeoutMs ?? MAX_TIMEOUT_MS, 1, 24 * 60 * 60 * 1000);
-  const defaultTimeoutMs = clampInteger(options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS, 1, maxTimeoutMs);
-  const maxOutputBytes = clampInteger(options.maxOutputBytes ?? MAX_OUTPUT_BYTES, 1024, 1024 * 1024);
+  const defaultTimeoutMs = clampInteger(
+    options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS,
+    1,
+    maxTimeoutMs,
+  );
+  const maxOutputBytes = clampInteger(
+    options.maxOutputBytes ?? MAX_OUTPUT_BYTES,
+    1024,
+    1024 * 1024,
+  );
   const spawnImpl = options.spawnImpl ?? spawn;
   const allowNetworkSubcommands = options.allowNetworkSubcommands === true;
 
@@ -124,7 +138,8 @@ export function createShellForAgentTool(options: ShellForAgentToolOptions = {}):
       properties: {
         command: {
           type: "string",
-          description: "Allowed executable name to run directly. Shell syntax, pipes, and path separators are not accepted.",
+          description:
+            "Allowed executable name to run directly. Shell syntax, pipes, and path separators are not accepted.",
         },
         args: {
           type: "array",
@@ -153,6 +168,25 @@ export function createShellForAgentTool(options: ShellForAgentToolOptions = {}):
         operation: "shell.command.execute",
       }),
     },
+    authorization: inputAuthorization((input: ShellForAgentInput, context) => {
+      const requestedCwd = stringInput(input.cwd);
+      const defaultCwd = resolvePath(
+        context.artifactDir ? resolvePath(projectRoot, context.artifactDir) : artifactRoot,
+        "agents",
+        safeAgentPathSegment(context.agentId ?? context.worker?.run.id ?? "missing-agent"),
+        "work",
+      );
+      const cwd = requestedCwd
+        ? isAbsolute(requestedCwd)
+          ? resolvePath(requestedCwd)
+          : resolvePath(projectRoot, requestedCwd)
+        : defaultCwd;
+      return {
+        verb: "EXECUTE",
+        effect: "execute",
+        resources: [`command:${stringInput(input.command)}`, pathToFileURL(cwd).toString()],
+      };
+    }),
     timeoutMs: maxTimeoutMs + FORCE_KILL_GRACE_MS + 1_000,
     async handle(input, ctx) {
       const normalized = normalizeInput(input, maxTimeoutMs, defaultTimeoutMs);
@@ -167,8 +201,12 @@ export function createShellForAgentTool(options: ShellForAgentToolOptions = {}):
       const policyError = allowNetworkSubcommands ? null : networkSubcommandError(command, args);
       if (policyError) return { ok: false, error: policyError };
 
-      const scopedArtifactRoot = ctx.artifactDir ? resolvePath(projectRoot, ctx.artifactDir) : artifactRoot;
-      const scopedCwdRoots = ctx.artifactDir ? uniqueResolved([...cwdRoots, scopedArtifactRoot]) : cwdRoots;
+      const scopedArtifactRoot = ctx.artifactDir
+        ? resolvePath(projectRoot, ctx.artifactDir)
+        : artifactRoot;
+      const scopedCwdRoots = ctx.artifactDir
+        ? uniqueResolved([...cwdRoots, scopedArtifactRoot])
+        : cwdRoots;
       const cwdResult = resolveScopedCwd({
         requestedCwd: normalized.value.cwd,
         projectRoot,
@@ -197,7 +235,14 @@ function normalizeInput(
   input: ShellForAgentInput,
   maxTimeoutMs: number,
   defaultTimeoutMs: number,
-): { ok: true; value: Required<Pick<ShellForAgentInput, "command" | "args" | "timeoutMs">> & { cwd?: string } } | { ok: false; error: string } {
+):
+  | {
+      ok: true;
+      value: Required<Pick<ShellForAgentInput, "command" | "args" | "timeoutMs">> & {
+        cwd?: string;
+      };
+    }
+  | { ok: false; error: string } {
   if (!input || typeof input !== "object") return { ok: false, error: "input must be an object" };
   const candidate = input as Partial<ShellForAgentInput>;
   if (typeof candidate.command !== "string" || candidate.command.trim().length === 0) {
@@ -216,7 +261,10 @@ function normalizeInput(
     return { ok: false, error: "args must not contain null bytes" };
   }
 
-  if (candidate.cwd !== undefined && (typeof candidate.cwd !== "string" || candidate.cwd.includes("\0"))) {
+  if (
+    candidate.cwd !== undefined &&
+    (typeof candidate.cwd !== "string" || candidate.cwd.includes("\0"))
+  ) {
     return { ok: false, error: "cwd must be a string without null bytes" };
   }
 
@@ -243,10 +291,17 @@ function resolveScopedCwd(params: {
   cwdRoots: readonly string[];
   agentId: string;
 }): { ok: true; cwd: string } | { ok: false; error: string } {
-  const defaultCwd = resolvePath(params.artifactRoot, "agents", safeAgentPathSegment(params.agentId), "work");
+  const defaultCwd = resolvePath(
+    params.artifactRoot,
+    "agents",
+    safeAgentPathSegment(params.agentId),
+    "work",
+  );
   const requested = params.requestedCwd;
   const candidate = requested
-    ? (isAbsolute(requested) ? resolvePath(requested) : resolvePath(params.projectRoot, requested))
+    ? isAbsolute(requested)
+      ? resolvePath(requested)
+      : resolvePath(params.projectRoot, requested)
     : defaultCwd;
 
   if (!isInsideAny(params.cwdRoots, candidate)) {
@@ -259,13 +314,17 @@ function resolveScopedCwd(params: {
     try {
       mkdirSync(candidate, { recursive: true });
     } catch (error) {
-      return { ok: false, error: `cwd "${candidate}" could not be created: ${(error as Error).message}` };
+      return {
+        ok: false,
+        error: `cwd "${candidate}" could not be created: ${(error as Error).message}`,
+      };
     }
   }
 
   let realCandidate: string;
   try {
-    if (!statSync(candidate).isDirectory()) return { ok: false, error: `cwd "${candidate}" is not a directory` };
+    if (!statSync(candidate).isDirectory())
+      return { ok: false, error: `cwd "${candidate}" is not a directory` };
     realCandidate = realpathSync.native(candidate);
   } catch (error) {
     return { ok: false, error: `cwd check failed: ${(error as Error).message}` };
@@ -273,7 +332,10 @@ function resolveScopedCwd(params: {
 
   const realRoots = params.cwdRoots.map(realpathOrResolved);
   if (!isInsideAny(realRoots, realCandidate)) {
-    return { ok: false, error: `cwd "${candidate}" resolves outside the shell_for_agent cwd scope` };
+    return {
+      ok: false,
+      error: `cwd "${candidate}" resolves outside the shell_for_agent cwd scope`,
+    };
   }
 
   return { ok: true, cwd: realCandidate };
@@ -415,7 +477,10 @@ function runDirectCommand(params: {
   });
 }
 
-function createBoundedTextBuffer(limit: number, streamName: "stdout" | "stderr"): BoundedTextBuffer {
+function createBoundedTextBuffer(
+  limit: number,
+  streamName: "stdout" | "stderr",
+): BoundedTextBuffer {
   let value = "";
   let bytes = 0;
   let truncated = false;
@@ -453,13 +518,19 @@ function scrubbedEnv(): NodeJS.ProcessEnv {
 
 function networkSubcommandError(command: string, args: readonly string[]): string | null {
   if (command === "git") {
-    const subcommand = firstSubcommand(args, new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"]));
+    const subcommand = firstSubcommand(
+      args,
+      new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"]),
+    );
     if (subcommand && GIT_NETWORK_SUBCOMMANDS.has(subcommand)) {
       return `git subcommand "${subcommand}" is not allowed for shell_for_agent`;
     }
   }
   if (command === "npm") {
-    const subcommand = firstSubcommand(args, new Set(["--cache", "--prefix", "--userconfig", "--workspace", "-w"]));
+    const subcommand = firstSubcommand(
+      args,
+      new Set(["--cache", "--prefix", "--userconfig", "--workspace", "-w"]),
+    );
     if (subcommand && NPM_NETWORK_SUBCOMMANDS.has(subcommand)) {
       return `npm subcommand "${subcommand}" is not allowed for shell_for_agent`;
     }
@@ -467,7 +538,10 @@ function networkSubcommandError(command: string, args: readonly string[]): strin
   return null;
 }
 
-function firstSubcommand(args: readonly string[], optionsWithValues: ReadonlySet<string>): string | null {
+function firstSubcommand(
+  args: readonly string[],
+  optionsWithValues: ReadonlySet<string>,
+): string | null {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]!;
     if (arg === "--") return args[index + 1]?.toLowerCase() ?? null;
@@ -483,7 +557,10 @@ function firstSubcommand(args: readonly string[], optionsWithValues: ReadonlySet
 }
 
 function safeAgentPathSegment(agentId: string): string {
-  const cleaned = agentId.replace(/[^A-Za-z0-9_.-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
+  const cleaned = agentId
+    .replace(/[^A-Za-z0-9_.-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 64);
   const hash = createHash("sha256").update(agentId).digest("hex").slice(0, 12);
   return cleaned ? `${cleaned}-${hash}` : `agent-${hash}`;
 }

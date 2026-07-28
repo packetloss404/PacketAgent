@@ -5,6 +5,7 @@ import {
   listImplementationPlanItemsForWorkspace,
   listWorkflowConcernsForWorkspace,
 } from "../packetagent-store.js";
+import { inputAuthorization, workspaceAuthorization } from "./authorization.js";
 import type { ToolDefinition } from "./types.js";
 
 function readOnlyEffect(operation: string) {
@@ -18,10 +19,12 @@ function readOnlyEffect(operation: string) {
 
 export const readWorkflowBriefTool: ToolDefinition = {
   name: "read_workflow_brief",
-  description: "Read the current workspace brief: summary, problem statement, desired outcome, customers, metrics, goals, constraints.",
+  description:
+    "Read the current workspace brief: summary, problem statement, desired outcome, customers, metrics, goals, constraints.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   side: "read",
   effect: readOnlyEffect("workflow_brief.read"),
+  authorization: workspaceAuthorization("READ", "read"),
   async handle(_input, ctx) {
     const data = await loadStoreAsync();
     const brief = findWorkspaceBrief(data, ctx.workspaceId);
@@ -42,8 +45,9 @@ export const listRequirementsTool: ToolDefinition = {
   },
   side: "read",
   effect: readOnlyEffect("requirements.list"),
+  authorization: workspaceAuthorization("LIST", "read"),
   async handle(input, ctx) {
-    const { priority, status } = (input as { priority?: string; status?: string });
+    const { priority, status } = input as { priority?: string; status?: string };
     const data = await loadStoreAsync();
     let entries = listRequirementsForWorkspace(data, ctx.workspaceId);
     if (priority) entries = entries.filter((r) => r.priority === priority);
@@ -62,8 +66,9 @@ export const listPlanItemsTool: ToolDefinition = {
   },
   side: "read",
   effect: readOnlyEffect("plan_items.list"),
+  authorization: workspaceAuthorization("LIST", "read"),
   async handle(input, ctx) {
-    const { status } = (input as { status?: string });
+    const { status } = input as { status?: string };
     const data = await loadStoreAsync();
     let entries = listImplementationPlanItemsForWorkspace(data, ctx.workspaceId);
     if (status) entries = entries.filter((p) => p.status === status);
@@ -76,13 +81,17 @@ export const listBlockersTool: ToolDefinition = {
   description: "List workflow blockers and questions, optionally filtered by status.",
   inputSchema: {
     type: "object",
-    properties: { kind: { type: "string", enum: ["blocker", "question"] }, status: { type: "string" } },
+    properties: {
+      kind: { type: "string", enum: ["blocker", "question"] },
+      status: { type: "string" },
+    },
     additionalProperties: false,
   },
   side: "read",
   effect: readOnlyEffect("workflow_concerns.list"),
+  authorization: workspaceAuthorization("LIST", "read"),
   async handle(input, ctx) {
-    const { kind, status } = (input as { kind?: string; status?: string });
+    const { kind, status } = input as { kind?: string; status?: string };
     const data = await loadStoreAsync();
     let entries = listWorkflowConcernsForWorkspace(data, ctx.workspaceId);
     if (kind) entries = entries.filter((c) => c.kind === kind);
@@ -97,6 +106,7 @@ export const listAgentsTool: ToolDefinition = {
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   side: "read",
   effect: readOnlyEffect("agents.list"),
+  authorization: workspaceAuthorization("LIST", "read"),
   async handle(_input, ctx) {
     const data = await loadStoreAsync();
     const agents = data.agents
@@ -128,11 +138,16 @@ export const listRecentRunsTool: ToolDefinition = {
   },
   side: "read",
   effect: readOnlyEffect("agent_runs.list"),
+  authorization: workspaceAuthorization("LIST", "read"),
   async handle(input, ctx) {
-    const { limit = 10, status } = (input as { limit?: number; status?: string });
+    const { limit = 10, status } = input as { limit?: number; status?: string };
     const data = await loadStoreAsync();
-    const workspaceAgents = new Set(data.agents.filter((a) => a.workspaceId === ctx.workspaceId).map((a) => a.id));
-    let runs = data.agentRuns.filter((r) => r.agentId !== undefined && workspaceAgents.has(r.agentId));
+    const workspaceAgents = new Set(
+      data.agents.filter((a) => a.workspaceId === ctx.workspaceId).map((a) => a.id),
+    );
+    let runs = data.agentRuns.filter(
+      (r) => r.agentId !== undefined && workspaceAgents.has(r.agentId),
+    );
     if (status) runs = runs.filter((r) => r.status === status);
     runs = runs.slice().reverse().slice(0, limit);
     return {
@@ -144,7 +159,10 @@ export const listRecentRunsTool: ToolDefinition = {
           title: r.title,
           status: r.status,
           createdAt: r.createdAt,
-          durationMs: r.startedAt && r.completedAt ? new Date(r.completedAt).getTime() - new Date(r.startedAt).getTime() : null,
+          durationMs:
+            r.startedAt && r.completedAt
+              ? new Date(r.completedAt).getTime() - new Date(r.startedAt).getTime()
+              : null,
         })),
       },
     };
@@ -153,7 +171,8 @@ export const listRecentRunsTool: ToolDefinition = {
 
 export const httpGetTool: ToolDefinition = {
   name: "http_get",
-  description: "Fetch a URL with GET. Returns status, headers, and (truncated) body. Only http(s) is allowed.",
+  description:
+    "Fetch a URL with GET. Returns status, headers, and (truncated) body. Only http(s) is allowed.",
   inputSchema: {
     type: "object",
     properties: { url: { type: "string", format: "uri" } },
@@ -162,12 +181,20 @@ export const httpGetTool: ToolDefinition = {
   },
   side: "read",
   effect: readOnlyEffect("http.get"),
+  authorization: inputAuthorization((input: { url?: unknown }) => ({
+    verb: "GET",
+    effect: "read",
+    resources: [typeof input.url === "string" ? input.url : ""],
+  })),
   timeoutMs: 15_000,
   async handle(input, ctx) {
     const { url } = input as { url: string };
     let parsed: URL;
-    try { parsed = new URL(url); }
-    catch { return { ok: false, error: `invalid url: ${url}` }; }
+    try {
+      parsed = new URL(url);
+    } catch {
+      return { ok: false, error: `invalid url: ${url}` };
+    }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return { ok: false, error: `protocol ${parsed.protocol} not allowed; must be http or https` };
     }

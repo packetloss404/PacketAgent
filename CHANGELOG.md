@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Immediate Worker tool policy enforcement (W6.2)
+
+- Extended Worker tool context with pinned run, deployment, version, capability, budget, effect, and actor data.
+- Added normalized authorization operations for every production-registered tool, covering HTTP method/URL, GitHub verb/resource, SQL mode/database, workspace and browser targets, Slack destinations, email recipients, executable names, and working-directory paths.
+- Added a fail-closed policy evaluator that verifies the compiled-policy schema, version digest, policy digest, approval requirement, verb, effect, capability, and every concrete resource.
+- Worker adapters now preflight policy before mutation receipt preparation, while `executeTool` independently re-authorizes and persists a redacted allow/deny decision immediately before the handler.
+- Default tool registration now rejects missing authorization descriptors and tests assert exact parity between the production catalog and the Worker capability schema.
+- Added executor, adapter, supervisor, normalization, stale/tampered-policy, undeclared-resource, event-redaction, and production-catalog coverage; the W6.2 baseline passes 1,360 API tests and 25 web tests.
+
 ### 2026-07-27 - Compiled Worker capability policy (W6.1)
 
 - Added a pure capability compiler that expands validated Worker requests into deterministic tool, verb, resource, effect, and approval tuples tied to the immutable version content digest.

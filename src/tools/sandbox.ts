@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, existsSync, statSync, writeFileSync } from "node:fs";
 import { resolve as resolvePath, dirname, isAbsolute } from "node:path";
+import { pathToFileURL } from "node:url";
+import { inputAuthorization, stringInput } from "./authorization.js";
 import type { ToolDefinition } from "./types.js";
 
 const PROJECT_ROOT = process.cwd();
@@ -55,7 +57,10 @@ export function createSandboxedShellTool(options: SandboxOptions = {}): ToolDefi
       properties: {
         command: { type: "string", description: "Binary to run (no shell, no pipes)." },
         args: { type: "array", items: { type: "string" }, default: [] },
-        cwd: { type: "string", description: "Working directory (absolute or relative to project root)." },
+        cwd: {
+          type: "string",
+          description: "Working directory (absolute or relative to project root).",
+        },
       },
       required: ["command"],
       additionalProperties: false,
@@ -67,22 +72,51 @@ export function createSandboxedShellTool(options: SandboxOptions = {}): ToolDefi
         operation: "sandbox.command.execute",
       }),
     },
+    authorization: inputAuthorization((input: Record<string, unknown>, context) => {
+      const requestedCwd = stringInput(input.cwd);
+      const cwd = requestedCwd
+        ? isAbsolute(requestedCwd)
+          ? resolvePath(requestedCwd)
+          : resolvePath(PROJECT_ROOT, requestedCwd)
+        : context.runId
+          ? resolvePath(ARTIFACT_ROOT, context.runId)
+          : PROJECT_ROOT;
+      return {
+        verb: "EXECUTE",
+        effect: "execute",
+        resources: [`command:${stringInput(input.command)}`, pathToFileURL(cwd).toString()],
+      };
+    }),
     timeoutMs: timeoutMs + 1_000,
     async handle(input, ctx) {
-      const { command, args = [], cwd } = input as { command: string; args?: string[]; cwd?: string };
+      const {
+        command,
+        args = [],
+        cwd,
+      } = input as { command: string; args?: string[]; cwd?: string };
       if (!allowed.has(command)) {
         return { ok: false, error: `command "${command}" is not in the sandbox allowlist` };
       }
       const resolvedCwd = cwd
-        ? (isAbsolute(cwd) ? cwd : resolvePath(PROJECT_ROOT, cwd))
-        : (ctx.runId ? ensureArtifactDir(ctx.runId) : PROJECT_ROOT);
+        ? isAbsolute(cwd)
+          ? cwd
+          : resolvePath(PROJECT_ROOT, cwd)
+        : ctx.runId
+          ? ensureArtifactDir(ctx.runId)
+          : PROJECT_ROOT;
 
       if (!cwdAllow.some((root) => isPathInside(root, resolvedCwd))) {
         return { ok: false, error: `cwd "${resolvedCwd}" is not inside the sandbox allowlist` };
       }
       if (!existsSync(resolvedCwd)) {
-        try { mkdirSync(resolvedCwd, { recursive: true }); }
-        catch { return { ok: false, error: `cwd "${resolvedCwd}" does not exist and could not be created` }; }
+        try {
+          mkdirSync(resolvedCwd, { recursive: true });
+        } catch {
+          return {
+            ok: false,
+            error: `cwd "${resolvedCwd}" does not exist and could not be created`,
+          };
+        }
       }
       try {
         if (!statSync(resolvedCwd).isDirectory()) {
@@ -108,13 +142,21 @@ export function createSandboxedShellTool(options: SandboxOptions = {}): ToolDefi
 
         const onAbort = () => {
           killed = true;
-          try { child.kill("SIGTERM"); } catch { /* ignore */ }
+          try {
+            child.kill("SIGTERM");
+          } catch {
+            /* ignore */
+          }
         };
         ctx.signal.addEventListener("abort", onAbort, { once: true });
 
         const timer = setTimeout(() => {
           killed = true;
-          try { child.kill("SIGTERM"); } catch { /* ignore */ }
+          try {
+            child.kill("SIGTERM");
+          } catch {
+            /* ignore */
+          }
         }, timeoutMs);
 
         child.stdout?.on("data", (chunk: Buffer) => {
@@ -139,8 +181,14 @@ export function createSandboxedShellTool(options: SandboxOptions = {}): ToolDefi
             cwd: resolvedCwd,
             exitCode: code,
             signal,
-            stdout: stdoutBytes > MAX_OUTPUT_BYTES ? stdout + `\n…[stdout truncated at ${MAX_OUTPUT_BYTES} bytes]` : stdout,
-            stderr: stderrBytes > MAX_OUTPUT_BYTES ? stderr + `\n…[stderr truncated at ${MAX_OUTPUT_BYTES} bytes]` : stderr,
+            stdout:
+              stdoutBytes > MAX_OUTPUT_BYTES
+                ? stdout + `\n…[stdout truncated at ${MAX_OUTPUT_BYTES} bytes]`
+                : stdout,
+            stderr:
+              stderrBytes > MAX_OUTPUT_BYTES
+                ? stderr + `\n…[stderr truncated at ${MAX_OUTPUT_BYTES} bytes]`
+                : stderr,
             killed,
           };
           if (killed) {
@@ -156,7 +204,11 @@ export function createSandboxedShellTool(options: SandboxOptions = {}): ToolDefi
   };
 }
 
-export function writeArtifact(runId: string, name: string, contents: string | Buffer): { path: string; bytes: number } {
+export function writeArtifact(
+  runId: string,
+  name: string,
+  contents: string | Buffer,
+): { path: string; bytes: number } {
   const dir = ensureArtifactDir(runId);
   const path = resolvePath(dir, name);
   if (!isPathInside(dir, path)) throw new Error(`artifact path ${name} escapes runId dir`);

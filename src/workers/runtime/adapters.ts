@@ -1,7 +1,7 @@
 import { recordedCall } from "../../providers/ledger.js";
 import { getDefaultRouter, type ProviderRouter } from "../../providers/router.js";
 import type { ProviderName, ProviderToolDef } from "../../providers/types.js";
-import { executeTool } from "../../tools/executor.js";
+import { executeTool, preflightWorkerToolPolicy } from "../../tools/executor.js";
 import { getDefaultToolRegistry, type ToolRegistry } from "../../tools/registry.js";
 import type { ToolContext, ToolDefinition, ToolResult } from "../../tools/types.js";
 import type { JsonObject, JsonValue } from "../types.js";
@@ -99,18 +99,6 @@ export function createWorkerToolPort(
       return definitions;
     },
     async execute(input) {
-      if (input.capability.tool !== input.call.name || input.capability.approval !== "never") {
-        const timestamp = new Date().toISOString();
-        return {
-          callId: input.call.id,
-          toolName: input.call.name,
-          status: "error",
-          error: `tool "${input.call.name}" is not permitted for unattended Worker execution`,
-          durationMs: 0,
-          startedAt: timestamp,
-          completedAt: timestamp,
-        };
-      }
       const tool = registry.get(input.call.name);
       if (!tool) {
         const timestamp = new Date().toISOString();
@@ -125,54 +113,71 @@ export function createWorkerToolPort(
         };
       }
       const descriptor = describeToolEffect(tool, input.call.input);
-      if (!capabilityAllowsEffect(input.capability.effect, tool.side, descriptor.classification)) {
-        const timestamp = new Date().toISOString();
-        return {
-          callId: input.call.id,
-          toolName: input.call.name,
-          status: "error",
-          error: `tool "${input.call.name}" requested an effect outside capability "${input.capability.id}"`,
-          durationMs: 0,
-          startedAt: timestamp,
-          completedAt: timestamp,
-        };
-      }
       const baseContext: Omit<ToolContext, "signal"> = {
         workspaceId: input.workspaceId,
         userId: "packetagent.worker-supervisor",
         runId: input.workerRunId,
+        agentId: input.workerDefinitionId,
+        worker: {
+          run: { id: input.workerRunId },
+          deployment: {
+            id: input.workerDeploymentId,
+            revision: input.workerDeploymentRevision,
+            ...(input.compiledPolicy ? { compiledPolicy: input.compiledPolicy } : {}),
+          },
+          version: {
+            id: input.workerVersionId,
+            contentDigest: input.workerVersionContentDigest,
+          },
+          budget: input.budgetUsage,
+          actor: input.actor,
+          recordPolicyDecision: input.recordPolicyDecision,
+        },
+      };
+      const preflightContext: ToolContext = { ...baseContext, signal: input.signal };
+      const preflight = preflightWorkerToolPolicy({
+        tool,
+        toolInput: { ...input.call.input },
+        context: preflightContext,
+      });
+      if (!preflight?.decision.allowed || !preflight.decision.capabilityId) {
+        const denied = await executeTool({
+          tool,
+          input: { ...input.call.input },
+          context: preflightContext,
+        });
+        return runtimeResultFromToolCallRecord(input.call.id, denied);
+      }
+      const authorizedContext: Omit<ToolContext, "signal"> = {
+        ...baseContext,
+        worker: {
+          ...baseContext.worker!,
+          capability: { id: preflight.decision.capabilityId },
+          effect: {
+            classification: descriptor.classification,
+            operation: descriptor.operation,
+            effect: preflight.operation!.effect,
+          },
+        },
       };
       const execute = async (effectKey?: string): Promise<WorkerRuntimeToolResult> => {
         const record = await executeTool({
           tool,
           input: { ...input.call.input },
           context: {
-            ...baseContext,
+            ...authorizedContext,
             ...(effectKey ? { effectKey } : {}),
             signal: input.signal,
           },
         });
-        const output = jsonValue(record.output);
-        return {
-          callId: input.call.id,
-          toolName: record.toolName,
-          status: record.status,
-          ...(output !== undefined ? { output } : {}),
-          ...(record.error ? { error: record.error } : {}),
-          ...(record.artifacts
-            ? { artifactRefs: record.artifacts.map((artifact) => artifact.path) }
-            : {}),
-          durationMs: record.durationMs,
-          startedAt: record.startedAt,
-          completedAt: record.completedAt,
-        };
+        return runtimeResultFromToolCallRecord(input.call.id, record);
       };
       const reconcile = tool.effect?.reconcile
         ? async (effectKey: string) => {
             const reconciled = await tool.effect!.reconcile!(
               { ...input.call.input },
               {
-                ...baseContext,
+                ...authorizedContext,
                 effectKey,
                 signal: input.signal,
               },
@@ -191,7 +196,7 @@ export function createWorkerToolPort(
         workerDeploymentId: input.workerDeploymentId,
         fencingToken: input.fencingToken,
         iteration: input.iteration,
-        capabilityId: input.capability.id,
+        capabilityId: preflight.decision.capabilityId,
         call: input.call,
         classification: descriptor.classification,
         operation: descriptor.operation,
@@ -314,16 +319,22 @@ function runtimeResultFromToolResult(
   };
 }
 
-function capabilityAllowsEffect(
-  capabilityEffect: "read" | "write" | "execute",
-  toolSide: "read" | "write" | "exec",
-  classification:
-    | "read_only"
-    | "idempotent_mutation"
-    | "reconcilable_mutation"
-    | "non_replayable_mutation",
-): boolean {
-  if (classification === "read_only") return capabilityEffect === "read";
-  if (toolSide === "exec") return capabilityEffect === "execute";
-  return capabilityEffect === "write";
+function runtimeResultFromToolCallRecord(
+  callId: string,
+  record: Awaited<ReturnType<typeof executeTool>>,
+): WorkerRuntimeToolResult {
+  const output = jsonValue(record.output);
+  return {
+    callId,
+    toolName: record.toolName,
+    status: record.status,
+    ...(output !== undefined ? { output } : {}),
+    ...(record.error ? { error: record.error } : {}),
+    ...(record.artifacts
+      ? { artifactRefs: record.artifacts.map((artifact) => artifact.path) }
+      : {}),
+    durationMs: record.durationMs,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
+  };
 }

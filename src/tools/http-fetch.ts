@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { inputAuthorization } from "./authorization.js";
 import type { ToolDefinition } from "./types.js";
 
 const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
@@ -23,12 +24,10 @@ const SAFE_RESPONSE_HEADERS = [
   "x-request-id",
 ] as const;
 
-const METADATA_HOSTS = new Set([
-  "metadata",
-  "metadata.google.internal",
-]);
+const METADATA_HOSTS = new Set(["metadata", "metadata.google.internal"]);
 
-const SENSITIVE_HEADER_NAME_PATTERN = /(^|[-_])(authorization|cookie|credential|key|password|secret|session|token)([-_]|$)|proxy-authorization/i;
+const SENSITIVE_HEADER_NAME_PATTERN =
+  /(^|[-_])(authorization|cookie|credential|key|password|secret|session|token)([-_]|$)|proxy-authorization/i;
 
 export type HttpFetchMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -57,17 +56,18 @@ interface NormalizedRequest {
   sensitiveHeaderValues: string[];
 }
 
-type NormalizeResult =
-  | { ok: true; request: NormalizedRequest }
-  | { ok: false; error: string };
+type NormalizeResult = { ok: true; request: NormalizedRequest } | { ok: false; error: string };
 
-export function createHttpFetchTool(options: CreateHttpFetchToolOptions = {}): ToolDefinition<HttpFetchInput> {
+export function createHttpFetchTool(
+  options: CreateHttpFetchToolOptions = {},
+): ToolDefinition<HttpFetchInput> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const maxBodyChars = options.maxBodyChars ?? DEFAULT_MAX_BODY_CHARS;
 
   return {
     name: "http_fetch",
-    description: "Fetch an http(s) URL with GET, POST, PUT, PATCH, or DELETE and return a safe, truncated response summary.",
+    description:
+      "Fetch an http(s) URL with GET, POST, PUT, PATCH, or DELETE and return a safe, truncated response summary.",
     inputSchema: {
       type: "object",
       properties: {
@@ -120,17 +120,21 @@ export function createHttpFetchTool(options: CreateHttpFetchToolOptions = {}): T
         };
       },
     },
+    authorization: inputAuthorization((input: HttpFetchInput) => {
+      const method = String(input.method ?? "GET").toUpperCase();
+      return {
+        verb: method,
+        effect: method === "GET" ? "read" : "write",
+        resources: [typeof input.url === "string" ? input.url : ""],
+      };
+    }),
     timeoutMs: 15_000,
     async handle(input, ctx) {
       const normalized = normalizeRequest(input);
       if (!normalized.ok) return { ok: false, error: normalized.error };
 
       const request = normalized.request;
-      if (
-        ctx.effectKey &&
-        request.method !== "GET" &&
-        !request.headers.has("idempotency-key")
-      ) {
+      if (ctx.effectKey && request.method !== "GET" && !request.headers.has("idempotency-key")) {
         request.headers.set("idempotency-key", ctx.effectKey);
       }
       let response: Response;
@@ -286,11 +290,7 @@ function validateUrl(parsed: URL): string | null {
 }
 
 function normalizeHost(hostname: string): string {
-  return hostname
-    .toLowerCase()
-    .replace(/^\[/, "")
-    .replace(/\]$/, "")
-    .replace(/\.$/, "");
+  return hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "").replace(/\.$/, "");
 }
 
 function isBlockedHostname(host: string): boolean {
@@ -305,7 +305,10 @@ function isBlockedHostname(host: string): boolean {
 
 function isBlockedIPv4(address: string): boolean {
   const octets = address.split(".").map((part) => Number(part));
-  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+  if (
+    octets.length !== 4 ||
+    octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+  ) {
     return true;
   }
 
@@ -332,17 +335,15 @@ function isBlockedIPv6(address: string): boolean {
   const isUniqueLocal = (first & 0xfe00) === 0xfc00;
   const isLinkLocal = (first & 0xffc0) === 0xfe80;
   const isIPv4Mapped = hextets.slice(0, 5).every((part) => part === 0) && hextets[5] === 0xffff;
-  const isIPv4Compatible = hextets.slice(0, 6).every((part) => part === 0) && !isUnspecified && !isLoopback;
+  const isIPv4Compatible =
+    hextets.slice(0, 6).every((part) => part === 0) && !isUnspecified && !isLoopback;
 
   if (isUnspecified || isLoopback || isUniqueLocal || isLinkLocal) return true;
 
   if (isIPv4Mapped || isIPv4Compatible) {
-    const mapped = [
-      hextets[6] >> 8,
-      hextets[6] & 0xff,
-      hextets[7] >> 8,
-      hextets[7] & 0xff,
-    ].join(".");
+    const mapped = [hextets[6] >> 8, hextets[6] & 0xff, hextets[7] >> 8, hextets[7] & 0xff].join(
+      ".",
+    );
     return isBlockedIPv4(mapped);
   }
 
@@ -397,7 +398,9 @@ function appendQuery(parsed: URL, query: HttpFetchInput["query"]): string | null
   return null;
 }
 
-function normalizeHeaders(headersInput: HttpFetchInput["headers"]): { ok: true; headers: Headers; sensitiveHeaderValues: string[] } | { ok: false; error: string } {
+function normalizeHeaders(
+  headersInput: HttpFetchInput["headers"],
+): { ok: true; headers: Headers; sensitiveHeaderValues: string[] } | { ok: false; error: string } {
   const headers = new Headers();
   const sensitiveHeaderValues: string[] = [];
   if (headersInput === undefined) return { ok: true, headers, sensitiveHeaderValues };
@@ -413,7 +416,9 @@ function normalizeHeaders(headersInput: HttpFetchInput["headers"]): { ok: true; 
     try {
       headers.set(name, value);
     } catch (error) {
-      const message = isSensitive ? redactSensitiveValues(errorMessage(error), [value]) : errorMessage(error);
+      const message = isSensitive
+        ? redactSensitiveValues(errorMessage(error), [value])
+        : errorMessage(error);
       return { ok: false, error: `invalid request header ${name}: ${message}` };
     }
     if (isSensitive) {

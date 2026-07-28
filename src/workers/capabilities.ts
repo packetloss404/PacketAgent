@@ -54,6 +54,20 @@ export interface WorkerCapabilityCompilationResult {
   readonly policy: WorkerCompiledPolicy;
 }
 
+export interface WorkerCapabilityOperationInput {
+  readonly tool: string;
+  readonly verb: string;
+  readonly resources: readonly string[];
+  readonly effect: WorkerCapabilityEffect;
+}
+
+export interface WorkerCapabilityOperation {
+  readonly tool: string;
+  readonly verb: string;
+  readonly resources: readonly string[];
+  readonly effect: WorkerCapabilityEffect;
+}
+
 const READ = { READ: "read" } as const;
 const LIST = { LIST: "read" } as const;
 const CREATE = { CREATE: "write" } as const;
@@ -218,6 +232,49 @@ export function assertWorkerDeploymentPolicyIntegrity(
   }
 }
 
+export function normalizeWorkerCapabilityOperation(
+  input: WorkerCapabilityOperationInput,
+): WorkerCapabilityOperation {
+  const issues: WorkerCapabilityCompilationIssue[] = [];
+  const tool = input.tool.trim();
+  const schema = WORKER_TOOL_CAPABILITY_SCHEMAS[tool];
+  if (!schema) {
+    addIssue(issues, "tool", "capability.unknown_tool", "is not a registered Worker tool");
+  }
+  const verb = input.verb.trim().toUpperCase();
+  const expectedEffect = schema?.verbs[verb];
+  if (!expectedEffect) {
+    addIssue(issues, "verb", "capability.unknown_verb", "is not supported by this tool");
+  } else if (expectedEffect !== input.effect) {
+    addIssue(
+      issues,
+      "effect",
+      "capability.effect_mismatch",
+      `must be ${JSON.stringify(expectedEffect)} for this tool and verb`,
+    );
+  }
+  const resources = schema
+    ? normalizeRuntimeResources(input.resources, schema.resourceKind, issues)
+    : [];
+  if (issues.length > 0) throw new WorkerCapabilityCompilationError(issues);
+  return {
+    tool,
+    verb,
+    resources,
+    effect: input.effect,
+  };
+}
+
+export function workerCompiledPolicyDigest(
+  policy: Omit<WorkerCompiledPolicy, "policyDigest">,
+): string {
+  return digest(policy);
+}
+
+export function workerCapabilityResourceContains(upperBound: string, candidate: string): boolean {
+  return resourceContains(upperBound, candidate);
+}
+
 interface NormalizedRequestedCapability {
   readonly id: string;
   readonly tool: string;
@@ -352,6 +409,67 @@ function normalizeResources(
     addIssue(issues, pathPrefix, "capability.resource_required", "must contain a safe resource");
   }
   return normalized.sort();
+}
+
+function normalizeRuntimeResources(
+  resources: readonly string[],
+  kind: WorkerCapabilityResourceKind,
+  issues: WorkerCapabilityCompilationIssue[],
+): string[] {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  resources.forEach((value, index) => {
+    if (typeof value !== "string" || value.includes("*")) {
+      addIssue(
+        issues,
+        `resources[${index}]`,
+        "capability.runtime_resource",
+        "must identify one concrete resource",
+      );
+      return;
+    }
+    const candidate =
+      kind === "network"
+        ? normalizeRuntimeHttpResource(value, `resources[${index}]`, issues)
+        : normalizeResource(value, kind, `resources[${index}]`, issues);
+    if (!candidate || seen.has(candidate)) return;
+    seen.add(candidate);
+    normalized.push(candidate);
+  });
+  if (normalized.length === 0) {
+    addIssue(issues, "resources", "capability.runtime_resource", "must identify a resource");
+  }
+  return normalized.sort();
+}
+
+function normalizeRuntimeHttpResource(
+  resource: string,
+  issuePath: string,
+  issues: WorkerCapabilityCompilationIssue[],
+): string | null {
+  let url: URL;
+  try {
+    url = new URL(resource.trim());
+  } catch {
+    addIssue(issues, issuePath, "capability.network_url", "must be an absolute HTTP(S) URL");
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    addIssue(issues, issuePath, "capability.network_scheme", "must use the http or https scheme");
+    return null;
+  }
+  if (url.username || url.password) {
+    addIssue(
+      issues,
+      issuePath,
+      "capability.network_ambiguous",
+      "must not contain embedded credentials",
+    );
+    return null;
+  }
+  url.search = "";
+  url.hash = "";
+  return normalizeHttpResource(url.toString(), issuePath, issues);
 }
 
 function normalizeResource(

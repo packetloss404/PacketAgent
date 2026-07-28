@@ -5,16 +5,19 @@ End-to-end test plan run before cutting a release. Covers the builder loop, agen
 This plan verifies the inherited workbench plus W2's durable Worker lifecycle,
 W3's trigger-intake boundary, W4's bounded supervisor, W5's checkpoint,
 recovery, and effect-safety boundary, and W6.1's capability compilation.
-Runtime policy enforcement, attention, and PacketADE handoff cases must be
-added as W6.2-W9 ship; they are not current product claims.
+W6.2's immediate runtime policy enforcement is also covered. Credential and
+network/process hardening, attention, and PacketADE handoff cases must be added
+as W6.3-W9 ship; they are not current product claims.
 
-Last automated W6.1 baseline (2026-07-27):
+Last automated W6.2 baseline (2026-07-27):
 
-- API: 1,355 passed, 1 skipped, 0 failed
+- API: 1,360 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused Worker capability compilation/narrowing, activation, supervisor,
-  checkpoint-chain, effect-replay, recovery/quarantine, lease/revision, scheduler, and
-  JSON/SQLite/managed-Postgres parity checks: passed
+- Focused Worker operation normalization, immediate allow/deny enforcement,
+  production tool catalog coverage, capability compilation/narrowing,
+  activation, supervisor, checkpoint-chain, effect-replay,
+  recovery/quarantine, lease/revision, scheduler, and JSON/SQLite/managed-Postgres
+  parity checks: passed
 - Typecheck: passed
 - Production web build: passed
 - ESLint: 0 errors, 145 inherited warnings
@@ -123,7 +126,18 @@ and executes that job through the bounded supervisor.
 5. Define overlapping grants for the same tool/verb/resource prefix with different approval requirements. Confirm compilation rejects the contradictory overlap.
 6. Modify the stored policy digest, capability tuple, version digest, or deployment grant after creation. Confirm repository integrity rejects the record. Transition a valid deployment and confirm its grant and compiled policy remain immutable.
 7. Repeat deployment creation, reload, export, and rollback through JSON, SQLite, and managed Postgres. Confirm the same normalized grants and compiled policy persist in every backend.
-8. Treat this as compilation evidence only. Until W6.2 passes, confirm product copy does not claim that every production tool invocation is authorized against the compiled tuple immediately before execution.
+8. Treat this section as compilation evidence. Continue with the W6.2 smoke to verify runtime enforcement.
+
+## W6.2 Immediate Tool Policy Enforcement Smoke
+
+1. Activate a Worker deployment whose compiled policy permits one `http_fetch` `GET` path and requires no approval. Confirm the provider sees only tools backed by compiled `approval=never` tuples.
+2. Request the allowed URL with query parameters. Confirm the operation normalizes to method plus scheme/host/path, the query value does not enter the policy event, and `worker.policy.allowed` is durably appended before the handler runs.
+3. Request another host or path, a verb outside the grant, an `approval=always` tuple, a stale version digest, a modified policy digest, or a registered tool missing operation metadata. Confirm `worker.policy.denied`, no handler invocation, and no prepared effect receipt.
+4. Exercise HTTP, GitHub, SQL, workspace, browser, Slack, email, and command adapters. Confirm they expose the expected verb/effect plus normalized URL, repository target, database, destination/recipient, command, and working-directory resources before authorization.
+5. Inspect the allowed handler context. Confirm it contains the run, deployment revision and policy, version/content digest, matched capability, current budget usage, effect classification/operation, and system actor.
+6. Inspect allow/deny event data. Confirm it contains only decision code, tool, verb, effect, policy/capability identifiers, resource schemes/count, and an operation digest; raw URLs, query values, selectors, commands, recipients, message bodies, SQL, and secrets must be absent.
+7. Attempt execution through the production Worker adapter and the default registry catalog. Confirm both reach `executeTool`; direct handler calls remain limited to explicit unit tests.
+8. Stop before claiming the W6 permission gate. W6.3-W6.5 still own secret resolution, SSRF/DNS and process/filesystem isolation, rolling budgets, and the adversarial bypass matrix.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

@@ -1,4 +1,10 @@
 import type { WorkerToolEffectClassification } from "../workers/effect-types.js";
+import type {
+  WorkerActorReference,
+  WorkerBudgetUsage,
+  WorkerCapabilityEffect,
+  WorkerCompiledPolicy,
+} from "../workers/types.js";
 
 export interface ToolContext {
   workspaceId: string;
@@ -8,6 +14,60 @@ export interface ToolContext {
   signal: AbortSignal;
   artifactDir?: string;
   effectKey?: string;
+  worker?: WorkerToolContext;
+}
+
+export interface WorkerToolContext {
+  readonly run: {
+    readonly id: string;
+  };
+  readonly deployment: {
+    readonly id: string;
+    readonly revision: number;
+    readonly compiledPolicy?: WorkerCompiledPolicy;
+  };
+  readonly version: {
+    readonly id: string;
+    readonly contentDigest: string;
+  };
+  readonly capability?: {
+    readonly id: string;
+  };
+  readonly budget: WorkerBudgetUsage;
+  readonly effect?: {
+    readonly classification: WorkerToolEffectClassification;
+    readonly operation: string;
+    readonly effect: WorkerCapabilityEffect;
+  };
+  readonly actor: WorkerActorReference;
+  readonly recordPolicyDecision: (decision: ToolPolicyDecision) => Promise<void>;
+}
+
+export interface ToolAuthorizationDescriptor {
+  readonly verb: string;
+  readonly resources: readonly string[];
+  readonly effect: WorkerCapabilityEffect;
+}
+
+export interface ToolPolicyDecision {
+  readonly allowed: boolean;
+  readonly code:
+    | "allowed"
+    | "approval_required"
+    | "capability_not_granted"
+    | "invalid_operation"
+    | "missing_authorization_descriptor"
+    | "missing_compiled_policy"
+    | "stale_policy"
+    | "tampered_policy";
+  readonly tool: string;
+  readonly verb: string;
+  readonly effect: WorkerCapabilityEffect;
+  readonly operationDigest: string;
+  readonly resourceCount: number;
+  readonly resourceSchemes: readonly string[];
+  readonly policyDigest?: string;
+  readonly capabilityId?: string;
 }
 
 export interface ToolResult {
@@ -23,6 +83,7 @@ export interface ToolDefinition<TInput = Record<string, unknown>> {
   inputSchema: Record<string, unknown>;
   side: "read" | "write" | "exec";
   effect?: ToolEffectDefinition<TInput>;
+  authorization?: ToolAuthorizationDefinition<TInput>;
   timeoutMs?: number;
   handle(input: TInput, ctx: ToolContext): Promise<ToolResult>;
 }
@@ -39,10 +100,11 @@ export type ToolEffectReconciliation =
 
 export interface ToolEffectDefinition<TInput = Record<string, unknown>> {
   describe(input: TInput): ToolEffectDescriptor;
-  reconcile?(
-    input: TInput,
-    ctx: ToolContext,
-  ): Promise<ToolEffectReconciliation>;
+  reconcile?(input: TInput, ctx: ToolContext): Promise<ToolEffectReconciliation>;
+}
+
+export interface ToolAuthorizationDefinition<TInput = Record<string, unknown>> {
+  describe(input: TInput, ctx: ToolContext): ToolAuthorizationDescriptor;
 }
 
 export interface ToolCallRecord {

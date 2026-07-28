@@ -1,17 +1,20 @@
+import type { ToolPolicyDecision } from "../../tools/types.js";
 import type {
   JsonObject,
   JsonValue,
+  WorkerActorReference,
   WorkerBudgetPolicy,
   WorkerBudgetUsage,
   WorkerCheckpoint,
   WorkerCheckpointCursor,
+  WorkerCompiledCapability,
+  WorkerCompiledPolicy,
   WorkerDefinition,
   WorkerDeployment,
   WorkerExitPredicate,
   WorkerRun,
   WorkerRunTerminalReason,
   WorkerSupervisorPhase,
-  WorkerToolCapability,
   WorkerVersion,
 } from "../types.js";
 
@@ -83,17 +86,23 @@ export interface WorkerRuntimeToolResult {
 
 export interface WorkerToolPort {
   definitions(
-    capabilities: readonly WorkerToolCapability[],
+    capabilities: readonly WorkerCompiledCapability[],
   ): readonly WorkerRuntimeToolDefinition[];
   execute(input: {
     readonly workspaceId: string;
+    readonly workerDefinitionId: string;
     readonly workerRunId: string;
     readonly workerVersionId: string;
+    readonly workerVersionContentDigest: string;
     readonly workerDeploymentId: string;
+    readonly workerDeploymentRevision: number;
+    readonly compiledPolicy?: WorkerCompiledPolicy;
+    readonly budgetUsage: WorkerBudgetUsage;
+    readonly actor: WorkerActorReference;
     readonly iteration: number;
     readonly fencingToken: number;
     readonly call: WorkerRuntimeToolCall;
-    readonly capability: WorkerToolCapability;
+    readonly recordPolicyDecision: (decision: ToolPolicyDecision) => Promise<void>;
     readonly signal: AbortSignal;
   }): Promise<WorkerRuntimeToolResult>;
 }

@@ -84,13 +84,14 @@ Dependencies: W4.
 Dependencies: W1, W4.
 
 Status: active. Resume at
-[`W6.2 - Enforce immediately before execution`](dev/worker-implementation-loops.md#w62---enforce-immediately-before-execution).
+[`W6.3 - Resolve secrets and harden process/network boundaries`](dev/worker-implementation-loops.md#w63---resolve-secrets-and-harden-processnetwork-boundaries).
 
-W6.1 is complete: validated versions now compile normalized tool/verb/resource
-tuples, and deployments persist only version-bounded narrowed grants plus a
-version-digest-bound compiled policy.
+W6.1-W6.2 are complete: validated versions compile normalized
+tool/verb/resource tuples, deployments persist only version-bounded narrowed
+grants, and every production Worker tool call is authorized again in
+`executeTool` immediately before its handler.
 
-- [ ] Replace whole-tool grants with verb/resource-scoped capabilities.
+- [x] Replace whole-tool grants with verb/resource-scoped capabilities.
 - [ ] Resolve credentials by reference at execution time; never embed secret values in Worker packages.
 - [ ] Add per-run and rolling cost ceilings.
 - [ ] Default network, filesystem, shell, and external-write access to deny.

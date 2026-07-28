@@ -7,6 +7,7 @@ import {
   makeWorkerVersion,
   makeWorkerVersionContent,
 } from "../__tests__/fixtures.js";
+import { compileWorkerCapabilityPolicy } from "../capabilities.js";
 import type {
   JsonObject,
   WorkerBudgetPolicy,
@@ -114,6 +115,10 @@ test("supervisor completes plan-act-evaluate-checkpoint-decide deterministically
   assert.equal(harness.checkpoints, 4);
   assert.equal(result.run.budgetUsage.iterations, 1);
   assert.equal(result.run.budgetUsage.toolCalls, 1);
+  assert.equal(
+    harness.events.some((event) => event.type === "worker.policy.allowed"),
+    true,
+  );
   assert.equal(
     harness.events.some(
       (event) =>
@@ -378,16 +383,25 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
     updatedAt: now.toISOString(),
     startedAt: now.toISOString(),
   });
+  const version = makeWorkerVersion({
+    status: "validated",
+    content,
+    createdAt: now.toISOString(),
+    validatedAt: now.toISOString(),
+  });
+  const compilation = compileWorkerCapabilityPolicy({
+    workerVersionContentDigest: version.contentDigest,
+    requestedCapabilities: content.tools,
+    allowedCapabilityIds: content.policy.permissions.allowedCapabilityIds,
+    credentialRefs: content.credentialRefs,
+  });
   const context: WorkerRuntimeContext = {
     definition: makeWorkerDefinition({ status: "active" }),
-    version: makeWorkerVersion({
-      status: "validated",
-      content,
-      createdAt: now.toISOString(),
-      validatedAt: now.toISOString(),
-    }),
+    version,
     deployment: makeWorkerDeployment({
       status: "active",
+      capabilityGrants: compilation.grants,
+      compiledPolicy: compilation.policy,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       activatedAt: now.toISOString(),
@@ -417,8 +431,34 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
         }));
       },
       async execute(input): Promise<WorkerRuntimeToolResult> {
-        toolCalls += 1;
+        const capability = input.compiledPolicy?.capabilities.find(
+          (entry) => entry.tool === input.call.name && entry.approval === "never",
+        );
+        await input.recordPolicyDecision({
+          allowed: Boolean(capability),
+          code: capability ? "allowed" : "capability_not_granted",
+          tool: input.call.name,
+          verb: capability?.verb ?? "UNKNOWN",
+          effect: capability?.effect ?? "execute",
+          operationDigest: `sha256:${"a".repeat(64)}`,
+          resourceCount: 1,
+          resourceSchemes: ["https"],
+          ...(input.compiledPolicy ? { policyDigest: input.compiledPolicy.policyDigest } : {}),
+          ...(capability ? { capabilityId: capability.capabilityId } : {}),
+        });
         const timestamp = clock.now().toISOString();
+        if (!capability) {
+          return {
+            callId: input.call.id,
+            toolName: input.call.name,
+            status: "error",
+            error: "Worker policy denied test tool.",
+            durationMs: 0,
+            startedAt: timestamp,
+            completedAt: timestamp,
+          };
+        }
+        toolCalls += 1;
         return {
           callId: input.call.id,
           toolName: input.call.name,

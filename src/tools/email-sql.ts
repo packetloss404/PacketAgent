@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { redactedErrorMessage } from "../security/redaction.js";
+import { inputAuthorization, recipientResources } from "./authorization.js";
 import type { ToolDefinition, ToolResult } from "./types.js";
 
 type Env = Record<string, string | undefined>;
@@ -138,7 +139,9 @@ const dangerousPragmas = new Set([
   "writable_schema",
 ]);
 
-export function createEmailSendTool(options: EmailSendToolOptions = {}): ToolDefinition<EmailSendInput> {
+export function createEmailSendTool(
+  options: EmailSendToolOptions = {},
+): ToolDefinition<EmailSendInput> {
   return {
     name: "email_send",
     description: "Send an email through the configured SMTP adapter.",
@@ -164,6 +167,15 @@ export function createEmailSendTool(options: EmailSendToolOptions = {}): ToolDef
         operation: "email.send",
       }),
     },
+    authorization: inputAuthorization((input: EmailSendInput) => ({
+      verb: "SEND",
+      effect: "write",
+      resources: [
+        ...recipientResources(input.to),
+        ...recipientResources(input.cc),
+        ...recipientResources(input.bcc),
+      ],
+    })),
     timeoutMs: EMAIL_TIMEOUT_MS,
     async handle(input) {
       const env = options.env ?? process.env;
@@ -171,7 +183,8 @@ export function createEmailSendTool(options: EmailSendToolOptions = {}): ToolDef
       if (!adapterFactory) {
         return {
           ok: false,
-          error: "SMTP adapter is not configured for email_send; provide an adapter factory before sending mail.",
+          error:
+            "SMTP adapter is not configured for email_send; provide an adapter factory before sending mail.",
         };
       }
 
@@ -202,10 +215,13 @@ export function createEmailSendTool(options: EmailSendToolOptions = {}): ToolDef
 
 export const emailSendTool = createEmailSendTool();
 
-export function createSqlQueryTool(options: SqlQueryToolOptions = {}): ToolDefinition<SqlQueryInput> {
+export function createSqlQueryTool(
+  options: SqlQueryToolOptions = {},
+): ToolDefinition<SqlQueryInput> {
   return {
     name: "sql_query",
-    description: "Run a scoped SQLite query for the current agent. SELECT and safe PRAGMA reads are allowed by default; mutations require write=true.",
+    description:
+      "Run a scoped SQLite query for the current agent. SELECT and safe PRAGMA reads are allowed by default; mutations require write=true.",
     inputSchema: {
       type: "object",
       properties: {
@@ -213,11 +229,7 @@ export function createSqlQueryTool(options: SqlQueryToolOptions = {}): ToolDefin
         params: {
           type: "array",
           items: {
-            anyOf: [
-              { type: "string" },
-              { type: "number" },
-              { type: "null" },
-            ],
+            anyOf: [{ type: "string" }, { type: "number" }, { type: "null" }],
           },
           default: [],
         },
@@ -230,25 +242,39 @@ export function createSqlQueryTool(options: SqlQueryToolOptions = {}): ToolDefin
     effect: {
       describe: (input) => ({
         classification:
-          input.write === true
-            ? ("non_replayable_mutation" as const)
-            : ("read_only" as const),
+          input.write === true ? ("non_replayable_mutation" as const) : ("read_only" as const),
         operation: input.write === true ? "sql.mutate" : "sql.read",
       }),
     },
+    authorization: inputAuthorization((input: SqlQueryInput, context) => ({
+      verb: input.write === true ? "MUTATE" : "READ",
+      effect: input.write === true ? "write" : "read",
+      resources: [
+        `database:${context.workspaceId}/${context.agentId ?? context.worker?.run.id ?? "missing-run"}`,
+      ],
+    })),
     timeoutMs: SQLITE_TIMEOUT_MS,
     async handle(input, ctx) {
       const parsed = parseSqlInput(input);
       if (!parsed.ok) return parsed;
-      if (!ctx.agentId) return { ok: false, error: "sql_query requires ctx.agentId for scoped storage" };
+      if (!ctx.agentId)
+        return { ok: false, error: "sql_query requires ctx.agentId for scoped storage" };
 
-      const { statement, params, write } = parsed.output as { statement: string; params: SQLInputValue[]; write: boolean };
+      const { statement, params, write } = parsed.output as {
+        statement: string;
+        params: SQLInputValue[];
+        write: boolean;
+      };
       const policy = validateSqlPolicy(statement, write);
       if (!policy.ok) return policy;
 
       let dbPath: string;
       try {
-        dbPath = resolveAgentSqlitePath({ dbRoot: options.dbRoot, workspaceId: ctx.workspaceId, agentId: ctx.agentId });
+        dbPath = resolveAgentSqlitePath({
+          dbRoot: options.dbRoot,
+          workspaceId: ctx.workspaceId,
+          agentId: ctx.agentId,
+        });
       } catch (error) {
         return { ok: false, error: (error as Error).message };
       }
@@ -293,10 +319,14 @@ export function resolveAgentSqlitePath(input: AgentSqlitePathInput): string {
 
 function parseEmailInput(input: EmailSendInput, env: Env): ToolResult {
   const to = normalizeRecipients(input.to);
-  if (to.length === 0) return { ok: false, error: "email_send requires at least one recipient in to" };
-  if (!isNonEmptyString(input.subject)) return { ok: false, error: "email_send requires a non-empty subject" };
-  if (typeof input.text !== "string") return { ok: false, error: "email_send requires text content" };
-  if (input.html !== undefined && typeof input.html !== "string") return { ok: false, error: "email_send html must be a string" };
+  if (to.length === 0)
+    return { ok: false, error: "email_send requires at least one recipient in to" };
+  if (!isNonEmptyString(input.subject))
+    return { ok: false, error: "email_send requires a non-empty subject" };
+  if (typeof input.text !== "string")
+    return { ok: false, error: "email_send requires text content" };
+  if (input.html !== undefined && typeof input.html !== "string")
+    return { ok: false, error: "email_send html must be a string" };
 
   const cc = normalizeOptionalRecipients(input.cc);
   const bcc = normalizeOptionalRecipients(input.bcc);
@@ -406,7 +436,10 @@ function parseSqlInput(input: SqlQueryInput): ToolResult {
   };
 }
 
-function validateSqlPolicy(statement: string, write: boolean): ToolResult & { kind?: "read" | "write" } {
+function validateSqlPolicy(
+  statement: string,
+  write: boolean,
+): ToolResult & { kind?: "read" | "write" } {
   const keyword = firstSqlKeyword(statement);
   if (!keyword) return { ok: false, error: "sql_query requires a SQL statement" };
   if (keyword === "attach" || keyword === "detach") {
@@ -420,15 +453,20 @@ function validateSqlPolicy(statement: string, write: boolean): ToolResult & { ki
     return { ok: true, kind: "write" };
   }
 
-  return { ok: false, error: `SQL statements starting with ${keyword.toUpperCase()} are not allowed` };
+  return {
+    ok: false,
+    error: `SQL statements starting with ${keyword.toUpperCase()} are not allowed`,
+  };
 }
 
 function validatePragmaPolicy(statement: string): ToolResult & { kind?: "read" } {
   const pragma = statement.match(/^\s*pragma\s+([a-zA-Z_][\w]*)/i)?.[1]?.toLowerCase();
   if (!pragma) return { ok: false, error: "PRAGMA statement must name a pragma" };
   if (dangerousPragmas.has(pragma)) return { ok: false, error: `PRAGMA ${pragma} is not allowed` };
-  if (!safeReadPragmas.has(pragma)) return { ok: false, error: `PRAGMA ${pragma} is not on the safe read allowlist` };
-  if (pragmaHasAssignment(statement)) return { ok: false, error: "PRAGMA assignments are not allowed" };
+  if (!safeReadPragmas.has(pragma))
+    return { ok: false, error: `PRAGMA ${pragma} is not on the safe read allowlist` };
+  if (pragmaHasAssignment(statement))
+    return { ok: false, error: "PRAGMA assignments are not allowed" };
   return { ok: true, kind: "read" };
 }
 
@@ -519,12 +557,21 @@ function stripLeadingSqlComments(sql: string): string {
 
 function stripSqlComments(sql: string): string {
   let out = "";
-  scanSql(sql, (char) => { out += char; });
+  scanSql(sql, (char) => {
+    out += char;
+  });
   return out;
 }
 
 function scanSql(sql: string, onNormalChar: (char: string, index: number) => void): void {
-  let state: "normal" | "single" | "double" | "backtick" | "bracket" | "line-comment" | "block-comment" = "normal";
+  let state:
+    | "normal"
+    | "single"
+    | "double"
+    | "backtick"
+    | "bracket"
+    | "line-comment"
+    | "block-comment" = "normal";
   for (let i = 0; i < sql.length; i += 1) {
     const char = sql[i];
     const next = sql[i + 1];
@@ -549,9 +596,9 @@ function scanSql(sql: string, onNormalChar: (char: string, index: number) => voi
       continue;
     }
     if (state === "double") {
-      if (char === "\"" && next === "\"") {
+      if (char === '"' && next === '"') {
         i += 1;
-      } else if (char === "\"") {
+      } else if (char === '"') {
         state = "normal";
       }
       continue;
@@ -583,7 +630,7 @@ function scanSql(sql: string, onNormalChar: (char: string, index: number) => voi
       state = "single";
       continue;
     }
-    if (char === "\"") {
+    if (char === '"') {
       state = "double";
       continue;
     }
@@ -605,7 +652,11 @@ function normalizeSqliteInteger(value: number | bigint): number | string {
 }
 
 function safePathSegment(value: string, fallback: string): string {
-  const segment = value.trim().replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;
+  const segment =
+    value
+      .trim()
+      .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || fallback;
   if (segment === "." || segment === ".." || segment.includes("..")) {
     throw new Error(`unsafe sql_query path segment: ${value}`);
   }

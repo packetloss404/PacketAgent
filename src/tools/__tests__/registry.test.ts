@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { WORKER_TOOL_CAPABILITY_SCHEMAS } from "../../workers/capabilities.js";
 import { ToolRegistry } from "../registry.js";
 import { executeTool } from "../executor.js";
-import { listDefaultToolSummaries } from "../bootstrap.js";
+import { listDefaultToolSummaries, listDefaultWorkerAuthorizationGaps } from "../bootstrap.js";
 import type { ToolDefinition } from "../types.js";
 
 const echoTool: ToolDefinition = {
@@ -24,7 +25,10 @@ const slowTool: ToolDefinition = {
   async handle(_input, ctx) {
     await new Promise<void>((_, reject) => {
       const id = setTimeout(() => {}, 10_000);
-      ctx.signal.addEventListener("abort", () => { clearTimeout(id); reject(new Error("aborted")); });
+      ctx.signal.addEventListener("abort", () => {
+        clearTimeout(id);
+        reject(new Error("aborted"));
+      });
     });
     return { ok: true };
   },
@@ -46,7 +50,11 @@ const artifactTool: ToolDefinition = {
   inputSchema: { type: "object" },
   side: "read",
   async handle() {
-    return { ok: true, output: { path: "data/artifacts/run-1/page.png" }, artifacts: [{ path: "data/artifacts/run-1/page.png", bytes: 12, kind: "image/png" }] };
+    return {
+      ok: true,
+      output: { path: "data/artifacts/run-1/page.png" },
+      artifacts: [{ path: "data/artifacts/run-1/page.png", bytes: 12, kind: "image/png" }],
+    };
   },
 };
 
@@ -55,7 +63,13 @@ test("register and list", () => {
   r.register(echoTool);
   r.register(slowTool);
   assert.equal(r.list().length, 2);
-  assert.deepEqual(r.list().map((t) => t.name).sort(), ["echo", "slow"]);
+  assert.deepEqual(
+    r
+      .list()
+      .map((t) => t.name)
+      .sort(),
+    ["echo", "slow"],
+  );
   assert.equal(r.get("echo")?.name, "echo");
   assert.equal(r.hasName("echo"), true);
   assert.equal(r.hasName("missing"), false);
@@ -84,6 +98,16 @@ test("default tool summaries include the Track D agent catalog", () => {
   }
 });
 
+test("every production-registered tool exposes a Worker authorization descriptor", () => {
+  assert.deepEqual(listDefaultWorkerAuthorizationGaps(), []);
+  assert.deepEqual(
+    listDefaultToolSummaries()
+      .map((tool) => tool.name)
+      .sort(),
+    Object.keys(WORKER_TOOL_CAPABILITY_SCHEMAS).sort(),
+  );
+});
+
 test("executeTool returns ok status with output", async () => {
   const ctrl = new AbortController();
   const record = await executeTool({
@@ -104,7 +128,9 @@ test("executeTool preserves artifact metadata", async () => {
     context: { workspaceId: "w", userId: "u" },
   });
   assert.equal(record.status, "ok");
-  assert.deepEqual(record.artifacts, [{ path: "data/artifacts/run-1/page.png", bytes: 12, kind: "image/png" }]);
+  assert.deepEqual(record.artifacts, [
+    { path: "data/artifacts/run-1/page.png", bytes: 12, kind: "image/png" },
+  ]);
 });
 
 test("executeTool catches thrown errors and returns error status", async () => {
