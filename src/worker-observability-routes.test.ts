@@ -70,6 +70,56 @@ test("Worker event cursors cannot be reused across route workspaces", async () =
   assert.match(JSON.stringify(await crossed.json()), /cursor is invalid/i);
 });
 
+test("health, detail, evidence, and artifact routes return server-side read models", async () => {
+  const harness = routeHarness();
+  const healthResponse = await harness.routes.request("/health");
+  const detailResponse = await harness.routes.request("/runs/run-1/detail");
+  const evidenceResponse = await harness.routes.request("/evidence?workerRunId=run-1");
+  const artifactResponse = await harness.routes.request("/artifacts?workerRunId=run-1");
+
+  assert.equal(healthResponse.status, 200);
+  assert.equal(detailResponse.status, 200);
+  assert.equal(evidenceResponse.status, 200);
+  assert.equal(artifactResponse.status, 200);
+  const health = (await healthResponse.json()) as {
+    health: { schemaVersion: string; totals: { runs: number } };
+  };
+  const detail = (await detailResponse.json()) as {
+    detail: { run: { id: string; definition: { name: string } } };
+  };
+  const evidence = (await evidenceResponse.json()) as {
+    evidence: unknown[];
+    page: { hasMore: boolean };
+  };
+  const artifacts = (await artifactResponse.json()) as {
+    artifacts: unknown[];
+    page: { hasMore: boolean };
+  };
+  assert.deepEqual(
+    {
+      schemaVersion: health.health.schemaVersion,
+      runs: health.health.totals.runs,
+      runId: detail.detail.run.id,
+      name: detail.detail.run.definition.name,
+      evidence: evidence.evidence.length,
+      evidenceHasMore: evidence.page.hasMore,
+      artifacts: artifacts.artifacts.length,
+      artifactsHaveMore: artifacts.page.hasMore,
+    },
+    {
+      schemaVersion: "packetagent.worker-operations-read-model/v1",
+      runs: 1,
+      runId: "run-1",
+      name: "Release watcher",
+      evidence: 0,
+      evidenceHasMore: false,
+      artifacts: 0,
+      artifactsHaveMore: false,
+    },
+  );
+  assert.deepEqual(harness.permissions, ["inspect", "inspect", "inspect", "inspect"]);
+});
+
 interface RouteHarness {
   readonly routes: ReturnType<typeof createWorkerObservabilityRoutes>;
   readonly permissions: WorkerOperatorPermission[];

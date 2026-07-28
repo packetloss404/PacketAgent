@@ -3,12 +3,14 @@ import test from "node:test";
 import { createSeedStore, type PacketAgentData } from "../../packetagent-store.js";
 import { LEGACY_WORKER_EVENT_SCHEMA_VERSION } from "../persistence-types.js";
 import {
+  makeWorkerAttentionRequest,
   makeWorkerCheckpoint,
   makeWorkerDefinition,
   makeWorkerDeployment,
   makeWorkerRun,
   makeWorkerVersion,
 } from "../__tests__/fixtures.js";
+import { appendWorkerJournalEntry } from "./journal.js";
 import { createWorkerOperationsReadModel } from "./read-model.js";
 
 const SECRET = "read-model-secret-value";
@@ -63,7 +65,7 @@ test("Worker detail answers identity, budget, checkpoint, attention, and evidenc
   const run = data.workerRuns.find((record) => record.id === "run-3")!;
   data.workerRuns[data.workerRuns.indexOf(run)] = {
     ...run,
-    status: "running",
+    status: "waiting_for_approval",
     revision: 3,
     latestCheckpointId: "checkpoint-3",
     budgetUsage: {
@@ -85,14 +87,61 @@ test("Worker detail answers identity, budget, checkpoint, attention, and evidenc
       sequence: 2,
       cursor: { phase: "evaluate", iteration: 2, actionIndex: 1 },
       workingMemory: { private: SECRET },
+      pendingApprovalIds: ["attention-3"],
       createdAt: "2026-07-27T12:04:00.000Z",
     }),
   );
+  const version = data.workerVersions.find((record) => record.id === "version-alpha")!;
+  data.workerAttentionRequests.push(
+    makeWorkerAttentionRequest({
+      id: "attention-3",
+      workspaceId: "alpha",
+      workerDefinitionId: "definition-alpha",
+      workerVersionId: version.id,
+      workerVersionContentDigest: version.contentDigest,
+      workerDeploymentId: "deployment-alpha",
+      workerRunId: "run-3",
+    }),
+  );
+  data.providerCalls.push({
+    id: "provider-call-3",
+    workspaceId: "alpha",
+    routeKey: "smart",
+    provider: "stub",
+    model: "stub",
+    promptTokens: 120,
+    completionTokens: 30,
+    costUsd: 0.125,
+    durationMs: 250,
+    status: "success",
+    startedAt: "2026-07-27T12:03:10.000Z",
+    completedAt: "2026-07-27T12:03:10.250Z",
+  });
+  appendWorkerJournalEntry(data, {
+    id: "event-alpha-provider",
+    workspaceId: "alpha",
+    type: "worker.provider.completed",
+    source: "provider",
+    workerDefinitionId: "definition-alpha",
+    workerVersionId: "version-alpha",
+    workerDeploymentId: "deployment-alpha",
+    workerRunId: "run-3",
+    actor: { type: "system", id: "packetagent.read-model-test" },
+    summary: "Completed a bounded provider call.",
+    correlation: { providerCallId: "provider-call-3" },
+    data: {
+      providerCallId: "provider-call-3",
+      promptTokens: 120,
+      completionTokens: 30,
+      costUsd: 0.125,
+    },
+    occurredAt: "2026-07-27T12:03:10.250Z",
+  });
   data.workerEvents.push({
     schemaVersion: LEGACY_WORKER_EVENT_SCHEMA_VERSION,
     id: "event-alpha-secret",
     workspaceId: "alpha",
-    sequence: 1,
+    sequence: 2,
     type: "worker.phase.completed",
     workerDefinitionId: "definition-alpha",
     workerVersionId: "version-alpha",
@@ -116,13 +165,25 @@ test("Worker detail answers identity, budget, checkpoint, attention, and evidenc
   assert.equal(reads, 1);
   assert.equal(detail.run.definition.name, "Worker alpha");
   assert.equal(detail.run.version.version, 1);
+  assert.equal(
+    detail.run.version.objective,
+    "Verify release readiness and report a bounded result.",
+  );
   assert.equal(detail.run.deployment.id, "deployment-alpha");
+  assert.equal(detail.run.trigger.kind, "manual");
   assert.equal(detail.run.budget.usage.iterations, 2);
   assert.equal(detail.run.latestCheckpoint?.cursor.phase, "evaluate");
-  assert.equal(detail.run.controls.canPause, true);
-  assert.equal(detail.events.items.length, 1);
+  assert.equal(detail.run.rollup.providers.costUsd, 0.125);
+  assert.equal(detail.run.attention.open, 1);
+  assert.equal(detail.attention[0]?.id, "attention-3");
+  assert.equal(detail.run.controls.canResolveAttention, true);
+  assert.equal(detail.evidence.items.length, 1);
+  assert.equal(detail.events.items.length, 2);
   assert.doesNotMatch(JSON.stringify(detail), new RegExp(SECRET));
-  assert.match(detail.events.items[0]!.summary, /\[redacted\]/i);
+  assert.match(
+    detail.events.items.find((event) => event.id === "event-alpha-secret")!.summary,
+    /\[redacted\]/i,
+  );
 });
 
 test("Worker health is derived from the same rollups and never crosses workspaces", async () => {
@@ -146,6 +207,70 @@ test("Worker health is derived from the same rollups and never crosses workspace
   assert.equal(alpha.runStatusCounts.waiting_for_approval, 1);
   assert.equal(bravo.totals.runs, 1);
   assert.equal(bravo.computedThroughSequence, 0);
+});
+
+test("attention cursors are stable and cannot drift across filters or tenants", async () => {
+  const data = operationsData();
+  const version = data.workerVersions.find((record) => record.id === "version-alpha")!;
+  const binding = {
+    workspaceId: "alpha",
+    workerDefinitionId: "definition-alpha",
+    workerVersionId: version.id,
+    workerVersionContentDigest: version.contentDigest,
+    workerDeploymentId: "deployment-alpha",
+    workerRunId: "run-3",
+  };
+  data.workerAttentionRequests.push(
+    makeWorkerAttentionRequest({
+      ...binding,
+      id: "attention-older",
+      requestKey: "run-3:iteration-1:action-1",
+    }),
+    makeWorkerAttentionRequest({
+      ...binding,
+      id: "attention-newer",
+      requestKey: "run-3:iteration-2:action-1",
+      requestedAt: "2026-07-27T12:01:00.000Z",
+    }),
+  );
+  const readModel = createWorkerOperationsReadModel({ loadStore: () => data });
+
+  const first = await readModel.listAttention("alpha", {
+    status: "open",
+    limit: 1,
+  });
+  assert.deepEqual(
+    first.attention.map((entry) => entry.id),
+    ["attention-newer"],
+  );
+  assert.ok(first.page.nextCursor);
+
+  const second = await readModel.listAttention("alpha", {
+    status: "open",
+    limit: 1,
+    cursor: first.page.nextCursor,
+  });
+  assert.deepEqual(
+    second.attention.map((entry) => entry.id),
+    ["attention-older"],
+  );
+
+  await assert.rejects(
+    readModel.listAttention("alpha", {
+      status: "approved",
+      limit: 1,
+      cursor: first.page.nextCursor,
+    }),
+    /cursor is invalid for this workspace and filter set/i,
+  );
+  await assert.rejects(
+    readModel.listAttention("bravo", {
+      status: "open",
+      limit: 1,
+      cursor: first.page.nextCursor,
+    }),
+    /cursor is invalid for this workspace and filter set/i,
+  );
 });
 
 function operationsData(): PacketAgentData {

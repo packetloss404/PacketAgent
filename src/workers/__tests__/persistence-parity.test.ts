@@ -48,6 +48,7 @@ import type {
 } from "../observability/rollup-types.js";
 import { buildWorkerObservabilityRollups } from "../observability/rollups.js";
 import { createWorkerRetentionService } from "../observability/retention.js";
+import { createWorkerOperationsReadModel } from "../observability/read-model.js";
 import {
   WORKER_RETENTION_POLICY_SCHEMA_VERSION,
   type WorkerRetentionPolicy,
@@ -112,6 +113,7 @@ interface BackendScenarioResult {
   readonly exportedArtifactManifestCount: number;
   readonly retentionEventCount: number;
   readonly rollupProjection: ReturnType<typeof parityRollupProjection>;
+  readonly operationsReadModel: Awaited<ReturnType<typeof parityOperationsProjection>>;
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -138,9 +140,11 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   const stored = await loadStoreAsync();
   const exported = await exportWorkspaceDataAsync({ workspaceId: "alpha" });
   const rollupProjection = buildWorkerObservabilityRollups(stored, "alpha");
+  const operationsReadModel = await parityOperationsProjection(stored);
   const reordered = structuredClone(stored);
   reverseRollupSources(reordered);
   assert.deepEqual(buildWorkerObservabilityRollups(reordered, "alpha"), rollupProjection);
+  assert.deepEqual(await parityOperationsProjection(reordered), operationsReadModel);
 
   assert.equal(race.deployments.filter((deployment) => deployment.status === "active").length, 1);
   assert.equal(rollback.rollouts.length, 1);
@@ -254,6 +258,7 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       event.type.startsWith("worker.retention."),
     ).length,
     rollupProjection: parityRollupProjection(rollupProjection),
+    operationsReadModel,
   };
 }
 
@@ -265,6 +270,68 @@ function parityRollupProjection(rollups: WorkerObservabilityRollupSet) {
     versions: rollups.versions.map(stableRollupFields),
     deployments: rollups.deployments.map(stableRollupFields),
     runs: rollups.runs.map(stableRollupFields),
+  };
+}
+
+async function parityOperationsProjection(data: PacketAgentData) {
+  const readModel = createWorkerOperationsReadModel({
+    loadStore: () => data,
+  });
+  const health = await readModel.health("alpha");
+  const runPage = await readModel.listRuns("alpha", { limit: 200 });
+  const details = await Promise.all(
+    runPage.runs.map((run) => readModel.getRun("alpha", run.id, 200)),
+  );
+  return {
+    health,
+    page: runPage.page,
+    runs: runPage.runs.map((run) => ({
+      id: run.id,
+      definition: run.definition,
+      version: run.version,
+      deployment: run.deployment,
+      status: run.status,
+      revision: run.revision,
+      attempt: run.attempt,
+      trigger: run.trigger,
+      terminalReason: run.terminalReason,
+      budget: run.budget,
+      latestCheckpoint: run.latestCheckpoint,
+      attention: run.attention,
+      rollup: stableRollupFields(run.rollup),
+      controls: run.controls,
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt,
+      startedAt: run.startedAt,
+      completedAt: run.completedAt,
+    })),
+    details: details.map((detail) => ({
+      runId: detail.run.id,
+      attention: detail.attention.map((entry) => ({
+        id: entry.id,
+        status: entry.status,
+        capabilityId: entry.capabilityId,
+        operationDigest: entry.operationDigest,
+      })),
+      events: detail.events.items.map((entry) => ({
+        id: entry.id,
+        sequence: entry.sequence,
+        type: entry.type,
+        summary: entry.summary,
+      })),
+      evidence: detail.evidence.items.map((entry) => ({
+        id: entry.id,
+        sequence: entry.sequence,
+        classification: entry.classification,
+        hasSha256Digest: /^sha256:[0-9a-f]{64}$/.test(entry.evidenceDigest),
+      })),
+      artifacts: detail.artifacts.items.map((entry) => ({
+        id: entry.id,
+        classification: entry.classification,
+        artifact: entry.artifact,
+        manifestDigest: entry.manifestDigest,
+      })),
+    })),
   };
 }
 

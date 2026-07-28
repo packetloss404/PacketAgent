@@ -6,6 +6,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - Worker answerability gate (W8.5)
+
+- Closed W8 with one-read tests proving the operations detail answers Worker
+  identity, objective/trigger, immutable version/deployment, hard-budget usage,
+  provider cost, latest checkpoint, attention, evidence, artifacts, and
+  outcome without client-side raw-table joins.
+- Added source-order replay and JSON/SQLite/managed-Postgres parity coverage
+  for the operations projection, plus stable filter- and tenant-bound
+  attention cursor checks.
+- Added explicit accessible semantics for Worker list/detail loading, error,
+  empty, missing, and ready states, with automated web coverage and a manual
+  screenshot/accessibility matrix.
+- The W8.5 baseline covers 1,460 API tests (1,459 passed and 1 intentionally
+  skipped) plus 28 web tests with zero lint errors.
+- W8 is complete. The unified cross-product Worker lifecycle is not yet a
+  shipped claim; W9 PacketADE handoff and W10 PacketChat/PacketPhone routes
+  remain gated work.
+
 ### 2026-07-28 - Canonical Worker operations API and UI (W8.4)
 
 - Added one workspace-scoped operations read model that joins Worker identity,

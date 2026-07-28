@@ -1,6 +1,6 @@
 # Worker observability and evidence plan
 
-Last updated: 2026-07-27.
+Last updated: 2026-07-28.
 
 This is the design record for W8. The active implementation ledger remains
 [`../BACKLOG.md`](../BACKLOG.md), and executable loop order remains
@@ -222,8 +222,13 @@ Implementation notes:
 
 ### W8.5 - Answerability gate
 
-Status: active.
+Status: complete as of 2026-07-28.
 
 - Prove the read model answers what is running, why, from which version and
   checkpoint, at what cost, with what evidence, and what needs attention
   without client-side joins over raw storage.
+- Proved one-read answerability, source-order replay, redaction,
+  retention-deleted versus unexplained gaps, stable filter/tenant-bound
+  cursors, accessible loading/error/empty semantics, and storage parity across
+  JSON, SQLite, and managed Postgres.
+- Added the screenshot and manual verification matrix to `dev/TESTING.md`.

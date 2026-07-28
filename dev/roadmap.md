@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W8 - Worker observability, cost, and evidence**. Repository/session state
+Current active loop: **W9 - PacketADE deployment handoff**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -16,8 +16,9 @@ digest-bound event/evidence and artifact-provenance contract, W8.2's
 deterministic version/deployment/run rollups, and W8.3's bounded retention,
 redaction, and deletion-evidence jobs are complete. W8.4's consolidated
 operations read model, cursor APIs, bounded resumable event stream, and
-canonical Worker list/detail workbench are also complete. Resume at W8.5 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w85---close-the-answerability-gate).
+canonical Worker list/detail workbench and W8.5's answerability, accessibility,
+cursor, tenant, and storage-parity gate are also complete. Resume at W9.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w91---freeze-workerpackage-v1).
 
 ## North star
 
@@ -102,7 +103,7 @@ redacted state. Fresh-process approval replay, approve/reject races, stop at
 every supervisor phase, activation/revoke races, and headless route controls
 pass without later work.
 
-### 8. Worker health, cost, and evidence - active
+### 8. Worker health, cost, and evidence - complete
 
 The v2 event envelope, monotonic deployment/run streams, atomic evidence
 entries, source correlations, artifact manifests, digests, W3C trace checks,
@@ -112,10 +113,11 @@ approvals, checkpoints, budgets, artifacts, outcomes, and explained source
 gaps up by immutable Worker version, deployment, and run. Separate metadata,
 summary, prompt, tool-payload, and artifact retention windows now execute
 through bounded workspace jobs with dry-run metrics and digest-only deletion
-evidence. Next make "what is running, why, at what cost, and what needs me"
-answerable from one screen.
+evidence. One server-side read model now makes "what is running, why, at what
+cost, and what needs me" answerable from the accessible canonical Worker
+list/detail workbench without client-side raw-table joins.
 
-### 9. PacketADE handoff
+### 9. PacketADE handoff - active
 
 Implement the versioned deployment contract in [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md): **Deploy to PacketAgent**, **Keep running**, update, inspect, pause, and revoke. Return progress and approval events to PacketADE.
 

@@ -24,7 +24,7 @@ Status: foundation complete on `codex/packetagent-foundation`; inherited quality
 - [x] Carry the only uncommitted TaskLoom worktree fix into the new branch.
 - [x] Refresh every Markdown document, label historical plans, and add an authoritative Codex project handoff.
 - [x] Pass typecheck, lint with zero errors, production web build, API tests, web tests, migration tests, diff check, and compatibility-only brand scan.
-- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 367 files; files authored in this foundation pass are formatted.
+- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 326 files; files authored in this foundation pass are formatted.
 - [ ] Reduce the inherited ESLint baseline of 145 warnings while preserving the current zero-error gate.
 - [ ] Review and remediate dependency advisories deliberately. The full install reports 11 advisories (including 2 critical development-tree advisories); `npm audit --omit=dev` reports 5 production advisories (1 low, 1 moderate, 3 high, 0 critical). Do not apply a blind force-fix that causes unrelated dependency churn.
 - Gate: a clean PacketAgent checkout starts with new defaults and can read an existing default TaskLoom deployment without destructive migration.
@@ -114,8 +114,7 @@ rolling reservation, effect preparation, or external I/O.
 
 Dependencies: W4-W6.
 
-Status: complete. Resume at
-[`W8.5 - Close the answerability gate`](dev/worker-implementation-loops.md#w85---close-the-answerability-gate).
+Status: complete.
 
 - [x] Define and persist version-bound attention requests, approval grants,
       control commands, and notification delivery references with durable replay
@@ -134,8 +133,8 @@ Status: complete. Resume at
 
 Dependencies: W2-W7.
 
-Status: active. Resume at
-[`W8.5 - Close the answerability gate`](dev/worker-implementation-loops.md#w85---close-the-answerability-gate).
+Status: complete. Resume at
+[`W9.1 - Freeze WorkerPackage v1`](dev/worker-implementation-loops.md#w91---freeze-workerpackage-v1).
 
 - [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
@@ -145,11 +144,20 @@ Status: active. Resume at
 - [x] Add retention and redaction policy for prompts, tool payloads, and outputs,
       including bounded workspace jobs, read-only dry runs, deletion evidence,
       and terminal-only compaction.
-- Gate: the UI and API answer what is running, why, current budget, last checkpoint, and required attention without joining raw tables manually.
+- Gate: passed 2026-07-28. One workspace-scoped read model answers what is
+  running, why, its immutable version/deployment, current hard-budget use,
+  provider cost, last checkpoint, required attention, evidence, artifacts,
+  source gaps, and outcome without client-side raw-table joins. Stable
+  filter-bound cursors, reconnect semantics, redaction, accessible
+  loading/error/empty states, tenant isolation, source-order replay, and
+  JSON/SQLite/managed-Postgres parity are covered.
 
 ### W9 - PacketADE deployment handoff
 
 Dependencies: W1-W7. Contract design may proceed earlier.
+
+Status: active. Resume at
+[`W9.1 - Freeze WorkerPackage v1`](dev/worker-implementation-loops.md#w91---freeze-workerpackage-v1).
 
 - [ ] Implement the WorkerPackage contract in [`dev/packetade-packetagent-handoff.md`](dev/packetade-packetagent-handoff.md).
 - [ ] Add validate, deploy, update, activate, inspect, pause, and revoke endpoints.

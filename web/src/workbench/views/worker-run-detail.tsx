@@ -10,6 +10,7 @@ import type {
 } from "@/lib/types";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
+import { workerRunDetailAccessibleState } from "../worker-operations-state";
 
 type RunControlAction = "pause" | "resume" | "stop" | "revoke";
 type AttentionAction = "approve-once" | "approve-for-run" | "reject";
@@ -64,6 +65,11 @@ export function WorkerRunDetailView() {
     };
   }, [id, refreshDetail]);
 
+  const accessibleState = workerRunDetailAccessibleState({
+    loading: detail.loading,
+    error: detail.error,
+    hasDetail: detail.data !== null,
+  });
   const run = detail.data?.run;
 
   const runControl = async (action: RunControlAction) => {
@@ -113,18 +119,23 @@ export function WorkerRunDetailView() {
     }
   };
 
-  if (detail.loading && !detail.data) {
+  if (accessibleState.kind === "loading") {
     return (
       <>
         <Topbar crumbs={["__WS__", "Runs", "Workers", id]} />
-        <div className="muted" aria-live="polite" style={{ padding: 26 }}>
-          Loading Worker read model…
+        <div
+          className="muted"
+          role={accessibleState.role}
+          aria-live={accessibleState.ariaLive}
+          style={{ padding: 26 }}
+        >
+          {accessibleState.message}
         </div>
       </>
     );
   }
 
-  if (detail.error || !detail.data || !run) {
+  if (accessibleState.kind === "error" || !detail.data || !run) {
     return (
       <>
         <Topbar crumbs={["__WS__", "Runs", "Workers", id]} />
@@ -134,10 +145,11 @@ export function WorkerRunDetailView() {
           </button>
           <div
             className="card"
-            role="alert"
+            role={accessibleState.kind === "error" ? accessibleState.role : "alert"}
+            aria-live={accessibleState.kind === "error" ? accessibleState.ariaLive : "assertive"}
             style={{ padding: 22, marginTop: 18, color: "var(--danger)" }}
           >
-            {detail.error ?? "Worker run not found."}
+            {accessibleState.kind === "error" ? accessibleState.message : "Worker run not found."}
           </div>
         </div>
       </>

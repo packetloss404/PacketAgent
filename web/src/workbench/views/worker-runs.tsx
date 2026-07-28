@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import type { WorkerOperationsHealth, WorkerRunStatus, WorkerRunSummary } from "@/lib/types";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
+import { workerRunListAccessibleState } from "../worker-operations-state";
 
 const WORKER_STATUS_FILTERS: Array<"all" | WorkerRunStatus> = [
   "all",
@@ -65,6 +66,11 @@ export function WorkerRunsView() {
       ].some((value) => value.toLowerCase().includes(needle)),
     );
   }, [loadedRuns, search]);
+  const accessibleState = workerRunListAccessibleState({
+    loading: firstPage.loading,
+    error: firstPage.error ?? health.error,
+    visibleRuns: visibleRuns.length,
+  });
 
   const refresh = () => {
     setAdditionalRuns([]);
@@ -172,18 +178,24 @@ export function WorkerRunsView() {
           </button>
         </div>
 
-        {(health.error || firstPage.error) && (
+        {accessibleState.kind === "error" && (
           <div
             className="card"
-            role="alert"
+            role={accessibleState.role}
+            aria-live={accessibleState.ariaLive}
             style={{ padding: 16, marginBottom: 12, color: "var(--danger)" }}
           >
-            {firstPage.error ?? health.error}
+            {accessibleState.message}
           </div>
         )}
-        {firstPage.loading && loadedRuns.length === 0 && (
-          <div className="muted" aria-live="polite" style={{ padding: 16 }}>
-            Loading Worker operations…
+        {accessibleState.kind === "loading" && (
+          <div
+            className="muted"
+            role={accessibleState.role}
+            aria-live={accessibleState.ariaLive}
+            style={{ padding: 16 }}
+          >
+            {accessibleState.message}
           </div>
         )}
 
@@ -259,10 +271,12 @@ export function WorkerRunsView() {
                   </td>
                 </tr>
               ))}
-              {visibleRuns.length === 0 && !firstPage.loading && (
+              {accessibleState.kind === "empty" && (
                 <tr>
                   <td colSpan={8} className="muted" style={{ padding: 22, textAlign: "center" }}>
-                    No canonical Worker runs match this view.
+                    <span role={accessibleState.role} aria-live={accessibleState.ariaLive}>
+                      {accessibleState.message}
+                    </span>
                   </td>
                 </tr>
               )}

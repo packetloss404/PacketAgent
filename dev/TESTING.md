@@ -14,14 +14,15 @@ W8.1 adds the versioned event, evidence, and artifact-provenance substrate.
 W8.2 adds deterministic cumulative version/deployment/run rollups. W8.3 adds
 bounded redaction, retention, and deletion evidence. W8.4 adds the consolidated
 Worker health/list/detail read model, filter-bound cursor APIs, bounded
-resumable event stream, and canonical Worker workbench. W8.5 still owns the
-complete answerability, accessibility, and screenshot matrix; PacketADE
-handoff cases remain W9 work and are not current product claims.
+resumable event stream, and canonical Worker workbench. W8.5 closes one-read
+answerability, source-order/backend parity, tenant-bound cursors, accessible
+loading/error/empty states, and the documented screenshot/manual matrix.
+PacketADE handoff cases remain W9 work and are not current product claims.
 
-Last automated W8.4 baseline (2026-07-28):
+Last automated W8.5 baseline (2026-07-28):
 
-- API: 1,457 passed, 1 skipped, 0 failed
-- Web: 25 passed, 0 failed
+- API: 1,459 passed, 1 skipped, 0 failed
+- Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
   case-aliased host paths, hostile command arguments, stale/tampered policy,
@@ -62,6 +63,10 @@ Last automated W8.4 baseline (2026-07-28):
   cross-workspace cursor rejection, independently authorized routes,
   `Last-Event-ID` SSE resume, duration/event ceilings, and explicit stream
   closure checks: passed
+- Focused source-order-independent operations projections,
+  JSON/SQLite/managed-Postgres read-model parity, filter- and tenant-bound
+  attention cursors, secret-free detail projections, and accessible Worker
+  loading/error/empty/ready state semantics: passed
 - Signed-in browser pass for the canonical `/runs` empty state, accessible
   labels and filters, `/activity` preservation and two-way navigation, missing
   Worker detail error state, and console warnings/errors: passed
@@ -494,6 +499,68 @@ Use authenticated requests under `/api/app/workers`. Every mutation requires
    whose bounds exceed their ceilings. Confirm it fails closed before cleanup.
 10. Repeat persisted compaction against JSON, SQLite, and managed Postgres and
     confirm equivalent result kinds, event counts, exports, and rollups.
+
+## W8.4 Worker Operations API and UI Smoke
+
+1. Sign in as a workspace operator with `inspectWorkers`, open `/runs`, and
+   confirm the page reads `/api/app/workers/health` plus the paginated
+   `/api/app/workers/runs` projection. It must not fetch raw definitions,
+   deployments, checkpoints, or journals and join them in the browser.
+2. In an empty workspace, confirm the health cards report zero canonical runs
+   and the table exposes one polite status message: `No canonical Worker runs
+match this view.` Capture `w8-worker-list-empty.png`.
+3. Activate a bounded Worker and confirm its row shows definition name, pinned
+   version and deployment, live state, maximum budget utilization, latest
+   checkpoint cursor, open-attention count, and last update. Capture
+   `w8-worker-list-active.png`.
+4. Exercise every state filter and load-more cursor. Confirm ordering remains
+   stable when a newer run arrives, changing a filter invalidates the prior
+   cursor, and a cursor copied to another workspace is rejected.
+5. Open `/runs/worker/:runId`. Confirm one detail response answers the
+   objective/trigger (why), version/deployment, state, hard budget and usage,
+   provider cost, effect/tool totals, latest checkpoint, attention, evidence
+   timeline, artifacts, and source gaps. Capture
+   `w8-worker-detail-running.png`.
+6. Put the run into approval attention. Confirm the detail exposes the bounded
+   operation summary and exactly the approve-once, approve-for-run, and reject
+   actions. Apply one action and confirm revision/idempotency races refresh
+   from the authoritative detail instead of applying optimistic client state.
+   Capture `w8-worker-detail-attention.png`.
+7. Observe `/api/app/workers/events/stream`, terminate the connection after a
+   known event ID, and reconnect with `Last-Event-ID`. Confirm no earlier event
+   repeats, the stream closes at its duration/event ceiling with a resume
+   sequence, and the normal paginated event endpoint refreshes the UI when SSE
+   is unavailable.
+8. Open `/activity` and return through **Canonical Workers**. Confirm inherited
+   Agent runs remain intact and route-specific detail navigation does not
+   collide with `/runs/worker/:runId`.
+
+## W8.5 Answerability and Accessibility Gate
+
+1. For one running, one waiting-for-approval, and one terminal Worker, answer
+   from only the health/list/detail DTOs: what is running, why it is running,
+   which immutable version/deployment is executing, current use versus every
+   hard budget, last durable checkpoint, provider cost, required attention,
+   evidence/artifacts, and terminal outcome. Any raw-table request or
+   browser-side identity join fails the gate.
+2. Rebuild the same DTOs after process replacement and after reversing source
+   collection order. Confirm all cumulative fields and cursor ordering are
+   identical.
+3. Remove a correlated source record and repeat after retention tombstoning.
+   Confirm unexplained and retention-deleted gaps remain distinct and neither
+   case exposes retained secret content.
+4. Exercise list and detail loading, error, empty, and ready states with a
+   keyboard and accessibility tree. Loading/empty messages use polite
+   `role=status`, failures use assertive `role=alert`, filter buttons expose
+   `aria-pressed`, the search box has a label, tables retain headers, and every
+   control has a unique accessible name.
+5. At narrow and desktop widths, capture the four W8.4 screenshots above and
+   confirm cards wrap, tables scroll without clipping controls, long opaque IDs
+   and digests wrap, focus remains visible, and color is not the only state
+   signal.
+6. Repeat health, detail, evidence, artifact, cursor, and tenant-isolation
+   reads through JSON, SQLite, and managed Postgres loaders. A storage-specific
+   answer or ordering fails the gate.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

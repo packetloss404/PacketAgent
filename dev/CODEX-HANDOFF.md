@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W7 and W8.1-W8.4 are implemented as
+in foundation commit `d60cd47`. W1-W8 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -133,6 +133,20 @@ Prompt-to-app generation remains a supported secondary capability.
   duplicate-effect metadata remains durable. Digest-only deletion events make
   retention gaps explainable, while artifact bytes require an injected
   digest-checked deletion port rather than arbitrary path removal.
+- Completed W8.4's canonical operations API and UI. One independently
+  authorized, workspace-scoped read model joins immutable Worker identity,
+  deterministic rollups, budget policy and usage, checkpoint metadata,
+  attention, evidence, artifacts, and allowed controls. Stable opaque cursors
+  bind workspace and filters; bounded SSE resumes from `Last-Event-ID` with
+  polling fallback. `/runs` is the canonical Worker workbench and `/activity`
+  preserves inherited Agent activity.
+- Completed W8.5's answerability gate. One-read projections answer what is
+  running, why, from which immutable version/deployment, against which hard
+  budgets, at which checkpoint, with what attention/evidence/artifacts and
+  terminal result. Tests cover source-order replay, redaction, retention gaps,
+  filter/tenant-bound cursors, accessible loading/error/empty states, and
+  JSON/SQLite/managed-Postgres parity. The screenshot/manual matrix is recorded
+  in `dev/TESTING.md`.
 
 ## Current implementation truth
 
@@ -221,18 +235,18 @@ Not shipped:
 
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
-- external notification transports and the final W8 answerability/accessibility
-  gate;
-- PacketADE-to-PacketAgent deployment endpoints.
+- external notification transports;
+- PacketADE-to-PacketAgent deployment endpoints and PacketChat/PacketPhone
+  delivery routes.
 
 Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W8 - Evidence, cost, retention, and operations UI** in
+Continue **W9 - PacketADE deployment handoff** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W7 and W8.1-W8.4 are complete under `src/workers/`, the store, migrations,
+W1-W8 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -298,10 +312,15 @@ connections with `Last-Event-ID` resume plus polling fallback. The workbench
 uses `/runs` for canonical Workers, retains inherited Agent activity at
 `/activity`, and renders Worker detail, evidence, artifact, and control states
 without joining raw tables in the browser.
+W8.5 closes the answerability gate with one-read identity, purpose, immutable
+version/deployment, hard-budget use, provider cost, checkpoint, attention,
+evidence, artifact, source-gap, and outcome assertions. It also proves
+source-order replay, secret-free reads, filter/tenant-bound cursors, accessible
+state semantics, and JSON/SQLite/managed-Postgres projection parity.
 
 The exact next slice is
-[`W8.5 - Close the answerability gate`](worker-implementation-loops.md#w85---close-the-answerability-gate).
-After each gate passes, continue through W8-W10 and then R1-R8 using that
+[`W9.1 - Freeze WorkerPackage v1`](worker-implementation-loops.md#w91---freeze-workerpackage-v1).
+After each gate passes, continue through W9-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
 
@@ -326,8 +345,8 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,451 passed, 1 skipped, 0 failed
-- `npm run test:web` - 25 passed, 0 failed
+- `npm run test:api` - 1,459 passed, 1 skipped, 0 failed
+- `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
   approval-required checkpointing, exact one-time/run grant consumption,
@@ -364,12 +383,18 @@ handoff, the roadmap, or the backlog.
   compaction, digest-checked artifact deletion, idempotent tombstones,
   retention-explained source gaps, and stable JSON/SQLite/managed-Postgres
   parity checks - passed
+- focused W8.4-W8.5 one-read Worker
+  identity/purpose/version/budget/checkpoint/attention/evidence projection,
+  health aggregation, stable filter/tenant-bound cursors, independent route
+  authorization, bounded `Last-Event-ID` SSE reconnect, source-order rebuild,
+  secret-free reads, accessible loading/error/empty/ready states, and
+  JSON/SQLite/managed-Postgres operations-read-model parity checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
 Known inherited quality debt:
 
-- repo-wide `npm run format:check` flags 367 files;
+- repo-wide `npm run format:check` flags 326 inherited files;
 - full dependency audit reports 11 advisories, including 2 critical
   development-tree advisories; and
 - production-only audit reports 5 advisories: 1 low, 1 moderate, 3 high,
@@ -393,6 +418,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W8.3 commit: clean. Stop if the active folder is
+Expected status after the W8.5 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

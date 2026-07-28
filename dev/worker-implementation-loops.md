@@ -639,7 +639,7 @@ without relying on the authoring UI.
 Outcome: one API and one UI surface answer what is running, why, at what cost,
 from which version, at which checkpoint, and what needs attention.
 
-Status: active. W8.1-W8.4 are complete; resume at W8.5.
+Status: complete. Gate passed 2026-07-28.
 
 ### W8.1 - Formalize the event and evidence model
 
@@ -717,19 +717,24 @@ inherited Agent-run view.
 
 ### W8.5 - Close the answerability gate
 
-Status: active. This is the exact resume point after W8.4.
+Status: complete as of 2026-07-28.
 
 - Test rollup rebuilds, missing source records, redaction, retention, cursor
   reconnect, tenant isolation, and accessible UI loading/error/empty states.
 - Add screenshots/manual cases to `dev/TESTING.md`.
 
 Gate: the required health and evidence answers come from the read model without
-client-side joins over raw tables.
+client-side joins over raw tables. Passed with one-read answerability tests,
+stable source-order and filter/tenant-bound cursor coverage, redaction and
+retention-gap checks, accessible state semantics, documented screenshot/manual
+cases, and JSON/SQLite/managed-Postgres parity.
 
 ## W9 - PacketADE deployment handoff
 
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
+
+Status: active. Resume at W9.1.
 
 ### W9.1 - Freeze WorkerPackage v1
 
