@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Independent Worker operator API (W7.4)
+
+- Mounted a dedicated Worker operator route module beside the lifecycle API,
+  independent of the Builder surface.
+- Added concise workspace-scoped run and attention reads plus pause, resume,
+  stop, deployment revoke, approve-once, approve-for-run, and reject
+  operations backed by the atomic control service.
+- Split Worker authorization into explicit inspect, run-control,
+  deployment-control, and approval permissions. Viewers can inspect, members
+  can control runs, and deployment revoke or approval requires an admin.
+- Operator mutations require an allowlisted JSON body, positive expected
+  revision, and bounded idempotency key. Durable command rejections return
+  conflict state suitable for CLI clients.
+- Operator projections omit run input/output, errors, traces, leases, request
+  digests, nonce digests, compiled policy, and raw events while retaining a
+  safe operation summary for approval decisions.
+- Approval nonces appear only on the first applied response and carry
+  `Cache-Control: no-store`; replay returns the durable grant without the raw
+  nonce.
+- The W7.4 baseline covers 1,427 API tests (1,426 passed and 1 intentionally
+  skipped) plus 25 web tests with zero lint errors.
+
 ### 2026-07-27 - Supervisor approval attention (W7.3)
 
 - Added an immutable Worker attention policy with bounded approval and

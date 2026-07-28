@@ -6,7 +6,14 @@ export const WORKSPACE_ROLES = ["viewer", "member", "admin", "owner"] as const;
 
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
 
-export type WorkspacePermission = "viewWorkspace" | "editWorkflow" | "manageWorkspace";
+export type WorkspacePermission =
+  | "viewWorkspace"
+  | "editWorkflow"
+  | "manageWorkspace"
+  | "inspectWorkers"
+  | "controlWorkerRuns"
+  | "controlWorkerDeployments"
+  | "approveWorkerActions";
 
 export interface WorkspaceMembershipLike {
   role?: string | null;
@@ -40,19 +47,35 @@ const roleRanks: Record<WorkspaceRole, number> = {
 export const WORKSPACE_ROLE_DEFINITIONS: Readonly<Record<WorkspaceRole, WorkspaceRoleDefinition>> = {
   viewer: {
     rank: roleRanks.viewer,
-    permissions: new Set<WorkspacePermission>(["viewWorkspace"]),
+    permissions: new Set<WorkspacePermission>(["viewWorkspace", "inspectWorkers"]),
   },
   member: {
     rank: roleRanks.member,
-    permissions: new Set<WorkspacePermission>(["viewWorkspace", "editWorkflow"]),
+    permissions: new Set<WorkspacePermission>(["viewWorkspace", "editWorkflow", "inspectWorkers", "controlWorkerRuns"]),
   },
   admin: {
     rank: roleRanks.admin,
-    permissions: new Set<WorkspacePermission>(["viewWorkspace", "editWorkflow", "manageWorkspace"]),
+    permissions: new Set<WorkspacePermission>([
+      "viewWorkspace",
+      "editWorkflow",
+      "manageWorkspace",
+      "inspectWorkers",
+      "controlWorkerRuns",
+      "controlWorkerDeployments",
+      "approveWorkerActions",
+    ]),
   },
   owner: {
     rank: roleRanks.owner,
-    permissions: new Set<WorkspacePermission>(["viewWorkspace", "editWorkflow", "manageWorkspace"]),
+    permissions: new Set<WorkspacePermission>([
+      "viewWorkspace",
+      "editWorkflow",
+      "manageWorkspace",
+      "inspectWorkers",
+      "controlWorkerRuns",
+      "controlWorkerDeployments",
+      "approveWorkerActions",
+    ]),
   },
 };
 
@@ -60,6 +83,10 @@ const permissionMinimumRoles: Record<WorkspacePermission, WorkspaceRole> = {
   viewWorkspace: "viewer",
   editWorkflow: "member",
   manageWorkspace: "admin",
+  inspectWorkers: "viewer",
+  controlWorkerRuns: "member",
+  controlWorkerDeployments: "admin",
+  approveWorkerActions: "admin",
 };
 
 export function isWorkspaceRole(value: unknown): value is WorkspaceRole {

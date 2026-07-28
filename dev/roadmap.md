@@ -10,9 +10,10 @@ for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
 complete. W6.5 closes the adversarial bypass gate across every registered tool.
-W7.1's durable records, W7.2's atomic control service, and W7.3's supervisor
-attention flow are also complete. Resume at W7.4 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w74---add-independent-operator-apis).
+W7.1's durable records, W7.2's atomic control service, W7.3's supervisor
+attention flow, and W7.4's independent operator API are also complete. Resume
+at W7.5 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w75---close-the-restartkill-gate).
 
 ## North star
 
@@ -90,8 +91,10 @@ revoke, approve-once, approve-for-run, and reject commands while fencing live
 supervisors and preserving paused checkpoints and budgets. Approval-required
 operations now checkpoint the exact action, persist and notify durable
 attention, consume exact unexpired grants at the execution boundary, and apply
-the version's explicit pause/reject expiration disposition. Next expose these
-controls through independent operator APIs.
+the version's explicit pause/reject expiration disposition. Independently
+mounted operator routes now authorize inspect, run-control,
+deployment-control, and approval actions separately and return concise,
+redacted state. Next close the restart/kill race gate.
 
 ### 8. Worker health, cost, and evidence
 

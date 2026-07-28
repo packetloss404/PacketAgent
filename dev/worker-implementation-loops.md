@@ -530,7 +530,7 @@ committed budget.
 Outcome: approvals and operator commands are durable, independently available,
 audited, and safe across restarts and replay.
 
-Status: active. W7.1-W7.3 are complete; resume at W7.4.
+Status: active. W7.1-W7.4 are complete; resume at W7.5.
 
 ### W7.1 - Add durable control records
 
@@ -597,7 +597,14 @@ reject expiration never approves implicitly.
 
 ### W7.4 - Add independent operator APIs
 
-Status: active. This is the exact resume point after W7.3.
+Status: complete. Worker operator routes are mounted independently beside the
+lifecycle routes at `/api/app/workers`. They expose concise run and attention
+inspection plus pause, resume, stop, deployment revoke, approve-once,
+approve-for-run, and reject actions. Every endpoint authorizes one explicit
+inspect, run-control, deployment-control, or approval permission. Mutation
+bodies are allowlisted and revision/idempotency bound; responses omit raw run
+payloads, leases, request and nonce digests, and event payloads. A first-use
+approval nonce is returned with no-store headers and is absent on replay.
 
 - Mount Worker control routes outside the Builder route module.
 - Apply RBAC separately to inspect, run control, deployment control, and
@@ -607,6 +614,8 @@ Status: active. This is the exact resume point after W7.3.
   client.
 
 ### W7.5 - Close the restart/kill gate
+
+Status: active. This is the exact resume point after W7.4.
 
 - Restart while waiting for approval, replay approval callbacks, race
   approve/reject, stop during each supervisor phase, and revoke while new

@@ -66,6 +66,7 @@ import { operationsJobMetricsRoutes } from "./operations-job-metrics-routes.js";
 import { operationsAlertsRoutes } from "./operations-alerts-routes.js";
 import { sandboxRoutes } from "./sandbox-routes.js";
 import { workerRoutes } from "./worker-routes.js";
+import { workerOperatorRoutes } from "./worker-operator-routes.js";
 import {
   ALERTS_EVALUATE_JOB_TYPE,
   ensureAlertsCronJobAsync,
@@ -386,6 +387,7 @@ app.route("/api/app/operations/job-metrics", operationsJobMetricsRoutes);
 app.route("/api/app/operations/alerts", operationsAlertsRoutes);
 app.route("/api/app/sandbox", sandboxRoutes);
 app.route("/api/app/workers", workerRoutes);
+app.route("/api/app/workers", workerOperatorRoutes);
 
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
 const workerExecutionJobHandler = createWorkerExecutionJobHandler();

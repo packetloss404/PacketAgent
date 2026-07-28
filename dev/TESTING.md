@@ -9,12 +9,12 @@ immediate runtime policy enforcement, W6.3's credential/network/process
 hardening, W6.4's atomic rolling budgets, W6.5's adversarial bypass gate, and
 W7.1's durable control records plus W7.2's atomic control service. Supervisor
 attention and deadline enforcement are covered by W7.3. Independent operator
-API, restart/kill, and PacketADE handoff cases must be added as W7.4-W9 ship;
-they are not current product claims.
+API coverage is added by W7.4. Restart/kill and PacketADE handoff cases must be
+added as W7.5-W9 ship; they are not current product claims.
 
-Last automated W7.3 baseline (2026-07-27):
+Last automated W7.4 baseline (2026-07-27):
 
-- API: 1,419 passed, 1 skipped, 0 failed
+- API: 1,426 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -27,7 +27,9 @@ Last automated W7.3 baseline (2026-07-27):
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
   approval-required checkpointing, exact one-time/run grant consumption,
   final-boundary grant rechecks, escalation deduplication, pause/reject
-  expiration, paused-job draining,
+  expiration, independent operator RBAC, redacted projections, strict mutation
+  inputs, no-store first-use approval nonces, workspace isolation,
+  paused-job draining,
   recovery/quarantine, lease/revision, scheduler, and JSON/SQLite/managed-Postgres
   parity checks: passed
 - Typecheck: passed
@@ -315,6 +317,41 @@ and executes that job through the bounded supervisor.
 8. Repeat persistence and graph validation across JSON, SQLite, and managed
    Postgres. Send malformed or cross-workspace deadline work and confirm it
    fails closed without changing another workspace.
+
+## W7.4 Independent Worker Operator API Smoke
+
+Use authenticated requests under `/api/app/workers`. Every mutation requires
+`Content-Type: application/json`, an `Idempotency-Key` header, and a positive
+`expectedRevision`.
+
+1. As a viewer, read `GET /runs/:workerRunId`, `GET /attention`, and
+   `GET /attention/:attentionRequestId`. Confirm the response contains concise
+   status, revision, budget, checkpoint, deadline, and safe tool/verb/effect
+   context but no input, output, error, trace, runtime lease, raw event,
+   compiled policy, request digest, nonce digest, or attention request key.
+2. As a viewer, attempt every mutation and confirm denial before body parsing
+   or target lookup. As a member, confirm pause/resume/stop are allowed but
+   deployment revoke and approval remain denied. As an admin, confirm all four
+   inspect/run-control/deployment-control/approval permission classes work.
+3. Pause, resume, and stop one run through `/runs/:workerRunId/{action}`.
+   Confirm the response revision advances once, replay returns the original
+   command state without another job or transition, and a reused key with
+   changed input returns `idempotency_mismatch`.
+4. Revoke through `/deployments/:workerDeploymentId/revoke`. Confirm the
+   concise deployment response is revoked, future activation fails, and all
+   nonterminal run IDs are returned after terminalization.
+5. Approve once, approve for run, and reject through the three attention
+   action routes. Confirm a raw approval nonce appears only on the first
+   applied approve response with `Cache-Control: no-store` and never appears
+   in replay, storage, events, errors, or the projected grant.
+6. Send an unknown JSON field, invalid revision/timestamp, missing idempotency
+   key, unsupported content type, or malformed body. Confirm `invalid_input`
+   and no command record. Replay a durable rejected command and confirm a
+   stable HTTP 409 response with its concise rejection code.
+7. Repeat every read and mutation with another workspace selected. Confirm
+   reads return not found or an empty collection and controls cannot discover
+   or change the other workspace's run, deployment, attention, grants, jobs,
+   or commands.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

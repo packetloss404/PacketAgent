@@ -11,6 +11,7 @@ import {
   canManageWorkspace,
   canViewWorkspace,
   getWorkspaceRole,
+  hasWorkspacePermission,
   hasWorkspaceRole,
   requirePrivateWorkspace,
   requirePrivateWorkspaceAsync,
@@ -52,6 +53,24 @@ test("workspace permission helpers follow the role hierarchy", () => {
   assert.equal(canViewWorkspace(owner), true);
   assert.equal(canEditWorkflow(owner), true);
   assert.equal(canManageWorkspace(owner), true);
+});
+
+test("Worker operator permissions separate inspection, run control, deployment control, and approval", () => {
+  const viewer = { role: "viewer" };
+  const member = { role: "member" };
+  const admin = { role: "admin" };
+
+  assert.equal(hasWorkspacePermission(viewer, "inspectWorkers"), true);
+  assert.equal(hasWorkspacePermission(viewer, "controlWorkerRuns"), false);
+
+  assert.equal(hasWorkspacePermission(member, "inspectWorkers"), true);
+  assert.equal(hasWorkspacePermission(member, "controlWorkerRuns"), true);
+  assert.equal(hasWorkspacePermission(member, "controlWorkerDeployments"), false);
+  assert.equal(hasWorkspacePermission(member, "approveWorkerActions"), false);
+
+  assert.equal(hasWorkspacePermission(admin, "controlWorkerRuns"), true);
+  assert.equal(hasWorkspacePermission(admin, "controlWorkerDeployments"), true);
+  assert.equal(hasWorkspacePermission(admin, "approveWorkerActions"), true);
 });
 
 test("role checks accept higher roles for lower requirements", () => {
