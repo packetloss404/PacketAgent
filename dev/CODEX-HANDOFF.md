@@ -8,13 +8,14 @@ as a new project in the Codex app.
 ## Open this project
 
 - Project folder: `D:\projects\PacketAgent`
-- Active branch: `codex/packetagent-foundation`
+- Active local branch: `codex/packetagent-foundation`, tracking `origin/main`
 - Historical source remote: `taskloom-source`
-- PacketAgent `origin`: not configured
+- PacketAgent `origin`: `git@github.com:packetloss404/PacketAgent.git`
+- Primary remote branch: `main`
 - Original TaskLoom checkout: `D:\projects\taskloom`, preserved and unchanged
 
-Do not push PacketAgent changes to `taskloom-source`. Create and confirm the
-new PacketAgent repository before adding an `origin`.
+Do not push PacketAgent changes to `taskloom-source`. PacketAgent commits belong
+on `origin/main`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
@@ -433,6 +434,10 @@ must not be resumed independently.
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
 - Verification: [`TESTING.md`](TESTING.md)
 - Shipped history: [`../CHANGELOG.md`](../CHANGELOG.md)
+- W1-W10.2 implementation report:
+  [`../output/pdf/packetagent-worker-implementation-report.pdf`](../output/pdf/packetagent-worker-implementation-report.pdf)
+- Packet-suite integration reality check:
+  [`../output/pdf/packet-suite-integration-reality-check.pdf`](../output/pdf/packet-suite-integration-reality-check.pdf)
 
 Historical documents are labeled at their top and must not override this
 handoff, the roadmap, or the backlog.

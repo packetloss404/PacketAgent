@@ -54,7 +54,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 [![React 19](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev)
 [![Hono](https://img.shields.io/badge/API-Hono-orange.svg)](https://hono.dev)
 
-- **Repository status:** local foundation branch; PacketAgent `origin` is not configured yet
+- **Repository:** `git@github.com:packetloss404/PacketAgent.git`; primary branch `main`
 - **License:** MIT
 
 ## Project docs
@@ -62,7 +62,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [docs/SELF_HOST.md](docs/SELF_HOST.md) is the canonical setup guide: prerequisites, 5-minute quick start, BYO-LLM-key configuration, and Docker-Compose deploy.
 - [CLOUD.md](CLOUD.md) inventories the hosted-only capabilities PacketAgent intentionally does not ship as self-host, and what a hypothetical PacketAgent Cloud product would need to ship them.
 - [CHANGELOG.md](CHANGELOG.md) records notable product and platform changes.
-- [BACKLOG.md](BACKLOG.md) is the master ledger for the autonomous-worker foundation and inherited platform work.
+- [BACKLOG.md](BACKLOG.md) is the single implementation ledger for all remaining autonomous-worker and inherited platform work.
 - [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md) is the authoritative state and resume point for a new Codex project.
 - [dev/worker-implementation-loops.md](dev/worker-implementation-loops.md) turns W2-W10 and the inherited backlog into dependency-ordered implementation and verification loops.
 - [dev/packetade-packetagent-handoff.md](dev/packetade-packetagent-handoff.md) defines the versioned WorkerPackage v1 contract and PacketADE deployment lifecycle.
@@ -70,6 +70,8 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [dev/worker-contract-plan.md](dev/worker-contract-plan.md) records W1 research, contract decisions, implementation loops, and verification.
 - [dev/TESTING.md](dev/TESTING.md) covers local verification and release checks.
 - [dev/roadmap.md](dev/roadmap.md) captures the broader roadmap after the MVP path is reliable.
+- [Canonical Worker implementation report](output/pdf/packetagent-worker-implementation-report.pdf) summarizes W1-W10.2, its safety model, verification, and exact pause state.
+- [Packet suite integration reality check](output/pdf/packet-suite-integration-reality-check.pdf) separates PacketAgent-side PacketADE and PacketChat work from changes still required in the other Packet repositories, including PacketPhone W10.3.
 
 ## Why PacketAgent
 
@@ -87,9 +89,10 @@ npm run dev
 
 Then open **http://localhost:7341**. Two processes start:
 
-The current foundation checkout is `D:\projects\PacketAgent`. A PacketAgent
-`origin` has not been configured yet; do not clone from or push to the
-historical `taskloom-source` remote.
+The current foundation checkout is `D:\projects\PacketAgent`. Its `origin` is
+`git@github.com:packetloss404/PacketAgent.git`, with `main` as the primary
+branch. The `taskloom-source` remote is historical and must not receive
+PacketAgent changes.
 
 | Port   | Process    | Purpose                                         |
 | ------ | ---------- | ----------------------------------------------- |
@@ -316,11 +319,16 @@ PacketAgent is in its foundation transition from TaskLoom's app/agent workbench 
 
 The exact resume point is W10.3 in [BACKLOG.md](BACKLOG.md), the sole ledger for all remaining W10 and R1-R8 work. New Codex projects should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived Phase 3 or legacy handoff documents.
 
-For current product changes, see [CHANGELOG.md](CHANGELOG.md). PacketAgent does not yet have a configured GitHub `origin`, website, issue tracker, or release feed.
+For current product changes, see [CHANGELOG.md](CHANGELOG.md). The repository is
+published at `git@github.com:packetloss404/PacketAgent.git`; a website, issue
+tracker policy, and release feed have not yet been established.
 
 ## Contributing
 
-Until the PacketAgent remote is created, make changes on local `codex/*` branches and do not push to `taskloom-source`. Run `npm run build` before publishing work; it runs the web build, full TypeScript typecheck, API tests, and frontend tests.
+Make changes on local `codex/*` branches and publish PacketAgent work to
+`origin`, never to the historical `taskloom-source` remote. Run `npm run build`
+before publishing work; it runs the web build, full TypeScript typecheck, API
+tests, and frontend tests.
 
 ## License
 

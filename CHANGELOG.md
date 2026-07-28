@@ -6,6 +6,20 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - Pause handoff and implementation reports
+
+- Consolidated every remaining W10 and inherited R1-R8 task into
+  `BACKLOG.md`, the single active implementation ledger, and made the Codex
+  handoff resume directly at W10.3 there.
+- Added a 15-page canonical Worker implementation report covering W1-W10.2,
+  the runtime safety model, verification baseline, and exact pause state.
+- Added a separate 9-page Packet-suite integration reality check that states
+  which work exists only inside PacketAgent, what PacketADE and PacketChat
+  still need in their own repositories, and why PacketPhone W10.3 is not yet
+  implemented.
+- Recorded the PacketAgent `origin` and `main` branch while retaining
+  `taskloom-source` as a read-only historical source.
+
 ### 2026-07-28 - PacketChat Worker delivery (W10.2)
 
 - Added `packetagent.packetchat-route/v1` encrypted route configuration and a
