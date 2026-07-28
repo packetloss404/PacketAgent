@@ -1,9 +1,6 @@
 import { createHash } from "node:crypto";
 import { parseCron } from "../jobs/cron.js";
-import {
-  compileWorkerCapabilityPolicy,
-  WorkerCapabilityCompilationError,
-} from "./capabilities.js";
+import { compileWorkerCapabilityPolicy, WorkerCapabilityCompilationError } from "./capabilities.js";
 import {
   WORKER_COMPILED_POLICY_SCHEMA_VERSION,
   WORKER_CONTRACT_SCHEMA_VERSION,
@@ -590,24 +587,13 @@ function validatePolicy(
       exclusiveMinimum: 0,
     });
     if (budgets.rolling !== undefined) {
-      const rolling = recordAt(
-        budgets.rolling,
-        `${path}.budgets.rolling`,
-        issues,
-      );
+      const rolling = recordAt(budgets.rolling, `${path}.budgets.rolling`, issues);
       if (rolling) {
-        numberAt(
-          rolling,
-          "windowMs",
-          `${path}.budgets.rolling`,
-          issues,
-          { integer: true, exclusiveMinimum: 0 },
-        );
-        validateRollingBudgetLimit(
-          rolling.workspace,
-          `${path}.budgets.rolling.workspace`,
-          issues,
-        );
+        numberAt(rolling, "windowMs", `${path}.budgets.rolling`, issues, {
+          integer: true,
+          exclusiveMinimum: 0,
+        });
+        validateRollingBudgetLimit(rolling.workspace, `${path}.budgets.rolling.workspace`, issues);
         validateRollingBudgetLimit(
           rolling.deployment,
           `${path}.budgets.rolling.deployment`,
@@ -700,11 +686,7 @@ function validatePolicy(
   }
 }
 
-function validateRollingBudgetLimit(
-  value: unknown,
-  path: string,
-  issues: IssueCollector,
-): void {
+function validateRollingBudgetLimit(value: unknown, path: string, issues: IssueCollector): void {
   const limit = recordAt(value, path, issues);
   if (!limit) return;
   numberAt(limit, "maxProviderCostUsd", path, issues, {
@@ -1007,11 +989,21 @@ function validateTrace(value: unknown, path: string, issues: IssueCollector): vo
   const traceId = stringAt(trace, "traceId", path, issues);
   const spanId = stringAt(trace, "spanId", path, issues, { optional: true });
   stringAt(trace, "traceState", path, issues, { optional: true });
-  if (traceId && !/^[a-f0-9]{32}$/i.test(traceId)) {
-    issue(issues, `${path}.traceId`, "trace.trace_id", "must contain 32 hexadecimal characters");
+  if (traceId && (!/^[a-f0-9]{32}$/i.test(traceId) || /^0{32}$/.test(traceId))) {
+    issue(
+      issues,
+      `${path}.traceId`,
+      "trace.trace_id",
+      "must contain 32 hexadecimal characters and cannot be all zeroes",
+    );
   }
-  if (spanId && !/^[a-f0-9]{16}$/i.test(spanId)) {
-    issue(issues, `${path}.spanId`, "trace.span_id", "must contain 16 hexadecimal characters");
+  if (spanId && (!/^[a-f0-9]{16}$/i.test(spanId) || /^0{16}$/.test(spanId))) {
+    issue(
+      issues,
+      `${path}.spanId`,
+      "trace.span_id",
+      "must contain 16 hexadecimal characters and cannot be all zeroes",
+    );
   }
 }
 
@@ -1176,10 +1168,7 @@ export function validateWorkerDeployment(
   if (record.compiledPolicy !== undefined) {
     validateCompiledPolicy(record.compiledPolicy, "$.compiledPolicy", issues);
   }
-  if (
-    (record.capabilityGrants === undefined) !==
-    (record.compiledPolicy === undefined)
-  ) {
+  if ((record.capabilityGrants === undefined) !== (record.compiledPolicy === undefined)) {
     issue(
       issues,
       "$.compiledPolicy",
@@ -1398,12 +1387,7 @@ export function validateWorkerCheckpoint(
   timestampAt(record, "createdAt", "$", issues);
   const stateDigest = stringAt(record, "stateDigest", "$", issues);
   if (stateDigest && !/^sha256:[a-f0-9]{64}$/.test(stateDigest)) {
-    issue(
-      issues,
-      "$.stateDigest",
-      "checkpoint.digest_format",
-      "must be a sha256 digest",
-    );
+    issue(issues, "$.stateDigest", "checkpoint.digest_format", "must be a sha256 digest");
   }
   return finish(value, issues);
 }

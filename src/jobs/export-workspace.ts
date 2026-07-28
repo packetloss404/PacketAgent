@@ -1,4 +1,7 @@
-import { loadStore as loadDefaultStore, loadStoreAsync as loadDefaultStoreAsync } from "../packetagent-store.js";
+import {
+  loadStore as loadDefaultStore,
+  loadStoreAsync as loadDefaultStoreAsync,
+} from "../packetagent-store.js";
 import type {
   ActivationSignalRecord,
   ActivityRecord,
@@ -38,6 +41,10 @@ import type {
   WorkerEvent,
   WorkerLifecycleCommandReceipt,
 } from "../workers/persistence-types.js";
+import type {
+  WorkerArtifactManifest,
+  WorkerEvidenceEntry,
+} from "../workers/observability/types.js";
 import type {
   WorkerActivationInboxRecord,
   WorkerActivationPayloadMetadata,
@@ -115,6 +122,8 @@ export interface ExportedWorkspaceData {
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];
+  workerEvidenceEntries: WorkerEvidenceEntry[];
+  workerArtifactManifests: WorkerArtifactManifest[];
   workerActivationInboxes: WorkerActivationInboxRecord[];
   workerActivationPayloads: WorkerActivationPayloadMetadata[];
   activationFacts: WorkspaceActivationFacts | null;
@@ -162,7 +171,9 @@ function buildWorkspaceExport(
     throw Object.assign(new Error("workspace not found"), { status: 404 });
   }
 
-  const memberships = (store.memberships ?? []).filter((entry) => entry.workspaceId === workspaceId);
+  const memberships = (store.memberships ?? []).filter(
+    (entry) => entry.workspaceId === workspaceId,
+  );
   const memberUserIds = new Set(memberships.map((entry) => entry.userId));
   const users = (store.users ?? []).filter((entry) => memberUserIds.has(entry.id));
 
@@ -231,30 +242,40 @@ function buildWorkspaceExport(
     .filter((entry) => entry.workspaceId === workspaceId)
     .map((entry) => redactSensitiveValue(entry) as ActivityRecord);
 
-  const workerCredentials = workspaceWorkerRecords(
-    store.workerCredentials,
-    workspaceId,
-  ).map((record: WorkerCredentialRecord) => workerCredentialMetadata(record));
+  const workerCredentials = workspaceWorkerRecords(store.workerCredentials, workspaceId).map(
+    (record: WorkerCredentialRecord) => workerCredentialMetadata(record),
+  );
   const workerDefinitions = workspaceWorkerRecords(store.workerDefinitions, workspaceId);
   const workerVersions = workspaceWorkerRecords(store.workerVersions, workspaceId);
   const workerDeployments = workspaceWorkerRecords(store.workerDeployments, workspaceId);
   const workerRuns = workspaceWorkerRecords(store.workerRuns, workspaceId);
   const workerCheckpoints = workspaceWorkerRecords(store.workerCheckpoints, workspaceId);
-  const workerEffectReceipts = workspaceWorkerRecords(
-    store.workerEffectReceipts,
-    workspaceId,
-  );
+  const workerEffectReceipts = workspaceWorkerRecords(store.workerEffectReceipts, workspaceId);
   const workerBudgetReservations = workspaceWorkerRecords(
     store.workerBudgetReservations,
     workspaceId,
   );
-  const workerAttentionRequests = workspaceWorkerRecords(store.workerAttentionRequests, workspaceId);
+  const workerAttentionRequests = workspaceWorkerRecords(
+    store.workerAttentionRequests,
+    workspaceId,
+  );
   const workerApprovalGrants = workspaceWorkerRecords(store.workerApprovalGrants, workspaceId);
   const workerControlCommands = workspaceWorkerRecords(store.workerControlCommands, workspaceId);
-  const workerNotificationDeliveries = workspaceWorkerRecords(store.workerNotificationDeliveries, workspaceId);
-  const workerDeploymentRollouts = workspaceWorkerRecords(store.workerDeploymentRollouts, workspaceId);
+  const workerNotificationDeliveries = workspaceWorkerRecords(
+    store.workerNotificationDeliveries,
+    workspaceId,
+  );
+  const workerDeploymentRollouts = workspaceWorkerRecords(
+    store.workerDeploymentRollouts,
+    workspaceId,
+  );
   const workerCommandReceipts = workspaceWorkerRecords(store.workerCommandReceipts, workspaceId);
   const workerEvents = workspaceWorkerRecords(store.workerEvents, workspaceId);
+  const workerEvidenceEntries = workspaceWorkerRecords(store.workerEvidenceEntries, workspaceId);
+  const workerArtifactManifests = workspaceWorkerRecords(
+    store.workerArtifactManifests,
+    workspaceId,
+  );
   const workerActivationInboxes = workspaceWorkerRecords(
     store.workerActivationInboxes,
     workspaceId,
@@ -268,8 +289,9 @@ function buildWorkspaceExport(
   const activationSignals = (store.activationSignals ?? [])
     .filter((entry) => entry.workspaceId === workspaceId)
     .map((entry) => redactSensitiveValue(entry) as ActivationSignalRecord);
-  const activationMilestones = (store.activationMilestones?.[workspaceId] ?? [])
-    .map((entry) => redactSensitiveValue(entry) as ActivationMilestoneRecord);
+  const activationMilestones = (store.activationMilestones?.[workspaceId] ?? []).map(
+    (entry) => redactSensitiveValue(entry) as ActivationMilestoneRecord,
+  );
   const activationReadModel = store.activationReadModels?.[workspaceId]
     ? (redactSensitiveValue(store.activationReadModels[workspaceId]) as ActivationStatusDto)
     : null;
@@ -312,6 +334,8 @@ function buildWorkspaceExport(
       workerDeploymentRollouts,
       workerCommandReceipts,
       workerEvents,
+      workerEvidenceEntries,
+      workerArtifactManifests,
       workerActivationInboxes,
       workerActivationPayloads,
       activationFacts,
@@ -376,7 +400,9 @@ function briefEntries(collection: WorkspaceBriefCollection | undefined): Workspa
   return Array.isArray(collection) ? collection : Object.values(collection);
 }
 
-function releaseEntries(collection: ReleaseConfirmationCollection | undefined): ReleaseConfirmationRecord[] {
+function releaseEntries(
+  collection: ReleaseConfirmationCollection | undefined,
+): ReleaseConfirmationRecord[] {
   if (!collection) return [];
   return Array.isArray(collection) ? collection : Object.values(collection);
 }

@@ -9,7 +9,6 @@ import {
 } from "../security/vault.js";
 import {
   createWorkerActivationRepository,
-  makeWorkerActivationEvent,
   type WorkerActivationRepository,
 } from "./activation-repository.js";
 import {
@@ -350,29 +349,48 @@ export function createWorkerActivationService(
         transaction.insertRun(run);
         onCommitPhase("after_run_creation");
         onCommitPhase("before_event_append");
-        transaction.appendEvent(
-          makeWorkerActivationEvent({
-            id: eventId,
-            workspaceId: input.workspaceId,
-            sequence: transaction.nextEventSequence(),
-            type: "worker.activation.accepted",
-            workerDefinitionId: definition.id,
-            workerVersionId: version.id,
-            workerDeploymentId: deployment.id,
-            actor: input.actor,
-            summary: `Worker ${definition.name} activation accepted from ${input.source}.`,
-            data: {
-              activationId,
-              activationInboxId: inbox.id,
-              source: input.source,
-              deliveryId: input.deliveryId,
-              workerRunId: run.id,
-              executionJobId: job.id,
-              payloadDisposition: payloadReference ? "encrypted_reference" : "inline",
-            },
-            occurredAt: receivedAt,
-          }),
-        );
+        transaction.appendJournal({
+          id: eventId,
+          workspaceId: input.workspaceId,
+          type: "worker.activation.accepted",
+          source: "activation",
+          workerDefinitionId: definition.id,
+          workerVersionId: version.id,
+          workerDeploymentId: deployment.id,
+          workerRunId: run.id,
+          actor: input.actor,
+          summary: `Worker ${definition.name} activation accepted from ${input.source}.`,
+          data: {
+            activationId,
+            activationInboxId: inbox.id,
+            source: input.source,
+            deliveryId: input.deliveryId,
+            workerRunId: run.id,
+            executionJobId: job.id,
+            payloadDisposition: payloadReference ? "encrypted_reference" : "inline",
+          },
+          trace: envelope.trace,
+          correlation: {
+            activationId,
+            activationInboxId: inbox.id,
+            executionJobId: job.id,
+          },
+          ...(payloadReference
+            ? {
+                dataClassification: "sensitive_reference" as const,
+                rawPayload: {
+                  state: "retained" as const,
+                  reference: payloadReference.reference,
+                  contentDigest: payloadReference.digest,
+                  mediaType: "application/json",
+                  byteLength: payloadReference.byteLength,
+                  classification: "sensitive_reference" as const,
+                  expiresAt: payloadReference.expiresAt,
+                },
+              }
+            : {}),
+          occurredAt: receivedAt,
+        });
         onCommitPhase("after_event_append");
         onCommitPhase("before_job_enqueue");
         transaction.insertJob(job);

@@ -639,11 +639,21 @@ without relying on the authoring UI.
 Outcome: one API and one UI surface answer what is running, why, at what cost,
 from which version, at which checkpoint, and what needs attention.
 
-Status: active. Resume at W8.1.
+Status: active. W8.1 is complete; resume at W8.2.
 
 ### W8.1 - Formalize the event and evidence model
 
-Status: active. This is the exact resume point after the W7 gate.
+Status: complete. New writes use digest-bound v2 envelopes with workspace,
+deployment, and run sequences; atomically paired evidence; W3C trace and
+durable source correlations; optional opaque raw-payload references; and
+provenance-bound artifact manifests. Lifecycle, activation/queue, supervisor,
+provider, tool/effect, approval, checkpoint, control, recovery, and terminal
+sources share the journal. V1 events remain readable, ordered repository reads
+are workspace scoped, and migration `0022` plus parity tests cover JSON, SQLite,
+and managed Postgres.
+
+Design record and executable W8 subloops:
+[`worker-observability-plan.md`](worker-observability-plan.md).
 
 - Version Worker event envelopes and assign monotonic sequence within a
   deployment/run stream.
@@ -655,6 +665,8 @@ Status: active. This is the exact resume point after the W7 gate.
   remain useful after raw retention expires.
 
 ### W8.2 - Build deterministic rollups
+
+Status: active. This is the exact resume point after W8.1.
 
 - Roll provider calls, tool calls, effects, retries, queue duration, approvals,
   checkpoints, budget usage, artifacts, and outcomes up by Worker version and

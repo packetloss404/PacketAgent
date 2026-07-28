@@ -48,6 +48,7 @@ export interface WorkerRuntimeProviderUsage {
 }
 
 export interface WorkerRuntimeProviderResult {
+  readonly providerCallId?: string;
   readonly content: string;
   readonly toolCalls: readonly WorkerRuntimeToolCall[];
   readonly finishReason: "stop" | "tool_use" | "length" | "error";
@@ -57,6 +58,7 @@ export interface WorkerRuntimeProviderResult {
 }
 
 export interface WorkerRuntimeProviderRequest {
+  readonly providerCallId: string;
   readonly workspaceId: string;
   readonly workerRunId: string;
   readonly routeKey: string;

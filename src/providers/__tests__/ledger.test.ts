@@ -4,7 +4,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { clearStoreCacheForTests, resetStoreForTests, loadStore, mutateStore, type ProviderCallRecord } from "../../packetagent-store.js";
+import {
+  clearStoreCacheForTests,
+  resetStoreForTests,
+  loadStore,
+  mutateStore,
+  type ProviderCallRecord,
+} from "../../packetagent-store.js";
 import {
   listProviderCalls,
   listProviderCallsAsync,
@@ -18,12 +24,19 @@ import type { ProviderStreamChunk } from "../types.js";
 test("recordedCall writes a success record with measured duration", async () => {
   resetStoreForTests();
   const result = await recordedCall(
-    { workspaceId: "alpha", routeKey: "workflow.draft", provider: "stub", model: "stub-small" },
+    {
+      recordId: "provider-call-explicit",
+      workspaceId: "alpha",
+      routeKey: "workflow.draft",
+      provider: "stub",
+      model: "stub-small",
+    },
     async () => ({ usage: { promptTokens: 5, completionTokens: 8, costUsd: 0 } }),
   );
   assert.deepEqual(result.usage, { promptTokens: 5, completionTokens: 8, costUsd: 0 });
   const calls = listProviderCalls("alpha");
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].id, "provider-call-explicit");
   assert.equal(calls[0].status, "success");
   assert.equal(calls[0].promptTokens, 5);
   assert.ok(calls[0].durationMs >= 0);
@@ -32,10 +45,18 @@ test("recordedCall writes a success record with measured duration", async () => 
 test("recordedCall writes an error record and re-throws", async () => {
   resetStoreForTests();
   await assert.rejects(
-    () => recordedCall(
-      { workspaceId: "alpha", routeKey: "agent.summary", provider: "openai", model: "gpt-4o-mini" },
-      async () => { throw new Error("boom"); },
-    ),
+    () =>
+      recordedCall(
+        {
+          workspaceId: "alpha",
+          routeKey: "agent.summary",
+          provider: "openai",
+          model: "gpt-4o-mini",
+        },
+        async () => {
+          throw new Error("boom");
+        },
+      ),
     /boom/,
   );
   const calls = listProviderCalls("alpha");
@@ -53,7 +74,12 @@ test("recordedStream records once with accumulated final usage", async () => {
   }
   const collected: ProviderStreamChunk[] = [];
   for await (const c of recordedStream(
-    { workspaceId: "alpha", routeKey: "agent.reasoning", provider: "anthropic", model: "claude-opus-4-7" },
+    {
+      workspaceId: "alpha",
+      routeKey: "agent.reasoning",
+      provider: "anthropic",
+      model: "claude-opus-4-7",
+    },
     iter(),
   )) {
     collected.push(c);
@@ -75,7 +101,9 @@ test("recordedStream with chunk error marks status error", async () => {
   for await (const _ of recordedStream(
     { workspaceId: "alpha", routeKey: "x", provider: "stub", model: "stub-small" },
     iter(),
-  )) { /* drain */ }
+  )) {
+    /* drain */
+  }
   const calls = listProviderCalls("alpha");
   assert.equal(calls.length, 1);
   assert.equal(calls[0].status, "error");
@@ -97,12 +125,28 @@ test("listProviderCalls returns newest-first and respects limit", async () => {
 
 test("summarizeUsage aggregates across providers and routes", async () => {
   resetStoreForTests();
-  await recordedCall({ workspaceId: "alpha", routeKey: "workflow.draft", provider: "anthropic", model: "claude-opus-4-7" },
-    async () => ({ usage: { promptTokens: 10, completionTokens: 20, costUsd: 0.01 } }));
-  await recordedCall({ workspaceId: "alpha", routeKey: "workflow.draft", provider: "anthropic", model: "claude-opus-4-7" },
-    async () => ({ usage: { promptTokens: 5, completionTokens: 5, costUsd: 0.005 } }));
-  await recordedCall({ workspaceId: "alpha", routeKey: "agent.summary", provider: "openai", model: "gpt-4o-mini" },
-    async () => ({ usage: { promptTokens: 2, completionTokens: 3, costUsd: 0.001 } }));
+  await recordedCall(
+    {
+      workspaceId: "alpha",
+      routeKey: "workflow.draft",
+      provider: "anthropic",
+      model: "claude-opus-4-7",
+    },
+    async () => ({ usage: { promptTokens: 10, completionTokens: 20, costUsd: 0.01 } }),
+  );
+  await recordedCall(
+    {
+      workspaceId: "alpha",
+      routeKey: "workflow.draft",
+      provider: "anthropic",
+      model: "claude-opus-4-7",
+    },
+    async () => ({ usage: { promptTokens: 5, completionTokens: 5, costUsd: 0.005 } }),
+  );
+  await recordedCall(
+    { workspaceId: "alpha", routeKey: "agent.summary", provider: "openai", model: "gpt-4o-mini" },
+    async () => ({ usage: { promptTokens: 2, completionTokens: 3, costUsd: 0.001 } }),
+  );
   const summary = summarizeUsage("alpha");
   assert.equal(summary.totalCalls, 3);
   assert.ok(Math.abs(summary.totalCostUsd - 0.016) < 1e-9);
@@ -116,9 +160,18 @@ test("summarizeUsage excludes records older than 24h from last24h block", () => 
   const data = loadStore();
   const old = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   data.providerCalls.push({
-    id: "p1", workspaceId: "alpha", routeKey: "x", provider: "stub", model: "stub-small",
-    promptTokens: 1, completionTokens: 1, costUsd: 0.5, durationMs: 1, status: "success",
-    startedAt: old, completedAt: old,
+    id: "p1",
+    workspaceId: "alpha",
+    routeKey: "x",
+    provider: "stub",
+    model: "stub-small",
+    promptTokens: 1,
+    completionTokens: 1,
+    costUsd: 0.5,
+    durationMs: 1,
+    status: "success",
+    startedAt: old,
+    completedAt: old,
   });
   const summary = summarizeUsage("alpha");
   assert.equal(summary.totalCalls, 1);
@@ -169,19 +222,27 @@ function readProviderCallMirrors(dbPath: string): {
 } {
   const db = new DatabaseSync(dbPath);
   try {
-    const appRows = db.prepare(`
+    const appRows = db
+      .prepare(
+        `
       select payload
       from app_records
       where collection = 'providerCalls'
       order by json_extract(payload, '$.completedAt'), id
-    `).all() as Array<{ payload: string }>;
-    const dedicatedRows = db.prepare(`
+    `,
+      )
+      .all() as Array<{ payload: string }>;
+    const dedicatedRows = db
+      .prepare(
+        `
       select id, workspace_id, route_key, provider, model, prompt_tokens,
         completion_tokens, cost_usd, duration_ms, status, error_message,
         started_at, completed_at
       from provider_calls
       order by completed_at, id
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       workspace_id: string;
       route_key: string;
@@ -314,6 +375,9 @@ test("recordedCall in sqlite mode prunes provider call cap in the dedicated tabl
     assert.equal(mirrors.dedicated.length, 5_000);
     assert.equal(appIds.has("provider_call_0"), false);
     assert.equal(dedicatedIds.has("provider_call_0"), false);
-    assert.equal(mirrors.dedicated.some((entry) => entry.routeKey === "provider.cap"), true);
+    assert.equal(
+      mirrors.dedicated.some((entry) => entry.routeKey === "provider.cap"),
+      true,
+    );
   });
 });

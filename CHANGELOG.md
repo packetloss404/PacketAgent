@@ -6,6 +6,25 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Worker event and evidence model (W8.1)
+
+- Added digest-bound v2 Worker event envelopes with monotonic workspace,
+  deployment, and run sequences; W3C trace context; durable provider, tool,
+  effect, approval, checkpoint, and control correlations; and explicit
+  redaction classifications.
+- Routed lifecycle, activation, queue, supervisor, provider, tool, effect,
+  approval, checkpoint, control, recovery, and terminal occurrences through a
+  central journal that atomically pairs every new event with evidence.
+- Added optional opaque raw-payload references plus artifact manifests bound to
+  content digests, source evidence, materials, and generation provenance.
+- Kept legacy v1 events readable without fabricating evidence and added ordered,
+  workspace-scoped event, evidence, and artifact-manifest repository reads.
+- Added migration `0022_worker_observability.sql`, dedicated evidence and
+  artifact tables, event indexes, workspace export support, and
+  JSON/SQLite/managed-Postgres parity coverage.
+- The W8.1 baseline covers 1,444 API tests (1,443 passed and 1 intentionally
+  skipped) plus 25 web tests with zero lint errors.
+
 ### 2026-07-27 - Worker restart and kill gate (W7.5)
 
 - Added a fresh-process approval test that reconstructs runtime, attention, and

@@ -20,9 +20,16 @@ import {
   WORKER_ROLLOUT_SCHEMA_VERSION,
   type WorkerDeploymentRollout,
   type WorkerEvent,
+  type WorkerJournalAppendInput,
   type WorkerLifecycleCommandReceipt,
 } from "./persistence-types.js";
 import { WORKER_EFFECT_RECEIPT_SCHEMA_VERSION, type WorkerEffectReceipt } from "./effect-types.js";
+import { appendWorkerJournalEntry } from "./observability/journal.js";
+import {
+  assertValidWorkerArtifactManifest,
+  assertValidWorkerEvidenceEntry,
+  assertValidWorkerEvent,
+} from "./observability/validation.js";
 import type { WorkerDefinition, WorkerDeployment, WorkerVersion } from "./types.js";
 import {
   assertValidWorkerCheckpoint,
@@ -60,7 +67,7 @@ export interface WorkerRepositoryTransaction {
   replaceDeployment(record: WorkerDeployment): void;
   insertRollout(record: WorkerDeploymentRollout): void;
   insertCommandReceipt(record: WorkerLifecycleCommandReceipt): void;
-  appendEvent(record: WorkerEvent): void;
+  appendJournal(input: WorkerJournalAppendInput): void;
 }
 
 export interface WorkerRepository {
@@ -305,9 +312,9 @@ function createTransaction(
       }
       data.workerCommandReceipts.push(record);
     },
-    appendEvent(record) {
-      assertWorkspace(record.workspaceId, workspaceId);
-      data.workerEvents.push(record);
+    appendJournal(input) {
+      assertWorkspace(input.workspaceId, workspaceId);
+      appendWorkerJournalEntry(data, input);
     },
   };
 }
@@ -362,6 +369,8 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     data.workerApprovalGrants.forEach(assertValidWorkerApprovalGrant);
     data.workerControlCommands.forEach(assertValidWorkerControlCommand);
     data.workerNotificationDeliveries.forEach(assertValidWorkerNotificationDeliveryReference);
+    data.workerEvidenceEntries.forEach(assertValidWorkerEvidenceEntry);
+    data.workerArtifactManifests.forEach(assertValidWorkerArtifactManifest);
 
     assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.reference}`);
@@ -424,6 +433,12 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     assertUnique(data.workerDeploymentRollouts, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerEvents, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerEvents, (record) => `${record.workspaceId}:${record.sequence}`);
+    assertUnique(data.workerEvidenceEntries, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.workerEvidenceEntries,
+      (record) => `${record.workspaceId}:${record.sequence}`,
+    );
+    assertUnique(data.workerArtifactManifests, (record) => `${record.workspaceId}:${record.id}`);
 
     validateCoreReferences(data);
     validateSupportRecords(data);
@@ -784,19 +799,7 @@ function validateSupportRecords(data: PacketAgentData): void {
     }
   }
   for (const event of data.workerEvents) {
-    if (
-      event.schemaVersion !== WORKER_EVENT_SCHEMA_VERSION ||
-      !event.id ||
-      !event.workspaceId ||
-      !event.workerDefinitionId ||
-      !event.type ||
-      !event.actor?.type ||
-      !event.actor.id ||
-      !Number.isInteger(event.sequence) ||
-      event.sequence <= 0
-    ) {
-      throw new Error("Worker event is invalid.");
-    }
+    assertValidWorkerEvent(event);
     if (
       !data.workerDefinitions.some(
         (record) =>
@@ -820,6 +823,7 @@ function validateSupportRecords(data: PacketAgentData): void {
       throw new Error(`Worker event ${event.id} references a missing Worker record.`);
     }
   }
+  validateWorkerEvidenceGraph(data);
   for (const rollout of data.workerDeploymentRollouts) {
     if (
       rollout.schemaVersion !== WORKER_ROLLOUT_SCHEMA_VERSION ||
@@ -847,6 +851,119 @@ function validateSupportRecords(data: PacketAgentData): void {
       }
     }
   }
+}
+
+function validateWorkerEvidenceGraph(data: PacketAgentData): void {
+  for (const event of data.workerEvents) {
+    if (event.schemaVersion !== WORKER_EVENT_SCHEMA_VERSION) continue;
+    const evidence = data.workerEvidenceEntries.find(
+      (entry) => entry.workspaceId === event.workspaceId && entry.id === event.evidenceId,
+    );
+    if (
+      !evidence ||
+      evidence.sourceEventId !== event.id ||
+      evidence.sourceEventDigest !== event.eventDigest ||
+      evidence.sequence !== event.sequence ||
+      evidence.workerDefinitionId !== event.workerDefinitionId ||
+      evidence.workerVersionId !== event.workerVersionId ||
+      evidence.workerDeploymentId !== event.workerDeploymentId ||
+      evidence.workerRunId !== event.workerRunId
+    ) {
+      throw new Error(`Worker event ${event.id} references inconsistent evidence.`);
+    }
+    if (event.workerRunId) {
+      const run = data.workerRuns.find(
+        (record) => record.workspaceId === event.workspaceId && record.id === event.workerRunId,
+      );
+      if (
+        !run ||
+        run.workerDefinitionId !== event.workerDefinitionId ||
+        run.workerVersionId !== event.workerVersionId ||
+        run.workerDeploymentId !== event.workerDeploymentId
+      ) {
+        throw new Error(`Worker event ${event.id} references an inconsistent run.`);
+      }
+    }
+  }
+  assertMonotonicEventStreams(data.workerEvents);
+  for (const evidence of data.workerEvidenceEntries) {
+    const event = data.workerEvents.find(
+      (record) =>
+        record.workspaceId === evidence.workspaceId && record.id === evidence.sourceEventId,
+    );
+    if (
+      !event ||
+      event.schemaVersion !== WORKER_EVENT_SCHEMA_VERSION ||
+      event.evidenceId !== evidence.id
+    ) {
+      throw new Error(`Worker evidence ${evidence.id} references a missing source event.`);
+    }
+    for (const artifactId of evidence.artifactManifestIds ?? []) {
+      if (
+        !data.workerArtifactManifests.some(
+          (record) => record.workspaceId === evidence.workspaceId && record.id === artifactId,
+        )
+      ) {
+        throw new Error(`Worker evidence ${evidence.id} references a missing artifact manifest.`);
+      }
+    }
+  }
+  for (const manifest of data.workerArtifactManifests) {
+    const run = data.workerRuns.find(
+      (record) => record.workspaceId === manifest.workspaceId && record.id === manifest.workerRunId,
+    );
+    if (
+      !run ||
+      run.workerDefinitionId !== manifest.workerDefinitionId ||
+      run.workerVersionId !== manifest.workerVersionId ||
+      run.workerDeploymentId !== manifest.workerDeploymentId ||
+      manifest.provenance.sourceEvidenceIds.some(
+        (id) =>
+          !data.workerEvidenceEntries.some(
+            (entry) => entry.workspaceId === manifest.workspaceId && entry.id === id,
+          ),
+      )
+    ) {
+      throw new Error(`Worker artifact manifest ${manifest.id} has inconsistent provenance.`);
+    }
+  }
+}
+
+function assertMonotonicEventStreams(events: readonly WorkerEvent[]): void {
+  const deploymentSequences = new Map<string, number>();
+  const runSequences = new Map<string, number>();
+  for (const event of [...events].sort((left, right) => left.sequence - right.sequence)) {
+    if (event.schemaVersion !== WORKER_EVENT_SCHEMA_VERSION) continue;
+    if (event.workerDeploymentId) {
+      assertIncreasingSequence(
+        deploymentSequences,
+        `${event.workspaceId}:${event.workerDeploymentId}`,
+        event.deploymentSequence!,
+        "deployment",
+      );
+    }
+    if (event.workerRunId) {
+      assertIncreasingSequence(
+        runSequences,
+        `${event.workspaceId}:${event.workerRunId}`,
+        event.runSequence!,
+        "run",
+      );
+    }
+  }
+}
+
+function assertIncreasingSequence(
+  sequences: Map<string, number>,
+  key: string,
+  next: number,
+  label: string,
+): void {
+  const previous = sequences.get(key) ?? 0;
+  if (next <= previous) {
+    throw new Error(`Worker ${label} event sequence is not monotonic for ${key}.`);
+  }
+  sequences.set(key, next);
 }
 
 function assertValidWorkerEffectReceipt(receipt: WorkerEffectReceipt): void {

@@ -11,8 +11,10 @@ W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
 complete. W6.5 closes the adversarial bypass gate across every registered tool.
 W7's durable attention, atomic controls, supervisor integration, independent
-operator API, and restart/kill race gate are also complete. Resume at W8.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w81---formalize-the-event-and-evidence-model).
+operator API, and restart/kill race gate are also complete. W8.1's versioned,
+digest-bound event/evidence and artifact-provenance contract is complete.
+Resume at W8.2 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w82---build-deterministic-rollups).
 
 ## North star
 
@@ -99,7 +101,12 @@ pass without later work.
 
 ### 8. Worker health, cost, and evidence - active
 
-Roll provider calls, queue health, checkpoints, retries, approvals, and outcomes up by worker and deployment. Make "what is running, why, at what cost, and what needs me" answerable from one screen.
+The v2 event envelope, monotonic deployment/run streams, atomic evidence
+entries, source correlations, artifact manifests, digests, W3C trace checks,
+legacy v1 reads, and three-backend persistence are complete. Next roll provider
+calls, queue health, checkpoints, retries, approvals, and outcomes up by worker
+and deployment. Make "what is running, why, at what cost, and what needs me"
+answerable from one screen.
 
 ### 9. PacketADE handoff
 

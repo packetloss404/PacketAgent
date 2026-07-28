@@ -30,6 +30,8 @@ test("legacy stores normalize with every Worker persistence collection", () => {
   assert.deepEqual(normalized.workerDeploymentRollouts, []);
   assert.deepEqual(normalized.workerCommandReceipts, []);
   assert.deepEqual(normalized.workerEvents, []);
+  assert.deepEqual(normalized.workerEvidenceEntries, []);
+  assert.deepEqual(normalized.workerArtifactManifests, []);
 });
 
 test("Worker repository integrity rejects orphaned records", () => {

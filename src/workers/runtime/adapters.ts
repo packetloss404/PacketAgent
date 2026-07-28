@@ -55,6 +55,7 @@ export function createWorkerProviderPort(
       }));
       const result = await recordedCall(
         {
+          recordId: request.providerCallId,
           workspaceId: request.workspaceId,
           routeKey: request.routeKey,
           provider: route.provider,
@@ -76,6 +77,7 @@ export function createWorkerProviderPort(
           }),
       );
       return {
+        providerCallId: request.providerCallId,
         content: result.content,
         toolCalls: (result.toolCalls ?? []).map((call) => ({
           id: call.id,
@@ -278,8 +280,7 @@ function workerToolBaseContext(
   services: WorkerToolAdapterServices,
   recordPolicyDecision: NonNullable<ToolContext["worker"]>["recordPolicyDecision"],
 ): Omit<ToolContext, "signal"> {
-  const approvalTime =
-    "reservedAt" in input ? input.reservedAt : input.authorizedAt;
+  const approvalTime = "reservedAt" in input ? input.reservedAt : input.authorizedAt;
   const approval =
     input.approval?.actionId === input.call.id &&
     Date.parse(input.approval.expiresAt) > approvalTime.getTime()

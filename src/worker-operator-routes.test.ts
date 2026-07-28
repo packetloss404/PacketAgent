@@ -9,7 +9,7 @@ import {
 } from "./worker-operator-routes.js";
 import { compileWorkerCapabilityPolicy } from "./workers/capabilities.js";
 import { createWorkerControlService } from "./workers/control-service.js";
-import { WORKER_EVENT_SCHEMA_VERSION } from "./workers/persistence-types.js";
+import { LEGACY_WORKER_EVENT_SCHEMA_VERSION } from "./workers/persistence-types.js";
 import type { WorkerRunStatus } from "./workers/types.js";
 import {
   makeWorkerAttentionRequest,
@@ -423,7 +423,7 @@ function createStore(options: HarnessOptions): PacketAgentData {
       }),
     );
     data.workerEvents.push({
-      schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
+      schemaVersion: LEGACY_WORKER_EVENT_SCHEMA_VERSION,
       id: "event-policy-denied",
       workspaceId: "workspace-1",
       sequence: 1,
@@ -449,7 +449,7 @@ function createStore(options: HarnessOptions): PacketAgentData {
       occurredAt: TEST_NOW,
     });
     data.workerEvents.push({
-      schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
+      schemaVersion: LEGACY_WORKER_EVENT_SCHEMA_VERSION,
       id: "event-attention-requested",
       workspaceId: "workspace-1",
       sequence: 2,

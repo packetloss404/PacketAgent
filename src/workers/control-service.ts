@@ -14,7 +14,7 @@ import {
   type WorkerControlCommand,
   type WorkerControlCommandKind,
 } from "./control-types.js";
-import { WORKER_EVENT_SCHEMA_VERSION, type WorkerEvent } from "./persistence-types.js";
+import { appendWorkerJournalEntry, workerEventCorrelation } from "./observability/journal.js";
 import { validateWorkerPersistence } from "./repository.js";
 import {
   assertWorkerDeploymentUpdate,
@@ -834,39 +834,42 @@ function appendControlEvent(
   command: WorkerControlCommand,
   affectedRunIds: readonly string[] = [],
 ): void {
-  const event: WorkerEvent = {
-    schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
+  const eventData = {
+    controlCommandId: command.id,
+    kind: command.kind,
+    status: command.status,
+    expectedRevision: command.expectedRevision,
+    ...(command.appliedRevision !== undefined ? { appliedRevision: command.appliedRevision } : {}),
+    ...(command.rejectionCode ? { rejectionCode: command.rejectionCode } : {}),
+    ...(command.workerRunId ? { workerRunId: command.workerRunId } : {}),
+    ...(command.attentionRequestId ? { attentionRequestId: command.attentionRequestId } : {}),
+    ...(command.approvalGrantId ? { approvalGrantId: command.approvalGrantId } : {}),
+    ...(affectedRunIds.length > 0 ? { affectedRunIds: [...affectedRunIds] } : {}),
+  };
+  const run = command.workerRunId
+    ? data.workerRuns.find(
+        (record) => record.workspaceId === command.workspaceId && record.id === command.workerRunId,
+      )
+    : undefined;
+  appendWorkerJournalEntry(data, {
     id: eventId,
     workspaceId: command.workspaceId,
-    sequence:
-      data.workerEvents
-        .filter((record) => record.workspaceId === command.workspaceId)
-        .reduce((maximum, record) => Math.max(maximum, record.sequence), 0) + 1,
     type: `worker.control.${command.kind}.${command.status}`,
+    source: "control",
     workerDefinitionId: command.workerDefinitionId,
     workerVersionId: command.workerVersionId,
     workerDeploymentId: command.workerDeploymentId,
+    ...(command.workerRunId ? { workerRunId: command.workerRunId } : {}),
     actor: command.actor,
     summary:
       command.status === "applied"
         ? `Worker control ${command.kind} applied.`
         : `Worker control ${command.kind} rejected.`,
-    data: {
-      controlCommandId: command.id,
-      kind: command.kind,
-      status: command.status,
-      expectedRevision: command.expectedRevision,
-      ...(command.appliedRevision !== undefined
-        ? { appliedRevision: command.appliedRevision }
-        : {}),
-      ...(command.rejectionCode ? { rejectionCode: command.rejectionCode } : {}),
-      ...(command.workerRunId ? { workerRunId: command.workerRunId } : {}),
-      ...(command.attentionRequestId ? { attentionRequestId: command.attentionRequestId } : {}),
-      ...(affectedRunIds.length > 0 ? { affectedRunIds: [...affectedRunIds] } : {}),
-    },
+    data: eventData,
+    ...(run?.trace ? { trace: run.trace } : {}),
+    correlation: workerEventCorrelation(eventData),
     occurredAt: command.updatedAt,
-  };
-  data.workerEvents.push(event);
+  });
 }
 
 function controlResult(

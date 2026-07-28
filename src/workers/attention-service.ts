@@ -14,7 +14,7 @@ import {
   type WorkerNotificationDeliveryReference,
 } from "./control-types.js";
 import { WorkerLifecycleError } from "./errors.js";
-import { WORKER_EVENT_SCHEMA_VERSION, type WorkerEvent } from "./persistence-types.js";
+import { appendWorkerJournalEntry, workerEventCorrelation } from "./observability/journal.js";
 import { validateWorkerPersistence } from "./repository.js";
 import { assertWorkerRunUpdate, isTerminalWorkerRunStatus } from "./transitions.js";
 import {
@@ -894,28 +894,27 @@ function appendAttentionEvent(
   occurredAt: string,
   eventData: Record<string, unknown>,
 ): void {
-  const event: WorkerEvent = {
-    schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
+  const dataValue = {
+    workerRunId: run.id,
+    attentionRequestId: attention.id,
+    ...eventData,
+  };
+  appendWorkerJournalEntry(data, {
     id: eventId,
     workspaceId: run.workspaceId,
-    sequence:
-      data.workerEvents
-        .filter((record) => record.workspaceId === run.workspaceId)
-        .reduce((maximum, record) => Math.max(maximum, record.sequence), 0) + 1,
     type,
+    source: "approval",
     workerDefinitionId: run.workerDefinitionId,
     workerVersionId: run.workerVersionId,
     workerDeploymentId: run.workerDeploymentId,
+    workerRunId: run.id,
     actor: ATTENTION_SYSTEM_ACTOR,
     summary,
-    data: {
-      workerRunId: run.id,
-      attentionRequestId: attention.id,
-      ...eventData,
-    },
+    data: dataValue,
+    ...(run.trace ? { trace: run.trace } : {}),
+    correlation: workerEventCorrelation(dataValue),
     occurredAt,
-  };
-  data.workerEvents.push(event);
+  });
 }
 
 function replaceRun(data: PacketAgentData, next: WorkerRun): void {

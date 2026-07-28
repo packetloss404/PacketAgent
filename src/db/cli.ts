@@ -1,5 +1,13 @@
 import { migrateLegacyDefaultDataFiles } from "../brand.js";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+} from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
@@ -12,7 +20,24 @@ import { sqliteInvitationEmailDeliveriesRepository } from "../repositories/invit
 import { sqliteJobMetricSnapshotsRepository } from "../repositories/job-metric-snapshots-repo";
 import { sqliteJobsRepository } from "../repositories/jobs-repo";
 import { sqliteProviderCallsRepository } from "../repositories/provider-calls-repo";
-import type { ActivationSignalRecord, ActivityRecord, AgentRunLogEntry, AgentRunRecord, AgentRunStatus, AgentRunStep, AgentRunToolCall, AgentTriggerKind, AlertEventRecord, InvitationEmailDeliveryMode, InvitationEmailDeliveryRecord, InvitationEmailDeliveryStatus, JobMetricSnapshotRecord, JobRecord, JobStatus, ProviderCallRecord } from "../packetagent-store";
+import type {
+  ActivationSignalRecord,
+  ActivityRecord,
+  AgentRunLogEntry,
+  AgentRunRecord,
+  AgentRunStatus,
+  AgentRunStep,
+  AgentRunToolCall,
+  AgentTriggerKind,
+  AlertEventRecord,
+  InvitationEmailDeliveryMode,
+  InvitationEmailDeliveryRecord,
+  InvitationEmailDeliveryStatus,
+  JobMetricSnapshotRecord,
+  JobRecord,
+  JobStatus,
+  ProviderCallRecord,
+} from "../packetagent-store";
 import {
   createSeedStore,
   loadStoreAsync,
@@ -362,9 +387,13 @@ export function migrateDatabase(options: DbCliOptions = {}): MigrationResult {
   const db = new DatabaseSync(dbPath);
   try {
     db.exec("pragma foreign_keys = on");
-    db.exec("create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))");
+    db.exec(
+      "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
+    );
 
-    const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+    const appliedRows = db
+      .prepare("select name from schema_migrations order by name")
+      .all() as Array<{ name: string }>;
     const alreadyApplied = new Set(appliedRows.map((row) => row.name));
     const migrations = readdirSync(migrationsDir)
       .filter((name) => name.endsWith(".sql"))
@@ -388,7 +417,6 @@ export function migrateDatabase(options: DbCliOptions = {}): MigrationResult {
       if (isDestructiveMigration(sql)) {
         const backupPath = backupBeforeDestructiveMigration(db, dbPath, name);
         if (backupPath) {
-          // eslint-disable-next-line no-console
           console.warn(
             `[migrate] "${name}" contains a destructive statement; backed up DB to ${backupPath} before applying.`,
           );
@@ -446,7 +474,10 @@ function backupBeforeDestructiveMigration(
 
   const safeName = migrationName.replace(/\.sql$/i, "").replace(/[^a-zA-Z0-9._-]/g, "_");
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const backupPath = resolve(dirname(dbPath), `${basename(dbPath)}.pre-migrate-${safeName}-${timestamp}.bak`);
+  const backupPath = resolve(
+    dirname(dbPath),
+    `${basename(dbPath)}.pre-migrate-${safeName}-${timestamp}.bak`,
+  );
   mkdirSync(dirname(backupPath), { recursive: true });
   copyFileSync(dbPath, backupPath);
   return backupPath;
@@ -455,7 +486,9 @@ function backupBeforeDestructiveMigration(
 export function migrationStatus(options: DbCliOptions = {}): MigrationStatusResult {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
   const migrationsDir = options.migrationsDir ?? DEFAULT_MIGRATIONS_DIR;
-  const migrations = readdirSync(migrationsDir).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(migrationsDir)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
 
   if (!existsSync(dbPath)) {
     return { command: "status", dbPath, exists: false, applied: [], pending: migrations };
@@ -463,10 +496,19 @@ export function migrationStatus(options: DbCliOptions = {}): MigrationStatusResu
 
   const db = new DatabaseSync(dbPath);
   try {
-    const hasMigrationsTable = db.prepare("select count(*) as count from sqlite_master where type = 'table' and name = 'schema_migrations'").get() as { count: number };
-    const applied = hasMigrationsTable.count > 0
-      ? (db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>).map((row) => row.name)
-      : [];
+    const hasMigrationsTable = db
+      .prepare(
+        "select count(*) as count from sqlite_master where type = 'table' and name = 'schema_migrations'",
+      )
+      .get() as { count: number };
+    const applied =
+      hasMigrationsTable.count > 0
+        ? (
+            db.prepare("select name from schema_migrations order by name").all() as Array<{
+              name: string;
+            }>
+          ).map((row) => row.name)
+        : [];
     const appliedSet = new Set(applied);
     return {
       command: "status",
@@ -484,7 +526,12 @@ export function backupDatabase(options: DbCliOptions = {}): BackupResult {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
   if (!existsSync(dbPath)) throw new Error(`database not found: ${dbPath}`);
 
-  const backupPath = options.backupPath ?? resolve(dirname(dbPath), `${basename(dbPath)}.${new Date().toISOString().replace(/[:.]/g, "-")}.bak`);
+  const backupPath =
+    options.backupPath ??
+    resolve(
+      dirname(dbPath),
+      `${basename(dbPath)}.${new Date().toISOString().replace(/[:.]/g, "-")}.bak`,
+    );
   mkdirSync(dirname(backupPath), { recursive: true });
 
   const db = new DatabaseSync(dbPath);
@@ -512,7 +559,9 @@ export function restoreDatabase(options: DbCliOptions = {}): RestoreResult {
     const migrated = migrateDatabase({ ...options, dbPath: tempPath });
     const validation = migrationStatus({ ...options, dbPath: tempPath });
     if (validation.pending.length > 0) {
-      throw new Error(`restore validation failed: pending migrations ${validation.pending.join(", ")}`);
+      throw new Error(
+        `restore validation failed: pending migrations ${validation.pending.join(", ")}`,
+      );
     }
     if (existsSync(dbPath)) rmSync(dbPath);
     renameSync(tempPath, dbPath);
@@ -523,7 +572,10 @@ export function restoreDatabase(options: DbCliOptions = {}): RestoreResult {
   }
 }
 
-export function seedDatabase(options: DbCliOptions = {}, seedData: PacketAgentData = createSeedStore()): DbSeedResult {
+export function seedDatabase(
+  options: DbCliOptions = {},
+  seedData: PacketAgentData = createSeedStore(),
+): DbSeedResult {
   const migrated = migrateDatabase(options);
   const db = new DatabaseSync(migrated.dbPath);
   try {
@@ -553,7 +605,11 @@ export function seedDatabase(options: DbCliOptions = {}, seedData: PacketAgentDa
       for (const workspace of seedData.workspaces) {
         const subject = activationSubjectForWorkspace(workspace.id);
         const snapshot = snapshotForWorkspace(seedData, workspace.id);
-        const status = deriveActivationStatus(subject, snapshot, seedData.activationMilestones[workspace.id] ?? []);
+        const status = deriveActivationStatus(
+          subject,
+          snapshot,
+          seedData.activationMilestones[workspace.id] ?? [],
+        );
         const timestamp = snapshot.now;
 
         insertTrack.run(
@@ -616,17 +672,25 @@ export function seedDatabase(options: DbCliOptions = {}, seedData: PacketAgentDa
   }
 }
 
-export function seedAppDatabase(options: DbCliOptions = {}, seedData: PacketAgentData = createSeedStore()): AppDataResult {
+export function seedAppDatabase(
+  options: DbCliOptions = {},
+  seedData: PacketAgentData = createSeedStore(),
+): AppDataResult {
   return writeAppData(options, normalizeStore(seedData), "seed", "seed-app");
 }
 
 export function backfillAppDatabase(options: DbCliOptions = {}): AppDataResult {
   const jsonPath = options.jsonPath ?? DEFAULT_JSON_PATH;
-  const data = normalizeStore(JSON.parse(readFileSync(jsonPath, "utf8")) as Partial<PacketAgentData>);
+  const data = normalizeStore(
+    JSON.parse(readFileSync(jsonPath, "utf8")) as Partial<PacketAgentData>,
+  );
   return writeAppData(options, data, "backfill", "backfill");
 }
 
-export function resetAppDatabase(options: DbCliOptions = {}, seedData: PacketAgentData = createSeedStore()): AppDataResult {
+export function resetAppDatabase(
+  options: DbCliOptions = {},
+  seedData: PacketAgentData = createSeedStore(),
+): AppDataResult {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
   if (existsSync(dbPath)) rmSync(dbPath);
   return writeAppData(options, normalizeStore(seedData), "seed", "reset-app");
@@ -717,6 +781,8 @@ const STORE_COMPARISON_COLLECTIONS = [
   "workerDeploymentRollouts",
   "workerCommandReceipts",
   "workerEvents",
+  "workerEvidenceEntries",
+  "workerArtifactManifests",
   "workerActivationInboxes",
   "workerActivationPayloads",
   "activationFacts",
@@ -736,9 +802,10 @@ export async function backfillManagedPostgres(
   const sourceStats = managedPostgresStoreStats(source.data);
   const targetBeforeStats = managedPostgresStoreStats(targetBefore);
   const comparison = compareManagedPostgresStores(source.data, targetBefore);
-  const wouldWriteRecords = comparison.sourceOnly > 0 || comparison.targetOnly > 0 || comparison.contentDrift > 0
-    ? sourceStats.records
-    : 0;
+  const wouldWriteRecords =
+    comparison.sourceOnly > 0 || comparison.targetOnly > 0 || comparison.contentDrift > 0
+      ? sourceStats.records
+      : 0;
 
   let writtenRecords = 0;
   let targetCountsAfter: Record<string, number> | undefined;
@@ -747,7 +814,9 @@ export async function backfillManagedPostgres(
       replaceManagedPostgresStoreData(target, source.data);
     });
     writtenRecords = sourceStats.records;
-    targetCountsAfter = managedPostgresStoreStats(normalizeStore(await loadTargetStore())).collections;
+    targetCountsAfter = managedPostgresStoreStats(
+      normalizeStore(await loadTargetStore()),
+    ).collections;
   }
 
   return {
@@ -849,14 +918,16 @@ async function withManagedPostgresTargetEnv<T>(run: () => Promise<T>): Promise<T
 
 function hasManagedPostgresTargetHint(env: NodeJS.ProcessEnv = process.env): boolean {
   const requestedStore = (env.PACKETAGENT_STORE ?? "").trim().toLowerCase();
-  return requestedStore === "managed"
-    || requestedStore === "managed-db"
-    || requestedStore === "managed-database"
-    || requestedStore === "postgres"
-    || requestedStore === "postgresql"
-    || Boolean((env.DATABASE_URL ?? "").trim())
-    || Boolean((env.PACKETAGENT_DATABASE_URL ?? "").trim())
-    || Boolean((env.PACKETAGENT_MANAGED_DATABASE_URL ?? "").trim());
+  return (
+    requestedStore === "managed" ||
+    requestedStore === "managed-db" ||
+    requestedStore === "managed-database" ||
+    requestedStore === "postgres" ||
+    requestedStore === "postgresql" ||
+    Boolean((env.DATABASE_URL ?? "").trim()) ||
+    Boolean((env.PACKETAGENT_DATABASE_URL ?? "").trim()) ||
+    Boolean((env.PACKETAGENT_MANAGED_DATABASE_URL ?? "").trim())
+  );
 }
 
 export function managedPostgresStoreStats(data: PacketAgentData): ManagedPostgresStoreStats {
@@ -916,7 +987,10 @@ function comparableStoreEntries(data: PacketAgentData): Map<string, string> {
   return entries;
 }
 
-function collectionEntries(collection: keyof PacketAgentData, value: unknown): Array<[string, unknown]> {
+function collectionEntries(
+  collection: keyof PacketAgentData,
+  value: unknown,
+): Array<[string, unknown]> {
   if (Array.isArray(value)) {
     return value.map((entry, index) => [recordComparisonId(collection, entry, index), entry]);
   }
@@ -926,11 +1000,19 @@ function collectionEntries(collection: keyof PacketAgentData, value: unknown): A
   return [];
 }
 
-function recordComparisonId(collection: keyof PacketAgentData, value: unknown, index: number): string {
+function recordComparisonId(
+  collection: keyof PacketAgentData,
+  value: unknown,
+  index: number,
+): string {
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
     if (typeof record.id === "string") return record.id;
-    if (collection === "memberships" && typeof record.workspaceId === "string" && typeof record.userId === "string") {
+    if (
+      collection === "memberships" &&
+      typeof record.workspaceId === "string" &&
+      typeof record.userId === "string"
+    ) {
       return `${record.workspaceId}:${record.userId}`;
     }
     if (typeof record.workspaceId === "string") return record.workspaceId;
@@ -954,7 +1036,9 @@ function stableValue(value: unknown): unknown {
   return value;
 }
 
-export function backfillJobMetricSnapshots(options: BackfillJobMetricSnapshotsOptions = {}): BackfillJobMetricSnapshotsResult {
+export function backfillJobMetricSnapshots(
+  options: BackfillJobMetricSnapshotsOptions = {},
+): BackfillJobMetricSnapshotsResult {
   const migrated = migrateDatabase(options);
   const dbPath = migrated.dbPath;
   const dryRun = options.dryRun ?? false;
@@ -1001,7 +1085,9 @@ export function backfillJobMetricSnapshots(options: BackfillJobMetricSnapshotsOp
   };
 }
 
-export function verifyJobMetricSnapshots(options: DbCliOptions = {}): VerifyJobMetricSnapshotsResult {
+export function verifyJobMetricSnapshots(
+  options: DbCliOptions = {},
+): VerifyJobMetricSnapshotsResult {
   const migrated = migrateDatabase(options);
   const dbPath = migrated.dbPath;
 
@@ -1044,7 +1130,9 @@ export function verifyJobMetricSnapshots(options: DbCliOptions = {}): VerifyJobM
 function readJobMetricSnapshotJsonRows(dbPath: string): JobMetricSnapshotRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'jobMetricSnapshots'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'jobMetricSnapshots'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as JobMetricSnapshotRecord);
   } finally {
     db.close();
@@ -1054,11 +1142,15 @@ function readJobMetricSnapshotJsonRows(dbPath: string): JobMetricSnapshotRecord[
 function readJobMetricSnapshotDedicatedRows(dbPath: string): JobMetricSnapshotRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select id, captured_at, type, total_runs, succeeded_runs, failed_runs, canceled_runs,
         last_run_started_at, last_run_finished_at, last_duration_ms, average_duration_ms, p95_duration_ms
       from job_metric_snapshots
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       captured_at: string;
       type: string;
@@ -1108,7 +1200,9 @@ function canonicalize(record: JobMetricSnapshotRecord): string {
   });
 }
 
-export function backfillAlertEvents(options: BackfillAlertEventsOptions = {}): BackfillAlertEventsResult {
+export function backfillAlertEvents(
+  options: BackfillAlertEventsOptions = {},
+): BackfillAlertEventsResult {
   const migrated = migrateDatabase(options);
   const dbPath = migrated.dbPath;
   const dryRun = options.dryRun ?? false;
@@ -1198,7 +1292,9 @@ export function verifyAlertEvents(options: DbCliOptions = {}): VerifyAlertEvents
 function readAlertEventJsonRows(dbPath: string): AlertEventRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'alertEvents'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'alertEvents'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as AlertEventRecord);
   } finally {
     db.close();
@@ -1208,11 +1304,15 @@ function readAlertEventJsonRows(dbPath: string): AlertEventRecord[] {
 function readAlertEventDedicatedRows(dbPath: string): AlertEventRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select id, rule_id, severity, title, detail, observed_at, context,
         delivered, delivery_error, delivery_attempts, last_delivery_attempt_at, dead_lettered
       from alert_events
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       rule_id: string;
       severity: "info" | "warning" | "critical";
@@ -1239,7 +1339,8 @@ function readAlertEventDedicatedRows(dbPath: string): AlertEventRecord[] {
       };
       if (row.delivery_error !== null) record.deliveryError = row.delivery_error;
       if (row.delivery_attempts !== null) record.deliveryAttempts = row.delivery_attempts;
-      if (row.last_delivery_attempt_at !== null) record.lastDeliveryAttemptAt = row.last_delivery_attempt_at;
+      if (row.last_delivery_attempt_at !== null)
+        record.lastDeliveryAttemptAt = row.last_delivery_attempt_at;
       if (row.dead_lettered !== null) record.deadLettered = row.dead_lettered === 1;
       return record;
     });
@@ -1362,7 +1463,9 @@ export function verifyAgentRuns(options: VerifyAgentRunsOptions = {}): VerifyAge
 function readAgentRunJsonRows(dbPath: string): AgentRunRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'agentRuns'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'agentRuns'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => normalizeAgentRunRecord(JSON.parse(row.payload) as AgentRunRecord));
   } finally {
     db.close();
@@ -1372,13 +1475,17 @@ function readAgentRunJsonRows(dbPath: string): AgentRunRecord[] {
 function readAgentRunDedicatedRows(dbPath: string): AgentRunRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select id, workspace_id, agent_id, title, status, trigger_kind,
         started_at, completed_at, inputs, output, error,
         logs, tool_calls, transcript, model_used, cost_usd,
         created_at, updated_at
       from agent_runs
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       workspace_id: string;
       agent_id: string | null;
@@ -1410,13 +1517,15 @@ function readAgentRunDedicatedRows(dbPath: string): AgentRunRecord[] {
       };
       if (row.agent_id !== null) record.agentId = row.agent_id;
       if (row.trigger_kind !== null) record.triggerKind = row.trigger_kind;
-      if (row.transcript !== null) record.transcript = parseAgentRunJsonArray<AgentRunStep>(row.transcript);
+      if (row.transcript !== null)
+        record.transcript = parseAgentRunJsonArray<AgentRunStep>(row.transcript);
       if (row.started_at !== null) record.startedAt = row.started_at;
       if (row.completed_at !== null) record.completedAt = row.completed_at;
       if (row.inputs !== null) record.inputs = parseAgentRunInputs(row.inputs);
       if (row.output !== null) record.output = row.output;
       if (row.error !== null) record.error = row.error;
-      if (row.tool_calls !== null) record.toolCalls = parseAgentRunJsonArray<AgentRunToolCall>(row.tool_calls);
+      if (row.tool_calls !== null)
+        record.toolCalls = parseAgentRunJsonArray<AgentRunToolCall>(row.tool_calls);
       if (row.model_used !== null) record.modelUsed = row.model_used;
       if (row.cost_usd !== null) record.costUsd = row.cost_usd;
       return record;
@@ -1567,7 +1676,9 @@ export function verifyJobs(options: DbCliOptions = {}): VerifyJobsResult {
 function readJobJsonRows(dbPath: string): JobRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'jobs'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'jobs'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => normalizeJobRecord(JSON.parse(row.payload) as JobRecord));
   } finally {
     db.close();
@@ -1577,12 +1688,16 @@ function readJobJsonRows(dbPath: string): JobRecord[] {
 function readJobDedicatedRows(dbPath: string): JobRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select id, workspace_id, type, payload, status, attempts, max_attempts,
         scheduled_at, started_at, completed_at, cron, result, error,
         cancel_requested, created_at, updated_at
       from jobs
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       workspace_id: string;
       type: string;
@@ -1627,7 +1742,13 @@ function readJobDedicatedRows(dbPath: string): JobRecord[] {
 }
 
 function normalizeJobRecord(record: JobRecord): JobRecord {
-  return { ...record, payload: record.payload && typeof record.payload === "object" && !Array.isArray(record.payload) ? record.payload : {} };
+  return {
+    ...record,
+    payload:
+      record.payload && typeof record.payload === "object" && !Array.isArray(record.payload)
+        ? record.payload
+        : {},
+  };
 }
 
 function parseJobPayload(raw: string): Record<string, unknown> {
@@ -1674,11 +1795,17 @@ function canonicalizeJob(record: JobRecord): string {
 function countAgentRunOrphans(dbPath: string, jsonRows: AgentRunRecord[]): number {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select id from app_records where collection = 'agents'").all() as Array<{ id: string }>;
+    const rows = db
+      .prepare("select id from app_records where collection = 'agents'")
+      .all() as Array<{ id: string }>;
     const agentIds = new Set(rows.map((row) => row.id));
     let orphans = 0;
     for (const record of jsonRows) {
-      if (record.agentId !== undefined && record.agentId !== null && !agentIds.has(record.agentId)) {
+      if (
+        record.agentId !== undefined &&
+        record.agentId !== null &&
+        !agentIds.has(record.agentId)
+      ) {
         orphans += 1;
       }
     }
@@ -1711,7 +1838,9 @@ export function backfillInvitationEmailDeliveries(
       toInsert.push(record);
       continue;
     }
-    if (canonicalizeInvitationEmailDelivery(existing) === canonicalizeInvitationEmailDelivery(record)) {
+    if (
+      canonicalizeInvitationEmailDelivery(existing) === canonicalizeInvitationEmailDelivery(record)
+    ) {
       alreadyPresent += 1;
     } else {
       drift += 1;
@@ -1739,7 +1868,9 @@ export function backfillInvitationEmailDeliveries(
   };
 }
 
-export function verifyInvitationEmailDeliveries(options: DbCliOptions = {}): VerifyInvitationEmailDeliveriesResult {
+export function verifyInvitationEmailDeliveries(
+  options: DbCliOptions = {},
+): VerifyInvitationEmailDeliveriesResult {
   const migrated = migrateDatabase(options);
   const dbPath = migrated.dbPath;
 
@@ -1759,7 +1890,10 @@ export function verifyInvitationEmailDeliveries(options: DbCliOptions = {}): Ver
       jsonOnly += 1;
       continue;
     }
-    if (canonicalizeInvitationEmailDelivery(jsonRecord) === canonicalizeInvitationEmailDelivery(dedicated)) {
+    if (
+      canonicalizeInvitationEmailDelivery(jsonRecord) ===
+      canonicalizeInvitationEmailDelivery(dedicated)
+    ) {
       matched += 1;
     } else {
       contentDrift += 1;
@@ -1782,7 +1916,9 @@ export function verifyInvitationEmailDeliveries(options: DbCliOptions = {}): Ver
 function readInvitationEmailDeliveryJsonRows(dbPath: string): InvitationEmailDeliveryRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'invitationEmailDeliveries'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'invitationEmailDeliveries'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as InvitationEmailDeliveryRecord);
   } finally {
     db.close();
@@ -1792,12 +1928,16 @@ function readInvitationEmailDeliveryJsonRows(dbPath: string): InvitationEmailDel
 function readInvitationEmailDeliveryDedicatedRows(dbPath: string): InvitationEmailDeliveryRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select id, workspace_id, invitation_id, recipient_email, subject,
         status, provider, mode, created_at, sent_at, error,
         provider_status, provider_delivery_id, provider_status_at, provider_error
       from invitation_email_deliveries
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       workspace_id: string;
       invitation_id: string;
@@ -1859,7 +1999,9 @@ function canonicalizeInvitationEmailDelivery(record: InvitationEmailDeliveryReco
   });
 }
 
-export function backfillActivities(options: BackfillActivitiesOptions = {}): BackfillActivitiesResult {
+export function backfillActivities(
+  options: BackfillActivitiesOptions = {},
+): BackfillActivitiesResult {
   const migrated = migrateDatabase(options);
   const dbPath = migrated.dbPath;
   const dryRun = options.dryRun ?? false;
@@ -1951,7 +2093,9 @@ export function verifyActivities(options: DbCliOptions = {}): VerifyActivitiesRe
 function readActivityJsonRows(dbPath: string): ActivityRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'activities'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'activities'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as ActivityRecord);
   } finally {
     db.close();
@@ -1961,10 +2105,14 @@ function readActivityJsonRows(dbPath: string): ActivityRecord[] {
 function readActivityDedicatedRows(dbPath: string): ActivityRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select payload
       from activities
-    `).all() as Array<{ payload: string }>;
+    `,
+      )
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as ActivityRecord);
   } finally {
     db.close();
@@ -2005,7 +2153,9 @@ interface ProviderCallsWriteRepository {
   upsert?: (record: ProviderCallRecord) => void;
 }
 
-export function backfillProviderCalls(options: BackfillProviderCallsOptions = {}): BackfillProviderCallsResult {
+export function backfillProviderCalls(
+  options: BackfillProviderCallsOptions = {},
+): BackfillProviderCallsResult {
   const migrated = migrateDatabase(options);
   const dbPath = migrated.dbPath;
   const dryRun = options.dryRun ?? false;
@@ -2109,7 +2259,9 @@ function writeProviderCallsViaRepository(dbPath: string, records: ProviderCallRe
 function readProviderCallJsonRows(dbPath: string): ProviderCallRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'providerCalls'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'providerCalls'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as ProviderCallRecord);
   } finally {
     db.close();
@@ -2119,12 +2271,16 @@ function readProviderCallJsonRows(dbPath: string): ProviderCallRecord[] {
 function readProviderCallDedicatedRows(dbPath: string): ProviderCallRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select id, workspace_id, route_key, provider, model,
         prompt_tokens, completion_tokens, cost_usd, duration_ms,
         status, error_message, started_at, completed_at
       from provider_calls
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       workspace_id: string;
       route_key: string;
@@ -2199,7 +2355,8 @@ export function backfillActivationSignals(
 
   for (const record of jsonRows) {
     const stableKey = activationSignalStableKey(record);
-    const existing = dedicatedById.get(record.id) ?? (stableKey ? dedicatedByStableKey.get(stableKey) : undefined);
+    const existing =
+      dedicatedById.get(record.id) ?? (stableKey ? dedicatedByStableKey.get(stableKey) : undefined);
     if (!existing) {
       wouldInsert += 1;
       toInsert.push(record);
@@ -2246,7 +2403,8 @@ export function verifyActivationSignals(options: DbCliOptions = {}): VerifyActiv
 
   for (const [id, jsonRecord] of jsonById) {
     const stableKey = activationSignalStableKey(jsonRecord);
-    const dedicated = dedicatedById.get(id) ?? (stableKey ? dedicatedByStableKey.get(stableKey) : undefined);
+    const dedicated =
+      dedicatedById.get(id) ?? (stableKey ? dedicatedByStableKey.get(stableKey) : undefined);
     if (!dedicated) {
       jsonOnly += 1;
       continue;
@@ -2271,8 +2429,12 @@ export function verifyActivationSignals(options: DbCliOptions = {}): VerifyActiv
 function readActivationSignalJsonRows(dbPath: string): ActivationSignalRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'activationSignals'").all() as Array<{ payload: string }>;
-    return rows.map((row) => normalizeActivationSignalForCli(JSON.parse(row.payload) as ActivationSignalRecord));
+    const rows = db
+      .prepare("select payload from app_records where collection = 'activationSignals'")
+      .all() as Array<{ payload: string }>;
+    return rows.map((row) =>
+      normalizeActivationSignalForCli(JSON.parse(row.payload) as ActivationSignalRecord),
+    );
   } finally {
     db.close();
   }
@@ -2281,10 +2443,14 @@ function readActivationSignalJsonRows(dbPath: string): ActivationSignalRecord[] 
 function readActivationSignalDedicatedRows(dbPath: string): ActivationSignalRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select id, workspace_id, kind, source, origin, source_id, stable_key, data, created_at, updated_at
       from activation_signals
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       workspace_id: string;
       kind: ActivationSignalRecord["kind"];
@@ -2316,7 +2482,10 @@ function readActivationSignalDedicatedRows(dbPath: string): ActivationSignalReco
   }
 }
 
-function writeActivationSignalsToDedicatedTable(dbPath: string, records: ActivationSignalRecord[]): void {
+function writeActivationSignalsToDedicatedTable(
+  dbPath: string,
+  records: ActivationSignalRecord[],
+): void {
   const db = new DatabaseSync(dbPath);
   try {
     db.exec("begin immediate");
@@ -2355,13 +2524,19 @@ function normalizeActivationSignalForCli(record: ActivationSignalRecord): Activa
   };
 }
 
-function inferActivationSignalOriginForCli(source: ActivationSignalRecord["source"]): ActivationSignalRecord["origin"] | undefined {
-  if (source === "seed" || source === "system_fact" || source === "activity") return "system_observed";
-  if (source === "user_fact" || source === "workflow" || source === "agent_run") return "user_entered";
+function inferActivationSignalOriginForCli(
+  source: ActivationSignalRecord["source"],
+): ActivationSignalRecord["origin"] | undefined {
+  if (source === "seed" || source === "system_fact" || source === "activity")
+    return "system_observed";
+  if (source === "user_fact" || source === "workflow" || source === "agent_run")
+    return "user_entered";
   return undefined;
 }
 
-function parseRecordData(raw: string): Record<string, string | number | boolean | null | undefined> {
+function parseRecordData(
+  raw: string,
+): Record<string, string | number | boolean | null | undefined> {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -2389,7 +2564,9 @@ function canonicalizeActivationSignal(record: ActivationSignalRecord): string {
   });
 }
 
-function activationSignalsByStableKey(records: ActivationSignalRecord[]): Map<string, ActivationSignalRecord> {
+function activationSignalsByStableKey(
+  records: ActivationSignalRecord[],
+): Map<string, ActivationSignalRecord> {
   const byStableKey = new Map<string, ActivationSignalRecord>();
   for (const record of records) {
     const key = activationSignalStableKey(record);
@@ -2437,11 +2614,27 @@ export async function runDbCli(argv = process.argv.slice(2)): Promise<number> {
     }
     if (command === "backfill-managed-postgres") {
       const dryRun = args.includes("--dry-run");
-      console.log(JSON.stringify(await backfillManagedPostgres({ ...options, dryRun, source: parseManagedPostgresSource(args) }), null, 2));
+      console.log(
+        JSON.stringify(
+          await backfillManagedPostgres({
+            ...options,
+            dryRun,
+            source: parseManagedPostgresSource(args),
+          }),
+          null,
+          2,
+        ),
+      );
       return 0;
     }
     if (command === "verify-managed-postgres") {
-      console.log(JSON.stringify(await verifyManagedPostgres({ ...options, source: parseManagedPostgresSource(args) }), null, 2));
+      console.log(
+        JSON.stringify(
+          await verifyManagedPostgres({ ...options, source: parseManagedPostgresSource(args) }),
+          null,
+          2,
+        ),
+      );
       return 0;
     }
     if (command === "reset-db") {
@@ -2500,7 +2693,9 @@ export async function runDbCli(argv = process.argv.slice(2)): Promise<number> {
     }
     if (command === "backfill-invitation-email-deliveries") {
       const dryRun = args.includes("--dry-run");
-      console.log(JSON.stringify(backfillInvitationEmailDeliveries({ ...options, dryRun }), null, 2));
+      console.log(
+        JSON.stringify(backfillInvitationEmailDeliveries({ ...options, dryRun }), null, 2),
+      );
       return 0;
     }
     if (command === "verify-invitation-email-deliveries") {
@@ -2568,7 +2763,9 @@ function parseManagedPostgresSource(args: string[]): ManagedPostgresSource | und
 }
 
 function writeUsage(): void {
-  console.error("Usage: node --import tsx src/db/cli.ts <migrate|status|backup|restore|seed-db|seed-app|backfill|backfill-managed-postgres|verify-managed-postgres|reset-db|reset-app|seed-store|reset-store|backfill-job-metric-snapshots|verify-job-metric-snapshots|backfill-alert-events|verify-alert-events|backfill-agent-runs|verify-agent-runs|backfill-jobs|verify-jobs|backfill-invitation-email-deliveries|verify-invitation-email-deliveries|backfill-activities|verify-activities|backfill-provider-calls|verify-provider-calls|backfill-activation-signals|verify-activation-signals> [--db-path=data/packetagent.sqlite] [--json-path=data/packetagent.json] [--backup-path=data/packetagent.sqlite.bak] [--source=json|sqlite|seed] [--dry-run] [--check-orphans]");
+  console.error(
+    "Usage: node --import tsx src/db/cli.ts <migrate|status|backup|restore|seed-db|seed-app|backfill|backfill-managed-postgres|verify-managed-postgres|reset-db|reset-app|seed-store|reset-store|backfill-job-metric-snapshots|verify-job-metric-snapshots|backfill-alert-events|verify-alert-events|backfill-agent-runs|verify-agent-runs|backfill-jobs|verify-jobs|backfill-invitation-email-deliveries|verify-invitation-email-deliveries|backfill-activities|verify-activities|backfill-provider-calls|verify-provider-calls|backfill-activation-signals|verify-activation-signals> [--db-path=data/packetagent.sqlite] [--json-path=data/packetagent.json] [--backup-path=data/packetagent.sqlite.bak] [--source=json|sqlite|seed] [--dry-run] [--check-orphans]",
+  );
 }
 
 function isExecutedDirectly(): boolean {
@@ -2579,10 +2776,12 @@ function isExecutedDirectly(): boolean {
 
 if (isExecutedDirectly()) {
   migrateLegacyDefaultDataFiles();
-  runDbCli().then((exitCode) => {
-    process.exitCode = exitCode;
-  }).catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
+  runDbCli()
+    .then((exitCode) => {
+      process.exitCode = exitCode;
+    })
+    .catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    });
 }

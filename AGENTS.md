@@ -40,6 +40,7 @@ Runtime branding and legacy migration constants live in `src/brand.ts`. Web bran
 - `dev/roadmap.md` - short direction.
 - `BACKLOG.md` - master implementation ledger and loop gates.
 - `dev/worker-implementation-loops.md` - executable W2-W10 and inherited loop map.
+- `dev/worker-observability-plan.md` - W8 event, evidence, rollup, retention, API, and UI decisions.
 - `dev/packetade-packetagent-handoff.md` - PacketADE deployment contract.
 - `dev/taskloom-to-packetagent.md` - rename and compatibility notes.
 - `CHANGELOG.md` - shipped history only.

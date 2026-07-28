@@ -12,7 +12,8 @@ import {
   type WorkerEffectResultReference,
   type WorkerToolEffectClassification,
 } from "./effect-types.js";
-import { WORKER_EVENT_SCHEMA_VERSION, type WorkerEvent } from "./persistence-types.js";
+import type { WorkerEventV2 } from "./persistence-types.js";
+import { appendWorkerJournalEntry, workerEventCorrelation } from "./observability/journal.js";
 import { validateWorkerPersistence } from "./repository.js";
 import type { JsonValue, WorkerRun } from "./types.js";
 import { canonicalWorkerJson } from "./validation.js";
@@ -511,24 +512,22 @@ function appendEffectEvent(
   data: PacketAgentData,
   eventId: string,
   run: WorkerRun,
-  input: Pick<WorkerEvent, "type" | "summary" | "data" | "occurredAt">,
+  input: Pick<WorkerEventV2, "type" | "summary" | "data" | "occurredAt">,
 ): void {
-  const sequence =
-    data.workerEvents
-      .filter((record) => record.workspaceId === run.workspaceId)
-      .reduce((maximum, record) => Math.max(maximum, record.sequence), 0) + 1;
-  data.workerEvents.push({
-    schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
+  appendWorkerJournalEntry(data, {
     id: eventId,
     workspaceId: run.workspaceId,
-    sequence,
     type: input.type,
+    source: "effect",
     workerDefinitionId: run.workerDefinitionId,
     workerVersionId: run.workerVersionId,
     workerDeploymentId: run.workerDeploymentId,
+    workerRunId: run.id,
     actor: RUNTIME_ACTOR,
     summary: input.summary,
     ...(input.data ? { data: input.data } : {}),
+    ...(run.trace ? { trace: run.trace } : {}),
+    correlation: workerEventCorrelation(input.data),
     occurredAt: input.occurredAt,
   });
 }

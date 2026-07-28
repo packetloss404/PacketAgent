@@ -13,7 +13,8 @@ import {
   type WorkerActivationInboxRecord,
   type WorkerActivationPayloadRecord,
 } from "./activation-types.js";
-import { WORKER_EVENT_SCHEMA_VERSION, type WorkerEvent } from "./persistence-types.js";
+import { appendWorkerJournalEntry } from "./observability/journal.js";
+import type { WorkerJournalAppendInput } from "./persistence-types.js";
 import { validateWorkerPersistence } from "./repository.js";
 import type { WorkerDefinition, WorkerDeployment, WorkerRun, WorkerVersion } from "./types.js";
 
@@ -37,13 +38,12 @@ export interface WorkerActivationRepositoryTransaction {
     source: WorkerActivationInboxRecord["source"];
     deliveryId: string;
   }): WorkerActivationInboxRecord | null;
-  nextEventSequence(): number;
   insertInbox(record: WorkerActivationInboxRecord): void;
   replaceInbox(record: WorkerActivationInboxRecord): void;
   insertPayload(record: WorkerActivationPayloadRecord): void;
   insertRun(record: WorkerRun): void;
   insertJob(record: JobRecord): void;
-  appendEvent(record: WorkerEvent): void;
+  appendJournal(input: WorkerJournalAppendInput): void;
 }
 
 export interface WorkerActivationRepository {
@@ -156,13 +156,6 @@ function createTransaction(
         ) ?? null
       );
     },
-    nextEventSequence() {
-      return (
-        data.workerEvents
-          .filter((record) => record.workspaceId === workspaceId)
-          .reduce((maximum, record) => Math.max(maximum, record.sequence), 0) + 1
-      );
-    },
     insertInbox(record) {
       assertWorkspace(record.workspaceId, workspaceId);
       const key = workerActivationDeliveryKey(record);
@@ -217,9 +210,9 @@ function createTransaction(
       }
       data.jobs.push(record);
     },
-    appendEvent(record) {
-      assertWorkspace(record.workspaceId, workspaceId);
-      data.workerEvents.push(record);
+    appendJournal(input) {
+      assertWorkspace(input.workspaceId, workspaceId);
+      appendWorkerJournalEntry(data, input);
     },
   };
 }
@@ -423,11 +416,4 @@ function clone<T>(value: T): T {
 
 function cloneOrNull<T>(value: T | null): T | null {
   return value === null ? null : clone(value);
-}
-
-export function makeWorkerActivationEvent(input: Omit<WorkerEvent, "schemaVersion">): WorkerEvent {
-  return {
-    schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
-    ...input,
-  };
 }

@@ -42,9 +42,27 @@ export function seedStore(): PacketAgentData {
   ];
 
   const workspaces: WorkspaceRecord[] = [
-    createWorkspaceRecord("alpha", "Alpha Workspace", "https://alpha.example.com", "Capture the implementation brief and move into validation.", createdAt),
-    createWorkspaceRecord("beta", "Beta Workspace", "https://beta.example.com", "Recover from blockers and regain forward progress.", createdAt),
-    createWorkspaceRecord("gamma", "Gamma Workspace", "https://gamma.example.com", "Sustain a complete release process for the workspace.", createdAt),
+    createWorkspaceRecord(
+      "alpha",
+      "Alpha Workspace",
+      "https://alpha.example.com",
+      "Capture the implementation brief and move into validation.",
+      createdAt,
+    ),
+    createWorkspaceRecord(
+      "beta",
+      "Beta Workspace",
+      "https://beta.example.com",
+      "Recover from blockers and regain forward progress.",
+      createdAt,
+    ),
+    createWorkspaceRecord(
+      "gamma",
+      "Gamma Workspace",
+      "https://gamma.example.com",
+      "Sustain a complete release process for the workspace.",
+      createdAt,
+    ),
   ];
 
   const memberships: WorkspaceMemberRecord[] = [
@@ -60,7 +78,8 @@ export function seedStore(): PacketAgentData {
       goals: ["Capture validation evidence", "Track remaining launch question"],
       audience: "Implementation lead and customer success manager",
       constraints: "First release should avoid optional reporting scope until it is confirmed.",
-      problemStatement: "The implementation scope is understood, but release readiness still needs durable validation evidence.",
+      problemStatement:
+        "The implementation scope is understood, but release readiness still needs durable validation evidence.",
       targetCustomers: ["Implementation lead", "Customer success manager"],
       desiredOutcome: "A ready-to-review workspace with one remaining question tracked.",
       successMetrics: ["Validation checklist has passing evidence", "Open questions have owners"],
@@ -74,10 +93,15 @@ export function seedStore(): PacketAgentData {
       goals: ["Resolve dependency ownership", "Clarify retry scope"],
       audience: "Operations owner and technical lead",
       constraints: "Implementation restart is blocked until the dependency owner is confirmed.",
-      problemStatement: "Dependency gaps and unanswered scope questions are preventing forward progress.",
+      problemStatement:
+        "Dependency gaps and unanswered scope questions are preventing forward progress.",
       targetCustomers: ["Operations owner", "Technical lead"],
       desiredOutcome: "Critical blockers are visible and the implementation plan can restart.",
-      successMetrics: ["Dependency blocker is resolved", "Critical issue has an owner", "Retry plan is documented"],
+      successMetrics: [
+        "Dependency blocker is resolved",
+        "Critical issue has an owner",
+        "Retry plan is documented",
+      ],
       updatedByUserId: "user_beta",
       createdAt: isoDaysAgo(14),
       updatedAt: isoDaysAgo(4),
@@ -88,10 +112,14 @@ export function seedStore(): PacketAgentData {
       goals: ["Preserve release evidence", "Keep confirmation auditable"],
       audience: "Product manager and release owner",
       constraints: "Release records must stay linked to validation evidence.",
-      problemStatement: "The workflow is complete and needs a durable audit trail for release confidence.",
+      problemStatement:
+        "The workflow is complete and needs a durable audit trail for release confidence.",
       targetCustomers: ["Product manager", "Release owner"],
       desiredOutcome: "Release confirmation remains tied to validation evidence and requirements.",
-      successMetrics: ["Release confirmation is recorded", "Validation evidence is linked to the plan"],
+      successMetrics: [
+        "Release confirmation is recorded",
+        "Validation evidence is linked to the plan",
+      ],
       updatedByUserId: "user_gamma",
       createdAt: isoDaysAgo(30),
       updatedAt: isoDaysAgo(7),
@@ -106,7 +134,10 @@ export function seedStore(): PacketAgentData {
       detail: "Record proof that the implemented workflow meets the activation checklist.",
       priority: "must",
       status: "approved",
-      acceptanceCriteria: ["Evidence includes outcome, owner, and linked plan item", "Failed checks create follow-up work"],
+      acceptanceCriteria: [
+        "Evidence includes outcome, owner, and linked plan item",
+        "Failed checks create follow-up work",
+      ],
       source: "brief",
       createdByUserId: "user_alpha",
       createdAt: isoDaysAgo(8),
@@ -119,7 +150,10 @@ export function seedStore(): PacketAgentData {
       detail: "Keep unanswered launch questions visible until they are resolved or deferred.",
       priority: "should",
       status: "approved",
-      acceptanceCriteria: ["Each question has status and owner", "Resolved questions keep their resolution note"],
+      acceptanceCriteria: [
+        "Each question has status and owner",
+        "Resolved questions keep their resolution note",
+      ],
       source: "team",
       createdByUserId: "user_alpha",
       createdAt: isoDaysAgo(7),
@@ -129,10 +163,14 @@ export function seedStore(): PacketAgentData {
       id: "req_beta_dependencies",
       workspaceId: "beta",
       title: "Unblock dependency decisions",
-      detail: "Identify dependency blockers and critical scope decisions before restarting implementation.",
+      detail:
+        "Identify dependency blockers and critical scope decisions before restarting implementation.",
       priority: "must",
       status: "changed",
-      acceptanceCriteria: ["Critical blockers are marked high or critical", "Dependency owner is assigned"],
+      acceptanceCriteria: [
+        "Critical blockers are marked high or critical",
+        "Dependency owner is assigned",
+      ],
       source: "customer",
       createdByUserId: "user_beta",
       createdAt: isoDaysAgo(12),
@@ -145,7 +183,10 @@ export function seedStore(): PacketAgentData {
       detail: "Tie release confirmation to validation evidence and notes for later review.",
       priority: "must",
       status: "done",
-      acceptanceCriteria: ["Release version is recorded", "Confirmation references validation evidence"],
+      acceptanceCriteria: [
+        "Release version is recorded",
+        "Confirmation references validation evidence",
+      ],
       source: "brief",
       createdByUserId: "user_gamma",
       createdAt: isoDaysAgo(28),
@@ -184,7 +225,8 @@ export function seedStore(): PacketAgentData {
       workspaceId: "beta",
       requirementIds: ["req_beta_dependencies"],
       title: "Restart implementation after dependency review",
-      description: "Document dependency ownership, then move the implementation back to active work.",
+      description:
+        "Document dependency ownership, then move the implementation back to active work.",
       status: "blocked",
       ownerUserId: "user_beta",
       order: 1,
@@ -317,9 +359,34 @@ export function seedStore(): PacketAgentData {
   ];
 
   const providers: ProviderRecord[] = [
-    createProvider("provider_alpha_openai", "alpha", "OpenAI", "openai", "gpt-4.1-mini", true, createdAt),
-    createProvider("provider_beta_anthropic", "beta", "Anthropic", "anthropic", "claude-3-5-sonnet-latest", false, createdAt),
-    createProvider("provider_gamma_ollama", "gamma", "Local Ollama", "ollama", "llama3.1", true, createdAt, "http://localhost:11434"),
+    createProvider(
+      "provider_alpha_openai",
+      "alpha",
+      "OpenAI",
+      "openai",
+      "gpt-4.1-mini",
+      true,
+      createdAt,
+    ),
+    createProvider(
+      "provider_beta_anthropic",
+      "beta",
+      "Anthropic",
+      "anthropic",
+      "claude-3-5-sonnet-latest",
+      false,
+      createdAt,
+    ),
+    createProvider(
+      "provider_gamma_ollama",
+      "gamma",
+      "Local Ollama",
+      "ollama",
+      "llama3.1",
+      true,
+      createdAt,
+      "http://localhost:11434",
+    ),
   ];
 
   const agents: AgentRecord[] = [
@@ -329,7 +396,8 @@ export function seedStore(): PacketAgentData {
       createdByUserId: "user_alpha",
       name: "Support inbox triage",
       description: "Classifies new support emails, drafts replies, and flags urgent requests.",
-      instructions: "Watch the support inbox. Classify urgency, draft a concise reply, and alert the owner when severity is high.",
+      instructions:
+        "Watch the support inbox. Classify urgency, draft a concise reply, and alert the owner when severity is high.",
       providerId: "provider_alpha_openai",
       model: "gpt-4.1-mini",
       tools: ["gmail", "email_drafts", "notifications"],
@@ -338,15 +406,45 @@ export function seedStore(): PacketAgentData {
       status: "active",
       templateId: "support_triage",
       inputSchema: [
-        { key: "mailbox", label: "Mailbox label", type: "string", required: true, description: "Inbox or label to scan." },
-        { key: "urgency_threshold", label: "Urgency threshold", type: "enum", required: true, options: ["low", "medium", "high"], defaultValue: "medium" },
+        {
+          key: "mailbox",
+          label: "Mailbox label",
+          type: "string",
+          required: true,
+          description: "Inbox or label to scan.",
+        },
+        {
+          key: "urgency_threshold",
+          label: "Urgency threshold",
+          type: "enum",
+          required: true,
+          options: ["low", "medium", "high"],
+          defaultValue: "medium",
+        },
       ],
       timestamp: createdAt,
       playbook: [
-        { id: "step_alpha_support_1", title: "Read new inbox messages", instruction: "Pull unread support emails from the inbox tool." },
-        { id: "step_alpha_support_2", title: "Classify urgency", instruction: "Score each message as low / medium / high based on subject + body keywords." },
-        { id: "step_alpha_support_3", title: "Draft reply", instruction: "Compose a concise reply for each non-urgent message." },
-        { id: "step_alpha_support_4", title: "Escalate critical", instruction: "If severity is high, post to #ops and assign the on-call owner." },
+        {
+          id: "step_alpha_support_1",
+          title: "Read new inbox messages",
+          instruction: "Pull unread support emails from the inbox tool.",
+        },
+        {
+          id: "step_alpha_support_2",
+          title: "Classify urgency",
+          instruction:
+            "Score each message as low / medium / high based on subject + body keywords.",
+        },
+        {
+          id: "step_alpha_support_3",
+          title: "Draft reply",
+          instruction: "Compose a concise reply for each non-urgent message.",
+        },
+        {
+          id: "step_alpha_support_4",
+          title: "Escalate critical",
+          instruction: "If severity is high, post to #ops and assign the on-call owner.",
+        },
       ],
     }),
     createAgent({
@@ -354,8 +452,10 @@ export function seedStore(): PacketAgentData {
       workspaceId: "alpha",
       createdByUserId: "user_alpha",
       name: "Daily workspace brief",
-      description: "Summarizes open work, recent runs, blockers, and questions every weekday morning.",
-      instructions: "Generate a compact morning brief from recent activity, open questions, blockers, and validation state.",
+      description:
+        "Summarizes open work, recent runs, blockers, and questions every weekday morning.",
+      instructions:
+        "Generate a compact morning brief from recent activity, open questions, blockers, and validation state.",
       providerId: "provider_alpha_openai",
       model: "gpt-4.1-mini",
       tools: ["activity", "workflow", "email"],
@@ -364,14 +464,38 @@ export function seedStore(): PacketAgentData {
       status: "active",
       templateId: "daily_brief",
       inputSchema: [
-        { key: "lookback_hours", label: "Lookback (hours)", type: "number", required: true, defaultValue: "24" },
-        { key: "include_runs", label: "Include agent runs", type: "boolean", required: false, defaultValue: "true" },
+        {
+          key: "lookback_hours",
+          label: "Lookback (hours)",
+          type: "number",
+          required: true,
+          defaultValue: "24",
+        },
+        {
+          key: "include_runs",
+          label: "Include agent runs",
+          type: "boolean",
+          required: false,
+          defaultValue: "true",
+        },
       ],
       timestamp: createdAt,
       playbook: [
-        { id: "step_alpha_brief_1", title: "Pull yesterday's activity", instruction: "Fetch activity events from the last 24 hours." },
-        { id: "step_alpha_brief_2", title: "Summarize open work", instruction: "Group blockers, open questions, and in-progress plan items." },
-        { id: "step_alpha_brief_3", title: "Send brief", instruction: "Email the morning brief to the workspace owners list." },
+        {
+          id: "step_alpha_brief_1",
+          title: "Pull yesterday's activity",
+          instruction: "Fetch activity events from the last 24 hours.",
+        },
+        {
+          id: "step_alpha_brief_2",
+          title: "Summarize open work",
+          instruction: "Group blockers, open questions, and in-progress plan items.",
+        },
+        {
+          id: "step_alpha_brief_3",
+          title: "Send brief",
+          instruction: "Email the morning brief to the workspace owners list.",
+        },
       ],
     }),
     createAgent({
@@ -380,7 +504,8 @@ export function seedStore(): PacketAgentData {
       createdByUserId: "user_beta",
       name: "Dependency watcher",
       description: "Monitors unresolved implementation dependencies and prepares escalation notes.",
-      instructions: "Track critical blockers and summarize what is needed to restart implementation.",
+      instructions:
+        "Track critical blockers and summarize what is needed to restart implementation.",
       providerId: "provider_beta_anthropic",
       model: "claude-3-5-sonnet-latest",
       tools: ["workflow", "activity"],
@@ -390,8 +515,16 @@ export function seedStore(): PacketAgentData {
       inputSchema: [],
       timestamp: createdAt,
       playbook: [
-        { id: "step_beta_dep_1", title: "List critical blockers", instruction: "Enumerate blockers with severity high or critical." },
-        { id: "step_beta_dep_2", title: "Draft escalation notes", instruction: "Write a brief note per blocker with owner and required action." },
+        {
+          id: "step_beta_dep_1",
+          title: "List critical blockers",
+          instruction: "Enumerate blockers with severity high or critical.",
+        },
+        {
+          id: "step_beta_dep_2",
+          title: "Draft escalation notes",
+          instruction: "Write a brief note per blocker with owner and required action.",
+        },
       ],
     }),
     createAgent({
@@ -400,7 +533,8 @@ export function seedStore(): PacketAgentData {
       createdByUserId: "user_gamma",
       name: "Release audit",
       description: "Checks release evidence and prepares a confirmation summary.",
-      instructions: "Review validation evidence, release confirmation, and open questions before release.",
+      instructions:
+        "Review validation evidence, release confirmation, and open questions before release.",
       providerId: "provider_gamma_ollama",
       model: "llama3.1",
       tools: ["validation", "release_notes"],
@@ -409,14 +543,32 @@ export function seedStore(): PacketAgentData {
       status: "active",
       templateId: "release_audit",
       inputSchema: [
-        { key: "release_label", label: "Release label", type: "string", required: true, description: "Version label being audited." },
+        {
+          key: "release_label",
+          label: "Release label",
+          type: "string",
+          required: true,
+          description: "Version label being audited.",
+        },
         { key: "evidence_url", label: "Evidence URL", type: "url", required: false },
       ],
       timestamp: createdAt,
       playbook: [
-        { id: "step_gamma_audit_1", title: "Verify validation evidence", instruction: "Confirm every passed evidence has a source and capturer." },
-        { id: "step_gamma_audit_2", title: "Check open questions", instruction: "Confirm no open question is tagged release-blocking." },
-        { id: "step_gamma_audit_3", title: "Compose release summary", instruction: "Produce a concise audit summary for the release confirmation." },
+        {
+          id: "step_gamma_audit_1",
+          title: "Verify validation evidence",
+          instruction: "Confirm every passed evidence has a source and capturer.",
+        },
+        {
+          id: "step_gamma_audit_2",
+          title: "Check open questions",
+          instruction: "Confirm no open question is tagged release-blocking.",
+        },
+        {
+          id: "step_gamma_audit_3",
+          title: "Compose release summary",
+          instruction: "Produce a concise audit summary for the release confirmation.",
+        },
       ],
     }),
   ];
@@ -472,10 +624,38 @@ export function seedStore(): PacketAgentData {
       inputs: { mailbox: "support@alpha.example.com", urgency_threshold: "medium" },
       output: "Scanned 18 messages. Drafted 4 replies. Flagged 1 high-severity request.",
       transcript: [
-        { id: "rs_alpha_support_1", title: "Read new inbox messages", status: "success", output: "Pulled 4 unread messages.", durationMs: 380, startedAt: isoDaysAgo(0) },
-        { id: "rs_alpha_support_2", title: "Classify urgency", status: "success", output: "3 low, 1 high.", durationMs: 720, startedAt: isoDaysAgo(0) },
-        { id: "rs_alpha_support_3", title: "Draft reply", status: "success", output: "Drafted 3 replies for review.", durationMs: 980, startedAt: isoDaysAgo(0) },
-        { id: "rs_alpha_support_4", title: "Escalate critical", status: "success", output: "Escalated 1 high-severity message to on-call.", durationMs: 410, startedAt: isoDaysAgo(0) },
+        {
+          id: "rs_alpha_support_1",
+          title: "Read new inbox messages",
+          status: "success",
+          output: "Pulled 4 unread messages.",
+          durationMs: 380,
+          startedAt: isoDaysAgo(0),
+        },
+        {
+          id: "rs_alpha_support_2",
+          title: "Classify urgency",
+          status: "success",
+          output: "3 low, 1 high.",
+          durationMs: 720,
+          startedAt: isoDaysAgo(0),
+        },
+        {
+          id: "rs_alpha_support_3",
+          title: "Draft reply",
+          status: "success",
+          output: "Drafted 3 replies for review.",
+          durationMs: 980,
+          startedAt: isoDaysAgo(0),
+        },
+        {
+          id: "rs_alpha_support_4",
+          title: "Escalate critical",
+          status: "success",
+          output: "Escalated 1 high-severity message to on-call.",
+          durationMs: 410,
+          startedAt: isoDaysAgo(0),
+        },
       ],
       logs: [
         { at: isoDaysAgo(0), level: "info", message: "Connected to support inbox." },
@@ -494,9 +674,30 @@ export function seedStore(): PacketAgentData {
       inputs: { lookback_hours: 24, include_runs: true },
       output: "Brief delivered. 3 open items, 1 question, no failed validations.",
       transcript: [
-        { id: "rs_alpha_brief_1", title: "Pull yesterday's activity", status: "success", output: "Fetched 12 events.", durationMs: 230, startedAt: isoDaysAgo(1) },
-        { id: "rs_alpha_brief_2", title: "Summarize open work", status: "success", output: "1 blocker, 2 questions, 4 in-progress items.", durationMs: 540, startedAt: isoDaysAgo(1) },
-        { id: "rs_alpha_brief_3", title: "Send brief", status: "success", output: "Brief delivered to 3 recipients.", durationMs: 310, startedAt: isoDaysAgo(1) },
+        {
+          id: "rs_alpha_brief_1",
+          title: "Pull yesterday's activity",
+          status: "success",
+          output: "Fetched 12 events.",
+          durationMs: 230,
+          startedAt: isoDaysAgo(1),
+        },
+        {
+          id: "rs_alpha_brief_2",
+          title: "Summarize open work",
+          status: "success",
+          output: "1 blocker, 2 questions, 4 in-progress items.",
+          durationMs: 540,
+          startedAt: isoDaysAgo(1),
+        },
+        {
+          id: "rs_alpha_brief_3",
+          title: "Send brief",
+          status: "success",
+          output: "Brief delivered to 3 recipients.",
+          durationMs: 310,
+          startedAt: isoDaysAgo(1),
+        },
       ],
       logs: [
         { at: isoDaysAgo(1), level: "info", message: "Pulled 24h of activity." },
@@ -513,8 +714,22 @@ export function seedStore(): PacketAgentData {
       triggerKind: "schedule",
       error: "Provider API key is not configured.",
       transcript: [
-        { id: "rs_beta_dep_1", title: "List critical blockers", status: "failed", output: "Provider API key is not configured.", durationMs: 60, startedAt: isoDaysAgo(2) },
-        { id: "rs_beta_dep_2", title: "Draft escalation notes", status: "skipped", output: "Skipped because the previous step failed.", durationMs: 0, startedAt: isoDaysAgo(2) },
+        {
+          id: "rs_beta_dep_1",
+          title: "List critical blockers",
+          status: "failed",
+          output: "Provider API key is not configured.",
+          durationMs: 60,
+          startedAt: isoDaysAgo(2),
+        },
+        {
+          id: "rs_beta_dep_2",
+          title: "Draft escalation notes",
+          status: "skipped",
+          output: "Skipped because the previous step failed.",
+          durationMs: 0,
+          startedAt: isoDaysAgo(2),
+        },
       ],
       logs: [
         { at: isoDaysAgo(2), level: "warn", message: "Provider connection check failed." },
@@ -532,9 +747,30 @@ export function seedStore(): PacketAgentData {
       inputs: { release_label: "gamma-1.0" },
       output: "Audit passed. Validation evidence linked, confirmation recorded.",
       transcript: [
-        { id: "rs_gamma_audit_1", title: "Verify validation evidence", status: "success", output: "All passed evidence has source + capturer.", durationMs: 450, startedAt: isoDaysAgo(7) },
-        { id: "rs_gamma_audit_2", title: "Check open questions", status: "success", output: "0 release-blocking questions open.", durationMs: 220, startedAt: isoDaysAgo(7) },
-        { id: "rs_gamma_audit_3", title: "Compose release summary", status: "success", output: "Summary written to release confirmation.", durationMs: 690, startedAt: isoDaysAgo(7) },
+        {
+          id: "rs_gamma_audit_1",
+          title: "Verify validation evidence",
+          status: "success",
+          output: "All passed evidence has source + capturer.",
+          durationMs: 450,
+          startedAt: isoDaysAgo(7),
+        },
+        {
+          id: "rs_gamma_audit_2",
+          title: "Check open questions",
+          status: "success",
+          output: "0 release-blocking questions open.",
+          durationMs: 220,
+          startedAt: isoDaysAgo(7),
+        },
+        {
+          id: "rs_gamma_audit_3",
+          title: "Compose release summary",
+          status: "success",
+          output: "Summary written to release confirmation.",
+          durationMs: 690,
+          startedAt: isoDaysAgo(7),
+        },
       ],
       logs: [
         { at: isoDaysAgo(7), level: "info", message: "Loaded release confirmation." },
@@ -625,11 +861,35 @@ export function seedStore(): PacketAgentData {
   };
 
   const activationSignals: ActivationSignalRecord[] = [
-    createActivationSignal("activation_signal_alpha_retry_1", "alpha", "retry", isoDaysAgo(1), "run_alpha_support_latest"),
-    createActivationSignal("activation_signal_alpha_scope_1", "alpha", "scope_change", isoDaysAgo(3), "question_alpha_reporting"),
-    createActivationSignal("activation_signal_beta_retry_1", "beta", "retry", isoDaysAgo(2), "run_beta_dependency_latest"),
+    createActivationSignal(
+      "activation_signal_alpha_retry_1",
+      "alpha",
+      "retry",
+      isoDaysAgo(1),
+      "run_alpha_support_latest",
+    ),
+    createActivationSignal(
+      "activation_signal_alpha_scope_1",
+      "alpha",
+      "scope_change",
+      isoDaysAgo(3),
+      "question_alpha_reporting",
+    ),
+    createActivationSignal(
+      "activation_signal_beta_retry_1",
+      "beta",
+      "retry",
+      isoDaysAgo(2),
+      "run_beta_dependency_latest",
+    ),
     createActivationSignal("activation_signal_beta_retry_2", "beta", "retry", isoDaysAgo(1)),
-    createActivationSignal("activation_signal_beta_scope_1", "beta", "scope_change", isoDaysAgo(3), "question_beta_scope"),
+    createActivationSignal(
+      "activation_signal_beta_scope_1",
+      "beta",
+      "scope_change",
+      isoDaysAgo(3),
+      "question_beta_scope",
+    ),
     createActivationSignal("activation_signal_beta_scope_2", "beta", "scope_change", isoDaysAgo(2)),
   ];
 
@@ -702,14 +962,58 @@ export function seedStore(): PacketAgentData {
     validationEvidence,
     releaseConfirmations,
     onboardingStates: [
-      createOnboardingState("alpha", ["create_workspace_profile", "define_requirements", "define_plan", "start_implementation"], "validate", createdAt),
-      createOnboardingState("beta", ["create_workspace_profile", "define_requirements", "define_plan"], "start_implementation", createdAt),
-      createOnboardingState("gamma", ["create_workspace_profile", "define_requirements", "define_plan", "start_implementation", "validate", "confirm_release"], "confirm_release", createdAt, true),
+      createOnboardingState(
+        "alpha",
+        ["create_workspace_profile", "define_requirements", "define_plan", "start_implementation"],
+        "validate",
+        createdAt,
+      ),
+      createOnboardingState(
+        "beta",
+        ["create_workspace_profile", "define_requirements", "define_plan"],
+        "start_implementation",
+        createdAt,
+      ),
+      createOnboardingState(
+        "gamma",
+        [
+          "create_workspace_profile",
+          "define_requirements",
+          "define_plan",
+          "start_implementation",
+          "validate",
+          "confirm_release",
+        ],
+        "confirm_release",
+        createdAt,
+        true,
+      ),
     ],
     activities: [
-      createActivity("alpha", "account", "account.created", { type: "system", id: "seed" }, { title: "Workspace initialized" }, createdAt),
-      createActivity("beta", "account", "account.created", { type: "system", id: "seed" }, { title: "Workspace initialized" }, createdAt),
-      createActivity("gamma", "account", "account.created", { type: "system", id: "seed" }, { title: "Workspace initialized" }, createdAt),
+      createActivity(
+        "alpha",
+        "account",
+        "account.created",
+        { type: "system", id: "seed" },
+        { title: "Workspace initialized" },
+        createdAt,
+      ),
+      createActivity(
+        "beta",
+        "account",
+        "account.created",
+        { type: "system", id: "seed" },
+        { title: "Workspace initialized" },
+        createdAt,
+      ),
+      createActivity(
+        "gamma",
+        "account",
+        "account.created",
+        { type: "system", id: "seed" },
+        { title: "Workspace initialized" },
+        createdAt,
+      ),
     ],
     activationSignals,
     agents,
@@ -738,6 +1042,8 @@ export function seedStore(): PacketAgentData {
     workerDeploymentRollouts: [],
     workerCommandReceipts: [],
     workerEvents: [],
+    workerEvidenceEntries: [],
+    workerArtifactManifests: [],
     workerActivationInboxes: [],
     workerActivationPayloads: [],
     activationFacts,
@@ -750,7 +1056,12 @@ export function createSeedStore(): PacketAgentData {
   return seedStore();
 }
 
-function createSeedUser(id: string, email: string, displayName: string, timestamp: string): UserRecord {
+function createSeedUser(
+  id: string,
+  email: string,
+  displayName: string,
+  timestamp: string,
+): UserRecord {
   return {
     id,
     email,
@@ -762,7 +1073,13 @@ function createSeedUser(id: string, email: string, displayName: string, timestam
   };
 }
 
-function createWorkspaceRecord(id: string, name: string, website: string, automationGoal: string, timestamp: string): WorkspaceRecord {
+function createWorkspaceRecord(
+  id: string,
+  name: string,
+  website: string,
+  automationGoal: string,
+  timestamp: string,
+): WorkspaceRecord {
   return {
     id,
     slug: slugify(name) || id,
@@ -896,7 +1213,8 @@ function createAgentRun(input: {
     triggerKind: input.triggerKind,
     transcript: input.transcript,
     startedAt: input.timestamp,
-    completedAt: input.status === "queued" || input.status === "running" ? undefined : input.timestamp,
+    completedAt:
+      input.status === "queued" || input.status === "running" ? undefined : input.timestamp,
     inputs: input.inputs,
     output: input.output,
     error: input.error,

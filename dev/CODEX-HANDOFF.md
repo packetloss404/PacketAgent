@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W7 are implemented as
+in foundation commit `d60cd47`. W1-W7 and W8.1 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -111,6 +111,14 @@ Prompt-to-app generation remains a supported secondary capability.
   orderings, durable stop is observed at every supervisor phase with no later
   action, and operator routes reconstructed from durable state can stop runs
   and revoke deployments without an authoring service.
+- Completed W8.1's event and evidence contract. New Worker journal writes use
+  digest-bound v2 envelopes with monotonic workspace, deployment, and run
+  sequences and atomically paired evidence entries. Activation, queue,
+  supervisor, provider, tool/effect, approval, checkpoint, control, recovery,
+  and terminal sources carry W3C trace and durable record correlations.
+  Opaque raw-payload references remain separate; provenance-bound artifact
+  manifests require content digests. V1 events remain readable, and migration
+  `0022` persists indexed event/evidence/artifact records in SQLite.
 
 ## Current implementation truth
 
@@ -173,6 +181,9 @@ Implemented substrate:
   redacted run, attention, command, grant, and deployment projections;
 - an adversarial restart/kill gate covering approval callback replay, competing
   controls, every supervisor phase, and headless operator independence;
+- versioned digest-bound Worker events, atomically paired evidence, explicit
+  source/trace correlations, opaque raw-payload references, provenance-bound
+  artifact manifests, and ordered workspace-scoped observability reads;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -198,7 +209,7 @@ Do not describe those missing Worker features as implemented.
 Continue **W8 - Evidence, cost, retention, and operations UI** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W7 are complete under `src/workers/`, the store, migrations,
+W1-W7 and W8.1 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -237,9 +248,15 @@ W7.5 closes the gate with fresh-process approval resume and callback replay,
 both approve/reject and activation/revoke race orderings, durable stop at every
 supervisor phase with no subsequent action, and headless operator controls
 reconstructed from durable state.
+W8.1 routes every new Worker occurrence through a v2 journal with monotonic
+workspace/deployment/run sequences, redacted data and envelope digests, W3C
+trace/source correlation, and an atomic evidence entry. Artifact manifests bind
+content descriptors to producers, evidence, and materials; stored v1 events
+remain readable without fabricated evidence. JSON, dedicated SQLite, and
+managed Postgres persistence/export remain equivalent.
 
 The exact next slice is
-[`W8.1 - Formalize the event and evidence model`](worker-implementation-loops.md#w81---formalize-the-event-and-evidence-model).
+[`W8.2 - Build deterministic rollups`](worker-implementation-loops.md#w82---build-deterministic-rollups).
 After each gate passes, continue through W8-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -252,6 +269,7 @@ have been reconciled there and must not be resumed independently.
 - W6-W10 and inherited execution map: [`worker-implementation-loops.md`](worker-implementation-loops.md)
 - PacketADE contract: [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md)
 - W1 contract plan and decisions: [`worker-contract-plan.md`](worker-contract-plan.md)
+- W8 observability/evidence decisions: [`worker-observability-plan.md`](worker-observability-plan.md)
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
 - Verification: [`TESTING.md`](TESTING.md)
 - Shipped history: [`../CHANGELOG.md`](../CHANGELOG.md)
@@ -264,7 +282,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,437 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,443 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -285,6 +303,11 @@ handoff, the roadmap, or the backlog.
   redirect denial, Docker-only execution, capability compilation/narrowing,
   activation, supervisor, checkpoint-chain, effect replay,
   recovery/quarantine, lease/revision, scheduler, route, and
+  JSON/SQLite/managed-Postgres parity checks - passed
+- focused W8.1 v2 envelope/evidence pairing, monotonic workspace/deployment/run
+  streams, W3C trace and provider/tool/effect/control correlation, event and
+  evidence tamper detection, artifact content/provenance manifests, legacy v1
+  reads, cursor filtering, export isolation, migration, and
   JSON/SQLite/managed-Postgres parity checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
@@ -314,6 +337,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W7.5 commit: clean. Stop if the active folder is
+Expected status after the W8.1 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

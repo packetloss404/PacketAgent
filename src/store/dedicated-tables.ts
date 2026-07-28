@@ -18,6 +18,10 @@ import type {
 } from "../workers/activation-types.js";
 import type { WorkerEffectReceipt } from "../workers/effect-types.js";
 import type {
+  WorkerArtifactManifest,
+  WorkerEvidenceEntry,
+} from "../workers/observability/types.js";
+import type {
   ActivationSignalKind,
   ActivationSignalOrigin,
   ActivationSignalRecord,
@@ -63,10 +67,15 @@ export type DedicatedRelationalCollectionKey =
   | "workerDeploymentRollouts"
   | "workerCommandReceipts"
   | "workerEvents"
+  | "workerEvidenceEntries"
+  | "workerArtifactManifests"
   | "workerActivationInboxes"
   | "workerActivationPayloads";
 
-export type DedicatedRelationalCollections = Pick<PacketAgentData, DedicatedRelationalCollectionKey>;
+export type DedicatedRelationalCollections = Pick<
+  PacketAgentData,
+  DedicatedRelationalCollectionKey
+>;
 
 // Structural mirror of the barrel's ActivationSignalUpsertInput; kept local so
 // this leaf module never imports the barrel. Only the fields read by the
@@ -74,7 +83,9 @@ export type DedicatedRelationalCollections = Pick<PacketAgentData, DedicatedRela
 type ActivationSignalUpsertInput = Omit<ActivationSignalRecord, "id" | "createdAt" | "updatedAt"> &
   Partial<Pick<ActivationSignalRecord, "id" | "createdAt" | "updatedAt">>;
 
-export function loadDedicatedRelationalCollections(db: DatabaseSync): DedicatedRelationalCollections {
+export function loadDedicatedRelationalCollections(
+  db: DatabaseSync,
+): DedicatedRelationalCollections {
   return {
     jobMetricSnapshots: loadDedicatedJobMetricSnapshots(db),
     alertEvents: loadDedicatedAlertEvents(db),
@@ -120,6 +131,14 @@ export function loadDedicatedRelationalCollections(db: DatabaseSync): DedicatedR
       db,
       "select payload from worker_events order by workspace_id, sequence",
     ),
+    workerEvidenceEntries: loadWorkerPayloads<WorkerEvidenceEntry>(
+      db,
+      "select payload from worker_evidence_entries order by workspace_id, sequence",
+    ),
+    workerArtifactManifests: loadWorkerPayloads<WorkerArtifactManifest>(
+      db,
+      "select payload from worker_artifact_manifests order by workspace_id, created_at, id",
+    ),
     workerActivationInboxes: loadWorkerPayloads<WorkerActivationInboxRecord>(
       db,
       "select payload from worker_activation_inbox order by workspace_id, first_seen_at, id",
@@ -140,7 +159,9 @@ export function mergeDedicatedRelationalCollections(
   partial: Partial<PacketAgentData>,
   dedicatedCollections: DedicatedRelationalCollections,
 ): void {
-  for (const collection of Object.keys(dedicatedCollections) as DedicatedRelationalCollectionKey[]) {
+  for (const collection of Object.keys(
+    dedicatedCollections,
+  ) as DedicatedRelationalCollectionKey[]) {
     const records = dedicatedCollections[collection];
     if (records.length > 0 || partial[collection] === undefined) {
       partial[collection] = records as never;
@@ -149,12 +170,16 @@ export function mergeDedicatedRelationalCollections(
 }
 
 function loadDedicatedJobMetricSnapshots(db: DatabaseSync): JobMetricSnapshotRecord[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     select id, captured_at, type, total_runs, succeeded_runs, failed_runs, canceled_runs,
       last_run_started_at, last_run_finished_at, last_duration_ms, average_duration_ms, p95_duration_ms
     from job_metric_snapshots
     order by captured_at asc, id asc
-  `).all() as Array<{
+  `,
+    )
+    .all() as Array<{
     id: string;
     captured_at: string;
     type: string;
@@ -185,12 +210,16 @@ function loadDedicatedJobMetricSnapshots(db: DatabaseSync): JobMetricSnapshotRec
 }
 
 function loadDedicatedAlertEvents(db: DatabaseSync): AlertEventRecord[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     select id, rule_id, severity, title, detail, observed_at, context,
       delivered, delivery_error, delivery_attempts, last_delivery_attempt_at, dead_lettered
     from alert_events
     order by observed_at desc, id asc
-  `).all() as Array<{
+  `,
+    )
+    .all() as Array<{
     id: string;
     rule_id: string;
     severity: AlertEventRecord["severity"];
@@ -217,21 +246,26 @@ function loadDedicatedAlertEvents(db: DatabaseSync): AlertEventRecord[] {
     };
     if (row.delivery_error !== null) record.deliveryError = row.delivery_error;
     if (row.delivery_attempts !== null) record.deliveryAttempts = row.delivery_attempts;
-    if (row.last_delivery_attempt_at !== null) record.lastDeliveryAttemptAt = row.last_delivery_attempt_at;
+    if (row.last_delivery_attempt_at !== null)
+      record.lastDeliveryAttemptAt = row.last_delivery_attempt_at;
     if (row.dead_lettered !== null) record.deadLettered = row.dead_lettered === 1;
     return record;
   });
 }
 
 function loadDedicatedAgentRuns(db: DatabaseSync): AgentRunRecord[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     select id, workspace_id, agent_id, title, status, trigger_kind,
       started_at, completed_at, inputs, output, error,
       logs, tool_calls, transcript, model_used, cost_usd,
       created_at, updated_at
     from agent_runs
     order by created_at desc, id asc
-  `).all() as Array<{
+  `,
+    )
+    .all() as Array<{
     id: string;
     workspace_id: string;
     agent_id: string | null;
@@ -263,13 +297,16 @@ function loadDedicatedAgentRuns(db: DatabaseSync): AgentRunRecord[] {
     };
     if (row.agent_id !== null) record.agentId = row.agent_id;
     if (row.trigger_kind !== null) record.triggerKind = row.trigger_kind;
-    if (row.transcript !== null) record.transcript = parseJsonArrayValue<AgentRunStep>(row.transcript);
+    if (row.transcript !== null)
+      record.transcript = parseJsonArrayValue<AgentRunStep>(row.transcript);
     if (row.started_at !== null) record.startedAt = row.started_at;
     if (row.completed_at !== null) record.completedAt = row.completed_at;
-    if (row.inputs !== null) record.inputs = parseJsonRecord(row.inputs) as Record<string, string | number | boolean>;
+    if (row.inputs !== null)
+      record.inputs = parseJsonRecord(row.inputs) as Record<string, string | number | boolean>;
     if (row.output !== null) record.output = row.output;
     if (row.error !== null) record.error = row.error;
-    if (row.tool_calls !== null) record.toolCalls = parseJsonArrayValue<AgentRunToolCall>(row.tool_calls);
+    if (row.tool_calls !== null)
+      record.toolCalls = parseJsonArrayValue<AgentRunToolCall>(row.tool_calls);
     if (row.model_used !== null) record.modelUsed = row.model_used;
     if (row.cost_usd !== null) record.costUsd = row.cost_usd;
     return record;
@@ -277,13 +314,17 @@ function loadDedicatedAgentRuns(db: DatabaseSync): AgentRunRecord[] {
 }
 
 function loadDedicatedJobs(db: DatabaseSync): JobRecord[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     select id, workspace_id, type, payload, status, attempts, max_attempts,
       scheduled_at, started_at, completed_at, cron, result, error,
       cancel_requested, created_at, updated_at
     from jobs
     order by created_at desc, id asc
-  `).all() as Array<{
+  `,
+    )
+    .all() as Array<{
     id: string;
     workspace_id: string;
     type: string;
@@ -325,13 +366,17 @@ function loadDedicatedJobs(db: DatabaseSync): JobRecord[] {
 }
 
 function loadDedicatedInvitationEmailDeliveries(db: DatabaseSync): InvitationEmailDeliveryRecord[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     select id, workspace_id, invitation_id, recipient_email, subject,
       status, provider, mode, created_at, sent_at, error,
       provider_status, provider_delivery_id, provider_status_at, provider_error
     from invitation_email_deliveries
     order by created_at desc, id asc
-  `).all() as Array<{
+  `,
+    )
+    .all() as Array<{
     id: string;
     workspace_id: string;
     invitation_id: string;
@@ -371,22 +416,30 @@ function loadDedicatedInvitationEmailDeliveries(db: DatabaseSync): InvitationEma
 }
 
 function loadDedicatedActivities(db: DatabaseSync): ActivityRecord[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     select payload
     from activities
     order by occurred_at desc, id desc
-  `).all() as Array<{ payload: string }>;
+  `,
+    )
+    .all() as Array<{ payload: string }>;
   return rows.map((row) => JSON.parse(row.payload) as ActivityRecord);
 }
 
 function loadDedicatedProviderCalls(db: DatabaseSync): ProviderCallRecord[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     select id, workspace_id, route_key, provider, model, prompt_tokens,
       completion_tokens, cost_usd, duration_ms, status, error_message,
       started_at, completed_at
     from provider_calls
     order by completed_at asc, id asc
-  `).all() as Array<{
+  `,
+    )
+    .all() as Array<{
     id: string;
     workspace_id: string;
     route_key: string;
@@ -422,11 +475,15 @@ function loadDedicatedProviderCalls(db: DatabaseSync): ProviderCallRecord[] {
 }
 
 function loadDedicatedActivationSignals(db: DatabaseSync): ActivationSignalRecord[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     select id, workspace_id, kind, source, origin, source_id, stable_key, data, created_at, updated_at
     from activation_signals
     order by workspace_id asc, created_at asc, id asc
-  `).all() as unknown as ActivationSignalRow[];
+  `,
+    )
+    .all() as unknown as ActivationSignalRow[];
   return rows.map(activationSignalRowToRecord);
 }
 
@@ -444,6 +501,8 @@ export function persistDedicatedRelationalRows(db: DatabaseSync, data: PacketAge
 
 function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData): void {
   db.exec(`
+    delete from worker_artifact_manifests;
+    delete from worker_evidence_entries;
     delete from worker_activation_inbox;
     delete from worker_activation_payloads;
     delete from worker_events;
@@ -667,10 +726,13 @@ function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData):
   const eventStatement = db.prepare(`
     insert into worker_events (
       workspace_id, id, sequence, type, worker_definition_id,
-      worker_version_id, worker_deployment_id, occurred_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      worker_version_id, worker_deployment_id, worker_run_id, source,
+      deployment_sequence, run_sequence, evidence_id, event_digest,
+      occurred_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const record of data.workerEvents ?? []) {
+    const v2 = record.schemaVersion === "packetagent.worker-event/v2" ? record : undefined;
     eventStatement.run(
       record.workspaceId,
       record.id,
@@ -679,13 +741,65 @@ function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData):
       record.workerDefinitionId,
       record.workerVersionId ?? null,
       record.workerDeploymentId ?? null,
+      v2?.workerRunId ?? null,
+      v2?.source ?? null,
+      v2?.deploymentSequence ?? null,
+      v2?.runSequence ?? null,
+      v2?.evidenceId ?? null,
+      v2?.eventDigest ?? null,
       record.occurredAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const evidenceStatement = db.prepare(`
+    insert into worker_evidence_entries (
+      workspace_id, id, sequence, worker_definition_id, worker_version_id,
+      worker_deployment_id, worker_run_id, source_event_id, created_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerEvidenceEntries ?? []) {
+    evidenceStatement.run(
+      record.workspaceId,
+      record.id,
+      record.sequence,
+      record.workerDefinitionId,
+      record.workerVersionId ?? null,
+      record.workerDeploymentId ?? null,
+      record.workerRunId ?? null,
+      record.sourceEventId,
+      record.createdAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const artifactManifestStatement = db.prepare(`
+    insert into worker_artifact_manifests (
+      workspace_id, id, worker_definition_id, worker_version_id,
+      worker_deployment_id, worker_run_id, created_at, expires_at,
+      manifest_digest, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerArtifactManifests ?? []) {
+    artifactManifestStatement.run(
+      record.workspaceId,
+      record.id,
+      record.workerDefinitionId,
+      record.workerVersionId,
+      record.workerDeploymentId,
+      record.workerRunId,
+      record.createdAt,
+      record.expiresAt ?? null,
+      record.manifestDigest,
       JSON.stringify(record),
     );
   }
 }
 
-function persistDedicatedJobMetricSnapshots(db: DatabaseSync, records: JobMetricSnapshotRecord[]): void {
+function persistDedicatedJobMetricSnapshots(
+  db: DatabaseSync,
+  records: JobMetricSnapshotRecord[],
+): void {
   db.exec("delete from job_metric_snapshots");
   const stmt = db.prepare(`
     insert or replace into job_metric_snapshots (
@@ -883,7 +997,10 @@ function persistDedicatedProviderCalls(db: DatabaseSync, records: ProviderCallRe
   }
 }
 
-function persistDedicatedActivationSignals(db: DatabaseSync, records: ActivationSignalRecord[]): void {
+function persistDedicatedActivationSignals(
+  db: DatabaseSync,
+  records: ActivationSignalRecord[],
+): void {
   db.exec("delete from activation_signals");
   for (const record of records) {
     upsertDedicatedActivationSignal(db, normalizeActivationSignalRecord(record));
@@ -933,13 +1050,20 @@ export interface ActivationSignalRow {
   updated_at: string;
 }
 
-export function readDedicatedActivationSignalsForWorkspace(db: DatabaseSync, workspaceId: string): ActivationSignalRecord[] {
-  const rows = db.prepare(`
+export function readDedicatedActivationSignalsForWorkspace(
+  db: DatabaseSync,
+  workspaceId: string,
+): ActivationSignalRecord[] {
+  const rows = db
+    .prepare(
+      `
     select id, workspace_id, kind, source, origin, source_id, stable_key, data, created_at, updated_at
     from activation_signals
     where workspace_id = ?
     order by created_at asc, id asc
-  `).all(workspaceId) as unknown as ActivationSignalRow[];
+  `,
+    )
+    .all(workspaceId) as unknown as ActivationSignalRow[];
   return rows.map(activationSignalRowToRecord);
 }
 
@@ -948,19 +1072,27 @@ export function findDedicatedActivationSignalForUpsert(
   input: ActivationSignalUpsertInput,
 ): ActivationSignalRecord | null {
   const row = input.stableKey
-    ? db.prepare(`
+    ? (db
+        .prepare(
+          `
       select id, workspace_id, kind, source, origin, source_id, stable_key, data, created_at, updated_at
       from activation_signals
       where workspace_id = ? and stable_key = ?
       limit 1
-    `).get(input.workspaceId, input.stableKey) as ActivationSignalRow | undefined
+    `,
+        )
+        .get(input.workspaceId, input.stableKey) as ActivationSignalRow | undefined)
     : input.id
-      ? db.prepare(`
+      ? (db
+          .prepare(
+            `
         select id, workspace_id, kind, source, origin, source_id, stable_key, data, created_at, updated_at
         from activation_signals
         where id = ?
         limit 1
-      `).get(input.id) as ActivationSignalRow | undefined
+      `,
+          )
+          .get(input.id) as ActivationSignalRow | undefined)
       : undefined;
   return row ? activationSignalRowToRecord(row) : null;
 }
@@ -981,8 +1113,12 @@ export function activationSignalRowToRecord(row: ActivationSignalRow): Activatio
   return normalizeActivationSignalRecord(record);
 }
 
-export function upsertDedicatedActivationSignal(db: DatabaseSync, record: ActivationSignalRecord): void {
-  db.prepare(`
+export function upsertDedicatedActivationSignal(
+  db: DatabaseSync,
+  record: ActivationSignalRecord,
+): void {
+  db.prepare(
+    `
     insert into activation_signals (
       id, workspace_id, kind, source, origin, source_id, stable_key, data, created_at, updated_at
     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -996,7 +1132,8 @@ export function upsertDedicatedActivationSignal(db: DatabaseSync, record: Activa
       data = excluded.data,
       created_at = excluded.created_at,
       updated_at = excluded.updated_at
-  `).run(
+  `,
+  ).run(
     record.id,
     record.workspaceId,
     record.kind,
@@ -1028,5 +1165,8 @@ export function mergeActivationSignals(
     if (entry.stableKey) seenStableKeys.add(`${entry.workspaceId}:${entry.stableKey}`);
     combined.push(entry);
   }
-  return combined.sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+  return combined.sort(
+    (left, right) =>
+      left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
+  );
 }

@@ -65,6 +65,8 @@ export function normalizeStore(data: Partial<PacketAgentData>): PacketAgentData 
     workerDeploymentRollouts: data.workerDeploymentRollouts ?? [],
     workerCommandReceipts: data.workerCommandReceipts ?? [],
     workerEvents: data.workerEvents ?? [],
+    workerEvidenceEntries: data.workerEvidenceEntries ?? [],
+    workerArtifactManifests: data.workerArtifactManifests ?? [],
     workerActivationInboxes: data.workerActivationInboxes ?? [],
     workerActivationPayloads: data.workerActivationPayloads ?? [],
     activationFacts: data.activationFacts ?? {},
@@ -73,7 +75,9 @@ export function normalizeStore(data: Partial<PacketAgentData>): PacketAgentData 
   };
 }
 
-function normalizeWorkspaceBriefCollection(collection: Partial<PacketAgentData>["workspaceBriefs"]): WorkspaceBriefCollection {
+function normalizeWorkspaceBriefCollection(
+  collection: Partial<PacketAgentData>["workspaceBriefs"],
+): WorkspaceBriefCollection {
   if (!collection) return {};
   if (!Array.isArray(collection)) return collection;
   return Object.fromEntries(collection.map((entry) => [entry.workspaceId, entry]));
@@ -87,13 +91,19 @@ function normalizeReleaseConfirmationCollection(
   return Object.fromEntries(collection.map((entry) => [entry.workspaceId, entry]));
 }
 
-export function inferActivationSignalOrigin(source: ActivationSignalSource): ActivationSignalOrigin | undefined {
-  if (source === "seed" || source === "system_fact" || source === "activity") return "system_observed";
-  if (source === "user_fact" || source === "workflow" || source === "agent_run") return "user_entered";
+export function inferActivationSignalOrigin(
+  source: ActivationSignalSource,
+): ActivationSignalOrigin | undefined {
+  if (source === "seed" || source === "system_fact" || source === "activity")
+    return "system_observed";
+  if (source === "user_fact" || source === "workflow" || source === "agent_run")
+    return "user_entered";
   return undefined;
 }
 
-export function normalizeActivationSignalRecord(record: ActivationSignalRecord): ActivationSignalRecord {
+export function normalizeActivationSignalRecord(
+  record: ActivationSignalRecord,
+): ActivationSignalRecord {
   return {
     ...record,
     origin: record.origin ?? inferActivationSignalOrigin(record.source),

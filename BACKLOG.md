@@ -115,7 +115,7 @@ rolling reservation, effect preparation, or external I/O.
 Dependencies: W4-W6.
 
 Status: complete. Resume at
-[`W8.1 - Formalize the event and evidence model`](dev/worker-implementation-loops.md#w81---formalize-the-event-and-evidence-model).
+[`W8.2 - Build deterministic rollups`](dev/worker-implementation-loops.md#w82---build-deterministic-rollups).
 
 - [x] Define and persist version-bound attention requests, approval grants,
       control commands, and notification delivery references with durable replay
@@ -135,7 +135,7 @@ Status: complete. Resume at
 Dependencies: W2-W7.
 
 Status: active. Resume at
-[`W8.1 - Formalize the event and evidence model`](dev/worker-implementation-loops.md#w81---formalize-the-event-and-evidence-model).
+[`W8.2 - Build deterministic rollups`](dev/worker-implementation-loops.md#w82---build-deterministic-rollups).
 
 - [ ] Add one Worker health/attention summary.
 - [ ] Roll provider calls, tool calls, retries, queue time, approvals, and outcome quality up by Worker version and deployment.

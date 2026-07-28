@@ -1,12 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { WorkerLifecycleError } from "./errors.js";
-import {
-  compileWorkerCapabilityPolicy,
-  WorkerCapabilityCompilationError,
-} from "./capabilities.js";
+import { compileWorkerCapabilityPolicy, WorkerCapabilityCompilationError } from "./capabilities.js";
 import {
   WORKER_COMMAND_SCHEMA_VERSION,
-  WORKER_EVENT_SCHEMA_VERSION,
   WORKER_ROLLOUT_SCHEMA_VERSION,
   type WorkerDeploymentRollout,
   type WorkerLifecycleCommandResponse,
@@ -380,9 +376,7 @@ export function createWorkerLifecycleService(
             requestedCapabilities: version.content.tools,
             allowedCapabilityIds: version.content.policy.permissions.allowedCapabilityIds,
             credentialRefs: version.content.credentialRefs,
-            ...(input.capabilityGrants
-              ? { deploymentGrants: input.capabilityGrants }
-              : {}),
+            ...(input.capabilityGrants ? { deploymentGrants: input.capabilityGrants } : {}),
           });
           const deployment: WorkerDeployment = {
             schemaVersion: WORKER_CONTRACT_SCHEMA_VERSION,
@@ -828,12 +822,11 @@ function appendEvent(
   occurredAt: string,
   input: AppendEventInput,
 ): void {
-  transaction.appendEvent({
-    schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
+  transaction.appendJournal({
     id: id("event"),
     workspaceId: transaction.workspaceId,
-    sequence: transaction.nextEventSequence(),
     type: input.type,
+    source: "lifecycle",
     workerDefinitionId: input.definition.id,
     ...(input.version ? { workerVersionId: input.version.id } : {}),
     ...(input.deployment ? { workerDeploymentId: input.deployment.id } : {}),

@@ -37,6 +37,11 @@ import { createWorkerCredentialService } from "../credentials.js";
 import { resolveWorkerRollingBudgetPolicy } from "../budget-types.js";
 import { createWorkerRollingBudgetService } from "../rolling-budget.js";
 import { createWorkerControlService } from "../control-service.js";
+import {
+  WORKER_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+  type WorkerArtifactManifest,
+} from "../observability/types.js";
+import { computeWorkerArtifactManifestDigest } from "../observability/validation.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -73,6 +78,8 @@ interface BackendScenarioResult {
   readonly rolloutLinks: readonly string[];
   readonly commandCount: number;
   readonly eventSequences: readonly number[];
+  readonly evidenceSequences: readonly number[];
+  readonly artifactManifestDigests: readonly string[];
   readonly exportedDefinitionIds: readonly string[];
   readonly exportedDeploymentIds: readonly string[];
   readonly activationInboxCount: number;
@@ -90,6 +97,8 @@ interface BackendScenarioResult {
   readonly exportedBudgetReservationCount: number;
   readonly controlRecordStatuses: readonly string[];
   readonly exportedControlRecordCounts: readonly number[];
+  readonly exportedEvidenceCount: number;
+  readonly exportedArtifactManifestCount: number;
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -127,6 +136,8 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   );
   assert.equal(exported.data.workerCommandReceipts.length, stored.workerCommandReceipts.length);
   assert.equal(exported.data.workerEvents.length, stored.workerEvents.length);
+  assert.equal(exported.data.workerEvidenceEntries.length, stored.workerEvidenceEntries.length);
+  assert.equal(exported.data.workerArtifactManifests.length, stored.workerArtifactManifests.length);
   assert.equal(exported.data.workerEffectReceipts.length, stored.workerEffectReceipts.length);
   assert.equal(
     exported.data.workerBudgetReservations.length,
@@ -160,6 +171,12 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       .sort(),
     commandCount: stored.workerCommandReceipts.length,
     eventSequences: stored.workerEvents.map((event) => event.sequence),
+    evidenceSequences: stored.workerEvidenceEntries
+      .map((entry) => entry.sequence)
+      .sort((left, right) => left - right),
+    artifactManifestDigests: stored.workerArtifactManifests
+      .map((manifest) => manifest.manifestDigest)
+      .sort(),
     exportedDefinitionIds: exported.data.workerDefinitions
       .map((definition) => definition.id)
       .sort(),
@@ -211,6 +228,8 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       exported.data.workerControlCommands.length,
       exported.data.workerNotificationDeliveries.length,
     ],
+    exportedEvidenceCount: exported.data.workerEvidenceEntries.length,
+    exportedArtifactManifestCount: exported.data.workerArtifactManifests.length,
   };
 }
 
@@ -538,6 +557,43 @@ async function runRuntimePersistence(): Promise<void> {
       startedAt: acquiredAt.toISOString(),
       completedAt: acquiredAt.toISOString(),
     },
+  });
+  await mutateStoreAsync((store) => {
+    const sourceEvidence = store.workerEvidenceEntries.find((entry) =>
+      entry.sourceReferences.some(
+        (reference) => reference.kind === "effect_receipt" && reference.id === completedEffect.id,
+      ),
+    );
+    assert.ok(sourceEvidence);
+    const unsigned = {
+      schemaVersion: WORKER_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+      id: "artifact-manifest-parity",
+      workspaceId: run.workspaceId,
+      workerDefinitionId: run.workerDefinitionId,
+      workerVersionId: run.workerVersionId,
+      workerDeploymentId: run.workerDeploymentId,
+      workerRunId: run.id,
+      artifact: {
+        reference: "artifact:parity-release-report",
+        name: "release-report.json",
+        mediaType: "application/json",
+        byteLength: 128,
+        contentDigest: `sha256:${"c".repeat(64)}`,
+      },
+      classification: "internal" as const,
+      provenance: {
+        producerKind: "worker_tool" as const,
+        producerId: "parity-action-1",
+        sourceEvidenceIds: [sourceEvidence.id],
+        materials: [],
+      },
+      createdAt: acquiredAt.toISOString(),
+    };
+    const manifest: WorkerArtifactManifest = {
+      ...unsigned,
+      manifestDigest: computeWorkerArtifactManifestDigest(unsigned),
+    };
+    store.workerArtifactManifests.push(manifest);
   });
   const checkpoint = await repository.save({
     workspaceId: run.workspaceId,

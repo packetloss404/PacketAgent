@@ -8,7 +8,8 @@ import { redactedErrorMessage } from "../../security/redaction.js";
 import { assertWorkerEffectResultDigest } from "../effects.js";
 import type { WorkerRollingBudgetPort } from "../budget-types.js";
 import { createWorkerRollingBudgetService } from "../rolling-budget.js";
-import { WORKER_EVENT_SCHEMA_VERSION, type WorkerEvent } from "../persistence-types.js";
+import type { WorkerEventV2 } from "../persistence-types.js";
+import { appendWorkerJournalEntry, workerEventCorrelation } from "../observability/journal.js";
 import { assertWorkerRunUpdate } from "../transitions.js";
 import type { WorkerCheckpoint, WorkerRun, WorkerVersion } from "../types.js";
 import { restoreWorkerSupervisorState } from "./checkpoint.js";
@@ -326,24 +327,22 @@ function appendRecoveryEvent(
   data: PacketAgentData,
   eventId: string,
   run: WorkerRun,
-  input: Pick<WorkerEvent, "type" | "summary" | "data" | "occurredAt">,
+  input: Pick<WorkerEventV2, "type" | "summary" | "data" | "occurredAt">,
 ): void {
-  const sequence =
-    data.workerEvents
-      .filter((record) => record.workspaceId === run.workspaceId)
-      .reduce((maximum, record) => Math.max(maximum, record.sequence), 0) + 1;
-  data.workerEvents.push({
-    schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
+  appendWorkerJournalEntry(data, {
     id: eventId,
     workspaceId: run.workspaceId,
-    sequence,
     type: input.type,
+    source: "recovery",
     workerDefinitionId: run.workerDefinitionId,
     workerVersionId: run.workerVersionId,
     workerDeploymentId: run.workerDeploymentId,
+    workerRunId: run.id,
     actor: RECOVERY_ACTOR,
     summary: input.summary,
     ...(input.data ? { data: input.data } : {}),
+    ...(run.trace ? { trace: run.trace } : {}),
+    correlation: workerEventCorrelation(input.data),
     occurredAt: input.occurredAt,
   });
 }

@@ -5,12 +5,20 @@ import type {
   WorkerDefinition,
   WorkerDeployment,
   WorkerRun,
+  WorkerTraceContext,
   WorkerVersion,
 } from "./types.js";
 import type { WorkerEffectReceipt } from "./effect-types.js";
+import type {
+  WorkerArtifactManifest,
+  WorkerEvidenceEntry,
+  WorkerEvidencePayloadReference,
+  WorkerEvidenceRedactionClassification,
+} from "./observability/types.js";
 
 export const WORKER_COMMAND_SCHEMA_VERSION = "packetagent.worker-command/v1" as const;
-export const WORKER_EVENT_SCHEMA_VERSION = "packetagent.worker-event/v1" as const;
+export const LEGACY_WORKER_EVENT_SCHEMA_VERSION = "packetagent.worker-event/v1" as const;
+export const WORKER_EVENT_SCHEMA_VERSION = "packetagent.worker-event/v2" as const;
 export const WORKER_ROLLOUT_SCHEMA_VERSION = "packetagent.worker-rollout/v1" as const;
 
 export type WorkerLifecycleOperation =
@@ -64,8 +72,34 @@ export interface WorkerLifecycleCommandReceipt {
   readonly createdAt: string;
 }
 
-export interface WorkerEvent {
-  readonly schemaVersion: typeof WORKER_EVENT_SCHEMA_VERSION;
+export type WorkerEventSource =
+  | "lifecycle"
+  | "activation"
+  | "queue"
+  | "supervisor"
+  | "provider"
+  | "tool"
+  | "effect"
+  | "approval"
+  | "checkpoint"
+  | "control"
+  | "recovery"
+  | "terminal";
+
+export interface WorkerEventCorrelation {
+  readonly activationId?: string;
+  readonly activationInboxId?: string;
+  readonly executionJobId?: string;
+  readonly providerCallId?: string;
+  readonly toolCallId?: string;
+  readonly effectReceiptId?: string;
+  readonly checkpointId?: string;
+  readonly attentionRequestId?: string;
+  readonly approvalGrantId?: string;
+  readonly controlCommandId?: string;
+}
+
+interface WorkerEventBase {
   readonly id: string;
   readonly workspaceId: string;
   readonly sequence: number;
@@ -73,9 +107,49 @@ export interface WorkerEvent {
   readonly workerDefinitionId: string;
   readonly workerVersionId?: string;
   readonly workerDeploymentId?: string;
+  readonly workerRunId?: string;
   readonly actor: WorkerActorReference;
   readonly summary: string;
   readonly data?: JsonObject;
+  readonly occurredAt: string;
+}
+
+export interface LegacyWorkerEvent extends Omit<WorkerEventBase, "workerRunId"> {
+  readonly schemaVersion: typeof LEGACY_WORKER_EVENT_SCHEMA_VERSION;
+}
+
+export interface WorkerEventV2 extends WorkerEventBase {
+  readonly schemaVersion: typeof WORKER_EVENT_SCHEMA_VERSION;
+  readonly source: WorkerEventSource;
+  readonly deploymentSequence?: number;
+  readonly runSequence?: number;
+  readonly trace?: WorkerTraceContext;
+  readonly correlation?: WorkerEventCorrelation;
+  readonly evidenceId: string;
+  readonly dataClassification: WorkerEvidenceRedactionClassification;
+  readonly dataDigest: string;
+  readonly eventDigest: string;
+}
+
+export type WorkerEvent = LegacyWorkerEvent | WorkerEventV2;
+
+export interface WorkerJournalAppendInput {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly type: string;
+  readonly source: WorkerEventSource;
+  readonly workerDefinitionId: string;
+  readonly workerVersionId?: string;
+  readonly workerDeploymentId?: string;
+  readonly workerRunId?: string;
+  readonly actor: WorkerActorReference;
+  readonly summary: string;
+  readonly data?: JsonObject;
+  readonly trace?: WorkerTraceContext;
+  readonly correlation?: WorkerEventCorrelation;
+  readonly dataClassification?: WorkerEvidenceRedactionClassification;
+  readonly rawPayload?: WorkerEvidencePayloadReference;
+  readonly artifactManifestIds?: readonly string[];
   readonly occurredAt: string;
 }
 
@@ -94,4 +168,6 @@ export interface WorkerPersistenceCollections {
   readonly workerDeploymentRollouts: readonly WorkerDeploymentRollout[];
   readonly workerCommandReceipts: readonly WorkerLifecycleCommandReceipt[];
   readonly workerEvents: readonly WorkerEvent[];
+  readonly workerEvidenceEntries: readonly WorkerEvidenceEntry[];
+  readonly workerArtifactManifests: readonly WorkerArtifactManifest[];
 }

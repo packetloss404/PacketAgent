@@ -10,12 +10,14 @@ hardening, W6.4's atomic rolling budgets, W6.5's adversarial bypass gate, and
 W7.1's durable control records plus W7.2's atomic control service. Supervisor
 attention and deadline enforcement are covered by W7.3. Independent operator
 API coverage is added by W7.4, and W7.5 closes the restart/kill gate.
-Consolidated evidence and PacketADE handoff cases must be added as W8-W9
-ship; they are not current product claims.
+W8.1 adds the versioned event, evidence, and artifact-provenance substrate.
+Deterministic rollups, retention, the consolidated evidence surface, and
+PacketADE handoff cases must be added as W8.2-W9 ship; they are not current
+product claims.
 
-Last automated W7.5 baseline (2026-07-27):
+Last automated W8.1 baseline (2026-07-27):
 
-- API: 1,437 passed, 1 skipped, 0 failed
+- API: 1,443 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -35,6 +37,11 @@ Last automated W7.5 baseline (2026-07-27):
   operator reconstruction, paused-job draining,
   recovery/quarantine, lease/revision, scheduler, and JSON/SQLite/managed-Postgres
   parity checks: passed
+- Focused v2 event/evidence pairing, monotonic workspace/deployment/run streams,
+  W3C trace validation, durable source correlation, event/evidence tamper
+  detection, content/provenance-bound artifact manifests, legacy v1 reads,
+  cursor filtering, migration, export isolation, and
+  JSON/SQLite/managed-Postgres parity checks: passed
 - Typecheck: passed
 - Production web build: passed
 - ESLint: 0 errors, 145 inherited warnings
@@ -376,6 +383,32 @@ Use authenticated requests under `/api/app/workers`. Every mutation requires
    its deployment successfully.
 6. Repeat the relevant restart and control persistence paths against JSON,
    SQLite, and managed Postgres and confirm equivalent terminal records.
+
+## W8.1 Event and Evidence Model Smoke
+
+1. Append a v2 journal occurrence and confirm the event plus its evidence entry
+   commit atomically or neither record is visible.
+2. Append interleaved occurrences for two deployments and runs. Confirm
+   workspace, deployment, and run sequences remain strictly monotonic and
+   ordered repository reads resume from the supplied cursor.
+3. Drive activation through a terminal state. Confirm lifecycle, provider,
+   tool, effect, checkpoint, approval, and control evidence carries the safe
+   trace and durable record correlations without storing raw secret or input
+   content.
+4. Change a persisted event or evidence field and confirm digest validation
+   rejects the graph before it can be used as trusted evidence.
+5. Expire or remove the source behind an optional opaque raw-payload reference.
+   Confirm the evidence summary, classifications, hashes, and source reference
+   remain readable without copying the payload into evidence.
+6. Persist an artifact manifest with a real content digest, media type, byte
+   size, source evidence, materials, and generator provenance. Confirm
+   provenance tampering fails validation, and do not create manifests for
+   reference-only artifacts whose content was never observed.
+7. Load a legacy v1 event and confirm it remains readable without fabricated
+   evidence, trace, correlations, or digests.
+8. Repeat the journal, artifact, workspace isolation, export, cursor, and
+   migration paths against JSON, SQLite, and managed Postgres. Confirm
+   dedicated event indexes and evidence/artifact tables preserve parity.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

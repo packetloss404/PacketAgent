@@ -26,6 +26,7 @@ export interface LedgerContext {
   routeKey: string;
   provider: ProviderName;
   model: string;
+  recordId?: string;
 }
 
 function nowIso(): string {
@@ -44,9 +45,8 @@ async function appendCall(record: ProviderCallRecord): Promise<AppendCallResult>
   const result = await mutateStoreAsync((data) => {
     data.providerCalls.push(record);
     const overflow = data.providerCalls.length - PROVIDER_CALL_CAP;
-    const removedIds = overflow > 0
-      ? data.providerCalls.splice(0, overflow).map((entry) => entry.id)
-      : [];
+    const removedIds =
+      overflow > 0 ? data.providerCalls.splice(0, overflow).map((entry) => entry.id) : [];
     return { inserted: record, removedIds };
   });
 
@@ -98,7 +98,7 @@ export async function recordedCall<T extends { usage: ProviderUsage }>(
   try {
     const result = await fn();
     await appendCall({
-      id: randomUUID(),
+      id: ctx.recordId ?? randomUUID(),
       workspaceId: ctx.workspaceId,
       routeKey: ctx.routeKey,
       provider: ctx.provider,
@@ -114,7 +114,7 @@ export async function recordedCall<T extends { usage: ProviderUsage }>(
     return result;
   } catch (error) {
     await appendCall({
-      id: randomUUID(),
+      id: ctx.recordId ?? randomUUID(),
       workspaceId: ctx.workspaceId,
       routeKey: ctx.routeKey,
       provider: ctx.provider,
@@ -155,7 +155,7 @@ export async function* recordedStream<T extends ProviderStreamChunk>(
     throw error;
   } finally {
     await appendCall({
-      id: randomUUID(),
+      id: ctx.recordId ?? randomUUID(),
       workspaceId: ctx.workspaceId,
       routeKey: ctx.routeKey,
       provider: ctx.provider,
@@ -185,8 +185,11 @@ export interface UsageSummary {
 
 function summarizeProviderCallEntries(entries: ProviderCallRecord[]): UsageSummary {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  let last24Calls = 0, last24Cost = 0;
-  let totalCost = 0, totalPrompt = 0, totalCompletion = 0;
+  let last24Calls = 0,
+    last24Cost = 0;
+  let totalCost = 0,
+    totalPrompt = 0,
+    totalCompletion = 0;
   const byProvider = new Map<ProviderName, { calls: number; costUsd: number }>();
   const byRoute = new Map<string, { calls: number; costUsd: number }>();
   for (const c of entries) {
@@ -194,11 +197,18 @@ function summarizeProviderCallEntries(entries: ProviderCallRecord[]): UsageSumma
     totalPrompt += c.promptTokens;
     totalCompletion += c.completionTokens;
     const ts = Date.parse(c.completedAt);
-    if (ts >= cutoff) { last24Calls++; last24Cost += c.costUsd; }
+    if (ts >= cutoff) {
+      last24Calls++;
+      last24Cost += c.costUsd;
+    }
     const p = byProvider.get(c.provider) ?? { calls: 0, costUsd: 0 };
-    p.calls++; p.costUsd += c.costUsd; byProvider.set(c.provider, p);
+    p.calls++;
+    p.costUsd += c.costUsd;
+    byProvider.set(c.provider, p);
     const r = byRoute.get(c.routeKey) ?? { calls: 0, costUsd: 0 };
-    r.calls++; r.costUsd += c.costUsd; byRoute.set(c.routeKey, r);
+    r.calls++;
+    r.costUsd += c.costUsd;
+    byRoute.set(c.routeKey, r);
   }
   return {
     totalCalls: entries.length,
@@ -206,8 +216,12 @@ function summarizeProviderCallEntries(entries: ProviderCallRecord[]): UsageSumma
     totalPromptTokens: totalPrompt,
     totalCompletionTokens: totalCompletion,
     last24h: { calls: last24Calls, costUsd: last24Cost },
-    byProvider: [...byProvider.entries()].map(([provider, v]) => ({ provider, ...v })).sort((a, b) => b.calls - a.calls),
-    byRoute: [...byRoute.entries()].map(([routeKey, v]) => ({ routeKey, ...v })).sort((a, b) => b.calls - a.calls),
+    byProvider: [...byProvider.entries()]
+      .map(([provider, v]) => ({ provider, ...v }))
+      .sort((a, b) => b.calls - a.calls),
+    byRoute: [...byRoute.entries()]
+      .map(([routeKey, v]) => ({ routeKey, ...v }))
+      .sort((a, b) => b.calls - a.calls),
     recent: entries.slice(0, 50),
   };
 }

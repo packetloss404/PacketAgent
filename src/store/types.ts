@@ -19,6 +19,10 @@ import type {
 import type { WorkerEffectReceipt } from "../workers/effect-types.js";
 import type { WorkerCredentialRecord } from "../workers/credential-types.js";
 import type {
+  WorkerArtifactManifest,
+  WorkerEvidenceEntry,
+} from "../workers/observability/types.js";
+import type {
   WorkerApprovalGrant,
   WorkerAttentionRequest,
   WorkerControlCommand,
@@ -171,7 +175,14 @@ export interface WorkspaceBriefVersionRecord {
 }
 
 export type RequirementPriority = "must" | "should" | "could";
-export type RequirementStatus = "draft" | "approved" | "changed" | "done" | "proposed" | "accepted" | "deferred";
+export type RequirementStatus =
+  | "draft"
+  | "approved"
+  | "changed"
+  | "done"
+  | "proposed"
+  | "accepted"
+  | "deferred";
 
 export interface RequirementRecord {
   id: string;
@@ -226,7 +237,12 @@ export interface WorkflowConcernRecord {
   updatedAt: string;
 }
 
-export type ValidationEvidenceType = "automated_test" | "manual_check" | "demo" | "metric" | "customer_review";
+export type ValidationEvidenceType =
+  | "automated_test"
+  | "manual_check"
+  | "demo"
+  | "metric"
+  | "customer_review";
 export type ValidationEvidenceOutcome = "pending" | "passed" | "failed";
 
 export interface ValidationEvidenceRecord {
@@ -266,8 +282,12 @@ export interface ReleaseConfirmationRecord {
   updatedAt: string;
 }
 
-export type WorkspaceBriefCollection = WorkspaceBriefRecord[] | Record<string, WorkspaceBriefRecord>;
-export type ReleaseConfirmationCollection = ReleaseConfirmationRecord[] | Record<string, ReleaseConfirmationRecord>;
+export type WorkspaceBriefCollection =
+  | WorkspaceBriefRecord[]
+  | Record<string, WorkspaceBriefRecord>;
+export type ReleaseConfirmationCollection =
+  | ReleaseConfirmationRecord[]
+  | Record<string, ReleaseConfirmationRecord>;
 
 export interface OnboardingStateRecord {
   workspaceId: string;
@@ -289,7 +309,13 @@ export interface ActivityRecord {
 }
 
 export type ActivationSignalKind = "retry" | "scope_change";
-export type ActivationSignalSource = "activity" | "agent_run" | "workflow" | "seed" | "user_fact" | "system_fact";
+export type ActivationSignalSource =
+  | "activity"
+  | "agent_run"
+  | "workflow"
+  | "seed"
+  | "user_fact"
+  | "system_fact";
 export type ActivationSignalOrigin = "user_entered" | "system_observed";
 
 export interface ActivationSignalRecord {
@@ -520,7 +546,14 @@ export interface GeneratedAppRecord {
   updatedAt: string;
 }
 
-export type ProviderKind = "openai" | "anthropic" | "minimax" | "azure_openai" | "ollama" | "gemini" | "custom";
+export type ProviderKind =
+  | "openai"
+  | "anthropic"
+  | "minimax"
+  | "azure_openai"
+  | "ollama"
+  | "gemini"
+  | "custom";
 export type ProviderStatus = "connected" | "missing_key" | "disabled";
 
 export interface ProviderRecord {
@@ -613,7 +646,13 @@ export interface WorkspaceEnvVarRecord {
   updatedAt: string;
 }
 
-export type ApiKeyProvider = "anthropic" | "openai" | "openrouter" | "minimax" | "ollama" | "gemini";
+export type ApiKeyProvider =
+  | "anthropic"
+  | "openai"
+  | "openrouter"
+  | "minimax"
+  | "ollama"
+  | "gemini";
 
 export interface ApiKeyRecord {
   id: string;
@@ -724,6 +763,8 @@ export interface PacketAgentData {
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];
+  workerEvidenceEntries: WorkerEvidenceEntry[];
+  workerArtifactManifests: WorkerArtifactManifest[];
   workerActivationInboxes: WorkerActivationInboxRecord[];
   workerActivationPayloads: WorkerActivationPayloadRecord[];
   activationFacts: Record<string, WorkspaceActivationFacts>;
@@ -739,7 +780,9 @@ export interface ResolvedPacketAgentStoreMode {
   managedDatabaseUrlKeys: string[];
 }
 
-export interface ManagedPostgresStoreQueryResult<TRow extends Record<string, unknown> = Record<string, unknown>> {
+export interface ManagedPostgresStoreQueryResult<
+  TRow extends Record<string, unknown> = Record<string, unknown>,
+> {
   rows: TRow[];
   rowCount?: number | null;
 }
@@ -768,8 +811,9 @@ export interface ManagedPostgresStoreClientConfig {
   resolution: ResolvedPacketAgentStoreMode;
 }
 
-export type ManagedPostgresStoreClientFactory =
-  (config: ManagedPostgresStoreClientConfig) => ManagedPostgresStoreQueryClient | Promise<ManagedPostgresStoreQueryClient>;
+export type ManagedPostgresStoreClientFactory = (
+  config: ManagedPostgresStoreClientConfig,
+) => ManagedPostgresStoreQueryClient | Promise<ManagedPostgresStoreQueryClient>;
 
 export interface WorkspaceRecordCollectionMap {
   invitationEmailDeliveries: InvitationEmailDeliveryRecord;

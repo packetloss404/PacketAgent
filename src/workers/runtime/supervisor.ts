@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   JsonObject,
   WorkerCompiledCapability,
@@ -57,11 +58,27 @@ class WorkerOperationAbortedError extends Error {
 
 class WorkerProviderPhaseError extends Error {
   readonly result: WorkerRuntimeProviderResult;
+  readonly phase: "plan" | "evaluate";
 
   constructor(phase: "plan" | "evaluate", result: WorkerRuntimeProviderResult) {
     super(`Worker provider ${phase} phase ended with ${result.finishReason}.`);
     this.name = "WorkerProviderPhaseError";
+    this.phase = phase;
     this.result = result;
+  }
+}
+
+class WorkerProviderInvocationError extends Error {
+  readonly providerCallId: string;
+  readonly phase: "plan" | "evaluate";
+
+  constructor(phase: "plan" | "evaluate", providerCallId: string, cause: unknown) {
+    super(cause instanceof Error ? cause.message : `Worker provider ${phase} invocation failed.`, {
+      cause,
+    });
+    this.name = "WorkerProviderInvocationError";
+    this.phase = phase;
+    this.providerCallId = providerCallId;
   }
 }
 
@@ -316,6 +333,23 @@ export async function runWorkerSupervisor(
     });
   };
 
+  const emitProviderFailure = async (error: unknown): Promise<void> => {
+    if (error instanceof WorkerProviderInvocationError) {
+      await emit("worker.provider.failed", "Worker provider call failed.", {
+        providerCallId: error.providerCallId,
+        phase: error.phase,
+      });
+      return;
+    }
+    if (error instanceof WorkerProviderPhaseError) {
+      await emit("worker.provider.failed", "Worker provider call returned an unusable result.", {
+        ...(error.result.providerCallId ? { providerCallId: error.result.providerCallId } : {}),
+        phase: error.phase,
+        finishReason: error.result.finishReason,
+      });
+    }
+  };
+
   const failPhase = async (error: unknown): Promise<void> => {
     const message = error instanceof Error ? error.message : String(error);
     state = reduceWorkerSupervisor(state, { type: "phase.failed", error: message });
@@ -340,9 +374,7 @@ export async function runWorkerSupervisor(
       state = reduceWorkerSupervisor(state, {
         type: "bound.reached",
         reason:
-          error.kind === "provider_cost_usd"
-            ? "rolling_provider_cost"
-            : "rolling_billable_actions",
+          error.kind === "provider_cost_usd" ? "rolling_provider_cost" : "rolling_billable_actions",
       });
       return true;
     }
@@ -385,10 +417,20 @@ export async function runWorkerSupervisor(
             result,
           });
           await persistState();
+          await emit("worker.provider.completed", "Worker provider planning call completed.", {
+            ...(result.providerCallId ? { providerCallId: result.providerCallId } : {}),
+            phase: "plan",
+            provider: result.provider,
+            model: result.model,
+            promptTokens: result.usage.promptTokens,
+            completionTokens: result.usage.completionTokens,
+            costUsd: result.usage.costUsd,
+          });
           await emit("worker.phase.planned", "Worker planning phase completed.", {
             iteration: state.cursor.iteration,
             requestedToolCalls: result.toolCalls.length,
             providerCostUsd: result.usage.costUsd,
+            ...(result.providerCallId ? { providerCallId: result.providerCallId } : {}),
           });
         } catch (error) {
           if (
@@ -409,6 +451,7 @@ export async function runWorkerSupervisor(
           if (error instanceof WorkerAwaitDeadlineError) {
             observeElapsed();
           } else {
+            await emitProviderFailure(error);
             if (error instanceof WorkerProviderPhaseError) {
               state = reduceWorkerSupervisor(state, {
                 type: "provider.evaluation_charged",
@@ -555,6 +598,7 @@ export async function runWorkerSupervisor(
             tool: result.toolName,
             status: result.status,
             durationMs: result.durationMs,
+            ...(result.effectReceiptId ? { effectReceiptId: result.effectReceiptId } : {}),
           });
         } catch (error) {
           if (
@@ -603,6 +647,15 @@ export async function runWorkerSupervisor(
             result,
           });
           if (state.terminal) continue;
+          await emit("worker.provider.completed", "Worker provider evaluation call completed.", {
+            ...(result.providerCallId ? { providerCallId: result.providerCallId } : {}),
+            phase: "evaluate",
+            provider: result.provider,
+            model: result.model,
+            promptTokens: result.usage.promptTokens,
+            completionTokens: result.usage.completionTokens,
+            costUsd: result.usage.costUsd,
+          });
           const evaluation = parseWorkerEvaluation(
             result.content,
             context.version.content.exitPredicates,
@@ -632,6 +685,7 @@ export async function runWorkerSupervisor(
             predicateKind: evaluation.predicateKind,
             matched: evaluation.matched,
             checkpointId: checkpoint.checkpointId,
+            ...(result.providerCallId ? { providerCallId: result.providerCallId } : {}),
           });
         } catch (error) {
           if (
@@ -642,7 +696,10 @@ export async function runWorkerSupervisor(
           }
           if (applyBudgetExhaustion(error)) continue;
           if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
-          else await failPhase(error);
+          else {
+            await emitProviderFailure(error);
+            await failPhase(error);
+          }
         }
         continue;
       }
@@ -741,8 +798,7 @@ async function callProvider(
   parentSignal: AbortSignal,
   awaitBounded: <T>(operation: (signal: AbortSignal) => Promise<T>) => Promise<T>,
 ): Promise<WorkerRuntimeProviderResult> {
-  const reservableAmount =
-    state.limits.maxProviderCostUsd - state.usage.providerCostUsd;
+  const reservableAmount = state.limits.maxProviderCostUsd - state.usage.providerCostUsd;
   if (!Number.isFinite(reservableAmount) || reservableAmount <= 0) {
     throw new WorkerPerRunProviderBudgetExceededError();
   }
@@ -784,7 +840,14 @@ async function callProvider(
       reason: "call_failed_before_result",
       now: ports.clock.now(),
     });
-    throw error;
+    if (
+      error instanceof WorkerAwaitDeadlineError ||
+      error instanceof WorkerOperationAbortedError ||
+      error instanceof WorkerRuntimeReleasedError
+    ) {
+      throw error;
+    }
+    throw new WorkerProviderInvocationError(phase, request.providerCallId, error);
   }
   await ports.budgets.settle({
     workspaceId: context.run.workspaceId,
@@ -809,6 +872,7 @@ function providerRequest(
 ): WorkerRuntimeProviderRequest {
   const content = context.version.content;
   const base = {
+    providerCallId: randomUUID(),
     workspaceId: context.run.workspaceId,
     workerRunId: context.run.id,
     routeKey: content.execution.routeKey,

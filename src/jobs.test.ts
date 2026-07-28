@@ -17,7 +17,11 @@ test("recomputeActivationReadModels refreshes activation read models for every w
   assert.equal(data.activationReadModels.alpha.stage, "definition");
   assert.equal(data.activationReadModels.beta.stage, "blocked");
   assert.ok(data.activationMilestones.alpha.length > 0);
-  assert.ok(data.activationMilestones.beta.some((milestone) => milestone.key === "blocked" && milestone.reached));
+  assert.ok(
+    data.activationMilestones.beta.some(
+      (milestone) => milestone.key === "blocked" && milestone.reached,
+    ),
+  );
 });
 
 test("cleanupExpiredSessions removes expired and invalid sessions", () => {
@@ -32,7 +36,10 @@ test("cleanupExpiredSessions removes expired and invalid sessions", () => {
 
   assert.equal(result.removed, 2);
   assert.deepEqual(result.removedSessionIds, ["expired", "invalid"]);
-  assert.deepEqual(data.sessions.map((session) => session.id), ["active"]);
+  assert.deepEqual(
+    data.sessions.map((session) => session.id),
+    ["active"],
+  );
 });
 
 test("snapshotForWorkspace derives activation from durable workflow records before legacy facts", () => {
@@ -46,39 +53,45 @@ test("snapshotForWorkspace derives activation from durable workflow records befo
       updatedAt: "2026-04-20T10:00:00.000Z",
     },
   };
-  data.requirements = [{
-    id: "req_alpha",
-    workspaceId: "alpha",
-    title: "Requirement",
-    priority: "must",
-    status: "accepted",
-    createdAt: "2026-04-20T11:00:00.000Z",
-    updatedAt: "2026-04-20T11:00:00.000Z",
-  }];
-  data.implementationPlanItems = [{
-    id: "plan_alpha",
-    workspaceId: "alpha",
-    requirementIds: ["req_alpha"],
-    title: "Build",
-    description: "Build the workflow",
-    status: "done",
-    order: 0,
-    startedAt: "2026-04-21T10:00:00.000Z",
-    completedAt: "2026-04-21T12:00:00.000Z",
-    createdAt: "2026-04-20T12:00:00.000Z",
-    updatedAt: "2026-04-21T12:00:00.000Z",
-  }];
-  data.validationEvidence = [{
-    id: "validation_alpha",
-    workspaceId: "alpha",
-    type: "automated_test",
-    title: "Tests passed",
-    status: "passed",
-    outcome: "passed",
-    capturedAt: "2026-04-21T13:00:00.000Z",
-    createdAt: "2026-04-21T13:00:00.000Z",
-    updatedAt: "2026-04-21T13:00:00.000Z",
-  }];
+  data.requirements = [
+    {
+      id: "req_alpha",
+      workspaceId: "alpha",
+      title: "Requirement",
+      priority: "must",
+      status: "accepted",
+      createdAt: "2026-04-20T11:00:00.000Z",
+      updatedAt: "2026-04-20T11:00:00.000Z",
+    },
+  ];
+  data.implementationPlanItems = [
+    {
+      id: "plan_alpha",
+      workspaceId: "alpha",
+      requirementIds: ["req_alpha"],
+      title: "Build",
+      description: "Build the workflow",
+      status: "done",
+      order: 0,
+      startedAt: "2026-04-21T10:00:00.000Z",
+      completedAt: "2026-04-21T12:00:00.000Z",
+      createdAt: "2026-04-20T12:00:00.000Z",
+      updatedAt: "2026-04-21T12:00:00.000Z",
+    },
+  ];
+  data.validationEvidence = [
+    {
+      id: "validation_alpha",
+      workspaceId: "alpha",
+      type: "automated_test",
+      title: "Tests passed",
+      status: "passed",
+      outcome: "passed",
+      capturedAt: "2026-04-21T13:00:00.000Z",
+      createdAt: "2026-04-21T13:00:00.000Z",
+      updatedAt: "2026-04-21T13:00:00.000Z",
+    },
+  ];
   data.releaseConfirmations = {
     alpha: {
       id: "release_alpha",
@@ -177,7 +190,15 @@ test("recomputeActivationReadModels normalizes legacy retry and scope-change cou
   const signals = data.activationSignals.filter((entry) => entry.workspaceId === "alpha");
   assert.equal(signals.filter((entry) => entry.kind === "retry").length, 2);
   assert.equal(signals.filter((entry) => entry.kind === "scope_change").length, 1);
-  assert.equal(signals.every((entry) => entry.source === "user_fact" && entry.origin === "user_entered" && entry.data?.origin === "legacy_fact"), true);
+  assert.equal(
+    signals.every(
+      (entry) =>
+        entry.source === "user_fact" &&
+        entry.origin === "user_entered" &&
+        entry.data?.origin === "legacy_fact",
+    ),
+    true,
+  );
   assert.equal(snapshotForWorkspace(data, "alpha").retryCount, 2);
   assert.equal(snapshotForWorkspace(data, "alpha").scopeChangeCount, 1);
 });
@@ -282,6 +303,8 @@ function makeStore(): PacketAgentData {
     workerDeploymentRollouts: [],
     workerCommandReceipts: [],
     workerEvents: [],
+    workerEvidenceEntries: [],
+    workerArtifactManifests: [],
     workerActivationInboxes: [],
     workerActivationPayloads: [],
     workspaceInvitations: [],

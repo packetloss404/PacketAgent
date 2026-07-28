@@ -5,7 +5,8 @@ import {
   type PacketAgentData,
 } from "../../packetagent-store.js";
 import { WorkerLifecycleError } from "../errors.js";
-import { WORKER_EVENT_SCHEMA_VERSION, type WorkerEvent } from "../persistence-types.js";
+import type { WorkerEventV2 } from "../persistence-types.js";
+import { appendWorkerJournalEntry, workerEventCorrelation } from "../observability/journal.js";
 import { validateWorkerPersistence } from "../repository.js";
 import { assertWorkerRunUpdate, isTerminalWorkerRunStatus } from "../transitions.js";
 import {
@@ -549,26 +550,35 @@ function appendRuntimeEvent(
   data: PacketAgentData,
   eventId: string,
   run: WorkerRun,
-  input: Pick<WorkerEvent, "type" | "summary" | "data" | "occurredAt">,
+  input: Pick<WorkerEventV2, "type" | "summary" | "data" | "occurredAt">,
 ): void {
-  const sequence =
-    data.workerEvents
-      .filter((record) => record.workspaceId === run.workspaceId)
-      .reduce((maximum, record) => Math.max(maximum, record.sequence), 0) + 1;
-  data.workerEvents.push({
-    schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
+  appendWorkerJournalEntry(data, {
     id: eventId,
     workspaceId: run.workspaceId,
-    sequence,
     type: input.type,
+    source: workerRuntimeEventSource(input.type),
     workerDefinitionId: run.workerDefinitionId,
     workerVersionId: run.workerVersionId,
     workerDeploymentId: run.workerDeploymentId,
+    workerRunId: run.id,
     actor: RUNTIME_ACTOR,
     summary: input.summary,
     ...(input.data ? { data: input.data } : {}),
+    ...(run.trace ? { trace: run.trace } : {}),
+    correlation: workerEventCorrelation(input.data),
     occurredAt: input.occurredAt,
   });
+}
+
+function workerRuntimeEventSource(
+  type: string,
+): "checkpoint" | "terminal" | "queue" | "provider" | "tool" | "supervisor" {
+  if (type.startsWith("worker.checkpoint.")) return "checkpoint";
+  if (type === "worker.run.terminal") return "terminal";
+  if (type === "worker.run.lease_acquired") return "queue";
+  if (type.startsWith("worker.provider.")) return "provider";
+  if (type.startsWith("worker.tool.") || type.startsWith("worker.policy.")) return "tool";
+  return "supervisor";
 }
 
 function clone<T>(value: T): T {
