@@ -2,7 +2,7 @@
 
 This is the short product direction. Detailed acceptance criteria and sequencing live in [`../BACKLOG.md`](../BACKLOG.md).
 
-Current active loop: **W1 - Durable Worker contract**. Repository/session state
+Current active loop: **W2 - Worker persistence, versioning, and activation**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 
 ## North star
@@ -36,11 +36,11 @@ These pieces work, but they are not yet unified as one durable Worker lifecycle.
 
 ## Now
 
-### 1. Durable Worker contract
+### 1. Durable Worker contract - complete
 
-Define the canonical Worker, WorkerVersion, WorkerDeployment, WorkerRun, WorkerCheckpoint, WorkerPolicy, and WorkerTrigger records. Keep the existing agent and workflow APIs readable while introducing explicit migration/projection boundaries.
+The storage-neutral canonical Worker, WorkerVersion, WorkerDeployment, WorkerRun, WorkerCheckpoint, WorkerPolicy, and WorkerTrigger records, runtime validators, transition guards, immutable-version checks, and legacy agent/workflow projections are implemented under `src/workers/`.
 
-### 2. Worker persistence and activation
+### 2. Worker persistence and activation - active
 
 Support draft, validated, deployed, active, paused, and retired deployments. Only validated immutable versions can activate. Persist version provenance and idempotency keys.
 

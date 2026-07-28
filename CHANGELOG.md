@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Canonical Worker contract (W1)
+
+- Added versioned, storage-neutral schemas and runtime validators for `WorkerDefinition`, `WorkerVersion`, `WorkerDeployment`, `WorkerTrigger`, `WorkerPolicy`, `WorkerRun`, and `WorkerCheckpoint`.
+- Added required time, iteration, provider-cost, failure, tool-call, retry, permission, trigger, exit-predicate, and provenance validation.
+- Added lifecycle and terminal-state transition guards, validated/deployment-bound version immutability, deployment version pinning, and optimistic deployment revision checks.
+- Added PacketADE source provenance fields for flight, project, conversation, repository, and revision.
+- Added deterministic draft projections over existing Agent and workspace workflow records without changing their APIs or exposing webhook tokens.
+- Added 31 focused contract tests and recorded the research, decisions, implementation loops, and W2 boundary in `dev/worker-contract-plan.md`.
+
 ### 2026-07-27 - PacketAgent foundation rename
 
 - Created PacketAgent from the complete TaskLoom Git history while preserving the original checkout.
@@ -14,7 +23,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Added non-destructive first-boot copying from legacy default TaskLoom JSON and SQLite files to PacketAgent defaults.
 - Repositioned the existing builder, scheduler, agent runtime, tools, vault, storage, and operations platform as the foundation for a bounded autonomous-worker runtime.
 - Added the Worker implementation loops and the planned PacketADE-to-PacketAgent deployment contract.
-- Added an authoritative Codex project handoff with repository state, verified gates, implementation truth, and the exact W1 resume point.
+- Added an authoritative Codex project handoff with repository state, verified gates, implementation truth, and the initial W1 resume point.
 - Marked the former Phase 3, playbook sprint, handoff, and repository-review documents as historical so they cannot override the current roadmap.
 - Corrected active setup and product documentation to reflect the shipped bounded code-repair loop, per-app SQLite runtime, outbound agent tools, missing PacketAgent remote, and unimplemented durable Worker lifecycle.
 

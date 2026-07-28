@@ -27,11 +27,11 @@ Status: foundation complete on `codex/packetagent-foundation`; inherited quality
 
 Dependencies: PA0.
 
-- [ ] Define versioned `WorkerDefinition`, `WorkerVersion`, `WorkerDeployment`, `WorkerTrigger`, `WorkerPolicy`, `WorkerRun`, and `WorkerCheckpoint` schemas.
-- [ ] Define lifecycle and terminal-state transition guards.
-- [ ] Project existing agent/workflow records into the new read model without breaking current APIs.
-- [ ] Record source provenance, including PacketADE flight, project, conversation, repository, and revision when supplied.
-- Gate: schema tests reject invalid state transitions, mutable deployed versions, missing bounds, and ambiguous trigger definitions.
+- [x] Define versioned `WorkerDefinition`, `WorkerVersion`, `WorkerDeployment`, `WorkerTrigger`, `WorkerPolicy`, `WorkerRun`, and `WorkerCheckpoint` schemas.
+- [x] Define lifecycle and terminal-state transition guards.
+- [x] Project existing agent/workflow records into the new read model without breaking current APIs.
+- [x] Record source provenance, including PacketADE flight, project, conversation, repository, and revision when supplied.
+- Gate: passed 2026-07-27. Schema tests reject invalid state transitions, mutable deployed versions, missing bounds, and ambiguous trigger definitions.
 
 ### W2 - Worker persistence, versioning, and activation
 

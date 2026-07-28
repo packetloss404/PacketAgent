@@ -16,10 +16,10 @@ as a new project in the Codex app.
 Do not push PacketAgent changes to `taskloom-source`. Create and confirm the
 new PacketAgent repository before adding an `origin`.
 
-The working tree is intentionally large and uncommitted. It contains the
-repository-wide rename, compatibility migration, documentation reset, one
-carried Builder layout fix, and three rename-sensitive test corrections. Do
-not discard or replace it with the source remote.
+The repository-wide rename, compatibility migration, documentation reset,
+carried Builder layout fix, and rename-sensitive test corrections are preserved
+in foundation commit `d60cd47`. W1 is implemented as the next isolated change.
+Do not reset this branch to the historical source remote.
 
 ## Product decision
 
@@ -52,11 +52,15 @@ Prompt-to-app generation remains a supported secondary capability.
   and non-destructive legacy default-data copying.
 - Reframed the roadmap and backlog around the W1-W10 autonomous-worker loops.
 - Defined the future PacketADE deployment package and event contract.
+- Completed W1's storage-neutral canonical Worker schemas, runtime validators,
+  lifecycle guards, immutable-version checks, and legacy read projections.
 
 ## Current implementation truth
 
-Shipped inherited substrate:
+Implemented substrate:
 
+- storage-neutral canonical Worker domain records, validators, transition
+  guards, content digests, version pinning, and draft legacy projections;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -69,8 +73,8 @@ Shipped inherited substrate:
 
 Not shipped:
 
-- one canonical versioned Worker contract;
-- immutable Worker deployments and activation lifecycle;
+- Worker repositories and migrations in JSON, SQLite, and managed Postgres;
+- immutable Worker deployment operations and activation lifecycle;
 - one normalized trigger envelope;
 - durable supervisor checkpoints and crash recovery;
 - external-effect idempotency receipts;
@@ -82,24 +86,14 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Start with **W1 - Canonical Worker contract** in [`../BACKLOG.md`](../BACKLOG.md).
+Start with **W2 - Worker persistence, versioning, and activation** in
+[`../BACKLOG.md`](../BACKLOG.md).
 
-The first change should define and test the domain contract before adding
-routes, UI, or database migrations:
-
-1. `WorkerDefinition`
-2. `WorkerVersion`
-3. `WorkerDeployment`
-4. `WorkerTrigger`
-5. `WorkerPolicy`
-6. `WorkerRun`
-7. `WorkerCheckpoint`
-8. lifecycle and terminal-state transition guards
-9. projections from existing agent/workflow records
-10. PacketADE source provenance fields
-
-Keep W1 storage-neutral. W2 owns JSON/SQLite/Postgres repositories and
-migrations.
+W1 is complete under `src/workers/`. Its design and implementation-loop record
+is [`worker-contract-plan.md`](worker-contract-plan.md). W2 should keep those
+domain files storage-neutral while adding JSON, SQLite, and managed Postgres
+repositories, migrations, lifecycle operations, activation idempotency, and
+optimistic concurrency with backend parity coverage.
 
 ## Canonical documents
 
@@ -107,6 +101,7 @@ migrations.
 - Short direction: [`roadmap.md`](roadmap.md)
 - Work ledger and gates: [`../BACKLOG.md`](../BACKLOG.md)
 - PacketADE contract: [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md)
+- W1 contract plan and decisions: [`worker-contract-plan.md`](worker-contract-plan.md)
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
 - Verification: [`TESTING.md`](TESTING.md)
 - Shipped history: [`../CHANGELOG.md`](../CHANGELOG.md)
@@ -119,9 +114,9 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 146 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,240 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,270 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
-- focused brand migration tests - 2 passed
+- focused Worker contract tests - 31 passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
@@ -134,7 +129,7 @@ Known inherited quality debt:
   0 critical.
 
 Do not use `npm audit fix --force` or format the entire repository as an
-incidental part of W1. Track those cleanups separately in the backlog.
+incidental part of W2. Track those cleanups separately in the backlog.
 
 ## First commands in the new Codex project
 
@@ -150,6 +145,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status: a large intentional uncommitted PacketAgent foundation
-change. Stop if the tree is unexpectedly clean or the active folder is
-`D:\projects\taskloom`.
+Expected status after the W1 commit: clean. Stop if the active folder is
+`D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
+appear unexpectedly.

@@ -24,8 +24,9 @@ This is "Fork B": self-host first, MIT licensed, no telemetry, no vendor in the 
 
 ## What's actually inside
 
-The following inherited subsystems are wired into `src/server.ts`, exercised by tests, and shipped. The durable Worker lifecycle described above is the new product direction and is tracked separately in [the roadmap](dev/roadmap.md) and [backlog](BACKLOG.md).
+The following implemented subsystems are exercised by tests. Most are inherited and wired into `src/server.ts`; the storage-neutral Worker contract is a domain layer that persistence and routes will consume starting in W2. The durable Worker lifecycle described above is tracked separately in [the roadmap](dev/roadmap.md) and [backlog](BACKLOG.md).
 
+- **Canonical Worker domain contract** (`src/workers/`). W1 adds versioned storage-neutral records and runtime validators for definitions, versions, deployments, triggers, policies, runs, and checkpoints; lifecycle and terminal-state guards; content digests and immutable validated-version checks; PacketADE provenance; and deterministic draft projections over existing agent/workflow records. Persistence and activation begin in W2.
 - **Two-phase LLM file-tree codegen** (`src/codegen/llm-author.ts`). The LLM authors whole React/Vite file trees via `write_file` tool calls: JSON plan parsing (fenced + bracket-scan fallback, one retry), token-budgeted chunked write rounds (`MAX_FILES_PER_WRITE_CHUNK=8`, `CHUNK_WRITE_THRESHOLD=10`), partial-result tolerance, and a workspace-escape `isSafePath` guard. `AppBuilderDraft` is a derived view; generated files land under `data/generated-apps/.../workspace` with sha256 manifests.
 - **Provider-agnostic router** (`src/providers/router.ts`). Route-key -> provider/model dispatch, six real BYOK clients, `preset-resolver.ts` (cheap/fast/smart/local presets walking a priority list), `ledger.ts` cost recording, and an always-present `stub` fallback so the loop runs without keys.
 - **Tool-using agent loop** (`src/tools/agent-loop.ts`). Provider-routed, cost-ledger-wrapped, registered tool execution with tool-result feedback, abort signals, and capped turns. Tool registry/executor and read/write/browser builtins under `src/tools/`.
@@ -65,6 +66,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md) is the authoritative state and resume point for a new Codex project.
 - [dev/packetade-packetagent-handoff.md](dev/packetade-packetagent-handoff.md) defines the planned PacketADE deployment contract.
 - [dev/taskloom-to-packetagent.md](dev/taskloom-to-packetagent.md) records rename compatibility and repository migration details.
+- [dev/worker-contract-plan.md](dev/worker-contract-plan.md) records W1 research, contract decisions, implementation loops, and verification.
 - [dev/TESTING.md](dev/TESTING.md) covers local verification and release checks.
 - [dev/roadmap.md](dev/roadmap.md) captures the broader roadmap after the MVP path is reliable.
 
@@ -128,7 +130,7 @@ See [docs/SELF_HOST.md](docs/SELF_HOST.md) for per-provider recipes, the local-L
 4. Review its instructions, typed inputs, trigger guidance, requested tools, and readiness blockers.
 5. Run it manually, approve risky tools explicitly, and inspect the transcript, tool calls, logs, model, and cost in Runs.
 6. Use the existing schedule or webhook surfaces only for work that fits the current capped agent-run model.
-7. Do not assume crash-resumable autonomous Workers exist yet; W1-W8 in [BACKLOG.md](BACKLOG.md) build that lifecycle.
+7. Do not assume crash-resumable autonomous Workers exist yet; W1 defines the storage-neutral contract, while W2-W8 build its persistence and runtime lifecycle.
 8. To exercise the inherited prompt-to-app path, choose **Build an app** and use its generated source, preview, iteration, and publish-handoff surfaces.
 
 ### Seed accounts (development only)
@@ -253,7 +255,7 @@ Anthropic, OpenAI, and MiniMax keys can be configured per workspace under **Admi
 
 PacketAgent is TypeScript ESM on Node >=22.5 with a React/Vite frontend. The code uses strict typechecking, dependency injection in many runtime boundaries, and feature directories for providers, tools, jobs, sandboxing, repositories, activation, codegen, and security. The inherited lint baseline still contains 146 warnings and is tracked as cleanup debt.
 
-The last foundation validation ran **1,241 API tests** (1,240 passed, 1 skipped) and **25 web tests** with no failures. Coverage includes SQLite/Postgres parity, async boundaries, managed-Postgres transaction/concurrency behavior, tools, routes, and UI helpers.
+The last W1 validation ran **1,271 API tests** (1,270 passed, 1 skipped) and **25 web tests** with no failures. Coverage includes the Worker contract gate, SQLite/Postgres parity, async boundaries, managed-Postgres transaction/concurrency behavior, tools, routes, and UI helpers.
 
 ## Development
 
@@ -281,7 +283,7 @@ Generated `web/dist/` is gitignored; rebuild locally rather than committing it.
 
 ## Known limits
 
-- **The durable Worker contract is not shipped.** Existing agents can run manually, on schedules, or from webhooks through a capped tool loop, but Worker versions, immutable deployments, normalized triggers, checkpoints, recovery, effect receipts, and Worker-level policies are W1-W8 roadmap work.
+- **The Worker contract is storage-neutral today.** W1 defines versioned Worker records, runtime validation, lifecycle guards, immutable validated versions, and draft projections over existing agents/workflows. Existing agents can still run manually, on schedules, or from webhooks through the inherited capped tool loop, but Worker repositories, activation, normalized trigger delivery, checkpoint recovery, effect receipts, and runtime policy enforcement remain W2-W8 work.
 - **File-tree codegen is an inherited secondary capability.** With a BYOK key, the LLM authors files through `write_file`, validates with `tsc` and Vite when real sandbox validation is enabled, and can make up to two bounded repair passes. Legacy template-shaped drafts still use their older iteration path.
 - **Per-app SQLite is current, with a compatibility caveat.** Current generated apps use the PacketAgent-served per-app SQLite API and supervised runtime processes. The legacy template/source-artifact path and older saved drafts can still contain sql.js/jsdelivr browser persistence.
 - **Outbound tools exist but are not yet Worker-grade capabilities.** `http_fetch`, `slack_post_webhook`, `github_api`, `email_send`, `sql_query`, and `shell_for_agent` are registered and tested. Approval tokens are currently whole-tool scoped, email needs an injected SMTP adapter, and durable side-effect receipts are not implemented.
@@ -302,9 +304,9 @@ npm run db:seed
 
 ## Project status
 
-PacketAgent is in its foundation transition from TaskLoom's app/agent workbench to the autonomous-worker runtime described at the top of this file. The inherited Builder and operate surfaces work; the rename and compatibility layer are implemented in the current uncommitted foundation branch. The canonical Worker model has not started.
+PacketAgent is in its foundation transition from TaskLoom's app/agent workbench to the autonomous-worker runtime described at the top of this file. The inherited Builder and operate surfaces work; the rename and compatibility layer are committed on the current foundation branch. The storage-neutral canonical Worker model and W1 gate are complete, but no Worker repository or activation path exists yet.
 
-The exact resume point is W1 in [BACKLOG.md](BACKLOG.md). New Codex projects should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived Phase 3 or legacy handoff documents.
+The exact resume point is W2 in [BACKLOG.md](BACKLOG.md). New Codex projects should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived Phase 3 or legacy handoff documents.
 
 For current product changes, see [CHANGELOG.md](CHANGELOG.md). PacketAgent does not yet have a configured GitHub `origin`, website, issue tracker, or release feed.
 
