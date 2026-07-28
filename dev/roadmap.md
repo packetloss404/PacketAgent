@@ -19,8 +19,10 @@ operations read model, cursor APIs, bounded resumable event stream, and
 canonical Worker list/detail workbench and W8.5's answerability, accessibility,
 cursor, tenant, and storage-parity gate are also complete. W9.1 freezes the
 strict, digest-bound WorkerPackage v1 contract and optional DSSE verification
-seam. Resume at W9.2 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w92---add-the-packet-product-trust-boundary).
+seam. W9.2 adds the workspace/actor-bound PacketADE credential, local
+capability acceptance, durable pre-deployment receipt, rate limit, audit, and
+storage parity. Resume at W9.3 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w93---implement-the-deployment-endpoints).
 
 ## North star
 
@@ -123,9 +125,11 @@ list/detail workbench without client-side raw-table joins.
 
 WorkerPackage v1 now freezes the strict W1-aligned envelope, canonical digest
 bytes, artifact references, compatibility fixtures, and optional DSSE
-verification seam. Next add the Packet-product trust boundary, then implement
-**Deploy to PacketAgent**, **Keep running**, update, inspect, pause, revoke, and
-reconnectable progress/approval events.
+verification seam. The Packet-product trust boundary now authenticates
+workspace-bound PacketADE service actors, narrows package capabilities through
+local policy, and persists token-safe integrity/idempotency receipts. Next
+implement **Deploy to PacketAgent**, **Keep running**, update, inspect, pause,
+revoke, and reconnectable progress/approval events.
 
 ### 10. PacketChat and PacketPhone routes
 

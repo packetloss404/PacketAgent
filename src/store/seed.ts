@@ -1028,6 +1028,8 @@ export function seedStore(): PacketAgentData {
     alertEvents: [],
     shareTokens: [],
     workerCredentials: [],
+    packetProductCredentials: [],
+    workerPackageReceipts: [],
     workerDefinitions: [],
     workerVersions: [],
     workerDeployments: [],

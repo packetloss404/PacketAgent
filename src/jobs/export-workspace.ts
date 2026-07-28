@@ -53,6 +53,11 @@ import type {
 import type { WorkerEffectReceipt } from "../workers/effect-types.js";
 import { workerCredentialMetadata } from "../workers/credentials.js";
 import type { WorkerCredentialMetadata } from "../workers/credential-types.js";
+import {
+  packetProductCredentialMetadata,
+  type PacketProductCredentialMetadata,
+  type WorkerPackageReceipt,
+} from "../workers/package/trust-types.js";
 
 export interface ExportWorkspaceOptions {
   workspaceId: string;
@@ -108,6 +113,8 @@ export interface ExportedWorkspaceData {
   shareTokens: RedactedShareToken[];
   activities: ActivityRecord[];
   workerCredentials: WorkerCredentialMetadata[];
+  packetProductCredentials: PacketProductCredentialMetadata[];
+  workerPackageReceipts: WorkerPackageReceipt[];
   workerDefinitions: WorkerDefinition[];
   workerVersions: WorkerVersion[];
   workerDeployments: WorkerDeployment[];
@@ -245,6 +252,11 @@ function buildWorkspaceExport(
   const workerCredentials = workspaceWorkerRecords(store.workerCredentials, workspaceId).map(
     (record: WorkerCredentialRecord) => workerCredentialMetadata(record),
   );
+  const packetProductCredentials = workspaceWorkerRecords(
+    store.packetProductCredentials,
+    workspaceId,
+  ).map(packetProductCredentialMetadata);
+  const workerPackageReceipts = workspaceWorkerRecords(store.workerPackageReceipts, workspaceId);
   const workerDefinitions = workspaceWorkerRecords(store.workerDefinitions, workspaceId);
   const workerVersions = workspaceWorkerRecords(store.workerVersions, workspaceId);
   const workerDeployments = workspaceWorkerRecords(store.workerDeployments, workspaceId);
@@ -320,6 +332,8 @@ function buildWorkspaceExport(
       shareTokens,
       activities,
       workerCredentials,
+      packetProductCredentials,
+      workerPackageReceipts,
       workerDefinitions,
       workerVersions,
       workerDeployments,

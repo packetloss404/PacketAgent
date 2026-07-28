@@ -2,6 +2,7 @@ import type { ActivationMilestoneRecord, ActivationStatusDto } from "../activati
 import type { WorkspaceActivationFacts } from "../activation/adapters";
 import type {
   WorkerCheckpoint,
+  WorkerActorReference,
   WorkerDefinition,
   WorkerDeployment,
   WorkerRun,
@@ -28,6 +29,10 @@ import type {
   WorkerControlCommand,
   WorkerNotificationDeliveryReference,
 } from "../workers/control-types.js";
+import type {
+  PacketProductCredentialRecord,
+  WorkerPackageReceipt,
+} from "../workers/package/trust-types.js";
 export type { WorkerCredentialRecord } from "../workers/credential-types.js";
 
 export interface UserRecord {
@@ -304,7 +309,7 @@ export interface ActivityRecord {
   scope: "account" | "workspace" | "activation";
   event: string;
   occurredAt: string;
-  actor: { type: "user" | "system"; id: string; displayName?: string };
+  actor: WorkerActorReference;
   data: Record<string, string | number | boolean | null | undefined>;
 }
 
@@ -749,6 +754,8 @@ export interface PacketAgentData {
   alertEvents: AlertEventRecord[];
   shareTokens: ShareTokenRecord[];
   workerCredentials: WorkerCredentialRecord[];
+  packetProductCredentials: PacketProductCredentialRecord[];
+  workerPackageReceipts: WorkerPackageReceipt[];
   workerDefinitions: WorkerDefinition[];
   workerVersions: WorkerVersion[];
   workerDeployments: WorkerDeployment[];

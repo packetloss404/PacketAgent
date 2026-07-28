@@ -17,13 +17,15 @@ Worker health/list/detail read model, filter-bound cursor APIs, bounded
 resumable event stream, and canonical Worker workbench. W8.5 closes one-read
 answerability, source-order/backend parity, tenant-bound cursors, accessible
 loading/error/empty states, and the documented screenshot/manual matrix.
-W9.1 adds the checked WorkerPackage v1 contract fixtures and integrity cases;
-authenticated PacketADE deployment/reconnection cases remain W9.2-W9.5 work
-and are not current product claims.
+W9.1 adds the checked WorkerPackage v1 contract fixtures and integrity cases.
+W9.2 adds workspace/actor/operation-bound PacketADE credentials, local
+capability acceptance, durable pre-deployment receipts, rate limiting,
+token-safe audit, and three-backend parity. PacketADE deployment/reconnection
+cases remain W9.3-W9.5 work and are not current product claims.
 
-Last automated W9.1 baseline (2026-07-28):
+Last automated W9.2 baseline (2026-07-28):
 
-- API: 1,465 passed, 1 skipped, 0 failed
+- API: 1,470 passed, 1 skipped, 0 failed
 - Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -74,6 +76,11 @@ Last automated W9.1 baseline (2026-07-28):
   non-JSON rejection, tamper/missing-bound/undeclared-field failures,
   unsupported-major compatibility, DSSE payload binding, and
   required/untrusted signature policy: passed
+- Focused PacketADE credential workspace/actor/operation binding, expiry and
+  revocation, digest-only token storage, local capability narrowing,
+  signature-policy enforcement, pre-deployment receipt idempotency and
+  integrity, durable rate-limit/audit outcomes, secret-free export, and
+  JSON/SQLite/managed-Postgres parity: passed
 - Signed-in browser pass for the canonical `/runs` empty state, accessible
   labels and filters, `/activity` preservation and two-way navigation, missing
   Worker detail error state, and console warnings/errors: passed

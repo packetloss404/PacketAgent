@@ -134,7 +134,7 @@ Status: complete.
 Dependencies: W2-W7.
 
 Status: complete. Resume at
-[`W9.2 - Add the Packet-product trust boundary`](dev/worker-implementation-loops.md#w92---add-the-packet-product-trust-boundary).
+[`W9.3 - Implement the deployment endpoints`](dev/worker-implementation-loops.md#w93---implement-the-deployment-endpoints).
 
 - [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
@@ -157,11 +157,13 @@ Status: complete. Resume at
 Dependencies: W1-W7. Contract design may proceed earlier.
 
 Status: active. Resume at
-[`W9.2 - Add the Packet-product trust boundary`](dev/worker-implementation-loops.md#w92---add-the-packet-product-trust-boundary).
+[`W9.3 - Implement the deployment endpoints`](dev/worker-implementation-loops.md#w93---implement-the-deployment-endpoints).
 
 - [x] Implement the WorkerPackage contract in [`dev/packetade-packetagent-handoff.md`](dev/packetade-packetagent-handoff.md).
 - [ ] Add validate, deploy, update, activate, inspect, pause, and revoke endpoints.
-- [ ] Verify package provenance, schema version, integrity, and idempotency.
+- [x] Verify package provenance, schema version, integrity, local capability
+      acceptance, and idempotency behind a workspace/actor-bound PacketADE
+      credential.
 - [ ] Return progress, approval, completion, failure, and budget events to PacketADE.
 - Gate: a PacketADE task can choose **Keep running**, close PacketADE, and later reconnect to the same durable Worker deployment and evidence trail.
 

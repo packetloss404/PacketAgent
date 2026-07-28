@@ -43,6 +43,16 @@ Primary user actions:
   references similarly carry an opaque reference, media type, byte length,
   content digest, role, and classification while W1 provenance identifies the
   originating PacketADE work.
+- [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750.html) standardizes bearer
+  credentials in the HTTP `Authorization` header, requires TLS, recommends
+  audience/scope restriction, and warns against putting tokens in URLs where
+  they are commonly logged. PacketAgent accepts the header form only, binds
+  every token to one local workspace and operation set, and persists only a
+  domain-separated digest.
+- [RFC 6585](https://www.rfc-editor.org/rfc/rfc6585.html#section-4) defines
+  `429 Too Many Requests` and `Retry-After`. Packet-product writes consume a
+  durable per-workspace/per-credential bucket before package or lifecycle
+  mutation; W9.3 maps exhausted decisions to that response shape.
 
 ## WorkerPackage v1 wire schema
 
@@ -206,12 +216,38 @@ Each event includes deployment ID, Worker version, run ID when applicable, monot
 
 ## Trust boundary
 
-- PacketAgent validates schema and policy independently of PacketADE.
-- Both sides authenticate the connection and bind actions to an actor/workspace.
-- Package integrity and source provenance are recorded before activation.
-- Requested capabilities are an upper bound, not an automatic grant.
-- The receiving PacketAgent operator can narrow capabilities or reject deployment.
-- Replayed packages and callbacks are safe through idempotency and expiry.
+W9.2 implements the receiving side under `src/workers/package/`:
+
+- PacketAgent issues an opaque `pkade.<credential-id>.<secret>` bearer value
+  once. Only a domain-separated SHA-256 digest is stored. Credentials are
+  fixed to `PacketADE`, one workspace, one `packet_product` actor, explicit
+  operations, expiry/revocation state, and whether DSSE verification is
+  required.
+- Authentication derives the actor from the credential rather than trusting a
+  request body. Cross-workspace, expired, revoked, malformed, and
+  operation-forbidden requests fail closed.
+- `acceptedCapabilityIds` is an explicit local decision and must be a subset
+  of the package's default-deny allow list. Optional deployment grants can
+  only narrow verbs, resources, or approval requirements further. PacketAgent
+  compiles the result against the immutable Worker content digest.
+- Successful validation stores
+  `packetagent.worker-package-receipt/v1`: package ID/version/digest,
+  idempotency/request digest, Worker content digest, PacketADE provenance and
+  author, authenticated actor/credential, integrity/signature result, and the
+  requested/allowed/accepted/compiled capability decision. This exists before
+  any deployment or activation.
+- Exact idempotent retries return the original receipt. Reusing the key with a
+  different package, credential, or local decision fails, as does rebinding
+  one package ID/version to different content.
+- A durable per-credential write bucket and workspace activity records cover
+  authorized, denied, rate-limited, accepted, rejected, replayed, and
+  conflicting writes. Authorization values are never placed in records or
+  workspace exports; credential exports omit even the stored digest.
+
+W9.3 must call this boundary for every package/control write and require the
+stored receipt before it invokes W2/W3/W7 lifecycle services. Transport TLS is
+an operator/deployment requirement; PacketAgent must not imply that a bearer
+token makes plaintext transport safe.
 
 ## Delivery order
 

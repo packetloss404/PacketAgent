@@ -19,6 +19,8 @@ test("legacy stores normalize with every Worker persistence collection", () => {
   const normalized = normalizeStore({});
 
   assert.deepEqual(normalized.workerDefinitions, []);
+  assert.deepEqual(normalized.packetProductCredentials, []);
+  assert.deepEqual(normalized.workerPackageReceipts, []);
   assert.deepEqual(normalized.workerVersions, []);
   assert.deepEqual(normalized.workerDeployments, []);
   assert.deepEqual(normalized.workerRuns, []);

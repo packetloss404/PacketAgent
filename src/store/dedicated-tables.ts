@@ -22,6 +22,10 @@ import type {
   WorkerEvidenceEntry,
 } from "../workers/observability/types.js";
 import type {
+  PacketProductCredentialRecord,
+  WorkerPackageReceipt,
+} from "../workers/package/trust-types.js";
+import type {
   ActivationSignalKind,
   ActivationSignalOrigin,
   ActivationSignalRecord,
@@ -58,6 +62,8 @@ export type DedicatedRelationalCollectionKey =
   | "activities"
   | "providerCalls"
   | "activationSignals"
+  | "packetProductCredentials"
+  | "workerPackageReceipts"
   | "workerDefinitions"
   | "workerVersions"
   | "workerDeployments"
@@ -95,6 +101,14 @@ export function loadDedicatedRelationalCollections(
     activities: loadDedicatedActivities(db),
     providerCalls: loadDedicatedProviderCalls(db),
     activationSignals: loadDedicatedActivationSignals(db),
+    packetProductCredentials: loadWorkerPayloads<PacketProductCredentialRecord>(
+      db,
+      "select payload from packet_product_credentials order by workspace_id, created_at, id",
+    ),
+    workerPackageReceipts: loadWorkerPayloads<WorkerPackageReceipt>(
+      db,
+      "select payload from worker_package_receipts order by workspace_id, accepted_at, id",
+    ),
     workerDefinitions: loadWorkerPayloads<WorkerDefinition>(
       db,
       "select payload from worker_definitions order by workspace_id, id",
@@ -501,6 +515,8 @@ export function persistDedicatedRelationalRows(db: DatabaseSync, data: PacketAge
 
 function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData): void {
   db.exec(`
+    delete from worker_package_receipts;
+    delete from packet_product_credentials;
     delete from worker_artifact_manifests;
     delete from worker_evidence_entries;
     delete from worker_activation_inbox;
@@ -515,6 +531,49 @@ function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData):
     delete from worker_versions;
     delete from worker_definitions;
   `);
+
+  const packetProductCredentialStatement = db.prepare(`
+    insert into packet_product_credentials (
+      workspace_id, id, product, subject_id, status, token_digest,
+      require_package_signature, expires_at, created_at, updated_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.packetProductCredentials ?? []) {
+    packetProductCredentialStatement.run(
+      record.workspaceId,
+      record.id,
+      record.product,
+      record.subjectId,
+      record.status,
+      record.tokenDigest,
+      record.requirePackageSignature ? 1 : 0,
+      record.expiresAt ?? null,
+      record.createdAt,
+      record.updatedAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const workerPackageReceiptStatement = db.prepare(`
+    insert into worker_package_receipts (
+      workspace_id, id, package_id, package_version, idempotency_key,
+      package_digest, request_digest, credential_id, accepted_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerPackageReceipts ?? []) {
+    workerPackageReceiptStatement.run(
+      record.workspaceId,
+      record.id,
+      record.packageId,
+      record.packageVersion,
+      record.idempotencyKey,
+      record.packageDigest,
+      record.requestDigest,
+      record.credentialId,
+      record.acceptedAt,
+      JSON.stringify(record),
+    );
+  }
 
   const definitionStatement = db.prepare(`
     insert into worker_definitions (

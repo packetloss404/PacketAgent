@@ -734,7 +734,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: active. Resume at W9.2.
+Status: active. Resume at W9.3.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -755,6 +755,16 @@ live under `src/workers/package/fixtures/`.
 - Add compatibility fixtures and reject unknown major schema versions.
 
 ### W9.2 - Add the Packet-product trust boundary
+
+Status: complete as of 2026-07-28. Workspace-bound PacketADE bearer
+credentials are returned once and stored only as SHA-256 digests. Each
+credential fixes the authenticated `packet_product` actor, allowed operations,
+expiry/revocation state, and signature requirement. Package acceptance records
+verified integrity, PacketADE provenance, the local capability decision, and
+an idempotency receipt before deployment. Authorized, denied, rate-limited,
+accepted, rejected, replayed, and conflicting writes are audited without
+persisting authorization tokens. JSON, dedicated SQLite migration `0023`, and
+managed Postgres pass the same persistence/export scenario.
 
 - Authenticate PacketADE service requests and bind them to an allowed
   PacketAgent workspace and actor.

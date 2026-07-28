@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W8 and W9.1 are implemented as
+in foundation commit `d60cd47`. W1-W8 and W9.1-W9.2 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -154,6 +154,16 @@ Prompt-to-app generation remains a supported secondary capability.
   deterministic UTF-8 subject bytes. Optional DSSE envelopes must contain the
   same bytes and pass an injected trust-policy verifier when signatures are
   required. Checked v1 and unsupported-v2 fixtures are committed.
+- Completed W9.2's Packet-product trust boundary. PacketADE bearer credentials
+  are returned once and stored only as digests; each binds one workspace,
+  service actor, allowed operation set, expiry/revocation state, and optional
+  signature requirement. Package acceptance re-verifies schema, digest,
+  provenance, and DSSE policy; requires an explicit local capability subset;
+  compiles narrowed grants; and stores a durable idempotency receipt before any
+  deployment. Accepted, rejected, denied, replayed, conflicting, and
+  rate-limited writes are auditable without raw tokens. Migration `0023` and
+  workspace export preserve JSON, SQLite, and managed-Postgres parity while
+  omitting token digests from exports.
 
 ## Current implementation truth
 
@@ -231,6 +241,10 @@ Implemented substrate:
 - a strict WorkerPackage v1 contract with W1-aligned content/provenance,
   canonical SHA-256 verification, artifact descriptors, compatibility
   fixtures, and optional DSSE payload/signature verification;
+- workspace-bound PacketADE service credentials, fixed `packet_product`
+  actors and operations, local capability acceptance, durable pre-deployment
+  package receipts, per-credential write limits, token-safe audit, and
+  three-backend persistence/export parity;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -246,17 +260,17 @@ Not shipped:
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
 - external notification transports;
-- PacketADE-to-PacketAgent deployment endpoints and PacketChat/PacketPhone
+- PacketADE-to-PacketAgent deployment/event endpoints and PacketChat/PacketPhone
   delivery routes.
 
 Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W9.2 - Packet-product trust boundary** in
+Continue **W9.3 - deployment endpoints** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W8 and W9.1 are complete under `src/workers/`, the store, migrations,
+W1-W8 and W9.1-W9.2 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -331,10 +345,15 @@ W9.1 freezes `packetagent.worker-package/v1` as a strict W1-aligned wire
 contract. Package validation rejects undeclared fields and unknown majors,
 verifies the canonical SHA-256 digest, binds optional DSSE envelopes to the
 same exact bytes, and exposes a verifier callback for the authenticated trust
-policy W9.2 will supply.
+policy. W9.2 supplies that trust policy through one-time-returned,
+digest-stored PacketADE bearer credentials bound to a workspace, actor,
+operation set, expiry/revocation status, and signature requirement. It
+requires an explicit local subset of the package capability upper bound and
+stores integrity, provenance, compiled policy, actor, and idempotency before
+deployment.
 
 The exact next slice is
-[`W9.2 - Add the Packet-product trust boundary`](worker-implementation-loops.md#w92---add-the-packet-product-trust-boundary).
+[`W9.3 - Implement the deployment endpoints`](worker-implementation-loops.md#w93---implement-the-deployment-endpoints).
 After each gate passes, continue through W9-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -360,7 +379,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,465 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,470 passed, 1 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -409,6 +428,11 @@ handoff, the roadmap, or the backlog.
   non-JSON rejection, changed-content detection, missing-bound rejection,
   unsupported-major compatibility, undeclared secret-field rejection, DSSE
   payload substitution, and required/untrusted signature checks - passed
+- focused W9.2 workspace/actor/operation authentication, digest-only and
+  revocable credentials, local capability narrowing, signature-policy
+  enforcement, pre-deployment idempotency receipts, durable rate-limit/audit
+  outcomes, secret-free exports, persistence-integrity rejection, and
+  JSON/SQLite/managed-Postgres parity checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
@@ -438,6 +462,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W9.1 commit: clean. Stop if the active folder is
+Expected status after the W9.2 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

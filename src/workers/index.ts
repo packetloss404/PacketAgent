@@ -20,5 +20,7 @@ export * from "./observability/validation.js";
 export * from "./package/types.js";
 export * from "./package/canonical.js";
 export * from "./package/validation.js";
+export * from "./package/trust-types.js";
+export * from "./package/trust.js";
 export * from "./repository.js";
 export * from "./service.js";

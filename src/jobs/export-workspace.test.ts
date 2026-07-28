@@ -518,6 +518,8 @@ function makeStore(): PacketAgentData {
       },
     ],
     workerCredentials: [],
+    packetProductCredentials: [],
+    workerPackageReceipts: [],
     workerDefinitions: [],
     workerVersions: [],
     workerDeployments: [],

@@ -5,7 +5,10 @@ import {
   type PacketAgentData,
 } from "../packetagent-store.js";
 import { WorkerLifecycleError } from "./errors.js";
-import { assertWorkerDeploymentPolicyIntegrity } from "./capabilities.js";
+import {
+  assertWorkerDeploymentPolicyIntegrity,
+  workerCompiledPolicyDigest,
+} from "./capabilities.js";
 import { assertValidWorkerCredentialRecord } from "./credential-types.js";
 import { assertValidWorkerBudgetReservationRecord } from "./budget-types.js";
 import {
@@ -26,6 +29,10 @@ import {
 } from "./persistence-types.js";
 import { WORKER_EFFECT_RECEIPT_SCHEMA_VERSION, type WorkerEffectReceipt } from "./effect-types.js";
 import { appendWorkerJournalEntry } from "./observability/journal.js";
+import {
+  assertValidPacketProductCredentialRecord,
+  assertValidWorkerPackageReceipt,
+} from "./package/trust-types.js";
 import {
   assertValidWorkerArtifactManifest,
   assertValidWorkerEvidenceEntry,
@@ -360,6 +367,8 @@ function assertWorkspace(actual: string, expected: string): void {
 export function validateWorkerPersistence(data: PacketAgentData): void {
   try {
     data.workerCredentials.forEach(assertValidWorkerCredentialRecord);
+    data.packetProductCredentials.forEach(assertValidPacketProductCredentialRecord);
+    data.workerPackageReceipts.forEach(assertValidWorkerPackageReceipt);
     data.workerDefinitions.forEach(assertValidWorkerDefinition);
     data.workerVersions.forEach(assertValidWorkerVersion);
     data.workerDeployments.forEach(assertValidWorkerDeployment);
@@ -376,6 +385,12 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
 
     assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.reference}`);
+    assertUnique(data.packetProductCredentials, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(data.workerPackageReceipts, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.workerPackageReceipts,
+      (record) => `${record.workspaceId}:${record.idempotencyKey}`,
+    );
     assertUnique(data.workerDefinitions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerVersions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(
@@ -442,6 +457,7 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     );
     assertUnique(data.workerArtifactManifests, (record) => `${record.workspaceId}:${record.id}`);
 
+    validatePackageTrustReferences(data);
     validateCoreReferences(data);
     validateSupportRecords(data);
     for (const definition of data.workerDefinitions) {
@@ -499,6 +515,50 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
       }`,
       { cause: error },
     );
+  }
+}
+
+function validatePackageTrustReferences(data: PacketAgentData): void {
+  const packageDigests = new Map<string, string>();
+  for (const receipt of data.workerPackageReceipts) {
+    const credential = data.packetProductCredentials.find(
+      (record) => record.workspaceId === receipt.workspaceId && record.id === receipt.credentialId,
+    );
+    if (!credential) {
+      throw new Error(
+        `Worker package receipt ${receipt.id} references a missing Packet-product credential.`,
+      );
+    }
+    if (
+      receipt.authenticatedActor.id !== credential.subjectId ||
+      receipt.authenticatedActor.product !== credential.product
+    ) {
+      throw new Error(
+        `Worker package receipt ${receipt.id} actor does not match its Packet-product credential.`,
+      );
+    }
+    if (
+      receipt.workerVersionContentDigest !==
+      receipt.capabilityDecision.compiledPolicy.workerVersionContentDigest
+    ) {
+      throw new Error(
+        `Worker package receipt ${receipt.id} compiled policy is bound to another version digest.`,
+      );
+    }
+    const { policyDigest: _policyDigest, ...policy } = receipt.capabilityDecision.compiledPolicy;
+    if (
+      receipt.capabilityDecision.compiledPolicy.policyDigest !== workerCompiledPolicyDigest(policy)
+    ) {
+      throw new Error(`Worker package receipt ${receipt.id} compiled policy digest is invalid.`);
+    }
+    const coordinate = `${receipt.workspaceId}:${receipt.packageId}:${receipt.packageVersion}`;
+    const priorDigest = packageDigests.get(coordinate);
+    if (priorDigest !== undefined && priorDigest !== receipt.packageDigest) {
+      throw new Error(
+        `Worker package coordinate ${coordinate} is bound to multiple package digests.`,
+      );
+    }
+    packageDigests.set(coordinate, receipt.packageDigest);
   }
 }
 

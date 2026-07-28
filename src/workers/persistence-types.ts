@@ -166,6 +166,8 @@ export interface WorkerPersistenceCollections {
   readonly workerRuns: readonly WorkerRun[];
   readonly workerCheckpoints: readonly WorkerCheckpoint[];
   readonly workerEffectReceipts: readonly WorkerEffectReceipt[];
+  readonly packetProductCredentials: readonly import("./package/trust-types.js").PacketProductCredentialRecord[];
+  readonly workerPackageReceipts: readonly import("./package/trust-types.js").WorkerPackageReceipt[];
   readonly workerBudgetReservations: readonly import("./budget-types.js").WorkerBudgetReservationRecord[];
   readonly workerAttentionRequests: readonly import("./control-types.js").WorkerAttentionRequest[];
   readonly workerApprovalGrants: readonly import("./control-types.js").WorkerApprovalGrant[];

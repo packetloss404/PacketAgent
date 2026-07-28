@@ -53,6 +53,8 @@ import {
   WORKER_RETENTION_POLICY_SCHEMA_VERSION,
   type WorkerRetentionPolicy,
 } from "../observability/retention-types.js";
+import { createPacketProductTrustService } from "../package/trust.js";
+import type { WorkerPackage } from "../package/types.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -114,6 +116,10 @@ interface BackendScenarioResult {
   readonly retentionEventCount: number;
   readonly rollupProjection: ReturnType<typeof parityRollupProjection>;
   readonly operationsReadModel: Awaited<ReturnType<typeof parityOperationsProjection>>;
+  readonly packetProductCredentialCount: number;
+  readonly workerPackageReceiptProjection: readonly string[];
+  readonly exportedPacketProductCredentialCount: number;
+  readonly exportedWorkerPackageReceiptCount: number;
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -126,6 +132,7 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     value: "backend-parity-secret",
   });
   const service = createWorkerLifecycleService();
+  const packetProductToken = await runPacketProductTrustPersistence();
   await runActivationRace(service);
   await runRollback(service);
   await runActivationAdmissionRace();
@@ -172,8 +179,18 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     stored.workerNotificationDeliveries.length,
   );
   assert.equal(exported.data.workerActivationInboxes.length, stored.workerActivationInboxes.length);
+  assert.equal(
+    exported.data.packetProductCredentials.length,
+    stored.packetProductCredentials.length,
+  );
+  assert.equal(exported.data.workerPackageReceipts.length, stored.workerPackageReceipts.length);
   assert.equal(JSON.stringify(exported).includes("backend-parity-secret"), false);
   assert.equal(JSON.stringify(exported).includes(stored.workerCredentials[0].ciphertext), false);
+  assert.equal(JSON.stringify(exported).includes(packetProductToken), false);
+  assert.equal(
+    JSON.stringify(exported).includes(stored.packetProductCredentials[0]!.tokenDigest),
+    false,
+  );
 
   return {
     definitionStatuses: definitions
@@ -259,7 +276,46 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     ).length,
     rollupProjection: parityRollupProjection(rollupProjection),
     operationsReadModel,
+    packetProductCredentialCount: stored.packetProductCredentials.length,
+    workerPackageReceiptProjection: stored.workerPackageReceipts
+      .map(
+        (receipt) =>
+          `${receipt.packageId}:${receipt.packageVersion}:${receipt.integrity.digestVerified}:${receipt.capabilityDecision.compiledPolicy.policyDigest}`,
+      )
+      .sort(),
+    exportedPacketProductCredentialCount: exported.data.packetProductCredentials.length,
+    exportedWorkerPackageReceiptCount: exported.data.workerPackageReceipts.length,
   };
+}
+
+async function runPacketProductTrustPersistence(): Promise<string> {
+  const trust = createPacketProductTrustService();
+  const issued = await trust.issueCredential({
+    workspaceId: "alpha",
+    subjectId: "packetade:backend-parity",
+    allowedOperations: ["package.validate"],
+    createdBy: ACTOR,
+  });
+  const workerPackage = JSON.parse(
+    readFileSync(
+      resolve(
+        process.cwd(),
+        "src",
+        "workers",
+        "package",
+        "fixtures",
+        "worker-package-v1.valid.json",
+      ),
+      "utf8",
+    ),
+  ) as WorkerPackage;
+  await trust.acceptPackage({
+    authorization: `Bearer ${issued.token}`,
+    workspaceId: "alpha",
+    workerPackage,
+    acceptedCapabilityIds: ["release-read"],
+  });
+  return issued.token;
 }
 
 function parityRollupProjection(rollups: WorkerObservabilityRollupSet) {
