@@ -35,6 +35,7 @@ const EVENT_SOURCES = new Set([
   "checkpoint",
   "control",
   "recovery",
+  "retention",
   "terminal",
 ]);
 const CLASSIFICATIONS = new Set(["public_metadata", "internal", "sensitive_reference"]);

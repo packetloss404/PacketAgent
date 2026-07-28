@@ -50,6 +50,11 @@ import {
   METRICS_SNAPSHOT_JOB_TYPE,
   type MetricsSnapshotJobPayload,
 } from "./jobs/metrics-snapshot-handler.js";
+import {
+  createWorkerRetentionJobHandler,
+  ensureWorkerRetentionJobs,
+  WORKER_RETENTION_JOB_TYPE,
+} from "./jobs/worker-retention-handler.js";
 import { registerDefaultProviders } from "./providers/bootstrap.js";
 import { registerDefaultTools } from "./tools/bootstrap.js";
 import { getDefaultToolRegistry } from "./tools/registry.js";
@@ -392,6 +397,7 @@ app.route("/api/app/workers", workerOperatorRoutes);
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
 const workerExecutionJobHandler = createWorkerExecutionJobHandler();
 const workerAttentionDeadlineJobHandler = createWorkerAttentionDeadlineJobHandler();
+const workerRetentionJobHandler = createWorkerRetentionJobHandler();
 const workerRecoveryCoordinator = createWorkerRecoveryCoordinator();
 scheduler.registerReconciler({
   name: "worker-recovery",
@@ -482,6 +488,12 @@ scheduler.register({
     return workerAttentionDeadlineJobHandler.handle(job);
   },
 });
+scheduler.register({
+  type: WORKER_RETENTION_JOB_TYPE,
+  async handle(job) {
+    return workerRetentionJobHandler.handle(job);
+  },
+});
 app.use("/data/artifacts/*", async (c, next) => {
   // Gated behind an explicit opt-in flag (default OFF, even in dev) — see
   // artifactServingEnabled(). Static artifacts are not tenant-scoped here:
@@ -520,6 +532,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env): Promise
   scheduler.start();
   await ensureMetricsSnapshotCronJobAsync();
   await ensureAlertsCronJobAsync();
+  await ensureWorkerRetentionJobs({ env });
   const shutdown = async () => {
     await scheduler.stop();
     try {

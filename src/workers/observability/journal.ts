@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { redactSensitiveString, redactSensitiveValue } from "../../security/redaction.js";
 import {
   LEGACY_WORKER_EVENT_SCHEMA_VERSION,
   WORKER_EVENT_SCHEMA_VERSION,
@@ -28,6 +29,13 @@ export function appendWorkerJournalEntry(
   data: WorkerJournalCollections,
   input: WorkerJournalAppendInput,
 ): WorkerJournalAppendResult {
+  const summary = redactSensitiveString(input.summary, input.knownSecretValues);
+  const safeData = input.data
+    ? (redactSensitiveValue(
+        input.data,
+        input.knownSecretValues,
+      ) as WorkerJournalAppendInput["data"])
+    : undefined;
   const sequence = nextWorkspaceSequence(data.workerEvents, input.workspaceId);
   const deploymentSequence = input.workerDeploymentId
     ? nextDeploymentSequence(data.workerEvents, input.workspaceId, input.workerDeploymentId)
@@ -36,7 +44,7 @@ export function appendWorkerJournalEntry(
     ? nextRunSequence(data.workerEvents, input.workspaceId, input.workerRunId)
     : undefined;
   const evidenceId = `evidence:${input.id}`;
-  const dataDigest = digest(input.data ?? null);
+  const dataDigest = digest(safeData ?? null);
   const eventWithoutDigest = {
     schemaVersion: WORKER_EVENT_SCHEMA_VERSION,
     id: input.id,
@@ -51,8 +59,8 @@ export function appendWorkerJournalEntry(
     ...(deploymentSequence ? { deploymentSequence } : {}),
     ...(runSequence ? { runSequence } : {}),
     actor: input.actor,
-    summary: input.summary,
-    ...(input.data ? { data: input.data } : {}),
+    summary,
+    ...(safeData ? { data: safeData } : {}),
     ...(input.trace ? { trace: input.trace } : {}),
     ...(input.correlation && Object.keys(input.correlation).length > 0
       ? { correlation: input.correlation }
@@ -81,7 +89,7 @@ export function appendWorkerJournalEntry(
     sourceReferences,
     ...(input.trace?.traceId ? { traceId: input.trace.traceId } : {}),
     ...(input.trace?.spanId ? { spanId: input.trace.spanId } : {}),
-    summary: input.summary,
+    summary,
     classification: input.dataClassification ?? "internal",
     ...(input.rawPayload ? { rawPayload: input.rawPayload } : {}),
     ...(input.artifactManifestIds && input.artifactManifestIds.length > 0

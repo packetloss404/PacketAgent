@@ -84,6 +84,7 @@ export type WorkerEventSource =
   | "checkpoint"
   | "control"
   | "recovery"
+  | "retention"
   | "terminal";
 
 export interface WorkerEventCorrelation {
@@ -150,6 +151,11 @@ export interface WorkerJournalAppendInput {
   readonly dataClassification?: WorkerEvidenceRedactionClassification;
   readonly rawPayload?: WorkerEvidencePayloadReference;
   readonly artifactManifestIds?: readonly string[];
+  /**
+   * Ephemeral values used only to sanitize the journal input. They are never
+   * persisted in the event or evidence envelope.
+   */
+  readonly knownSecretValues?: readonly (string | null | undefined)[];
   readonly occurredAt: string;
 }
 

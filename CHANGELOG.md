@@ -6,6 +6,27 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Bounded Worker retention and redaction (W8.3)
+
+- Added versioned, independently configurable retention windows for metadata,
+  summaries, prompts, tool inputs/outputs, and artifact bytes.
+- Redacted sensitive keys, structured credentials, and caller-supplied known
+  secret values before journal persistence and again in observability read
+  projections.
+- Compacted only terminal-run inputs, outputs, checkpoint chains, and effect
+  result bodies, preserving active-run recovery state and duplicate-effect
+  receipt metadata.
+- Added digest-only deletion events and rollup accounting that separates
+  retention-explained source gaps from unexplained missing records.
+- Added digest-checked artifact-deletion ports without interpreting or deleting
+  arbitrary artifact paths.
+- Registered bounded, workspace-scoped recurring cleanup jobs with read-only
+  dry runs, item/time ceilings, category metrics, and explicit tenant matching.
+- Proved repeat-run idempotency, active-run preservation, workspace isolation,
+  API-boundary redaction, and JSON/SQLite/managed-Postgres parity.
+- The W8.3 baseline covers 1,452 API tests (1,451 passed and 1 intentionally
+  skipped) plus 25 web tests with zero lint errors.
+
 ### 2026-07-27 - Deterministic Worker observability rollups (W8.2)
 
 - Added disposable cumulative rollups keyed by immutable Worker version,

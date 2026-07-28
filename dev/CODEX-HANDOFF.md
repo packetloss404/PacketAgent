@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W7 and W8.1-W8.2 are implemented as
+in foundation commit `d60cd47`. W1-W7 and W8.1-W8.3 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -125,6 +125,14 @@ Prompt-to-app generation remains a supported secondary capability.
   artifacts, outcomes, and exit-predicate matches. Reordered sources and fresh
   processes return the same view, and missing retained sources are explicit
   typed gaps rather than zeroed or fabricated data.
+- Completed W8.3's bounded retention and redaction. Separate metadata, summary,
+  prompt, tool-payload, and artifact windows drive read-only dry runs or
+  item/time-bounded workspace cleanup jobs. The journal sanitizes sensitive
+  keys and supplied known values before hashing, and observability reads apply
+  a second boundary pass. Only terminal-run payload state is compacted;
+  duplicate-effect metadata remains durable. Digest-only deletion events make
+  retention gaps explainable, while artifact bytes require an injected
+  digest-checked deletion port rather than arbitrary path removal.
 
 ## Current implementation truth
 
@@ -193,6 +201,9 @@ Implemented substrate:
 - deterministic cumulative Worker version/deployment/run rollups over
   provider/tool/effect calls, retries, queue duration, approvals, checkpoints,
   budgets, artifacts, outcomes, and deduplicated missing-source gaps;
+- separate Worker retention windows, central and read-boundary redaction,
+  terminal-only payload compaction, digest-only deletion events,
+  retention-explained gaps, and bounded workspace cleanup jobs;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -207,8 +218,8 @@ Not shipped:
 
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
-- external notification transports, evidence retention cleanup, and the
-  consolidated Worker health/cost/evidence API and UI; and
+- external notification transports and the consolidated Worker
+  health/cost/evidence API and UI; and
 - PacketADE-to-PacketAgent deployment endpoints.
 
 Do not describe those missing Worker features as implemented.
@@ -218,7 +229,7 @@ Do not describe those missing Worker features as implemented.
 Continue **W8 - Evidence, cost, retention, and operations UI** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W7 and W8.1-W8.2 are complete under `src/workers/`, the store, migrations,
+W1-W7 and W8.1-W8.3 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -268,9 +279,17 @@ cumulative projections keyed by immutable Worker version, deployment, and run.
 It joins only explicit canonical source identities, journals failed tools and
 phase retries, exposes missing retained references as typed gaps, and passes
 order-independent replay plus storage parity.
+W8.3 applies independent category windows through workspace-bound jobs with
+explicit item and elapsed-time ceilings. Dry runs use a read-only load path.
+Successful cleanup replaces expired summaries and metadata with digest-only
+deletion evidence, removes prompt/checkpoint/result bodies only from terminal
+runs, preserves effect identity for duplicate-effect safety, and delegates
+artifact-byte removal to a digest-checked storage port. Persistence and read
+boundaries both redact sensitive keys and known values, while rollups separate
+retention-deleted source gaps from unexplained gaps.
 
 The exact next slice is
-[`W8.3 - Add retention and redaction`](worker-implementation-loops.md#w83---add-retention-and-redaction).
+[`W8.4 - Expose API and UI`](worker-implementation-loops.md#w84---expose-api-and-ui).
 After each gate passes, continue through W8-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -296,7 +315,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,447 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,451 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -328,6 +347,12 @@ handoff, the roadmap, or the backlog.
   artifact/outcome metrics, exit-predicate matches, missing-source gaps,
   workspace isolation, and stable JSON/SQLite/managed-Postgres parity checks -
   passed
+- focused W8.3 persistence/read redaction, known-secret removal, separate
+  category windows, mutation-free dry runs, item/time bounds, workspace
+  isolation, active-run preservation, terminal prompt/checkpoint/effect
+  compaction, digest-checked artifact deletion, idempotent tombstones,
+  retention-explained source gaps, and stable JSON/SQLite/managed-Postgres
+  parity checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
@@ -357,6 +382,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W8.2 commit: clean. Stop if the active folder is
+Expected status after the W8.3 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

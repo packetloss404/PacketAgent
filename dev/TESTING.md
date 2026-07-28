@@ -11,13 +11,14 @@ W7.1's durable control records plus W7.2's atomic control service. Supervisor
 attention and deadline enforcement are covered by W7.3. Independent operator
 API coverage is added by W7.4, and W7.5 closes the restart/kill gate.
 W8.1 adds the versioned event, evidence, and artifact-provenance substrate.
-W8.2 adds deterministic cumulative version/deployment/run rollups. Retention,
-the consolidated evidence surface, and PacketADE handoff cases must be added
-as W8.3-W9 ship; they are not current product claims.
+W8.2 adds deterministic cumulative version/deployment/run rollups. W8.3 adds
+bounded redaction, retention, and deletion evidence. The consolidated evidence
+surface and PacketADE handoff cases must be added as W8.4-W9 ship; they are not
+current product claims.
 
-Last automated W8.2 baseline (2026-07-27):
+Last automated W8.3 baseline (2026-07-27):
 
-- API: 1,447 passed, 1 skipped, 0 failed
+- API: 1,451 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -47,6 +48,12 @@ Last automated W8.2 baseline (2026-07-27):
   supervisor retries, queue duration, approvals, checkpoints, reported and
   rolling budgets, artifacts, outcomes, exit-predicate matches,
   missing-source gaps, workspace isolation, and stable
+  JSON/SQLite/managed-Postgres parity checks: passed
+- Focused pre-persistence and read-boundary redaction, known-secret removal,
+  separate retention windows, read-only dry runs, item/time bounds, explicit
+  workspace scoping, terminal-only run/checkpoint/effect compaction,
+  digest-checked artifact deletion, idempotent tombstones,
+  retention-explained source gaps, active-run preservation, and
   JSON/SQLite/managed-Postgres parity checks: passed
 - Typecheck: passed
 - Production web build: passed
@@ -445,6 +452,38 @@ Use authenticated requests under `/api/app/workers`. Every mutation requires
    unchanged and another workspace receives no records.
 9. Repeat the stable projection fields against JSON, SQLite, and managed
    Postgres and confirm equivalent results.
+
+## W8.3 Retention and Redaction Smoke
+
+1. Append an event containing sensitive keys, a structured bearer credential,
+   and a known secret under a safe-looking key. Confirm neither the event nor
+   its evidence contains the raw values.
+2. Read legacy and current observability records through the repository with a
+   known-secret resolver. Confirm the boundary pass removes values even when
+   older persisted content was not sanitized.
+3. Configure distinct metadata, summary, prompt, tool-payload, and artifact
+   windows. Run a dry cleanup with small item/time bounds and confirm category
+   metrics report eligible records without invoking a mutation or artifact
+   deletion.
+4. Run live cleanup for one workspace. Confirm expired activation payloads and
+   terminal-run input/output disappear, checkpoint chains are removed with the
+   latest pointer, and effect receipts retain status/timing/digest metadata but
+   not result bodies.
+5. Include an old queued or otherwise resumable run. Confirm its input,
+   checkpoint, and effect state are untouched regardless of age.
+6. Provide an artifact deletion adapter that accepts only a manifest reference
+   plus expected content digest. Confirm successful or already-absent deletion
+   records one tombstone; adapter failure records no false success. Never
+   interpret arbitrary manifest references as filesystem paths.
+7. Confirm every successful category deletion emits a public-metadata
+   retention event containing only hashed resource IDs and content digests.
+   Re-run cleanup and confirm no duplicate artifact deletion or tombstone.
+8. Rebuild rollups after checkpoint retention. Confirm the missing source is
+   counted as retention-deleted rather than unexplained.
+9. Attempt a job whose payload workspace differs from the scheduler tenant, or
+   whose bounds exceed their ceilings. Confirm it fails closed before cleanup.
+10. Repeat persisted compaction against JSON, SQLite, and managed Postgres and
+    confirm equivalent result kinds, event counts, exports, and rollups.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

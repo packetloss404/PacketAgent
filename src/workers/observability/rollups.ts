@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   loadStoreAsync as defaultLoadStore,
   type PacketAgentData,
@@ -9,6 +10,7 @@ import type { WorkerEffectReceipt } from "../effect-types.js";
 import type { WorkerEvent, WorkerEventV2 } from "../persistence-types.js";
 import { validateWorkerPersistence } from "../repository.js";
 import type { WorkerCheckpoint, WorkerDeployment, WorkerRun, WorkerVersion } from "../types.js";
+import { canonicalWorkerJson } from "../validation.js";
 import { isWorkerEventV2 } from "./journal.js";
 import {
   WORKER_OBSERVABILITY_ROLLUP_SCHEMA_VERSION,
@@ -549,20 +551,49 @@ function outcomeRollup(records: ScopeRecords): WorkerOutcomeRollup {
 }
 
 function sourceGapRollup(records: ScopeRecords): WorkerSourceGapRollup {
-  const missing = new Map<string, WorkerEvidenceSourceKind>();
+  const missing = new Map<
+    string,
+    { readonly kind: WorkerEvidenceSourceKind; readonly id: string }
+  >();
   for (const entry of records.evidence) {
     for (const reference of entry.sourceReferences) {
       if (!sourceReferenceExists(records.allData, records.events, entry.workspaceId, reference)) {
-        missing.set(`${reference.kind}:${reference.id}`, reference.kind);
+        missing.set(`${reference.kind}:${reference.id}`, {
+          kind: reference.kind,
+          id: reference.id,
+        });
       }
     }
   }
   const byKind: Partial<Record<WorkerEvidenceSourceKind, number>> = {};
-  for (const kind of [...missing.values()].sort()) increment(byKind, kind);
+  let retentionDeleted = 0;
+  for (const reference of [...missing.values()].sort((left, right) =>
+    `${left.kind}:${left.id}`.localeCompare(`${right.kind}:${right.id}`),
+  )) {
+    increment(byKind, reference.kind);
+    if (retentionTombstoneExists(records.events, reference.id)) {
+      retentionDeleted += 1;
+    }
+  }
   return {
     total: missing.size,
+    retentionDeleted,
+    unexplained: missing.size - retentionDeleted,
     byKind,
   };
+}
+
+function retentionTombstoneExists(events: readonly WorkerEvent[], resourceId: string): boolean {
+  const resourceDigest = `sha256:${createHash("sha256")
+    .update(canonicalWorkerJson({ resourceId }))
+    .digest("hex")}`;
+  return events.some(
+    (event) =>
+      isWorkerEventV2(event) &&
+      event.source === "retention" &&
+      Array.isArray(event.data?.resourceIdDigests) &&
+      event.data.resourceIdDigests.includes(resourceDigest),
+  );
 }
 
 function sourceReferenceExists(

@@ -128,6 +128,8 @@ export interface WorkerOutcomeRollup {
 
 export interface WorkerSourceGapRollup {
   readonly total: number;
+  readonly retentionDeleted: number;
+  readonly unexplained: number;
   readonly byKind: Readonly<Partial<Record<WorkerEvidenceSourceKind, number>>>;
 }
 

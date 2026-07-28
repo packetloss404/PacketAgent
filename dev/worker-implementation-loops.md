@@ -639,7 +639,7 @@ without relying on the authoring UI.
 Outcome: one API and one UI surface answer what is running, why, at what cost,
 from which version, at which checkpoint, and what needs attention.
 
-Status: active. W8.1-W8.2 are complete; resume at W8.3.
+Status: active. W8.1-W8.3 are complete; resume at W8.4.
 
 ### W8.1 - Formalize the event and evidence model
 
@@ -687,7 +687,7 @@ new `src/workers/observability/` modules.
 
 ### W8.3 - Add retention and redaction
 
-Status: active. This is the exact resume point after W8.2.
+Status: complete as of 2026-07-27.
 
 - Define separate retention windows for metadata, summaries, prompts, tool
   inputs/outputs, and artifacts.
@@ -697,6 +697,8 @@ Status: active. This is the exact resume point after W8.2.
 - Add bounded cleanup jobs with dry-run metrics and tenant scoping.
 
 ### W8.4 - Expose API and UI
+
+Status: active. This is the exact resume point after W8.3.
 
 - Add list/detail/health/attention/evidence/event endpoints with cursor
   pagination and stable filters.

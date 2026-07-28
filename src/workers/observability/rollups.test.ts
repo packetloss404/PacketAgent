@@ -280,6 +280,8 @@ test("missing retained provider records remain explained rollup gaps", () => {
   assert.equal(rollup.providers.missingSourceRecords, 1);
   assert.deepEqual(rollup.sourceGaps, {
     total: 1,
+    retentionDeleted: 0,
+    unexplained: 1,
     byKind: { provider_call: 1 },
   });
 });

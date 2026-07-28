@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   loadStoreAsync as defaultLoadStore,
   mutateStoreAsync as defaultMutateStore,
@@ -37,6 +38,7 @@ import {
   assertValidWorkerDeployment,
   assertValidWorkerRun,
   assertValidWorkerVersion,
+  canonicalWorkerJson,
   validateWorkerRecordSet,
 } from "./validation.js";
 
@@ -995,10 +997,27 @@ function assertValidWorkerEffectReceipt(receipt: WorkerEffectReceipt): void {
     (!receipt.completedAt ||
       !receipt.result ||
       !Number.isFinite(Date.parse(receipt.completedAt)) ||
-      receipt.result.kind !== "inline_redacted" ||
+      !["inline_redacted", "retention_tombstone"].includes(receipt.result.kind) ||
       !/^sha256:[a-f0-9]{64}$/.test(receipt.result.digest))
   ) {
     throw new Error("Completed Worker effect receipt is missing its result reference.");
+  }
+  if (
+    receipt.result?.kind === "retention_tombstone" &&
+    (!/^sha256:[a-f0-9]{64}$/.test(receipt.result.originalDigest) ||
+      !receipt.result.tombstoneEventId ||
+      !Number.isFinite(Date.parse(receipt.result.deletedAt)))
+  ) {
+    throw new Error("Worker effect retention tombstone is invalid.");
+  }
+  if (receipt.result) {
+    const { digest: resultDigest, ...content } = receipt.result;
+    const expectedDigest = `sha256:${createHash("sha256")
+      .update(canonicalWorkerJson(content))
+      .digest("hex")}`;
+    if (resultDigest !== expectedDigest) {
+      throw new Error("Worker effect result digest does not match its contents.");
+    }
   }
   if (
     receipt.status === "prepared" &&

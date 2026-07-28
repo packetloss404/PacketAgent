@@ -43,6 +43,15 @@ primary specifications without claiming wire-level conformance:
   only for decomposable quantities, retains gauges such as consecutive
   failures with explicit maximum semantics, and treats missing source ranges as
   gaps instead of zeros.
+- [OWASP's Logging Cheat
+  Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
+  requires secrets to stay out of logs, recommends sanitizing event data, and
+  treats over-retention as a failure alongside premature deletion.
+  [NIST SP 800-88 Rev. 2](https://csrc.nist.gov/pubs/sp/800/88/r2/final)
+  defines sanitization by making access to target data infeasible for the
+  required protection level. W8.3 therefore removes payload-bearing records
+  rather than merely hiding them in the UI, while preserving only digests and
+  minimal deletion metadata.
 
 ## Contract decisions
 
@@ -118,6 +127,30 @@ Failed tool results and supervisor phase failures are journal occurrences, so
 the projection does not silently discard retries or failed calls. Exit
 evaluation counts and matches remain distinct from terminal status.
 
+### Retention and redaction
+
+`packetagent.worker-retention-policy/v1` defines independent metadata, summary,
+prompt, tool-payload, and artifact windows. Cleanup:
+
+- is explicitly scoped to one scheduler workspace and bounded by item count
+  plus elapsed time;
+- uses a truly read-only store path in dry-run mode;
+- applies only to terminal-run prompt, checkpoint, output, and effect-result
+  bodies so resumable work is never damaged;
+- retains duplicate-effect identity, status, timing, and original result
+  digest after result-body compaction;
+- emits digest-only `worker.retention.*_deleted` event/evidence pairs before
+  removing persisted data;
+- delegates artifact-byte removal to a port supplied with the opaque reference
+  and expected content digest, never generic filesystem deletion; and
+- distinguishes retention-explained evidence gaps from unexplained missing
+  source records in rollups.
+
+Journal inputs are sanitized before their data and envelope digests are
+computed. Observability reads apply a second targeted pass for sensitive keys
+and caller-supplied known values. Response digests continue to identify the
+stored envelope, not the post-redaction representation.
+
 ## Executable W8 loops
 
 ### W8.1A - Contract and atomic journal
@@ -159,6 +192,8 @@ Status: complete.
 - Rebuild the same result after process restart and in every storage mode.
 
 ### W8.3 - Retention and redaction
+
+Status: complete.
 
 - Add category-specific retention policies and tombstone events.
 - Delete raw records or artifact bytes without deleting their durable summary,

@@ -135,14 +135,16 @@ Status: complete. Resume at
 Dependencies: W2-W7.
 
 Status: active. Resume at
-[`W8.3 - Add retention and redaction`](dev/worker-implementation-loops.md#w83---add-retention-and-redaction).
+[`W8.4 - Expose API and UI`](dev/worker-implementation-loops.md#w84---expose-api-and-ui).
 
 - [ ] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
       checkpoints, budgets, artifacts, and outcome quality up by Worker version,
       deployment, and run with deterministic replay and explained source gaps.
 - [ ] Expose a chronological evidence trail and artifact manifest.
-- [ ] Add retention and redaction policy for prompts, tool payloads, and outputs.
+- [x] Add retention and redaction policy for prompts, tool payloads, and outputs,
+      including bounded workspace jobs, read-only dry runs, deletion evidence,
+      and terminal-only compaction.
 - Gate: the UI and API answer what is running, why, current budget, last checkpoint, and required attention without joining raw tables manually.
 
 ### W9 - PacketADE deployment handoff

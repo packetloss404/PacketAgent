@@ -47,6 +47,11 @@ import type {
   WorkerObservabilityRollupSet,
 } from "../observability/rollup-types.js";
 import { buildWorkerObservabilityRollups } from "../observability/rollups.js";
+import { createWorkerRetentionService } from "../observability/retention.js";
+import {
+  WORKER_RETENTION_POLICY_SCHEMA_VERSION,
+  type WorkerRetentionPolicy,
+} from "../observability/retention-types.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -93,6 +98,7 @@ interface BackendScenarioResult {
   readonly terminalRunStatuses: readonly string[];
   readonly checkpointCount: number;
   readonly effectReceiptStatuses: readonly string[];
+  readonly effectResultKinds: readonly string[];
   readonly compiledPolicyDigests: readonly string[];
   readonly capabilityGrantCounts: readonly string[];
   readonly runRevisions: readonly number[];
@@ -104,6 +110,7 @@ interface BackendScenarioResult {
   readonly exportedControlRecordCounts: readonly number[];
   readonly exportedEvidenceCount: number;
   readonly exportedArtifactManifestCount: number;
+  readonly retentionEventCount: number;
   readonly rollupProjection: ReturnType<typeof parityRollupProjection>;
 }
 
@@ -206,6 +213,9 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     effectReceiptStatuses: stored.workerEffectReceipts
       .map((receipt) => `${receipt.toolName}:${receipt.status}`)
       .sort(),
+    effectResultKinds: stored.workerEffectReceipts
+      .map((receipt) => receipt.result?.kind ?? "none")
+      .sort(),
     compiledPolicyDigests: stored.workerDeployments
       .map((deployment) => `${deployment.id}:${deployment.compiledPolicy!.policyDigest}`)
       .sort(),
@@ -240,6 +250,9 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     ],
     exportedEvidenceCount: exported.data.workerEvidenceEntries.length,
     exportedArtifactManifestCount: exported.data.workerArtifactManifests.length,
+    retentionEventCount: stored.workerEvents.filter((event) =>
+      event.type.startsWith("worker.retention."),
+    ).length,
     rollupProjection: parityRollupProjection(rollupProjection),
   };
 }
@@ -742,6 +755,42 @@ async function runRuntimePersistence(): Promise<void> {
   });
   assert.equal(terminal.revision, reacquired.context.run.revision + 1);
   assert.equal(terminal.runtimeLease, undefined);
+
+  const retentionPolicy: WorkerRetentionPolicy = {
+    schemaVersion: WORKER_RETENTION_POLICY_SCHEMA_VERSION,
+    metadataDays: 1,
+    summaryDays: 1,
+    promptDays: 1,
+    toolPayloadDays: 1,
+    artifactDays: 1,
+  };
+  let retentionId = 0;
+  const retention = createWorkerRetentionService({
+    now: () => new Date("2026-08-27T15:01:02.000Z"),
+    id: () => `event-parity-retention-${++retentionId}`,
+    artifactPort: {
+      async delete() {
+        return "deleted";
+      },
+    },
+  });
+  const retained = await retention.cleanup({
+    workspaceId: run.workspaceId,
+    policy: retentionPolicy,
+    maxItems: 500,
+    maxDurationMs: 60_000,
+  });
+  assert.ok(retained.deleted > 0);
+  const compacted = await loadStoreAsync();
+  assert.equal(
+    compacted.workerEffectReceipts.find((receipt) => receipt.id === completedEffect.id)?.result
+      ?.kind,
+    "retention_tombstone",
+  );
+  assert.equal(
+    compacted.workerCheckpoints.some((record) => record.workerRunId === run.id),
+    false,
+  );
 }
 
 async function runRollback(service: WorkerLifecycleService): Promise<void> {

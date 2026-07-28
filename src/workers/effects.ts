@@ -9,6 +9,7 @@ import { WorkerLifecycleError } from "./errors.js";
 import {
   WORKER_EFFECT_RECEIPT_SCHEMA_VERSION,
   type WorkerEffectReceipt,
+  type WorkerEffectRetainedResultReference,
   type WorkerEffectResultReference,
   type WorkerToolEffectClassification,
 } from "./effect-types.js";
@@ -401,7 +402,7 @@ export function workerEffectIdentity(input: {
 }
 
 function effectResultReference(result: WorkerRuntimeToolResult): WorkerEffectResultReference {
-  const content: Omit<WorkerEffectResultReference, "digest"> = {
+  const content: Omit<WorkerEffectRetainedResultReference, "digest"> = {
     kind: "inline_redacted",
     status: result.status,
     ...(result.output !== undefined
@@ -425,6 +426,11 @@ function resultFromReceipt(receipt: WorkerEffectReceipt): WorkerRuntimeToolResul
   if (!result) {
     throw new WorkerUnsafeReplayError(
       `Completed Worker effect ${receipt.id} is missing its result.`,
+    );
+  }
+  if (result.kind !== "inline_redacted") {
+    throw new WorkerUnsafeReplayError(
+      `Worker effect ${receipt.id} result was removed by retention and cannot be replayed.`,
     );
   }
   return {

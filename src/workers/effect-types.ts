@@ -10,7 +10,7 @@ export type WorkerToolEffectClassification =
 
 export type WorkerEffectReceiptStatus = "prepared" | "completed";
 
-export interface WorkerEffectResultReference {
+export interface WorkerEffectRetainedResultReference {
   readonly kind: "inline_redacted";
   readonly status: "ok" | "error" | "timeout";
   readonly output?: JsonValue;
@@ -21,6 +21,22 @@ export interface WorkerEffectResultReference {
   readonly completedAt: string;
   readonly digest: string;
 }
+
+export interface WorkerEffectRetentionTombstone {
+  readonly kind: "retention_tombstone";
+  readonly status: "ok" | "error" | "timeout";
+  readonly durationMs: number;
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly originalDigest: string;
+  readonly deletedAt: string;
+  readonly tombstoneEventId: string;
+  readonly digest: string;
+}
+
+export type WorkerEffectResultReference =
+  | WorkerEffectRetainedResultReference
+  | WorkerEffectRetentionTombstone;
 
 export interface WorkerEffectReceipt {
   readonly schemaVersion: typeof WORKER_EFFECT_RECEIPT_SCHEMA_VERSION;

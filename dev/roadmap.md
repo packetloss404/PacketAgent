@@ -12,9 +12,10 @@ W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
 complete. W6.5 closes the adversarial bypass gate across every registered tool.
 W7's durable attention, atomic controls, supervisor integration, independent
 operator API, and restart/kill race gate are also complete. W8.1's versioned,
-digest-bound event/evidence and artifact-provenance contract and W8.2's
-deterministic version/deployment/run rollups are complete. Resume at W8.3 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w83---add-retention-and-redaction).
+digest-bound event/evidence and artifact-provenance contract, W8.2's
+deterministic version/deployment/run rollups, and W8.3's bounded retention,
+redaction, and deletion-evidence jobs are complete. Resume at W8.4 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w84---expose-api-and-ui).
 
 ## North star
 
@@ -106,9 +107,11 @@ entries, source correlations, artifact manifests, digests, W3C trace checks,
 legacy v1 reads, and three-backend persistence are complete. Deterministic
 cumulative views now roll provider/tool/effect calls, retries, queue health,
 approvals, checkpoints, budgets, artifacts, outcomes, and explained source
-gaps up by immutable Worker version, deployment, and run. Next add bounded
-retention and deletion evidence, then make "what is running, why, at what cost,
-and what needs me" answerable from one screen.
+gaps up by immutable Worker version, deployment, and run. Separate metadata,
+summary, prompt, tool-payload, and artifact retention windows now execute
+through bounded workspace jobs with dry-run metrics and digest-only deletion
+evidence. Next make "what is running, why, at what cost, and what needs me"
+answerable from one screen.
 
 ### 9. PacketADE handoff
 
