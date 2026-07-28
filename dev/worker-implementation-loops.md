@@ -422,7 +422,7 @@ Outcome: the W1 policy becomes an enforceable, deny-by-default runtime boundary
 for every provider, tool, credential, network, filesystem, shell, and external
 write action.
 
-Status: active. W6.1-W6.2 are complete; resume at W6.3.
+Status: active. W6.1-W6.3 are complete; resume at W6.4.
 
 ### W6.1 - Compile typed capabilities
 
@@ -461,6 +461,18 @@ operation-digest-based allow/deny decisions persist as Worker events.
 - Record allow/deny decisions as redacted Worker events.
 
 ### W6.3 - Resolve secrets and harden process/network boundaries
+
+Status: complete. Worker credentials are encrypted, workspace-scoped opaque
+records whose public operations return metadata only. The runtime binds each
+resolver to the immutable version's declared references and invokes it inside
+the already-authorized handler immediately before hardened I/O. Worker HTTP,
+Slack, and GitHub calls use a deny-by-default client that validates protocols,
+all A/AAAA results, special ranges, the pinned connected address, response
+bounds, and denies redirects. Browser, SMTP, and SQL Worker paths fail closed
+until equivalent drivers exist. Worker command tools use an explicit
+no-network Docker-only port; the container runs non-root with a read-only
+root, PID/CPU/memory limits, all capabilities dropped, no-new-privileges, and
+scrubbed host process environments.
 
 - Add a workspace-scoped credential resolver for opaque credential references;
   adapt the existing encrypted API-key vault and add other credential kinds

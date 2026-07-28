@@ -177,7 +177,14 @@ export function createEmailSendTool(
       ],
     })),
     timeoutMs: EMAIL_TIMEOUT_MS,
-    async handle(input) {
+    async handle(input, ctx) {
+      if (ctx.worker) {
+        return {
+          ok: false,
+          error:
+            "Autonomous Worker email is disabled until the SMTP adapter enforces credential references and pinned network destinations.",
+        };
+      }
       const env = options.env ?? process.env;
       const adapterFactory = options.adapterFactory;
       if (!adapterFactory) {
@@ -255,6 +262,13 @@ export function createSqlQueryTool(
     })),
     timeoutMs: SQLITE_TIMEOUT_MS,
     async handle(input, ctx) {
+      if (ctx.worker) {
+        return {
+          ok: false,
+          error:
+            "Autonomous Worker SQL is disabled until an isolated, Worker-scoped database driver is configured.",
+        };
+      }
       const parsed = parseSqlInput(input);
       if (!parsed.ok) return parsed;
       if (!ctx.agentId)

@@ -5,6 +5,8 @@ export * from "./projections.js";
 export * from "./errors.js";
 export * from "./capabilities.js";
 export * from "./policy-enforcement.js";
+export * from "./credential-types.js";
+export * from "./credentials.js";
 export * from "./persistence-types.js";
 export * from "./repository.js";
 export * from "./service.js";

@@ -52,6 +52,7 @@ const RECORD_COLLECTIONS = [
   "workspaceEnvVars",
   "apiKeys",
   "shareTokens",
+  "workerCredentials",
 ] as const satisfies readonly StoreCollectionKey[];
 
 const MAP_COLLECTIONS = ["activationFacts", "activationMilestones", "activationReadModels"] as const satisfies readonly StoreCollectionKey[];

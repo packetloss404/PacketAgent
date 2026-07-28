@@ -29,6 +29,7 @@ import { createWorkerRuntimeRepository } from "../runtime/repository.js";
 import { createWorkerEffectRepository } from "../effects.js";
 import { createWorkerRecoveryCoordinator } from "../runtime/recovery.js";
 import { WORKER_MEMORY_SCHEMA_VERSION } from "../runtime/checkpoint.js";
+import { createWorkerCredentialService } from "../credentials.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -76,9 +77,19 @@ interface BackendScenarioResult {
   readonly compiledPolicyDigests: readonly string[];
   readonly capabilityGrantCounts: readonly string[];
   readonly runRevisions: readonly number[];
+  readonly workerCredentialRefs: readonly string[];
+  readonly exportedWorkerCredentialRefs: readonly string[];
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
+  const credentialService = createWorkerCredentialService();
+  await credentialService.upsert({
+    workspaceId: "alpha",
+    reference: "vault:release-api",
+    kind: "api_key",
+    label: "Release API",
+    value: "backend-parity-secret",
+  });
   const service = createWorkerLifecycleService();
   await runActivationRace(service);
   await runRollback(service);
@@ -113,6 +124,8 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     exported.data.workerActivationInboxes.length,
     stored.workerActivationInboxes.length,
   );
+  assert.equal(JSON.stringify(exported).includes("backend-parity-secret"), false);
+  assert.equal(JSON.stringify(exported).includes(stored.workerCredentials[0].ciphertext), false);
 
   return {
     definitionStatuses: definitions
@@ -157,6 +170,12 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       .map((deployment) => `${deployment.id}:${deployment.capabilityGrants!.length}`)
       .sort(),
     runRevisions: stored.workerRuns.map((run) => run.revision).sort((a, b) => a - b),
+    workerCredentialRefs: stored.workerCredentials
+      .map((credential) => `${credential.workspaceId}:${credential.reference}:${credential.kind}`)
+      .sort(),
+    exportedWorkerCredentialRefs: exported.data.workerCredentials
+      .map((credential) => `${credential.workspaceId}:${credential.reference}:${credential.kind}`)
+      .sort(),
   };
 }
 

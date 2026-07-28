@@ -202,6 +202,31 @@ export const httpGetTool: ToolDefinition = {
     if (blockedHosts.has(parsed.hostname.toLowerCase())) {
       return { ok: false, error: `host ${parsed.hostname} is blocked from tool fetch` };
     }
+    if (ctx.worker) {
+      if (!ctx.worker.services) {
+        return { ok: false, error: "Worker runtime security services are unavailable." };
+      }
+      try {
+        const response = await ctx.worker.services.network.request({
+          url: parsed.toString(),
+          method: "GET",
+          signal: ctx.signal,
+          maxResponseBytes: 16_384,
+        });
+        const raw = response.body;
+        const body = raw.length > 16_384 ? raw.slice(0, 16_384) + "\n…[truncated]" : raw;
+        const contentType = response.headers["content-type"] ?? "";
+        const ok = response.status >= 200 && response.status < 300;
+        return {
+          ok,
+          output: { status: response.status, contentType, body },
+          ...(ok ? {} : { error: `HTTP ${response.status}` }),
+        };
+      } catch (error) {
+        if (ctx.signal.aborted) throw error;
+        return { ok: false, error: `fetch failed: ${(error as Error).message}` };
+      }
+    }
     let res: Response;
     try {
       res = await fetch(parsed.toString(), { signal: ctx.signal, redirect: "follow" });

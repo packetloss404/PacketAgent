@@ -1,5 +1,6 @@
 import { inputAuthorization, stringInput } from "./authorization.js";
 import type { ToolDefinition } from "./types.js";
+import type { WorkerNetworkResponse } from "../workers/network.js";
 
 export type FetchImpl = (input: string | URL, init?: RequestInit) => Promise<Response>;
 export type EnvMap = Record<string, string | undefined>;
@@ -18,6 +19,7 @@ export interface GithubApiOptions {
 
 type SlackPostWebhookInput = Record<string, unknown> & {
   webhookUrl?: string;
+  credentialRef?: string;
   text?: string;
   blocks?: unknown;
   username?: string;
@@ -30,6 +32,7 @@ type PullRequestState = "open" | "closed" | "all";
 
 type GithubApiInput = Record<string, unknown> & {
   token?: string;
+  credentialRef?: string;
   owner?: string;
   repo?: string;
   operation?: GithubOperation;
@@ -168,6 +171,10 @@ export function createSlackPostWebhookTool(
       type: "object",
       properties: {
         webhookUrl: { type: "string", format: "uri" },
+        credentialRef: {
+          type: "string",
+          description: "Opaque vault: reference containing the Slack webhook URL.",
+        },
         text: { type: "string", minLength: 1 },
         blocks: { type: "array" },
         username: { type: "string" },
@@ -194,6 +201,63 @@ export function createSlackPostWebhookTool(
     }),
     timeoutMs: 15_000,
     async handle(input, ctx) {
+      if (ctx.worker) {
+        if (input.webhookUrl !== undefined) {
+          return {
+            ok: false,
+            error: "Worker Slack calls reject raw webhookUrl values; use credentialRef.",
+          };
+        }
+        if (typeof input.credentialRef !== "string" || !input.credentialRef.trim()) {
+          return {
+            ok: false,
+            error: "Worker Slack calls require an opaque credentialRef.",
+          };
+        }
+        if (!ctx.worker.services) {
+          return { ok: false, error: "Worker runtime security services are unavailable." };
+        }
+        const text = requiredString(input.text, "text");
+        if (typeof text !== "string") return { ok: false, error: text.error };
+        const payload: Record<string, unknown> = { text };
+        if (input.blocks !== undefined) payload.blocks = input.blocks;
+        if (input.username) payload.username = input.username;
+        if (input.iconEmoji) payload.icon_emoji = input.iconEmoji;
+        if (input.channel) payload.channel = input.channel;
+        try {
+          return await ctx.worker.services.credentials.use(
+            input.credentialRef,
+            ["webhook_url"],
+            async (webhookUrl) => {
+              const parsed = parseWebhookUrl(webhookUrl);
+              if ("error" in parsed) return { ok: false, error: parsed.error };
+              const response = await ctx.worker!.services!.network.request({
+                url: parsed.toString(),
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(payload),
+                signal: ctx.signal,
+              });
+              const body = readWorkerResponseBody(response, [webhookUrl]);
+              const output = { status: response.status, body };
+              const ok = response.status >= 200 && response.status < 300;
+              return ok
+                ? { ok: true, output }
+                : {
+                    ok: false,
+                    output,
+                    error: `Slack webhook POST failed: HTTP ${response.status}${responseDetail(body)}`,
+                  };
+            },
+          );
+        } catch (error) {
+          if (ctx.signal.aborted) throw error;
+          return {
+            ok: false,
+            error: `Slack webhook POST failed: ${(error as Error).message}`,
+          };
+        }
+      }
       const env = resolveEnv(options.env);
       const webhookUrl = valueOrEnv(input.webhookUrl, env, ["SLACK_WEBHOOK_URL"]);
       if (!webhookUrl)
@@ -254,6 +318,10 @@ export function createGithubApiTool(
       type: "object",
       properties: {
         token: { type: "string" },
+        credentialRef: {
+          type: "string",
+          description: "Opaque vault: reference containing a GitHub token.",
+        },
         owner: { type: "string", minLength: 1 },
         repo: { type: "string", minLength: 1 },
         operation: {
@@ -297,13 +365,28 @@ export function createGithubApiTool(
     }),
     timeoutMs: 20_000,
     async handle(input, ctx) {
-      const env = resolveEnv(options.env);
-      const token = valueOrEnv(input.token, env, ["GITHUB_TOKEN", "GITHUB_PAT"]);
-      if (!token)
+      const env = ctx.worker ? {} : resolveEnv(options.env);
+      const token = ctx.worker
+        ? undefined
+        : valueOrEnv(input.token, env, ["GITHUB_TOKEN", "GITHUB_PAT"]);
+      if (ctx.worker && input.token !== undefined) {
+        return {
+          ok: false,
+          error: "Worker GitHub calls reject raw token values; use credentialRef.",
+        };
+      }
+      if (ctx.worker && (typeof input.credentialRef !== "string" || !input.credentialRef.trim())) {
+        return {
+          ok: false,
+          error: "Worker GitHub calls require an opaque credentialRef.",
+        };
+      }
+      if (!ctx.worker && !token) {
         return {
           ok: false,
           error: "GitHub token is required via token, GITHUB_TOKEN, or GITHUB_PAT",
         };
+      }
 
       const owner = requiredString(input.owner, "owner");
       if (typeof owner !== "string") return { ok: false, error: owner.error };
@@ -362,12 +445,40 @@ export function createGithubApiTool(
         ]);
       }
 
-      try {
+      const executeWithToken = async (resolvedToken: string) => {
+        if (ctx.worker) {
+          if (!ctx.worker.services) {
+            return { ok: false, error: "Worker runtime security services are unavailable." };
+          }
+          const response = await ctx.worker.services.network.request({
+            url,
+            method: method as "GET" | "POST",
+            headers: {
+              accept: "application/vnd.github+json",
+              authorization: `Bearer ${resolvedToken}`,
+              "content-type": "application/json",
+              "user-agent": "packetagent-worker-tools",
+              "x-github-api-version": "2022-11-28",
+            },
+            ...(requestBody ? { body: requestBody } : {}),
+            signal: ctx.signal,
+          });
+          const body = readWorkerResponseBody(response, [resolvedToken]);
+          const output = { status: response.status, data: body };
+          const ok = response.status >= 200 && response.status < 300;
+          return ok
+            ? { ok: true, output }
+            : {
+                ok: false,
+                output,
+                error: `GitHub API ${operation} failed: HTTP ${response.status}${responseDetail(body)}`,
+              };
+        }
         const response = await fetchImpl(url, {
           method,
           headers: {
             accept: "application/vnd.github+json",
-            authorization: `Bearer ${token}`,
+            authorization: `Bearer ${resolvedToken}`,
             "content-type": "application/json",
             "user-agent": "packetagent-agent-tools",
             "x-github-api-version": "2022-11-28",
@@ -375,7 +486,7 @@ export function createGithubApiTool(
           ...(requestBody ? { body: requestBody } : {}),
           signal: ctx.signal,
         });
-        const body = await readResponseBody(response, [token]);
+        const body = await readResponseBody(response, [resolvedToken]);
         const output = { status: response.status, data: body };
         if (!response.ok) {
           return {
@@ -383,12 +494,27 @@ export function createGithubApiTool(
             output,
             error: redactText(
               `GitHub API ${operation} failed: HTTP ${response.status}${responseDetail(body)}`,
-              [token],
+              [resolvedToken],
             ),
           };
         }
         return { ok: true, output };
+      };
+
+      try {
+        if (ctx.worker) {
+          if (!ctx.worker.services) {
+            return { ok: false, error: "Worker runtime security services are unavailable." };
+          }
+          return await ctx.worker.services.credentials.use(
+            input.credentialRef!,
+            ["api_key", "bearer_token"],
+            executeWithToken,
+          );
+        }
+        return await executeWithToken(token!);
       } catch (error) {
+        if (ctx.signal.aborted) throw error;
         return {
           ok: false,
           error: redactText(`GitHub API ${operation} failed: ${(error as Error).message}`, [token]),
@@ -396,6 +522,21 @@ export function createGithubApiTool(
       }
     },
   };
+}
+
+function readWorkerResponseBody(
+  response: WorkerNetworkResponse,
+  secrets: Array<string | undefined>,
+): unknown {
+  if (!response.body) return "";
+  const redactedRaw = truncate(redactText(response.body, secrets));
+  const contentType = response.headers["content-type"] ?? "";
+  if (!contentType.toLowerCase().includes("json")) return redactedRaw;
+  try {
+    return redactUnknown(JSON.parse(response.body), secrets);
+  } catch {
+    return redactedRaw;
+  }
 }
 
 export const slackPostWebhookTool = createSlackPostWebhookTool();

@@ -7,9 +7,9 @@ continuation order live in
 
 Current active loop: **W6 - Permission and budget policy**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
-W6.1 capability compilation and W6.2 immediate tool-boundary enforcement are
-complete. Resume at W6.3 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w63---resolve-secrets-and-harden-processnetwork-boundaries).
+W6.1 capability compilation, W6.2 immediate tool-boundary enforcement, and
+W6.3 credential/network/process hardening are complete. Resume at W6.4 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w64---add-per-run-and-rolling-budgets).
 
 ## North star
 
@@ -68,9 +68,10 @@ Digest-chained immutable snapshots persist the run cursor, full working memory, 
 
 Version-digest-bound verb/resource capability compilation, deployment narrowing,
 normalized operation descriptors, immediate pre-handler enforcement, and
-redacted policy-decision events are complete. Next, resolve credentials by
-reference, harden network/process/filesystem boundaries, and add atomic rolling
-budgets.
+redacted policy-decision events are complete. Workspace-scoped opaque
+credentials, pinned public network destinations, redirect denial, fail-closed
+external adapters, and Docker-only autonomous command execution are also
+complete. Next, add atomic rolling budgets and close the policy bypass gate.
 
 ### 7. Attention and operator controls
 

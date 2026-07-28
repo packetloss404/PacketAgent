@@ -6,6 +6,9 @@ import { getDefaultToolRegistry, type ToolRegistry } from "../../tools/registry.
 import type { ToolContext, ToolDefinition, ToolResult } from "../../tools/types.js";
 import type { JsonObject, JsonValue } from "../types.js";
 import { createWorkerEffectCoordinator, type WorkerEffectCoordinator } from "../effects.js";
+import { createWorkerCredentialService, type WorkerCredentialService } from "../credentials.js";
+import { createWorkerNetworkClient, type WorkerNetworkPort } from "../network.js";
+import { createWorkerSandboxPort, type WorkerSandboxPort } from "../sandbox-execution.js";
 import type {
   WorkerClockPort,
   WorkerProviderPort,
@@ -80,6 +83,7 @@ export function createWorkerProviderPort(
 export function createWorkerToolPort(
   registry: ToolRegistry = getDefaultToolRegistry(),
   effects: WorkerEffectCoordinator = createWorkerEffectCoordinator(),
+  services: WorkerToolAdapterServices = createDefaultWorkerToolAdapterServices(),
 ): WorkerToolPort {
   return {
     definitions(capabilities) {
@@ -128,9 +132,27 @@ export function createWorkerToolPort(
           version: {
             id: input.workerVersionId,
             contentDigest: input.workerVersionContentDigest,
+            declaredCredentialRefs: input.declaredCredentialRefs,
           },
           budget: input.budgetUsage,
           actor: input.actor,
+          services: {
+            credentials: {
+              use(reference, expectedKinds, consumer) {
+                return services.credentials.use(
+                  {
+                    workspaceId: input.workspaceId,
+                    reference,
+                    declaredCredentialRefs: input.declaredCredentialRefs,
+                    expectedKinds,
+                  },
+                  consumer,
+                );
+              },
+            },
+            network: services.network,
+            sandbox: services.sandbox,
+          },
           recordPolicyDecision: input.recordPolicyDecision,
         },
       };
@@ -204,6 +226,20 @@ export function createWorkerToolPort(
         ...(reconcile ? { reconcile } : {}),
       });
     },
+  };
+}
+
+export interface WorkerToolAdapterServices {
+  readonly credentials: WorkerCredentialService;
+  readonly network: WorkerNetworkPort;
+  readonly sandbox: WorkerSandboxPort;
+}
+
+function createDefaultWorkerToolAdapterServices(): WorkerToolAdapterServices {
+  return {
+    credentials: createWorkerCredentialService(),
+    network: createWorkerNetworkClient(),
+    sandbox: createWorkerSandboxPort(),
   };
 }
 

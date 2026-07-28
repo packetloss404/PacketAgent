@@ -4,16 +4,17 @@ End-to-end test plan run before cutting a release. Covers the builder loop, agen
 
 This plan verifies the inherited workbench plus W2's durable Worker lifecycle,
 W3's trigger-intake boundary, W4's bounded supervisor, W5's checkpoint,
-recovery, and effect-safety boundary, and W6.1's capability compilation.
-W6.2's immediate runtime policy enforcement is also covered. Credential and
-network/process hardening, attention, and PacketADE handoff cases must be added
-as W6.3-W9 ship; they are not current product claims.
+recovery, and effect-safety boundary, W6.1's capability compilation, W6.2's
+immediate runtime policy enforcement, and W6.3's credential/network/process
+hardening. Attention and PacketADE handoff cases must be added as W7-W9 ship;
+they are not current product claims.
 
-Last automated W6.2 baseline (2026-07-27):
+Last automated W6.3 baseline (2026-07-27):
 
-- API: 1,360 passed, 1 skipped, 0 failed
+- API: 1,372 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused Worker operation normalization, immediate allow/deny enforcement,
+- Focused Worker credential isolation, policy-before-secret ordering, A/AAAA
+  and connected-address validation, redirect denial, Docker-only execution,
   production tool catalog coverage, capability compilation/narrowing,
   activation, supervisor, checkpoint-chain, effect-replay,
   recovery/quarantine, lease/revision, scheduler, and JSON/SQLite/managed-Postgres
@@ -29,7 +30,9 @@ Estimated time: 25-35 minutes for a full pass; about 10 minutes for the golden p
 ## Prerequisites
 
 - Node `>=22.5.0` and npm.
-- Optional: a running Docker daemon so the sandbox driver reports `docker` rather than the insecure `native` fallback.
+- A running Docker daemon for autonomous Worker command tests. Interactive
+  development may opt into the insecure native driver explicitly, but Workers
+  must refuse it.
 - Clean working tree.
 
 ```bash
@@ -137,7 +140,32 @@ and executes that job through the bounded supervisor.
 5. Inspect the allowed handler context. Confirm it contains the run, deployment revision and policy, version/content digest, matched capability, current budget usage, effect classification/operation, and system actor.
 6. Inspect allow/deny event data. Confirm it contains only decision code, tool, verb, effect, policy/capability identifiers, resource schemes/count, and an operation digest; raw URLs, query values, selectors, commands, recipients, message bodies, SQL, and secrets must be absent.
 7. Attempt execution through the production Worker adapter and the default registry catalog. Confirm both reach `executeTool`; direct handler calls remain limited to explicit unit tests.
-8. Stop before claiming the W6 permission gate. W6.3-W6.5 still own secret resolution, SSRF/DNS and process/filesystem isolation, rolling budgets, and the adversarial bypass matrix.
+8. Stop before claiming the W6 permission gate. W6.4-W6.5 still own rolling budgets and the adversarial bypass matrix.
+
+## W6.3 Credential, Network, and Process Boundary Smoke
+
+1. Store API-key, bearer-token, webhook-URL, SMTP-config, and opaque Worker
+   credentials under `vault:` references in two workspaces. Confirm list and
+   workspace export responses contain metadata only, with no ciphertext, IV,
+   authentication tag, preview, or plaintext.
+2. Run an allowed `http_fetch` with a declared credential reference. Confirm
+   `worker.policy.allowed` is appended before the resolver runs and the secret
+   resolves only immediately before the hardened request. Deny the operation,
+   use an undeclared reference, or request the wrong credential kind and
+   confirm neither credential resolution nor network I/O occurs.
+3. Attempt loopback, link-local, private, carrier-grade NAT, documentation,
+   multicast, IPv4-mapped IPv6, decimal IPv4, `.local`, and metadata targets.
+   Confirm all are denied. Return mixed public/private A or AAAA results,
+   change the connected address after resolution, or return a redirect and
+   confirm the call fails closed.
+4. Run Worker `run_command` and `shell_for_agent` with Docker available.
+   Confirm the invocation has no network, no host environment, a read-only
+   root, non-root user, PID/CPU/memory limits, dropped capabilities, and
+   no-new-privileges. Select or fall back to the native driver and confirm the
+   Worker command is refused even if interactive native sandbox opt-in is set.
+5. Attempt Worker browser, SMTP, or SQL execution. Confirm those adapters fail
+   closed until a hardened Worker-specific driver is configured; legacy
+   interactive Agent behavior remains unchanged.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 
@@ -230,7 +258,9 @@ Optional: open `/builder` and re-run an app draft. The provider readiness sectio
 ## Sandbox
 
 1. Visit `/sandbox`.
-2. Confirm the status panel shows the active driver. With Docker running it reports `docker`; without Docker it falls back to `native` and is marked insecure.
+2. Confirm the status panel shows the active driver. With Docker running it
+   reports `docker`; without Docker it reports the sandbox unavailable unless
+   the operator explicitly enabled the insecure interactive native driver.
 3. List sandbox runtimes. Pick a ready runtime in the composer.
 4. Run `echo hello sandbox` with working directory `/workspace`. Confirm the run appears in the executions table with status `success` and exit code `0`, and that stdout shows `hello sandbox` in the selected exec panel.
 5. Run a long sleep (`sleep 30`) and click cancel. Confirm the run transitions to `canceled`.

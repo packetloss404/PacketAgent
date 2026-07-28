@@ -94,6 +94,7 @@ export interface WorkerToolPort {
     readonly workerRunId: string;
     readonly workerVersionId: string;
     readonly workerVersionContentDigest: string;
+    readonly declaredCredentialRefs: readonly string[];
     readonly workerDeploymentId: string;
     readonly workerDeploymentRevision: number;
     readonly compiledPolicy?: WorkerCompiledPolicy;

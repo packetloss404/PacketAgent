@@ -463,6 +463,7 @@ function makeStore(): PacketAgentData {
         createdAt: "2026-04-20T10:00:00.000Z",
       },
     ],
+    workerCredentials: [],
     workerDefinitions: [],
     workerVersions: [],
     workerDeployments: [],

@@ -357,6 +357,7 @@ export async function runWorkerSupervisor(
               workerRunId: context.run.id,
               workerVersionId: context.run.workerVersionId,
               workerVersionContentDigest: context.version.contentDigest,
+              declaredCredentialRefs: context.version.content.credentialRefs,
               workerDeploymentId: context.run.workerDeploymentId,
               workerDeploymentRevision: context.deployment.revision,
               ...(context.deployment.compiledPolicy

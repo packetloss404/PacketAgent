@@ -17,6 +17,8 @@ import type {
   WorkerActivationPayloadRecord,
 } from "../workers/activation-types.js";
 import type { WorkerEffectReceipt } from "../workers/effect-types.js";
+import type { WorkerCredentialRecord } from "../workers/credential-types.js";
+export type { WorkerCredentialRecord } from "../workers/credential-types.js";
 
 export interface UserRecord {
   id: string;
@@ -701,6 +703,7 @@ export interface PacketAgentData {
   jobMetricSnapshots: JobMetricSnapshotRecord[];
   alertEvents: AlertEventRecord[];
   shareTokens: ShareTokenRecord[];
+  workerCredentials: WorkerCredentialRecord[];
   workerDefinitions: WorkerDefinition[];
   workerVersions: WorkerVersion[];
   workerDeployments: WorkerDeployment[];

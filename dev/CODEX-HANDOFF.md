@@ -18,8 +18,9 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W5 and W6.1-W6.2 are implemented as isolated changes
-on this branch. Do not reset this branch to the historical source remote.
+in foundation commit `d60cd47`. W1-W5 and W6.1-W6.3 are implemented as
+isolated changes on this branch. Do not reset this branch to the historical
+source remote.
 
 ## Product decision
 
@@ -72,6 +73,10 @@ Prompt-to-app generation remains a supported secondary capability.
 - Completed W6.2's typed operation descriptors for every production tool,
   pre-effect policy preflight, mandatory fail-closed `executeTool` enforcement,
   complete Worker tool context, and redacted allow/deny event recording.
+- Completed W6.3's encrypted workspace-scoped opaque credentials,
+  policy-before-secret resolution, public A/AAAA and pinned connected-address
+  validation, redirect denial, fail-closed external adapters, scrubbed process
+  environments, and Docker-only no-network Worker command execution.
 
 ## Current implementation truth
 
@@ -107,6 +112,15 @@ Implemented substrate:
 - immediate Worker tool authorization against the pinned version/deployment
   policy, including normalized network, workspace, browser, GitHub, Slack,
   email, database, command, and working-directory targets;
+- metadata-only workspace-scoped Worker credential records bound to immutable
+  version references and resolved inside allowed handlers immediately before
+  the external call;
+- a hardened Worker network client with protocol, hostname, all-address,
+  special-range, connected-address, redirect, timeout, and response-size
+  enforcement;
+- Docker-only Worker command execution with no network or host secrets,
+  non-root/read-only containers, dropped capabilities, no-new-privileges, and
+  CPU, memory, and PID limits;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -119,8 +133,9 @@ Implemented substrate:
 
 Not shipped:
 
-- credential-reference, deny-by-default network/process, and rolling-budget
-  enforcement;
+- Worker rolling-budget enforcement and the final adversarial W6 bypass gate;
+- hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
+  closed for Worker runs);
 - Worker-level attention, evidence, and cost rollups; and
 - PacketADE-to-PacketAgent deployment endpoints.
 
@@ -131,7 +146,7 @@ Do not describe those missing Worker features as implemented.
 Continue **W6 - Permission and budget policy** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W5 and W6.1-W6.2 are complete under `src/workers/`, the store, migrations, jobs, alerts,
+W1-W5 and W6.1-W6.3 are complete under `src/workers/`, the store, migrations, jobs, alerts,
 webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -146,10 +161,12 @@ tool/verb/resource tuples and persists a deployment grant that cannot exceed
 that version-bound upper limit. W6.2 normalizes each concrete operation,
 preflights it before mutation receipt preparation, re-authorizes it in
 `executeTool` immediately before the handler, and records a redacted decision
-event.
+event. W6.3 binds opaque encrypted credentials to the immutable version,
+resolves them only after that decision, pins public network destinations, and
+requires the isolated no-network Docker driver for Worker commands.
 
 The exact next slice is
-[`W6.3 - Resolve secrets and harden process/network boundaries`](worker-implementation-loops.md#w63---resolve-secrets-and-harden-processnetwork-boundaries).
+[`W6.4 - Add per-run and rolling budgets`](worker-implementation-loops.md#w64---add-per-run-and-rolling-budgets).
 After each gate passes, continue through W6-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -174,10 +191,11 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,360 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,372 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
-- focused Worker operation normalization, immediate allow/deny enforcement,
-  production tool catalog coverage, capability compilation/narrowing,
+- focused Worker credential isolation, policy-before-secret ordering, public
+  A/AAAA and connected-address validation, redirect denial, Docker-only
+  execution, production tool catalog coverage, capability compilation/narrowing,
   activation, supervisor, checkpoint-chain, effect replay,
   recovery/quarantine, lease/revision, scheduler, route, and
   JSON/SQLite/managed-Postgres parity checks - passed
@@ -209,6 +227,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W6.2 commit: clean. Stop if the active folder is
+Expected status after the W6.3 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

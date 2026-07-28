@@ -21,6 +21,7 @@ import type {
   WorkspaceEnvVarRecord,
   WorkspaceInvitationRecord,
   WorkspaceMemberRecord,
+  WorkerCredentialRecord,
 } from "../packetagent-store.js";
 import type { ActivationMilestoneRecord, ActivationStatusDto } from "../activation/domain.js";
 import type { WorkspaceActivationFacts } from "../activation/adapters.js";
@@ -43,6 +44,8 @@ import type {
   WorkerActivationPayloadRecord,
 } from "../workers/activation-types.js";
 import type { WorkerEffectReceipt } from "../workers/effect-types.js";
+import { workerCredentialMetadata } from "../workers/credentials.js";
+import type { WorkerCredentialMetadata } from "../workers/credential-types.js";
 
 export interface ExportWorkspaceOptions {
   workspaceId: string;
@@ -97,6 +100,7 @@ export interface ExportedWorkspaceData {
   workspaceEnvVars: RedactedWorkspaceEnvVar[];
   shareTokens: RedactedShareToken[];
   activities: ActivityRecord[];
+  workerCredentials: WorkerCredentialMetadata[];
   workerDefinitions: WorkerDefinition[];
   workerVersions: WorkerVersion[];
   workerDeployments: WorkerDeployment[];
@@ -222,6 +226,10 @@ function buildWorkspaceExport(
     .filter((entry) => entry.workspaceId === workspaceId)
     .map((entry) => redactSensitiveValue(entry) as ActivityRecord);
 
+  const workerCredentials = workspaceWorkerRecords(
+    store.workerCredentials,
+    workspaceId,
+  ).map((record: WorkerCredentialRecord) => workerCredentialMetadata(record));
   const workerDefinitions = workspaceWorkerRecords(store.workerDefinitions, workspaceId);
   const workerVersions = workspaceWorkerRecords(store.workerVersions, workspaceId);
   const workerDeployments = workspaceWorkerRecords(store.workerDeployments, workspaceId);
@@ -276,6 +284,7 @@ function buildWorkspaceExport(
       workspaceEnvVars,
       shareTokens,
       activities,
+      workerCredentials,
       workerDefinitions,
       workerVersions,
       workerDeployments,

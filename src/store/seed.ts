@@ -723,6 +723,7 @@ export function seedStore(): PacketAgentData {
     jobMetricSnapshots: [],
     alertEvents: [],
     shareTokens: [],
+    workerCredentials: [],
     workerDefinitions: [],
     workerVersions: [],
     workerDeployments: [],

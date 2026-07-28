@@ -10,6 +10,10 @@
  *     --network=none \
  *     --cpus=<cpus> \
  *     --memory=<memory>m \
+ *     --pids-limit=64 \
+ *     --cap-drop=ALL \
+ *     --security-opt=no-new-privileges:true \
+ *     --user=65534:65534 \
  *     --read-only \
  *     --tmpfs /tmp \
  *     -w <workingDir> \
@@ -103,6 +107,10 @@ export function createDockerDriver(deps: DockerDriverDeps = {}): SandboxDriver {
         "--network=none",
         `--cpus=${cpus}`,
         `--memory=${memoryMb}m`,
+        "--pids-limit=64",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges:true",
+        "--user=65534:65534",
         "--read-only",
         "--tmpfs",
         "/tmp",
@@ -118,6 +126,8 @@ export function createDockerDriver(deps: DockerDriverDeps = {}): SandboxDriver {
 
       const child = spawnFn("docker", args, {
         stdio: ["pipe", "pipe", "pipe"],
+        env: dockerCliEnvironment(),
+        shell: false,
         windowsHide: true,
       }) as ChildProcessWithoutNullStreams;
 
@@ -252,6 +262,8 @@ async function probeDocker(spawnFn: DockerSpawn): Promise<boolean> {
     try {
       const child = spawnFn("docker", ["info"], {
         stdio: ["ignore", "ignore", "ignore"],
+        env: dockerCliEnvironment(),
+        shell: false,
         windowsHide: true,
       });
       child.on("error", () => finish(false));
@@ -274,6 +286,8 @@ async function dockerKillContainer(spawnFn: DockerSpawn, containerName: string):
     try {
       const child = spawnFn("docker", ["kill", containerName], {
         stdio: ["ignore", "ignore", "ignore"],
+        env: dockerCliEnvironment(),
+        shell: false,
         windowsHide: true,
       });
       child.on("error", (err) => finish(err));
@@ -285,4 +299,22 @@ async function dockerKillContainer(spawnFn: DockerSpawn, containerName: string):
       finish(err instanceof Error ? err : new Error(String(err)));
     }
   });
+}
+
+function dockerCliEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const allowed = [
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "WINDIR",
+    "TEMP",
+    "TMP",
+    "DOCKER_HOST",
+    "DOCKER_CONTEXT",
+    "DOCKER_TLS_VERIFY",
+    "DOCKER_CERT_PATH",
+  ] as const;
+  return Object.fromEntries(
+    allowed.flatMap((key) => (env[key] === undefined ? [] : [[key, env[key]]])),
+  );
 }

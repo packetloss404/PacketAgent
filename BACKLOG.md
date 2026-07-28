@@ -84,17 +84,20 @@ Dependencies: W4.
 Dependencies: W1, W4.
 
 Status: active. Resume at
-[`W6.3 - Resolve secrets and harden process/network boundaries`](dev/worker-implementation-loops.md#w63---resolve-secrets-and-harden-processnetwork-boundaries).
+[`W6.4 - Add per-run and rolling budgets`](dev/worker-implementation-loops.md#w64---add-per-run-and-rolling-budgets).
 
-W6.1-W6.2 are complete: validated versions compile normalized
+W6.1-W6.3 are complete: validated versions compile normalized
 tool/verb/resource tuples, deployments persist only version-bounded narrowed
 grants, and every production Worker tool call is authorized again in
-`executeTool` immediately before its handler.
+`executeTool` immediately before its handler. Opaque, workspace-scoped
+credentials resolve only after that decision; Worker network calls pin
+validated public DNS answers and deny redirects; autonomous command execution
+requires the no-network Docker sandbox.
 
 - [x] Replace whole-tool grants with verb/resource-scoped capabilities.
-- [ ] Resolve credentials by reference at execution time; never embed secret values in Worker packages.
+- [x] Resolve credentials by reference at execution time; never embed secret values in Worker packages.
 - [ ] Add per-run and rolling cost ceilings.
-- [ ] Default network, filesystem, shell, and external-write access to deny.
+- [x] Default network, filesystem, shell, and external-write access to deny.
 - Gate: runtime enforcement rejects policy bypass at every tool boundary, not only at launch.
 
 ### W7 - Attention, approval, and kill controls

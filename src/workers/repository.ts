@@ -5,6 +5,7 @@ import {
 } from "../packetagent-store.js";
 import { WorkerLifecycleError } from "./errors.js";
 import { assertWorkerDeploymentPolicyIntegrity } from "./capabilities.js";
+import { assertValidWorkerCredentialRecord } from "./credential-types.js";
 import {
   WORKER_COMMAND_SCHEMA_VERSION,
   WORKER_EVENT_SCHEMA_VERSION,
@@ -348,6 +349,7 @@ function assertWorkspace(actual: string, expected: string): void {
 
 export function validateWorkerPersistence(data: PacketAgentData): void {
   try {
+    data.workerCredentials.forEach(assertValidWorkerCredentialRecord);
     data.workerDefinitions.forEach(assertValidWorkerDefinition);
     data.workerVersions.forEach(assertValidWorkerVersion);
     data.workerDeployments.forEach(assertValidWorkerDeployment);
@@ -355,6 +357,11 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     data.workerCheckpoints.forEach(assertValidWorkerCheckpoint);
     data.workerEffectReceipts.forEach(assertValidWorkerEffectReceipt);
 
+    assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.workerCredentials,
+      (record) => `${record.workspaceId}:${record.reference}`,
+    );
     assertUnique(data.workerDefinitions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerVersions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(

@@ -267,6 +267,7 @@ function makeStore(): PacketAgentData {
     jobMetricSnapshots: [],
     alertEvents: [],
     shareTokens: [],
+    workerCredentials: [],
     workerDefinitions: [],
     workerVersions: [],
     workerDeployments: [],

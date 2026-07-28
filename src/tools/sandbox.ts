@@ -97,6 +97,44 @@ export function createSandboxedShellTool(options: SandboxOptions = {}): ToolDefi
       if (!allowed.has(command)) {
         return { ok: false, error: `command "${command}" is not in the sandbox allowlist` };
       }
+      if (ctx.worker) {
+        if (cwd) {
+          return {
+            ok: false,
+            error: "Worker sandbox commands cannot use a host working directory.",
+          };
+        }
+        if (!ctx.worker.services) {
+          return { ok: false, error: "Worker runtime security services are unavailable." };
+        }
+        try {
+          const result = await ctx.worker.services.sandbox.execute({
+            workspaceId: ctx.workspaceId,
+            command,
+            args,
+            timeoutMs,
+            signal: ctx.signal,
+            network: "none",
+          });
+          const output = {
+            command,
+            args,
+            cwd: "/tmp",
+            exitCode: result.exitCode ?? null,
+            signal: null,
+            stdout: result.stdout,
+            stderr: result.stderr,
+            killed: result.status === "timeout" || result.status === "canceled",
+            execId: result.execId,
+          };
+          return result.status === "success"
+            ? { ok: true, output }
+            : { ok: false, error: result.error ?? `sandbox ${result.status}`, output };
+        } catch (error) {
+          if (ctx.signal.aborted) throw error;
+          return { ok: false, error: `sandbox failed: ${(error as Error).message}` };
+        }
+      }
       const resolvedCwd = cwd
         ? isAbsolute(cwd)
           ? cwd

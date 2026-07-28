@@ -3,8 +3,11 @@ import test from "node:test";
 import { compileWorkerCapabilityPolicy } from "../../workers/capabilities.js";
 import { makeWorkerVersionContent } from "../../workers/__tests__/fixtures.js";
 import type { WorkerCompiledPolicy } from "../../workers/types.js";
+import type { WorkerToolRuntimeServices } from "../../workers/runtime-services.js";
+import { WORKER_CREDENTIAL_SCHEMA_VERSION } from "../../workers/credential-types.js";
 import { computeWorkerVersionContentDigest } from "../../workers/validation.js";
 import { executeTool } from "../executor.js";
+import { createHttpFetchTool } from "../http-fetch.js";
 import type { ToolContext, ToolDefinition, ToolPolicyDecision } from "../types.js";
 
 test("executeTool records an allow decision before the Worker handler receives full context", async () => {
@@ -61,6 +64,85 @@ test("executeTool denies an undeclared Worker resource before the handler", asyn
   assert.equal(handled, 0);
   assert.equal(decisions[0].allowed, false);
   assert.equal(decisions[0].code, "capability_not_granted");
+});
+
+test("Worker credentials resolve only after policy approval and immediately before hardened I/O", async () => {
+  const order: string[] = [];
+  const policy = policyFor("https://releases.example.test/api/*");
+  const services: WorkerToolRuntimeServices = {
+    credentials: {
+      async use(reference, expectedKinds, consumer) {
+        order.push("credential");
+        assert.equal(reference, "vault:release-api");
+        assert.deepEqual(expectedKinds, ["api_key", "bearer_token", "opaque"]);
+        return consumer("resolved-secret", {
+          schemaVersion: WORKER_CREDENTIAL_SCHEMA_VERSION,
+          id: "credential-1",
+          workspaceId: "workspace-1",
+          reference,
+          kind: "bearer_token",
+          label: "Release API",
+          createdAt: "2026-07-27T12:00:00.000Z",
+          updatedAt: "2026-07-27T12:00:00.000Z",
+          encrypted: true,
+        });
+      },
+    },
+    network: {
+      async request(input) {
+        order.push("network");
+        assert.equal(input.headers?.authorization, "Bearer resolved-secret");
+        return {
+          status: 200,
+          headers: { "content-type": "application/json" },
+          body: '{"ok":true}',
+          connectedAddress: "93.184.216.34",
+        };
+      },
+    },
+    sandbox: {
+      async execute() {
+        throw new Error("unused");
+      },
+    },
+  };
+  const tool = createHttpFetchTool();
+
+  const denied = await executeTool({
+    tool,
+    input: {
+      url: "https://admin.example.test/api/releases",
+      credentialRef: "vault:release-api",
+    },
+    context: workerContext(
+      policy,
+      async () => {
+        order.push("deny");
+      },
+      services,
+    ),
+  });
+  assert.equal(denied.status, "error");
+  assert.deepEqual(order, ["deny"]);
+
+  order.length = 0;
+  const allowed = await executeTool({
+    tool,
+    input: {
+      url: "https://releases.example.test/api/releases",
+      credentialRef: "vault:release-api",
+    },
+    context: workerContext(
+      policy,
+      async () => {
+        order.push("allow");
+      },
+      services,
+    ),
+  });
+  assert.equal(allowed.status, "ok");
+  assert.deepEqual(order, ["allow", "credential", "network"]);
+  assert.doesNotMatch(JSON.stringify(allowed), /resolved-secret/);
 });
 
 test("executeTool fails closed for a missing descriptor or tampered compiled policy", async () => {
@@ -154,6 +236,7 @@ function policyFor(resource: string): WorkerCompiledPolicy {
 function workerContext(
   policy: WorkerCompiledPolicy,
   recordPolicyDecision: (decision: ToolPolicyDecision) => Promise<void>,
+  services?: WorkerToolRuntimeServices,
 ): Omit<ToolContext, "signal"> {
   return {
     workspaceId: "workspace-1",
@@ -169,6 +252,7 @@ function workerContext(
       version: {
         id: "worker-version-1",
         contentDigest: policy.workerVersionContentDigest,
+        declaredCredentialRefs: ["vault:release-api"],
       },
       budget: {
         elapsedMs: 10,
@@ -178,6 +262,7 @@ function workerContext(
         toolCalls: 1,
       },
       actor: { type: "system", id: "test-supervisor" },
+      ...(services ? { services } : {}),
       recordPolicyDecision,
     },
   };

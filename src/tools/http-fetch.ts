@@ -34,6 +34,7 @@ export type HttpFetchMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export interface HttpFetchInput extends Record<string, unknown> {
   url: string;
   method?: HttpFetchMethod;
+  credentialRef?: string;
   headers?: Record<string, string>;
   query?: Record<string, QueryValue>;
   json?: unknown;
@@ -73,6 +74,10 @@ export function createHttpFetchTool(
       properties: {
         url: { type: "string", format: "uri" },
         method: { type: "string", enum: [...ALLOWED_METHODS], default: "GET" },
+        credentialRef: {
+          type: "string",
+          description: "Opaque vault: reference used as a Bearer credential for Worker calls.",
+        },
         headers: {
           type: "object",
           additionalProperties: { type: "string" },
@@ -137,6 +142,59 @@ export function createHttpFetchTool(
       if (ctx.effectKey && request.method !== "GET" && !request.headers.has("idempotency-key")) {
         request.headers.set("idempotency-key", ctx.effectKey);
       }
+      if (ctx.worker) {
+        const services = ctx.worker.services;
+        if (!services) {
+          return { ok: false, error: "Worker runtime security services are unavailable." };
+        }
+        if (request.sensitiveHeaderValues.length > 0) {
+          return {
+            ok: false,
+            error: "Worker HTTP calls reject raw sensitive headers; use credentialRef.",
+          };
+        }
+        const execute = async () => {
+          const response = await services.network.request({
+            url: request.url,
+            method: request.method,
+            headers: Object.fromEntries(request.headers.entries()),
+            ...(request.body === undefined ? {} : { body: request.body }),
+            signal: ctx.signal,
+            maxResponseBytes: maxBodyChars + Buffer.byteLength(TRUNCATION_MARKER),
+          });
+          return summarizeResponse(
+            response.status,
+            new Headers(response.headers),
+            response.body,
+            maxBodyChars,
+          );
+        };
+        try {
+          if (input.credentialRef !== undefined) {
+            if (typeof input.credentialRef !== "string" || !input.credentialRef.trim()) {
+              return { ok: false, error: "credentialRef must be an opaque vault: reference." };
+            }
+            return await services.credentials.use(
+              input.credentialRef,
+              ["api_key", "bearer_token", "opaque"],
+              async (value) => {
+                request.headers.set("authorization", `Bearer ${value}`);
+                return execute();
+              },
+            );
+          }
+          return await execute();
+        } catch (error) {
+          if (ctx.signal.aborted) throw error;
+          return { ok: false, error: `fetch failed: ${errorMessage(error)}` };
+        }
+      }
+      if (input.credentialRef !== undefined) {
+        return {
+          ok: false,
+          error: "credentialRef is available only to the hardened Worker runtime.",
+        };
+      }
       let response: Response;
       try {
         response = await fetchImpl(request.url, {
@@ -165,28 +223,31 @@ export function createHttpFetchTool(
         };
       }
 
-      const bodyInfo = truncateBody(rawBody, maxBodyChars);
-      const contentType = response.headers.get("content-type") ?? "";
-      const output: Record<string, unknown> = {
-        status: response.status,
-        contentType,
-        headers: collectSafeResponseHeaders(response.headers),
-        body: bodyInfo.body,
-        bodyTruncated: bodyInfo.truncated,
-      };
-
-      if (!bodyInfo.truncated) {
-        const parsedJson = parseJson(rawBody);
-        if (parsedJson.ok) output.json = parsedJson.value;
-      }
-
-      return {
-        ok: response.ok,
-        output,
-        ...(response.ok ? {} : { error: `HTTP ${response.status}` }),
-      };
+      return summarizeResponse(response.status, response.headers, rawBody, maxBodyChars);
     },
   };
+}
+
+function summarizeResponse(
+  status: number,
+  headers: Headers,
+  rawBody: string,
+  maxBodyChars: number,
+): { ok: boolean; output: Record<string, unknown>; error?: string } {
+  const bodyInfo = truncateBody(rawBody, maxBodyChars);
+  const output: Record<string, unknown> = {
+    status,
+    contentType: headers.get("content-type") ?? "",
+    headers: collectSafeResponseHeaders(headers),
+    body: bodyInfo.body,
+    bodyTruncated: bodyInfo.truncated,
+  };
+  if (!bodyInfo.truncated) {
+    const parsedJson = parseJson(rawBody);
+    if (parsedJson.ok) output.json = parsedJson.value;
+  }
+  const ok = status >= 200 && status < 300;
+  return { ok, output, ...(ok ? {} : { error: `HTTP ${status}` }) };
 }
 
 export const httpFetchTool = createHttpFetchTool();

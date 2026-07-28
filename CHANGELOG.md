@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Worker credential, network, and process hardening (W6.3)
+
+- Added encrypted workspace-scoped Worker credentials for API keys, bearer tokens, webhook URLs, SMTP configuration, and opaque values. Public service and workspace-export results contain metadata only.
+- Bound credential resolution to immutable-version `vault:` references and credential kinds; allowed HTTP, Slack, and GitHub handlers resolve secrets only after immediate policy approval and directly before hardened I/O.
+- Added a Worker network client that permits only HTTP(S), validates every A/AAAA result against special/private ranges, pins the selected address through connection, verifies the connected address, bounds responses, and denies redirects.
+- Routed Worker HTTP tools through the hardened client; browser, SMTP, and SQL Worker paths now fail closed until equivalent hardened drivers exist.
+- Routed Worker command tools through a Docker-only no-network port. Docker runs non-root with CPU/memory/PID bounds, a read-only root, all capabilities dropped, no-new-privileges, shell-quoted arguments, and a scrubbed Docker CLI environment.
+- Added credential export/isolation, policy-before-resolution, SSRF/DNS-rebinding, redirect, Docker/native-fallback, environment, and JSON/SQLite/managed-Postgres parity coverage; the W6.3 baseline passes 1,372 API tests and 25 web tests.
+
 ### 2026-07-27 - Immediate Worker tool policy enforcement (W6.2)
 
 - Extended Worker tool context with pinned run, deployment, version, capability, budget, effect, and actor data.

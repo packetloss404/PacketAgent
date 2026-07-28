@@ -240,6 +240,7 @@ export type {
   WorkspaceRecordOrder,
   WorkspaceRole,
 } from "./store/types.js";
+export type { WorkerCredentialRecord } from "./workers/credential-types.js";
 export {
   ManagedDatabaseStoreBoundaryError,
   ManagedPostgresStoreConfigurationError,

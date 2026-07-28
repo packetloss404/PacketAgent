@@ -5,6 +5,7 @@ import type {
   WorkerCapabilityEffect,
   WorkerCompiledPolicy,
 } from "../workers/types.js";
+import type { WorkerToolRuntimeServices } from "../workers/runtime-services.js";
 
 export interface ToolContext {
   workspaceId: string;
@@ -29,6 +30,7 @@ export interface WorkerToolContext {
   readonly version: {
     readonly id: string;
     readonly contentDigest: string;
+    readonly declaredCredentialRefs: readonly string[];
   };
   readonly capability?: {
     readonly id: string;
@@ -40,6 +42,7 @@ export interface WorkerToolContext {
     readonly effect: WorkerCapabilityEffect;
   };
   readonly actor: WorkerActorReference;
+  readonly services?: WorkerToolRuntimeServices;
   readonly recordPolicyDecision: (decision: ToolPolicyDecision) => Promise<void>;
 }
 

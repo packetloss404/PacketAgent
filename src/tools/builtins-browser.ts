@@ -5,7 +5,7 @@ import {
   getOrCreateBrowserSession,
 } from "./browser-runtime.js";
 import { browserAuthorization, inputAuthorization } from "./authorization.js";
-import type { ToolDefinition } from "./types.js";
+import type { ToolContext, ToolDefinition, ToolResult } from "./types.js";
 
 function browserEffect(
   classification: "read_only" | "idempotent_mutation" | "non_replayable_mutation",
@@ -20,6 +20,16 @@ const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
 
 function ensureRunId(runId: string | undefined): string | null {
   return runId ?? null;
+}
+
+function workerBrowserBoundary(ctx: ToolContext): ToolResult | null {
+  return ctx.worker
+    ? {
+        ok: false,
+        error:
+          "Autonomous Worker browser access is disabled until its browser driver enforces pinned network destinations.",
+      }
+    : null;
 }
 
 function ensureSafeUrl(url: string): { ok: true; url: URL } | { ok: false; error: string } {
@@ -64,6 +74,8 @@ export const browserGotoTool: ToolDefinition = {
   })),
   timeoutMs: 30_000,
   async handle(input, ctx) {
+    const workerBoundary = workerBrowserBoundary(ctx);
+    if (workerBoundary) return workerBoundary;
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId on the tool context" };
     const { url, waitUntil = "domcontentloaded" } = input as {
@@ -102,6 +114,8 @@ export const browserClickTool: ToolDefinition = {
   authorization: browserAuthorization("CLICK", "execute"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
+    const workerBoundary = workerBrowserBoundary(ctx);
+    if (workerBoundary) return workerBoundary;
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId" };
     const session = await getOrCreateBrowserSession(runId);
@@ -133,6 +147,8 @@ export const browserFillTool: ToolDefinition = {
   authorization: browserAuthorization("FILL", "execute"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
+    const workerBoundary = workerBrowserBoundary(ctx);
+    if (workerBoundary) return workerBoundary;
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId" };
     const session = await getOrCreateBrowserSession(runId);
@@ -164,6 +180,8 @@ export const browserExtractTool: ToolDefinition = {
   authorization: browserAuthorization("EXTRACT", "read"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
+    const workerBoundary = workerBrowserBoundary(ctx);
+    if (workerBoundary) return workerBoundary;
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId" };
     const session = await getOrCreateBrowserSession(runId);
@@ -197,6 +215,8 @@ export const browserScreenshotTool: ToolDefinition = {
   authorization: browserAuthorization("CAPTURE", "execute"),
   timeoutMs: 30_000,
   async handle(input, ctx) {
+    const workerBoundary = workerBrowserBoundary(ctx);
+    if (workerBoundary) return workerBoundary;
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId" };
     const session = await getOrCreateBrowserSession(runId);
@@ -228,6 +248,8 @@ export const browserCloseSessionTool: ToolDefinition = {
   effect: browserEffect("idempotent_mutation", "browser.close"),
   authorization: browserAuthorization("CLOSE", "execute"),
   async handle(_input, ctx) {
+    const workerBoundary = workerBrowserBoundary(ctx);
+    if (workerBoundary) return workerBoundary;
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId" };
     await closeBrowserSession(runId);
