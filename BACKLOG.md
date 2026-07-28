@@ -4,11 +4,13 @@ This backlog keeps PacketAgent aimed at one thing first: **create a bounded work
 
 It is intentionally not a phase list. Items are grouped by product outcome so we can ship useful vertical slices.
 
-Detailed dependency order, implementation slices, repository seams, verification,
-and historical-plan reconciliation live in
-[`dev/worker-implementation-loops.md`](dev/worker-implementation-loops.md).
-After a loop gate passes, continue with the next dependency-ready loop in that
-map. "Later, not MVP" remains decision-gated.
+This file is the single implementation ledger for all remaining work.
+Dependency rationale, repository seams, verification mechanics, and
+historical-plan reconciliation are supporting context in
+[`dev/worker-implementation-loops.md`](dev/worker-implementation-loops.md);
+that document must not introduce active work absent from this backlog. After a
+gate passes, continue with the next dependency-ready unchecked loop here.
+"Later, not MVP" remains decision-gated.
 
 ## PacketAgent autonomous-worker flagship
 
@@ -134,7 +136,7 @@ Status: complete.
 Dependencies: W2-W7.
 
 Status: complete. Resume at
-[`W10.2 - Implement PacketChat delivery`](dev/worker-implementation-loops.md#w102---implement-packetchat-delivery).
+[`W10.3 - Implement PacketPhone controls`](dev/worker-implementation-loops.md#w103---implement-packetphone-controls).
 
 - [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
@@ -157,7 +159,7 @@ Status: complete. Resume at
 Dependencies: W1-W7. Contract design may proceed earlier.
 
 Status: complete. Resume at
-[`W10.2 - Implement PacketChat delivery`](dev/worker-implementation-loops.md#w102---implement-packetchat-delivery).
+[`W10.3 - Implement PacketPhone controls`](dev/worker-implementation-loops.md#w103---implement-packetphone-controls).
 
 - [x] Implement the WorkerPackage contract in [`dev/packetade-packetagent-handoff.md`](dev/packetade-packetagent-handoff.md).
 - [x] Add validate, deploy, update, activate, inspect, list-runs, pause, resume,
@@ -182,17 +184,142 @@ Status: complete. Resume at
 Dependencies: W7-W9.
 
 Status: active. Resume at
-[`W10.2 - Implement PacketChat delivery`](dev/worker-implementation-loops.md#w102---implement-packetchat-delivery).
+[`W10.3 - Implement PacketPhone controls`](dev/worker-implementation-loops.md#w103---implement-packetphone-controls).
 
 - [x] Add a versioned channel-neutral notification outbox with atomic
       event/evidence binding, stable idempotency, bounded retry/expiry,
       dead-letter state, opaque route references, redacted delivery metadata,
       scheduler delivery, retention pinning, and JSON/SQLite/managed-Postgres
       parity.
-- [ ] Deliver concise Worker updates into PacketChat.
-- [ ] Deliver approval and kill controls to PacketPhone.
-- [ ] Authenticate callback actions and prevent stale or replayed approvals.
+- [x] Deliver concise Worker updates into PacketChat through an encrypted
+      route credential, pinned-network transport, stable progress replacement,
+      bounded state/budget/checkpoint/evidence cards, and short-lived
+      exact-binding open/inspect callbacks.
+- [ ] **W10.3 - PacketPhone controls:** deliver approve, reject, pause, stop,
+      and revoke actions only when the PacketPhone actor and role are allowed
+      by W7.
+- [ ] Bind each W10.3 token to action, workspace, deployment, run, attention
+      request when applicable, immutable version digest, actor, audience,
+      nonce, and expiry.
+- [ ] Consume W10.3 callbacks durably and reject stale, replayed,
+      cross-workspace, cross-version, and already-resolved actions.
+- [ ] **W10.4 - Remote-control certification:** contract-test PacketChat and
+      PacketPhone adapters against fake endpoints; race local and remote
+      actions; rotate credentials; restart with pending deliveries; replay
+      callbacks; and verify dead-letter recovery.
+- [ ] Run live PacketChat and PacketPhone interoperability checks when those
+      endpoints and credentials are available.
 - Gate: remote approvals preserve the same policy and audit guarantees as local approvals.
+
+## Post-W10 execution ledger
+
+These are the only autonomous continuation loops after W10. The detailed
+inventory later in this file supplies additional context, but completion state
+is recorded in these checklists.
+
+### R1 - Repository health and historical finding re-audit
+
+- [ ] Re-audit every still-relevant historical P0/P1 finding and close stale
+      findings with evidence.
+- [ ] Finish the Prettier baseline in reviewable batches and reduce inherited
+      ESLint warnings to zero.
+- [ ] Triage dependency advisories without blind or forced upgrades.
+- [ ] Close verified persistence, migration, queue, managed-pool, startup,
+      redaction, rate-limit, CSP/header, artifact-scope, and dead-control
+      findings.
+- [ ] Decide and document the persistence end-state before removing any
+      compatibility facade.
+- Gate: every historical P0/P1 finding is fixed, proven stale, or assigned to a
+  named later loop; CI and migration recovery are green.
+
+### R2 - Provider policy and key parity
+
+- [ ] Add per-provider generation policy and capability metadata.
+- [ ] Add vLLM structured decoding/XGrammar with tested fallback.
+- [ ] Add one bounded malformed-tool-input correction attempt.
+- [ ] Add Gemini and OpenRouter vault-key parity.
+- [ ] Consolidate provider/model catalogs and readiness reporting.
+- Gate: every supported provider follows one tested policy contract and every
+  hosted provider key can use the vault.
+
+### R3 - File-tree generation depth
+
+- [ ] Add targeted bounded repair prompts from real failure clusters.
+- [ ] Move legacy-template iteration to the file-tree path or a deterministic
+      one-time conversion.
+- [ ] Stream per-file plan/write/validate progress.
+- [ ] Add file-level change review and targeted route/entity/component
+      regeneration.
+- [ ] Add sandboxed package planning and workspace export as zip or git-ready
+      files.
+- Gate: new and legacy drafts use one reviewable, repairable, exportable
+  file-tree source of truth.
+
+### R4 - Generated-app runtime and self-host publish
+
+- [ ] Add runtime health, metrics, crash visibility, and documented pool
+      limits.
+- [ ] Add health endpoints, static-asset manifest validation, and
+      signed/checksummed artifact manifests.
+- [ ] Turn publish handoff into a verified local Docker Compose run path.
+- [ ] Add reverse-proxy/VPN examples and public-URL reachability verification.
+- [ ] Preserve accurate schema/data migration claims.
+- Gate: an exported app can be integrity-checked, started, health-checked, and
+  reached through the documented self-host path.
+
+### R5 - Sandbox, egress, and preview isolation
+
+- [ ] Make real sandboxed TypeScript and Vite validation the default and remove
+      synthetic success.
+- [ ] Define a fail-closed isolated non-Docker fallback and remove `node:vm` as
+      a security boundary.
+- [ ] Enforce CPU, memory, process, timeout, filesystem, environment, and
+      egress limits at the sandbox boundary.
+- [ ] Reuse W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections.
+- [ ] Isolate generated previews by origin with scoped cookies, CSP, and proxy
+      rules.
+- [ ] Harden containers with non-root users, dropped capabilities,
+      no-new-privileges, and process limits.
+- Gate: untrusted generated code cannot inherit secrets or sessions, reach
+  undeclared networks, or escape resource bounds.
+
+### R6 - Agent authoring and execution depth
+
+- [ ] Wire the default SMTP transport through vault-backed credentials.
+- [ ] Add LLM-authored Worker/agent templates beyond the heuristic builder.
+- [ ] Show provider/model/key/capability readiness before first run.
+- [ ] Add editable memory/input examples and first-run evaluation.
+- [ ] Add signed, versioned agent/Worker import and export.
+- [ ] Consolidate legacy agent execution onto canonical Workers only after
+      compatibility and migration tests pass.
+- Gate: authored agents can be evaluated, moved between installs, and operated
+  canonically without losing compatibility.
+
+### R7 - Builder and frontend maintainability
+
+- [ ] Split remaining oversized views and routes along established seams.
+- [ ] Add shared accessible loading/error/empty boundaries and keyboard-safe
+      primitives.
+- [ ] Remove duplicate client fetch/format utilities after characterization.
+- [ ] Make styling direction explicit and migrate incrementally.
+- [ ] Add stable component/browser coverage for Builder app and Worker modes.
+- Gate: critical views have accessible state handling, bounded ownership, and
+  regression coverage.
+
+### R8 - Release reliability and production packaging
+
+- [ ] Persist smoke transcripts per generated-app checkpoint.
+- [ ] Add focused app and Worker happy paths through build, approval, run,
+      inspect, reconnect, publish/deploy, and stop.
+- [ ] Add path-traversal, preview, artifact, rollback, backup/restore, and
+      tenant-isolation regression tests.
+- [ ] Decide whether production images should run built JavaScript and prove
+      source-map/Playwright compatibility.
+- [ ] Remove placeholder, demo-only, fake-success, and unsupported coming-soon
+      claims from release surfaces.
+- [ ] Keep generated artifacts out of Git and document cleanup/reset.
+- Gate: release checks, production image, backup round-trip, automated paths,
+  and public claims describe the same tested product.
 
 ## Inherited capabilities already present
 

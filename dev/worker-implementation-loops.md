@@ -9,6 +9,11 @@ truth. This document supplies the dependency order, implementation slices,
 repository seams, verification, and stop conditions needed to execute that
 ledger without rebuilding the plan after every loop.
 
+`BACKLOG.md` is the sole active implementation ledger. Every unchecked W10 or
+R1-R8 task described here must also exist there. If the two differ, follow and
+update `BACKLOG.md` before implementation; this file cannot create orphaned
+active work.
+
 ## Scope and authority
 
 - W1-W5 are complete. W1's decisions and verification live in
@@ -734,7 +739,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: complete as of 2026-07-28. Resume at W10.2.
+Status: complete as of 2026-07-28. Resume at W10.3.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -836,7 +841,7 @@ Packet surfaces without weakening W7 policy or audit guarantees.
 
 ### W10.1 - Add a notification outbox
 
-Status: complete as of 2026-07-28. Resume at W10.2.
+Status: complete as of 2026-07-28. Resume at W10.3.
 
 - Define a versioned, channel-neutral notification envelope for attention,
   progress summaries, and terminal outcomes.
@@ -867,11 +872,45 @@ Implementation record:
 
 ### W10.2 - Implement PacketChat delivery
 
+Status: complete as of 2026-07-28. Resume at W10.3.
+
 - Send concise deployment/run/version state, reason, budget, checkpoint,
   evidence link, and required action.
 - Thread updates by deployment/run and collapse noisy progress into bounded
   summaries.
 - Authenticate callbacks that open or inspect the matching Worker.
+
+Implementation record:
+
+- External notification routes must use an opaque `vault:*` reference declared
+  by the immutable Worker version. `packetagent.packetchat-route/v1` keeps the
+  endpoint, optional bearer token, callback origin, callback secret, timeout,
+  and callback lifetime inside the encrypted Worker credential vault. Private
+  admin-only `GET`, `PUT`, and `DELETE /api/app/workers/credentials` routes
+  configure and return metadata for those values without returning plaintext
+  or encrypted fields.
+- The PacketChat transport reloads and verifies the exact
+  workspace/definition/deployment/run/version digest and route binding before
+  resolving that credential. It sends through the W6 pinned-DNS network port
+  with the W10.1 idempotency key and classifies provider/network failures into
+  bounded retry or terminal delivery outcomes.
+- `packetagent.packetchat-worker-message/v1` includes concise state, reason,
+  budget policy/usage, latest checkpoint, evidence link, required action, and
+  open/inspect callbacks. Deployment/run thread keys are stable; progress uses
+  one replaceable message key while attention and terminal messages append.
+- Open and inspect callbacks use compact HS256 JWTs following
+  [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515.html) and
+  [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519.html). The verifier checks
+  the algorithm, audience, issuer, issued/expiry bounds, signature in constant
+  time, and exact workspace/definition/deployment/run/version-digest/route
+  binding before returning a workbench URL or the W8 redacted read model.
+  These W10.2 callbacks are read-only; W10.3 adds durable nonce consumption for
+  mutating Phone controls.
+- Local contract tests cover the encrypted-vault round trip, bounded payload,
+  progress replacement, idempotency header, secret non-persistence,
+  tamper/expiry/cross-workspace rejection, failure classification, and
+  no-store callback route. Live PacketChat interoperability remains part of
+  W10.4 because no endpoint or credential is configured.
 
 ### W10.3 - Implement PacketPhone controls
 
@@ -895,9 +934,9 @@ semantics as local actions.
 
 ## R1-R8 - Inherited continuation after W10
 
-These loops turn the remaining active sections of `BACKLOG.md` into an ordered
-queue. A direct blocker may be pulled forward into W2-W10 and recorded in both
-places. Otherwise, execute these after W10.
+These loops explain how to execute the matching unchecked R1-R8 checklists in
+`BACKLOG.md`; they do not create a separate task queue. A direct blocker may be
+pulled forward only after the backlog records that change.
 
 | Active backlog section                    | Execution destination                  |
 | ----------------------------------------- | -------------------------------------- |

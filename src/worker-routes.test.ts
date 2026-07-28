@@ -10,6 +10,7 @@ import { createWorkerActivationRepository } from "./workers/activation-repositor
 import { createWorkerActivationService } from "./workers/activation.js";
 import type { WorkerSourceProvenance, WorkerVersionContent } from "./workers/types.js";
 import { makeWorkerVersionContent } from "./workers/__tests__/fixtures.js";
+import { createWorkerCredentialService } from "./workers/credentials.js";
 
 const SOURCE: WorkerSourceProvenance = {
   product: "PacketAgent",
@@ -129,6 +130,53 @@ test("Worker routes return stable validation and revision conflict codes", async
   const staleBody = (await stale.json()) as { code: string };
   assert.equal(stale.status, 409);
   assert.equal(staleBody.code, "conflict");
+});
+
+test("Worker credential routes are admin-only and return encrypted metadata without values", async () => {
+  const harness = createRouteHarness("admin");
+  const secret = JSON.stringify({
+    schemaVersion: "packetagent.packetchat-route/v1",
+    endpoint: "https://chat.example.test/api/worker-messages",
+    callbackBaseUrl: "https://agent.example.test",
+    callbackSecret: "callback-secret-that-is-longer-than-32-bytes",
+  });
+  const upserted = await harness.routes.request("/credentials", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      reference: "vault:packetchat-operations",
+      kind: "opaque",
+      label: "PacketChat operations route",
+      value: secret,
+    }),
+  });
+  assert.equal(upserted.status, 200);
+  const upsertBody = JSON.stringify(await upserted.json());
+  assert.equal(upsertBody.includes(secret), false);
+  assert.equal(upsertBody.includes("ciphertext"), false);
+  assert.equal(JSON.stringify(harness.data).includes(secret), false);
+  assert.ok(harness.data.workerCredentials[0]?.ciphertext);
+
+  const listed = await harness.routes.request("/credentials");
+  assert.equal(listed.status, 200);
+  const listBody = JSON.stringify(await listed.json());
+  assert.equal(listBody.includes(secret), false);
+  assert.equal(listBody.includes("ciphertext"), false);
+  assert.equal(harness.roles.at(-1), "admin");
+
+  const removed = await harness.routes.request("/credentials", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reference: "vault:packetchat-operations" }),
+  });
+  assert.equal(removed.status, 200);
+  assert.deepEqual(await removed.json(), { removed: true });
+  assert.equal(harness.data.workerCredentials.length, 0);
+
+  const member = createRouteHarness("member");
+  const denied = await member.routes.request("/credentials");
+  assert.equal(denied.status, 403);
+  assert.equal(member.roles.at(-1), "admin");
 });
 
 test("Worker routes scope reads to the authorized workspace", async () => {
@@ -297,6 +345,12 @@ function createRouteHarness(role: WorkerRouteRole): RouteHarness {
     now: () => new Date(Date.UTC(2026, 6, 27, 14, 0, tick++)),
     id: (kind) => `${kind}-route-${++id}`,
   });
+  const credentialService = createWorkerCredentialService({
+    mutateStore: async (mutator) => mutator(data),
+    masterKey: () => Buffer.alloc(32, 11),
+    generateId: () => `credential-route-${++id}`,
+    now: () => new Date(Date.UTC(2026, 6, 27, 15, 0, tick++)).toISOString(),
+  });
   const auth = { workspaceId: "alpha", role };
   const roles: WorkerRouteRole[] = [];
   const authorize = async (
@@ -321,7 +375,12 @@ function createRouteHarness(role: WorkerRouteRole): RouteHarness {
   return {
     data,
     service,
-    routes: createWorkerRoutes({ service, activationService, authorize }),
+    routes: createWorkerRoutes({
+      service,
+      activationService,
+      credentialService,
+      authorize,
+    }),
     auth,
     roles,
     authorize,

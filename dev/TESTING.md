@@ -23,15 +23,17 @@ capability acceptance, durable pre-deployment receipts, rate limiting,
 token-safe audit, and three-backend parity. W9.3 adds receipt-bound
 deployment/control routes, and W9.4 adds reconnectable event streams plus
 durable cursor acknowledgement. The serialized disconnect/process-restart
-gate passes in W9.5. PacketChat/PacketPhone delivery remains W10 work and is
+gate passes in W9.5. PacketPhone remote controls remain W10 work and are
 not yet a current product claim. W10.1 adds the channel-neutral notification
 outbox, atomic event/evidence binding, stable idempotency, bounded
 retry/expiry/dead-letter handling, scheduler integration, redaction, and
-retention-safe provenance; external delivery begins at W10.2.
+retention-safe provenance. W10.2 adds encrypted PacketChat route resolution,
+pinned-network delivery of bounded threaded cards, stable progress
+replacement, and short-lived exact-binding read-only callbacks.
 
-Last automated W10.1 baseline (2026-07-28):
+Last automated W10.2 baseline (2026-07-28):
 
-- API: 1,485 passed, 2 skipped, 0 failed
+- API: 1,493 passed, 2 skipped, 0 failed
 - Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -670,6 +672,44 @@ it in a URL, package, log, event, or evidence payload.
    `PACKETAGENT_PACKETADE_INTEROP_BASE_URL`,
    `PACKETAGENT_PACKETADE_INTEROP_TOKEN`, and
    `PACKETAGENT_PACKETADE_INTEROP_WORKSPACE_ID`; use HTTPS except for loopback.
+
+## W10.1-W10.2 PacketChat Delivery Smoke
+
+1. As a workspace admin, `PUT /api/app/workers/credentials` to create an
+   opaque Worker credential at the route's declared `vault:*` reference.
+   Confirm `GET` returns metadata only and `DELETE` removes it, while a
+   non-admin receives `403`. Its plaintext JSON must use
+   `packetagent.packetchat-route/v1` with `endpoint`, `callbackBaseUrl`,
+   a 32-byte-or-longer `callbackSecret`, and optional `bearerToken`,
+   `timeoutMs`, and `callbackTtlSeconds`.
+2. Add a `packetchat` notification route using that exact reference to an
+   immutable Worker version. Confirm a non-vault reference or a reference
+   omitted from `credentialRefs` fails validation.
+3. Produce attention, progress, and terminal Worker events. Confirm each source
+   event/evidence/outbox/job commits atomically, the scheduler sends through
+   the pinned-network port, and every retry uses the same W10.1 idempotency
+   key.
+4. Inspect the PacketChat request. Confirm it contains the exact immutable
+   Worker identity/version digest, deployment/run state and reason, budget
+   policy and usage, latest checkpoint, evidence link, required action, and
+   bounded title/summary. The endpoint, bearer token, and callback secret must
+   exist only during credential use.
+5. Send multiple progress updates for one run. Confirm the thread and progress
+   message keys remain stable with `replace` behavior. Confirm attention and
+   terminal cards use `append`.
+6. Follow open and inspect callbacks within their configured lifetime. Confirm
+   open returns only the matching workbench URL and inspect returns W8's
+   server-redacted run detail with `Cache-Control: no-store`.
+7. Tamper with the signature or claims, expire the token, change workspace,
+   deployment, run, version digest, audience, or route binding, and confirm
+   authentication fails without returning Worker data.
+8. Confirm JSON/SQLite/managed-Postgres records, exports, logs, events,
+   evidence, outbox jobs, delivery metadata, and error messages contain no raw
+   PacketChat endpoint credential, bearer token, callback secret, or signed
+   callback token.
+9. No live PacketChat endpoint is configured in this repository. Treat local
+   fake-endpoint contracts as the W10.2 gate and leave real interoperability
+   for W10.4.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

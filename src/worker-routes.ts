@@ -10,6 +10,12 @@ import type {
 } from "./workers/types.js";
 import { WorkerLifecycleError } from "./workers/errors.js";
 import {
+  createWorkerCredentialService,
+  WorkerCredentialError,
+  type WorkerCredentialService,
+} from "./workers/credentials.js";
+import type { WorkerCredentialKind } from "./workers/credential-types.js";
+import {
   createWorkerActivationService,
   workerTraceFromTraceparent,
   type WorkerActivationService,
@@ -26,6 +32,7 @@ export interface AuthorizedWorkerRouteContext {
 export interface WorkerRoutesDependencies {
   readonly service?: WorkerLifecycleService;
   readonly activationService?: WorkerActivationService;
+  readonly credentialService?: WorkerCredentialService;
   readonly authorize?: (
     context: Context,
     minimumRole: WorkerRouteRole,
@@ -37,7 +44,50 @@ export function createWorkerRoutes(dependencies: WorkerRoutesDependencies = {}):
   const service = dependencies.service ?? createWorkerLifecycleService();
   const activationService =
     dependencies.activationService ?? createWorkerActivationService();
+  const credentialService = dependencies.credentialService ?? createWorkerCredentialService();
   const authorize = dependencies.authorize ?? authorizeWorkerRoute;
+
+  routes.get("/credentials", async (c) => {
+    try {
+      const auth = await authorize(c, "admin");
+      return c.json({ credentials: await credentialService.list(auth.workspaceId) });
+    } catch (error) {
+      return workerRouteError(c, error);
+    }
+  });
+
+  routes.put("/credentials", async (c) => {
+    try {
+      const auth = await authorize(c, "admin");
+      const body = await readObjectBody(c);
+      return c.json({
+        credential: await credentialService.upsert({
+          workspaceId: auth.workspaceId,
+          reference: requiredString(body.reference, "reference"),
+          kind: requiredCredentialKind(body.kind),
+          label: requiredString(body.label, "label"),
+          value: requiredSecretValue(body.value),
+        }),
+      });
+    } catch (error) {
+      return workerRouteError(c, error);
+    }
+  });
+
+  routes.delete("/credentials", async (c) => {
+    try {
+      const auth = await authorize(c, "admin");
+      const body = await readObjectBody(c);
+      return c.json({
+        removed: await credentialService.remove(
+          auth.workspaceId,
+          requiredString(body.reference, "reference"),
+        ),
+      });
+    } catch (error) {
+      return workerRouteError(c, error);
+    }
+  });
 
   routes.get("/definitions", async (c) => {
     try {
@@ -488,6 +538,28 @@ function requiredRevision(value: unknown): number {
   return value as number;
 }
 
+function requiredCredentialKind(value: unknown): WorkerCredentialKind {
+  if (
+    value !== "api_key" &&
+    value !== "bearer_token" &&
+    value !== "webhook_url" &&
+    value !== "smtp_config" &&
+    value !== "opaque"
+  ) {
+    throw invalidRequest(
+      "kind must be api_key, bearer_token, webhook_url, smtp_config, or opaque.",
+    );
+  }
+  return value;
+}
+
+function requiredSecretValue(value: unknown): string {
+  if (typeof value !== "string" || !value || Buffer.byteLength(value, "utf8") > 64 * 1_024) {
+    throw invalidRequest("value must be a non-empty string of at most 65536 bytes.");
+  }
+  return value;
+}
+
 function optionalSequence(value: string | undefined): number | undefined {
   if (value === undefined || value === "") return undefined;
   const sequence = Number(value);
@@ -502,11 +574,20 @@ function invalidRequest(message: string): WorkerLifecycleError {
 }
 
 function workerRouteError(c: Context, error: unknown) {
-  const status = (error as Error & { status?: number }).status ?? 500;
+  const status =
+    error instanceof WorkerCredentialError
+      ? error.code === "not_found"
+        ? 404
+        : 400
+      : ((error as Error & { status?: number }).status ?? 500);
   c.status(status as 400 | 404 | 409 | 500);
   return c.json({
     error: redactedErrorMessage(error),
-    ...(error instanceof WorkerLifecycleError ? { code: error.code } : {}),
+    ...(error instanceof WorkerLifecycleError
+      ? { code: error.code }
+      : error instanceof WorkerCredentialError
+        ? { code: `credential_${error.code}` }
+        : {}),
   });
 }
 

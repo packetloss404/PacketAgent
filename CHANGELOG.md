@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - PacketChat Worker delivery (W10.2)
+
+- Added `packetagent.packetchat-route/v1` encrypted route configuration and a
+  pinned-network PacketChat transport that verifies immutable
+  workspace/deployment/run/version/route bindings before resolving secrets.
+- Added admin-only Worker credential list/upsert/remove routes whose responses
+  contain metadata only, allowing self-hosted operators to configure the
+  encrypted PacketChat route without exposing plaintext or encrypted fields.
+- Added `packetagent.packetchat-worker-message/v1` cards with bounded
+  state/reason/budget/checkpoint/evidence/action data, stable run threads, and
+  one replaceable progress message per run.
+- Added short-lived HS256 open/inspect callbacks bound to the exact Worker
+  identity, version digest, route, issuer, audience, and expiry. Callback
+  responses are no-store and return either the Worker workbench URL or W8's
+  redacted operations detail.
+- Added encrypted-vault, idempotency, secret non-persistence, tamper, expiry,
+  cross-workspace, failure-classification, delegation, and callback-route
+  contract tests. The W10.2 baseline passes 1,493 API tests plus 28 web tests,
+  with 2 intentional API skips and no failures. W10.3 PacketPhone controls and W10.4 cross-product
+  certification remain active, so the unified lifecycle is not yet a shipped
+  claim.
+
 ### 2026-07-28 - Channel-neutral Worker notification outbox (W10.1)
 
 - Added versioned attention, progress, and terminal notification envelopes

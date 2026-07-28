@@ -12,6 +12,7 @@ import {
   WORKER_NOTIFICATION_DELIVERY_JOB_TYPE,
   WorkerNotificationDeliveryError,
   appendWorkerEventWithNotifications,
+  createDefaultWorkerNotificationTransport,
   createWorkerNotificationDeliveryJobHandler,
   createWorkerNotificationService,
   type WorkerNotificationTransport,
@@ -66,7 +67,7 @@ test("source event, evidence, outbox envelope, and retry job are one durable uni
   assert.equal(outbox.envelope.threadKey, "worker-run:run-1");
   assert.equal(job.type, WORKER_NOTIFICATION_DELIVERY_JOB_TYPE);
   assert.deepEqual(job.payload, { outboxItemId: outbox.id });
-  assert.equal(JSON.stringify(job).includes("channel:operations"), false);
+  assert.equal(JSON.stringify(job).includes("vault:packetchat-operations"), false);
   assert.equal(JSON.stringify(harness.data).includes(SECRET), false);
   assert.doesNotThrow(() => validateWorkerPersistence(harness.data));
 });
@@ -226,7 +227,7 @@ test("the scheduler handler defers a transient failure without exposing route da
     (record) => record.id === created.outboxItems[0]!.id,
   );
   assert.equal(failed?.status, "failed");
-  assert.equal(JSON.stringify(job).includes("channel:operations"), false);
+  assert.equal(JSON.stringify(job).includes("vault:packetchat-operations"), false);
   if (!failed || failed.schemaVersion !== "packetagent.worker-notification-outbox/v1") {
     return;
   }
@@ -235,6 +236,51 @@ test("the scheduler handler defers a transient failure without exposing route da
     signal: new AbortController().signal,
   })) as { disposition: string };
   assert.equal(delivered.disposition, "delivered");
+});
+
+test("the default router delegates configured Packet-product transports and fails closed otherwise", async () => {
+  const harness = notificationHarness();
+  const created = await harness.transact((draft) => appendProgressNotification(draft));
+  const outbox = created.outboxItems[0]!;
+  let calls = 0;
+  const router = createDefaultWorkerNotificationTransport({
+    packetchat: {
+      async deliver(input) {
+        calls += 1;
+        assert.equal(input.route.reference, "vault:packetchat-operations");
+        return { deliveryReference: "packetchat:delegated" };
+      },
+    },
+  });
+  const route = {
+    id: outbox.notificationRouteId,
+    kind: outbox.notificationRouteKind,
+    reference: outbox.notificationRouteReference,
+    events: [outbox.event],
+  } as const;
+  const delivered = await router.deliver({
+    route,
+    envelope: outbox.envelope,
+    idempotencyKey: outbox.idempotencyKey,
+    signal: new AbortController().signal,
+  });
+  assert.equal(delivered.deliveryReference, "packetchat:delegated");
+  assert.equal(calls, 1);
+
+  const unavailable = createDefaultWorkerNotificationTransport();
+  await assert.rejects(
+    () =>
+      unavailable.deliver({
+        route,
+        envelope: outbox.envelope,
+        idempotencyKey: outbox.idempotencyKey,
+        signal: new AbortController().signal,
+      }),
+    (error: unknown) =>
+      error instanceof WorkerNotificationDeliveryError &&
+      error.code === "route_unavailable" &&
+      error.retryable,
+  );
 });
 
 test("retention pins pending delivery evidence and tombstones delivered sources", async () => {
@@ -349,11 +395,12 @@ function appendProgressNotification(
 function notificationHarness() {
   let data = createSeedStore();
   const content = makeWorkerVersionContent({
+    credentialRefs: ["vault:release-api", "vault:packetchat-operations"],
     notificationRoutes: [
       {
         id: "operations-chat",
         kind: "packetchat",
-        reference: "channel:operations",
+        reference: "vault:packetchat-operations",
         events: ["progress", "terminal"],
       },
     ],

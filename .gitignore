@@ -2,6 +2,8 @@ node_modules/
 web/dist/
 dist/
 coverage/
+*.tsbuildinfo
+.vite/
 *.log
 .env
 .env.*
@@ -17,4 +19,8 @@ exports/
 !.gitkeep
 .claude/
 .design-bundle/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
 tmp/

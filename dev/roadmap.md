@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W10.2 - implement PacketChat delivery**. Repository/session state
+Current active loop: **W10.3 - implement PacketPhone controls**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -33,8 +33,10 @@ reconstruction, reconnect, evidence, update, pause/resume, rollback, and
 revoke. W10.1 now adds the versioned channel-neutral outbox, atomic
 event/evidence binding, stable idempotency, bounded scheduler retry/expiry,
 dead-letter state, and retention-safe provenance across all three storage
-modes. Resume at W10.2 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w102---implement-packetchat-delivery).
+modes. W10.2 now adds encrypted PacketChat route resolution, pinned-network
+delivery of bounded replaceable progress cards, and short-lived exact-binding
+open/inspect callbacks. Resume at W10.3 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w103---implement-packetphone-controls).
 
 ## North star
 
@@ -148,10 +150,10 @@ later update, pause/resume, rollback, and revoke operations.
 
 ### 10. PacketChat and PacketPhone routes - active
 
-The channel-neutral notification outbox is complete. Next, deliver bounded
-threaded Worker summaries and authenticated inspect/open callbacks to
-PacketChat, then add PacketPhone approval and kill controls without weakening
-W7 controls.
+The channel-neutral notification outbox and PacketChat adapter are complete.
+PacketChat receives bounded threaded Worker summaries and authenticated
+inspect/open callbacks. Next, add PacketPhone approval and kill controls
+without weakening W7 controls.
 
 ### 11. Integrations and worker templates
 

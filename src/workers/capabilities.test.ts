@@ -3,7 +3,7 @@ import test from "node:test";
 import { compileWorkerCapabilityPolicy, WorkerCapabilityCompilationError } from "./capabilities.js";
 import type { WorkerDeploymentCapabilityGrant, WorkerToolCapability } from "./types.js";
 import { makeWorkerVersionContent } from "./__tests__/fixtures.js";
-import { computeWorkerVersionContentDigest } from "./validation.js";
+import { computeWorkerVersionContentDigest, validateWorkerVersionContent } from "./validation.js";
 
 test("capability compiler emits normalized deterministic tuples tied to the version digest", () => {
   const content = makeWorkerVersionContent({
@@ -144,6 +144,41 @@ test("compiler rejects unknown verbs, broad wildcards, unsafe schemes, path esca
   for (const entry of cases) {
     assertCompilationIssue(() => compile(entry.content), entry.code);
   }
+});
+
+test("external notification routes require an immutable declared credential reference", () => {
+  const rawReference = validateWorkerVersionContent(
+    makeWorkerVersionContent({
+      credentialRefs: ["channel:operations"],
+      notificationRoutes: [
+        {
+          id: "operations-chat",
+          kind: "packetchat",
+          reference: "channel:operations",
+          events: ["progress"],
+        },
+      ],
+    }),
+  );
+  assert.equal(rawReference.ok, false);
+  assert.ok(
+    rawReference.issues.some((entry) => entry.code === "notification.credential_reference"),
+  );
+
+  const undeclared = validateWorkerVersionContent(
+    makeWorkerVersionContent({
+      notificationRoutes: [
+        {
+          id: "operations-chat",
+          kind: "packetchat",
+          reference: "vault:packetchat-operations",
+          events: ["progress"],
+        },
+      ],
+    }),
+  );
+  assert.equal(undeclared.ok, false);
+  assert.ok(undeclared.issues.some((entry) => entry.code === "notification.credential_required"));
 });
 
 test("compiler rejects overlapping grants with contradictory approval requirements", () => {

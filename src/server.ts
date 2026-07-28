@@ -75,6 +75,7 @@ import { workerObservabilityRoutes } from "./worker-observability-routes.js";
 import { workerOperatorRoutes } from "./worker-operator-routes.js";
 import { workerPackageRoutes } from "./worker-package-routes.js";
 import { workerPackageEventRoutes } from "./worker-package-event-routes.js";
+import { packetProductCallbackRoutes } from "./packet-product-callback-routes.js";
 import {
   ALERTS_EVALUATE_JOB_TYPE,
   ensureAlertsCronJobAsync,
@@ -94,8 +95,11 @@ import {
 } from "./workers/attention-service.js";
 import {
   WORKER_NOTIFICATION_DELIVERY_JOB_TYPE,
+  createDefaultWorkerNotificationTransport,
   createWorkerNotificationDeliveryJobHandler,
+  createWorkerNotificationService,
 } from "./workers/notifications.js";
+import { createPacketChatNotificationTransport } from "./workers/packetchat.js";
 import { createWorkerExecutionJobHandler } from "./workers/runtime/job-handler.js";
 import { createWorkerRecoveryCoordinator } from "./workers/runtime/recovery.js";
 import {
@@ -403,11 +407,18 @@ app.route("/api/app/workers", workerRoutes);
 app.route("/api/app/workers", workerOperatorRoutes);
 app.route("/api", workerPackageRoutes);
 app.route("/api", workerPackageEventRoutes);
+app.route("/api/packet-products", packetProductCallbackRoutes);
 
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
 const workerExecutionJobHandler = createWorkerExecutionJobHandler();
 const workerAttentionDeadlineJobHandler = createWorkerAttentionDeadlineJobHandler();
-const workerNotificationDeliveryJobHandler = createWorkerNotificationDeliveryJobHandler();
+const workerNotificationDeliveryJobHandler = createWorkerNotificationDeliveryJobHandler(
+  createWorkerNotificationService({
+    transport: createDefaultWorkerNotificationTransport({
+      packetchat: createPacketChatNotificationTransport(),
+    }),
+  }),
+);
 const workerRetentionJobHandler = createWorkerRetentionJobHandler();
 const workerRecoveryCoordinator = createWorkerRecoveryCoordinator();
 scheduler.registerReconciler({

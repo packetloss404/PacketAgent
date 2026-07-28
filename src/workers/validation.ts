@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { parseCron } from "../jobs/cron.js";
 import { compileWorkerCapabilityPolicy, WorkerCapabilityCompilationError } from "./capabilities.js";
+import { isWorkerCredentialReference } from "./credential-types.js";
 import {
   WORKER_COMPILED_POLICY_SCHEMA_VERSION,
   WORKER_CONTRACT_SCHEMA_VERSION,
@@ -892,7 +893,9 @@ function validateVersionContent(value: unknown, path: string, issues: IssueColle
     });
   }
 
-  stringArrayAt(content, "credentialRefs", path, issues, { unique: true });
+  const credentialRefs = stringArrayAt(content, "credentialRefs", path, issues, {
+    unique: true,
+  });
 
   const triggers = arrayAt(content, "triggers", path, issues);
   const triggerIds = new Set<string>();
@@ -924,6 +927,32 @@ function validateVersionContent(value: unknown, path: string, issues: IssueColle
   validateExitPredicates(content.exitPredicates, `${path}.exitPredicates`, issues);
   stringArrayAt(content, "acceptanceCommands", path, issues, { unique: true });
   validateNotificationRoutes(content.notificationRoutes, `${path}.notificationRoutes`, issues);
+  if (Array.isArray(content.notificationRoutes)) {
+    content.notificationRoutes.forEach((route, index) => {
+      if (
+        !isRecord(route) ||
+        !["packetchat", "packetphone", "webhook", "email"].includes(String(route.kind)) ||
+        typeof route.reference !== "string"
+      ) {
+        return;
+      }
+      if (!isWorkerCredentialReference(route.reference)) {
+        issue(
+          issues,
+          `${path}.notificationRoutes[${index}].reference`,
+          "notification.credential_reference",
+          "must be an opaque vault: credential reference",
+        );
+      } else if (!credentialRefs.includes(route.reference)) {
+        issue(
+          issues,
+          `${path}.notificationRoutes[${index}].reference`,
+          "notification.credential_required",
+          "must reference a credential declared by this Worker version",
+        );
+      }
+    });
+  }
 }
 
 function validateJsonValue(value: unknown, path: string, issues: IssueCollector, depth = 0): void {

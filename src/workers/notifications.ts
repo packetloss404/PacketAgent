@@ -409,16 +409,27 @@ export function createWorkerNotificationDeliveryJobHandler(
   };
 }
 
-export function createDefaultWorkerNotificationTransport(): WorkerNotificationTransport {
+export function createDefaultWorkerNotificationTransport(
+  externalTransports: Partial<
+    Record<
+      Exclude<WorkerNotificationRouteReference["kind"], "packetagent">,
+      WorkerNotificationTransport
+    >
+  > = {},
+): WorkerNotificationTransport {
   return {
     async deliver(input) {
-      if (input.route.kind !== "packetagent") {
+      if (input.route.kind === "packetagent") {
+        return {
+          deliveryReference: `packetagent:${input.envelope.id}`,
+          metadata: { provider: "packetagent" },
+        };
+      }
+      const transport = externalTransports[input.route.kind];
+      if (!transport) {
         throw new WorkerNotificationDeliveryError("route_unavailable", true);
       }
-      return {
-        deliveryReference: `packetagent:${input.envelope.id}`,
-        metadata: { provider: "packetagent" },
-      };
+      return transport.deliver(input);
     },
   };
 }

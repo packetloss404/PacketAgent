@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W9 and W10.1 are implemented as
+in foundation commit `d60cd47`. W1-W9 and W10.1-W10.2 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -263,6 +263,9 @@ Implemented substrate:
 - a serialized PacketADE disconnect/restart handoff gate through fresh service
   reconstruction, evidence reconnect, update, pause/resume, rollback, and
   revoke, plus an opt-in real-network validation check;
+- encrypted PacketChat route credentials, pinned-network delivery of bounded
+  threaded Worker cards, replaceable progress summaries, and short-lived
+  exact-binding read-only open/inspect callbacks;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -277,17 +280,20 @@ Not shipped:
 
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
-- external notification transports;
-- PacketChat/PacketPhone delivery routes.
+- PacketPhone delivery and mutating callback routes;
+- live PacketChat/PacketPhone cross-product interoperability certification.
 
 Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W10.2 - implement PacketChat delivery** in
-[`../BACKLOG.md`](../BACKLOG.md).
+Continue **W10.3 - implement PacketPhone controls** in
+[`../BACKLOG.md#w10---packetchat-and-packetphone-routes`](../BACKLOG.md#w10---packetchat-and-packetphone-routes).
+`BACKLOG.md` is the single ledger for every remaining W10 and R1-R8 task.
+`worker-implementation-loops.md` provides execution mechanics but cannot add
+active work absent from the backlog.
 
-W1-W9 and W10.1 are complete under `src/workers/`, the store, migrations,
+W1-W9 and W10.1-W10.2 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -394,13 +400,26 @@ attempt leases, bounded retry/expiry, dead-letter state, opaque route
 references, and allowlisted redacted delivery metadata. Pending deliveries pin
 their W8 source evidence; terminal delivery state permits compaction only
 behind a digest-bound tombstone. The local PacketAgent transport is registered;
-external PacketChat and PacketPhone transports remain fail-closed.
+unconfigured external transports remain fail-closed.
+W10.2 adds a PacketChat transport behind that router. External routes now
+require a declared `vault:*` reference; the transport reloads the immutable
+Worker/run/version/route binding, resolves the encrypted route only around the
+pinned-network request, sends a stable-thread bounded state/budget/checkpoint/
+evidence card, and uses the W10.1 idempotency key. Progress replaces one stable
+message while attention and terminal outcomes append. Short-lived compact
+HS256 callbacks bind issuer, audience, action, workspace, definition,
+deployment, run, version digest, and route; constant-time verification returns
+only the matching workbench URL or W8 redacted detail. W10.2 callbacks are
+read-only, and no endpoint, bearer value, callback secret, or signed token is
+persisted. Workspace admins configure route secrets through metadata-only
+private Worker credential list/upsert/remove routes.
 
 The exact next slice is
-[`W10.2 - Implement PacketChat delivery`](worker-implementation-loops.md#w102---implement-packetchat-delivery).
+[`W10.3 - PacketPhone controls`](../BACKLOG.md#w10---packetchat-and-packetphone-routes).
 After each gate passes, continue through W10 and then R1-R8 using that
-document's autonomous execution protocol. Historical D/phase/track documents
-have been reconciled there and must not be resumed independently.
+backlog's unchecked checklists; use the loop document only for execution
+mechanics. Historical D/phase/track documents have been reconciled there and
+must not be resumed independently.
 
 ## Canonical documents
 
@@ -423,7 +442,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,485 passed, 2 skipped, 0 failed
+- `npm run test:api` - 1,493 passed, 2 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -501,6 +520,11 @@ handoff, the roadmap, or the backlog.
   secret redaction, pending-evidence retention pinning, terminal tombstones,
   attention/progress/terminal production paths, and
   JSON/SQLite/managed-Postgres parity checks - passed
+- focused W10.2 encrypted route resolution, pinned-network request and
+  idempotency semantics, bounded state/budget/checkpoint/evidence cards,
+  stable progress replacement, secret non-persistence, transport delegation,
+  retry classification, HS256 signature/tamper/expiry/cross-workspace binding,
+  redacted inspect projection, and no-store callback routes - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
