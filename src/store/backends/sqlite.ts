@@ -152,7 +152,8 @@ export async function mutateSqliteStoreAsync<T>(dbPath: string, mutator: (data: 
     db.exec("begin immediate");
     try {
       const data = loadSqliteStore(db) ?? seedStore();
-      const result = await mutator(data);
+      const pending = mutator(data);
+      const result = pending instanceof Promise || isPromiseLike(pending) ? await pending : pending;
       persistSqliteStoreRows(db, data);
       db.exec("commit");
       setCachedStore(data, backendKey);
@@ -169,6 +170,15 @@ export async function mutateSqliteStoreAsync<T>(dbPath: string, mutator: (data: 
       flushPendingDualWrites();
     }
   }
+}
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "then" in value &&
+    typeof value.then === "function"
+  );
 }
 
 export function loadSqliteAppData(dbPath: string): PacketAgentData | null {

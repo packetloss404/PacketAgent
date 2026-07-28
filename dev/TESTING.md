@@ -2,15 +2,15 @@
 
 End-to-end test plan run before cutting a release. Covers the builder loop, agent loop, workspace setup, providers, sandbox, operations, self-host publish handoff, and the backup round-trip.
 
-This plan verifies the inherited workbench. Durable Worker deployment,
-checkpoint recovery, and PacketADE handoff cases must be added as W1-W9 ship;
-they are not current product claims.
+This plan verifies the inherited workbench and W2's durable Worker
+control-plane lifecycle. Trigger execution, checkpoint recovery, and PacketADE
+handoff cases must be added as W3-W9 ship; they are not current product claims.
 
-Last automated W1 baseline (2026-07-27):
+Last automated W2 baseline (2026-07-27):
 
-- API: 1,270 passed, 1 skipped, 0 failed
+- API: 1,288 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused Worker contract: 31 passed, 0 failed
+- Focused Worker lifecycle, route, and export checks: 54 passed, 0 failed
 - Typecheck: passed
 - Production web build: passed
 - ESLint: 0 errors, 146 inherited warnings
@@ -54,6 +54,20 @@ npm run dev
 ```
 
 Open `http://localhost:7341/` in development, or `http://localhost:8484/` after `npm run build:web && npm start`.
+
+## W2 Worker Lifecycle Smoke
+
+Use an authenticated API client for `/api/app/workers`. Browser-originated
+mutations must also send the existing PacketAgent CSRF cookie/header pair.
+
+1. As a member, create a definition at `POST /api/app/workers/definitions` with a bounded W1 `content` object, PacketAgent source provenance, and an `Idempotency-Key` header.
+2. Replay the identical request with the same key. Confirm the original definition/version IDs return and no duplicate event appears.
+3. Validate the version using its `contentDigest`, then create, validate, and deploy a deployment using the returned revision at each step.
+4. As an admin, activate, pause, resume, and retire the deployment. Confirm each response increments `revision` exactly once.
+5. Create and activate a newer validated version, then roll it back to the older version. Confirm the old deployment retires, a new version-pinned deployment appears, and the rollout links predecessor to successor.
+6. Reuse an idempotency key with changed input and submit one stale digest/revision. Confirm stable `idempotency_mismatch` and `conflict` responses.
+7. Restart PacketAgent and read the definition plus `/events`. Confirm lifecycle state and monotonically increasing event sequence persist.
+8. Repeat once with `PACKETAGENT_STORE=sqlite`; run the managed-Postgres parity test before release when that mode is supported by the deployment.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

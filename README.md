@@ -284,7 +284,7 @@ Generated `web/dist/` is gitignored; rebuild locally rather than committing it.
 
 ## Known limits
 
-- **The Worker contract is storage-neutral today.** W1 defines versioned Worker records, runtime validation, lifecycle guards, immutable validated versions, and draft projections over existing agents/workflows. Existing agents can still run manually, on schedules, or from webhooks through the inherited capped tool loop, but Worker repositories, activation, normalized trigger delivery, checkpoint recovery, effect receipts, and runtime policy enforcement remain W2-W8 work.
+- **The Worker control-plane lifecycle is durable, but execution is not unified yet.** W1-W2 provide versioned Worker records, validation, immutable versions, JSON/SQLite/managed-Postgres persistence, private lifecycle routes, idempotent commands, optimistic revisions, rollback records, and an event journal. Existing agents still run through the inherited capped tool loop; normalized trigger delivery, canonical Worker runs, checkpoint recovery, effect receipts, and runtime policy enforcement remain W3-W8 work.
 - **File-tree codegen is an inherited secondary capability.** With a BYOK key, the LLM authors files through `write_file`, validates with `tsc` and Vite when real sandbox validation is enabled, and can make up to two bounded repair passes. Legacy template-shaped drafts still use their older iteration path.
 - **Per-app SQLite is current, with a compatibility caveat.** Current generated apps use the PacketAgent-served per-app SQLite API and supervised runtime processes. The legacy template/source-artifact path and older saved drafts can still contain sql.js/jsdelivr browser persistence.
 - **Outbound tools exist but are not yet Worker-grade capabilities.** `http_fetch`, `slack_post_webhook`, `github_api`, `email_send`, `sql_query`, and `shell_for_agent` are registered and tested. Approval tokens are currently whole-tool scoped, email needs an injected SMTP adapter, and durable side-effect receipts are not implemented.
@@ -305,9 +305,9 @@ npm run db:seed
 
 ## Project status
 
-PacketAgent is in its foundation transition from TaskLoom's app/agent workbench to the autonomous-worker runtime described at the top of this file. The inherited Builder and operate surfaces work; the rename and compatibility layer are committed on the current foundation branch. The storage-neutral canonical Worker model and W1 gate are complete, but no Worker repository or activation path exists yet.
+PacketAgent is in its foundation transition from TaskLoom's app/agent workbench to the autonomous-worker runtime described at the top of this file. The inherited Builder and operate surfaces work; the rename and compatibility layer are committed on the current foundation branch. The canonical Worker model and W2 persistence/activation gate are complete, including private lifecycle APIs, but triggers do not yet create canonical Worker runs.
 
-The exact resume point is W2 in [BACKLOG.md](BACKLOG.md). New Codex projects should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived Phase 3 or legacy handoff documents.
+The exact resume point is W3 in [BACKLOG.md](BACKLOG.md). New Codex projects should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived Phase 3 or legacy handoff documents.
 
 For current product changes, see [CHANGELOG.md](CHANGELOG.md). PacketAgent does not yet have a configured GitHub `origin`, website, issue tracker, or release feed.
 

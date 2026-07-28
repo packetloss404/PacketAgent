@@ -1,5 +1,17 @@
 import type { ActivationMilestoneRecord, ActivationStatusDto } from "../activation/domain";
 import type { WorkspaceActivationFacts } from "../activation/adapters";
+import type {
+  WorkerCheckpoint,
+  WorkerDefinition,
+  WorkerDeployment,
+  WorkerRun,
+  WorkerVersion,
+} from "../workers/types.js";
+import type {
+  WorkerDeploymentRollout,
+  WorkerEvent,
+  WorkerLifecycleCommandReceipt,
+} from "../workers/persistence-types.js";
 
 export interface UserRecord {
   id: string;
@@ -684,6 +696,14 @@ export interface PacketAgentData {
   jobMetricSnapshots: JobMetricSnapshotRecord[];
   alertEvents: AlertEventRecord[];
   shareTokens: ShareTokenRecord[];
+  workerDefinitions: WorkerDefinition[];
+  workerVersions: WorkerVersion[];
+  workerDeployments: WorkerDeployment[];
+  workerRuns: WorkerRun[];
+  workerCheckpoints: WorkerCheckpoint[];
+  workerDeploymentRollouts: WorkerDeploymentRollout[];
+  workerCommandReceipts: WorkerLifecycleCommandReceipt[];
+  workerEvents: WorkerEvent[];
   activationFacts: Record<string, WorkspaceActivationFacts>;
   activationMilestones: Record<string, ActivationMilestoneRecord[]>;
   activationReadModels: Record<string, ActivationStatusDto>;

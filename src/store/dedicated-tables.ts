@@ -1,6 +1,18 @@
 import { type DatabaseSync } from "node:sqlite";
 import { normalizeActivationSignalRecord } from "./normalize.js";
 import type {
+  WorkerCheckpoint,
+  WorkerDefinition,
+  WorkerDeployment,
+  WorkerRun,
+  WorkerVersion,
+} from "../workers/types.js";
+import type {
+  WorkerDeploymentRollout,
+  WorkerEvent,
+  WorkerLifecycleCommandReceipt,
+} from "../workers/persistence-types.js";
+import type {
   ActivationSignalKind,
   ActivationSignalOrigin,
   ActivationSignalRecord,
@@ -36,7 +48,15 @@ export type DedicatedRelationalCollectionKey =
   | "invitationEmailDeliveries"
   | "activities"
   | "providerCalls"
-  | "activationSignals";
+  | "activationSignals"
+  | "workerDefinitions"
+  | "workerVersions"
+  | "workerDeployments"
+  | "workerRuns"
+  | "workerCheckpoints"
+  | "workerDeploymentRollouts"
+  | "workerCommandReceipts"
+  | "workerEvents";
 
 export type DedicatedRelationalCollections = Pick<PacketAgentData, DedicatedRelationalCollectionKey>;
 
@@ -56,7 +76,44 @@ export function loadDedicatedRelationalCollections(db: DatabaseSync): DedicatedR
     activities: loadDedicatedActivities(db),
     providerCalls: loadDedicatedProviderCalls(db),
     activationSignals: loadDedicatedActivationSignals(db),
+    workerDefinitions: loadWorkerPayloads<WorkerDefinition>(
+      db,
+      "select payload from worker_definitions order by workspace_id, id",
+    ),
+    workerVersions: loadWorkerPayloads<WorkerVersion>(
+      db,
+      "select payload from worker_versions order by workspace_id, worker_definition_id, version",
+    ),
+    workerDeployments: loadWorkerPayloads<WorkerDeployment>(
+      db,
+      "select payload from worker_deployments order by workspace_id, updated_at, id",
+    ),
+    workerRuns: loadWorkerPayloads<WorkerRun>(
+      db,
+      "select payload from worker_runs order by workspace_id, updated_at, id",
+    ),
+    workerCheckpoints: loadWorkerPayloads<WorkerCheckpoint>(
+      db,
+      "select payload from worker_checkpoints order by workspace_id, worker_run_id, sequence",
+    ),
+    workerDeploymentRollouts: loadWorkerPayloads<WorkerDeploymentRollout>(
+      db,
+      "select payload from worker_deployment_rollouts order by workspace_id, created_at, id",
+    ),
+    workerCommandReceipts: loadWorkerPayloads<WorkerLifecycleCommandReceipt>(
+      db,
+      "select payload from worker_command_receipts order by workspace_id, created_at, id",
+    ),
+    workerEvents: loadWorkerPayloads<WorkerEvent>(
+      db,
+      "select payload from worker_events order by workspace_id, sequence",
+    ),
   };
+}
+
+function loadWorkerPayloads<T>(db: DatabaseSync, sql: string): T[] {
+  const rows = db.prepare(sql).all() as Array<{ payload: string }>;
+  return rows.map((row) => JSON.parse(row.payload) as T);
 }
 
 export function mergeDedicatedRelationalCollections(
@@ -362,6 +419,171 @@ export function persistDedicatedRelationalRows(db: DatabaseSync, data: PacketAge
   persistDedicatedActivities(db, data.activities ?? []);
   persistDedicatedProviderCalls(db, data.providerCalls ?? []);
   persistDedicatedActivationSignals(db, data.activationSignals ?? []);
+  persistDedicatedWorkerRecords(db, data);
+}
+
+function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData): void {
+  db.exec(`
+    delete from worker_events;
+    delete from worker_command_receipts;
+    delete from worker_deployment_rollouts;
+    delete from worker_checkpoints;
+    delete from worker_runs;
+    delete from worker_deployments;
+    delete from worker_versions;
+    delete from worker_definitions;
+  `);
+
+  const definitionStatement = db.prepare(`
+    insert into worker_definitions (
+      workspace_id, id, status, name, current_version_id, updated_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerDefinitions ?? []) {
+    definitionStatement.run(
+      record.workspaceId,
+      record.id,
+      record.status,
+      record.name,
+      record.currentVersionId ?? null,
+      record.updatedAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const versionStatement = db.prepare(`
+    insert into worker_versions (
+      workspace_id, id, worker_definition_id, version, status,
+      content_digest, created_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerVersions ?? []) {
+    versionStatement.run(
+      record.workspaceId,
+      record.id,
+      record.workerDefinitionId,
+      record.version,
+      record.status,
+      record.contentDigest,
+      record.createdAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const deploymentStatement = db.prepare(`
+    insert into worker_deployments (
+      workspace_id, id, worker_definition_id, worker_version_id,
+      status, revision, updated_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerDeployments ?? []) {
+    deploymentStatement.run(
+      record.workspaceId,
+      record.id,
+      record.workerDefinitionId,
+      record.workerVersionId,
+      record.status,
+      record.revision,
+      record.updatedAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const runStatement = db.prepare(`
+    insert into worker_runs (
+      workspace_id, id, worker_definition_id, worker_version_id,
+      worker_deployment_id, status, attempt, updated_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerRuns ?? []) {
+    runStatement.run(
+      record.workspaceId,
+      record.id,
+      record.workerDefinitionId,
+      record.workerVersionId,
+      record.workerDeploymentId,
+      record.status,
+      record.attempt,
+      record.updatedAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const checkpointStatement = db.prepare(`
+    insert into worker_checkpoints (
+      workspace_id, id, worker_run_id, worker_version_id,
+      sequence, created_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerCheckpoints ?? []) {
+    checkpointStatement.run(
+      record.workspaceId,
+      record.id,
+      record.workerRunId,
+      record.workerVersionId,
+      record.sequence,
+      record.createdAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const rolloutStatement = db.prepare(`
+    insert into worker_deployment_rollouts (
+      workspace_id, id, worker_definition_id, from_deployment_id,
+      to_deployment_id, kind, created_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerDeploymentRollouts ?? []) {
+    rolloutStatement.run(
+      record.workspaceId,
+      record.id,
+      record.workerDefinitionId,
+      record.fromDeploymentId,
+      record.toDeploymentId,
+      record.kind,
+      record.createdAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const receiptStatement = db.prepare(`
+    insert into worker_command_receipts (
+      workspace_id, id, idempotency_key, operation, target_id,
+      request_digest, created_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerCommandReceipts ?? []) {
+    receiptStatement.run(
+      record.workspaceId,
+      record.id,
+      record.idempotencyKey,
+      record.operation,
+      record.targetId ?? null,
+      record.requestDigest,
+      record.createdAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const eventStatement = db.prepare(`
+    insert into worker_events (
+      workspace_id, id, sequence, type, worker_definition_id,
+      worker_version_id, worker_deployment_id, occurred_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerEvents ?? []) {
+    eventStatement.run(
+      record.workspaceId,
+      record.id,
+      record.sequence,
+      record.type,
+      record.workerDefinitionId,
+      record.workerVersionId ?? null,
+      record.workerDeploymentId ?? null,
+      record.occurredAt,
+      JSON.stringify(record),
+    );
+  }
 }
 
 function persistDedicatedJobMetricSnapshots(db: DatabaseSync, records: JobMetricSnapshotRecord[]): void {

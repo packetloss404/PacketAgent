@@ -43,18 +43,18 @@ Dependencies: PA0.
 
 Dependencies: W1.
 
-Status: active. Resume at
-[`W2.1 - Register the durable data shape`](dev/worker-implementation-loops.md#w21---register-the-durable-data-shape).
-
-- [ ] Add repository support for JSON, SQLite, and managed Postgres modes.
-- [ ] Make deployed Worker versions immutable and addressable.
-- [ ] Implement draft, validate, deploy, activate, pause, resume, retire, and rollback operations.
-- [ ] Add activation idempotency and optimistic concurrency.
-- Gate: backend parity tests prove the same lifecycle and conflict behavior in every supported store.
+- [x] Add repository support for JSON, SQLite, and managed Postgres modes.
+- [x] Make deployed Worker versions immutable and addressable.
+- [x] Implement draft, validate, deploy, activate, pause, resume, retire, and rollback operations.
+- [x] Add activation idempotency and optimistic concurrency.
+- Gate: passed 2026-07-27. One shared lifecycle scenario proves replay, stale-write conflicts, two-writer activation, rollback replacement, process reload, and export behavior across JSON, SQLite, and managed Postgres.
 
 ### W3 - Trigger and activation envelope
 
 Dependencies: W1, W2.
+
+Status: active. Resume at
+[`W3.1 - Define the envelope and inbox records`](dev/worker-implementation-loops.md#w31---define-the-envelope-and-inbox-records).
 
 - [ ] Normalize manual, cron, webhook, alert, and queue inputs into one activation envelope.
 - [ ] Preserve trigger identity, delivery identity, timestamp, actor, payload reference, and trace context.

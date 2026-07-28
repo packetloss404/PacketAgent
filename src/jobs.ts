@@ -16,7 +16,7 @@ import {
   type PacketAgentData,
   upsertActivationSignal,
 } from "./packetagent-store";
-import { exportWorkspaceData } from "./jobs/export-workspace.js";
+import { exportWorkspaceDataAsync } from "./jobs/export-workspace.js";
 import { reconcileInvitationEmails } from "./jobs/reconcile-invitation-emails.js";
 import { snapshotJobMetrics } from "./jobs/job-metrics-snapshot.js";
 
@@ -235,7 +235,7 @@ export async function runJobsCli(argv = process.argv.slice(2)): Promise<number> 
       writeUsage();
       return 1;
     }
-    const result = exportWorkspaceData({ workspaceId });
+    const result = await exportWorkspaceDataAsync({ workspaceId });
     console.log(JSON.stringify(result, null, 2));
     return 0;
   }

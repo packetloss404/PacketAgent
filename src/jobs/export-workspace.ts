@@ -1,4 +1,4 @@
-import { loadStore as loadDefaultStore } from "../packetagent-store.js";
+import { loadStore as loadDefaultStore, loadStoreAsync as loadDefaultStoreAsync } from "../packetagent-store.js";
 import type {
   ActivationSignalRecord,
   ActivityRecord,
@@ -25,6 +25,18 @@ import type {
 import type { ActivationMilestoneRecord, ActivationStatusDto } from "../activation/domain.js";
 import type { WorkspaceActivationFacts } from "../activation/adapters.js";
 import { maskSecret, redactSensitiveValue } from "../security/redaction.js";
+import type {
+  WorkerCheckpoint,
+  WorkerDefinition,
+  WorkerDeployment,
+  WorkerRun,
+  WorkerVersion,
+} from "../workers/types.js";
+import type {
+  WorkerDeploymentRollout,
+  WorkerEvent,
+  WorkerLifecycleCommandReceipt,
+} from "../workers/persistence-types.js";
 
 export interface ExportWorkspaceOptions {
   workspaceId: string;
@@ -32,6 +44,10 @@ export interface ExportWorkspaceOptions {
 
 export interface ExportWorkspaceDeps {
   loadStore: () => PacketAgentData;
+}
+
+export interface ExportWorkspaceAsyncDeps {
+  loadStore: () => PacketAgentData | Promise<PacketAgentData>;
 }
 
 export interface RedactedInvitation extends Omit<WorkspaceInvitationRecord, "token"> {
@@ -75,6 +91,14 @@ export interface ExportedWorkspaceData {
   workspaceEnvVars: RedactedWorkspaceEnvVar[];
   shareTokens: RedactedShareToken[];
   activities: ActivityRecord[];
+  workerDefinitions: WorkerDefinition[];
+  workerVersions: WorkerVersion[];
+  workerDeployments: WorkerDeployment[];
+  workerRuns: WorkerRun[];
+  workerCheckpoints: WorkerCheckpoint[];
+  workerDeploymentRollouts: WorkerDeploymentRollout[];
+  workerCommandReceipts: WorkerLifecycleCommandReceipt[];
+  workerEvents: WorkerEvent[];
   activationFacts: WorkspaceActivationFacts | null;
   activationSignals: ActivationSignalRecord[];
   activationMilestones: ActivationMilestoneRecord[];
@@ -92,12 +116,29 @@ const defaultDeps: ExportWorkspaceDeps = {
   loadStore: loadDefaultStore,
 };
 
+const defaultAsyncDeps: ExportWorkspaceAsyncDeps = {
+  loadStore: loadDefaultStoreAsync,
+};
+
 export function exportWorkspaceData(
   options: ExportWorkspaceOptions,
   deps: ExportWorkspaceDeps = defaultDeps,
 ): ExportWorkspaceResult {
+  return buildWorkspaceExport(options, deps.loadStore());
+}
+
+export async function exportWorkspaceDataAsync(
+  options: ExportWorkspaceOptions,
+  deps: ExportWorkspaceAsyncDeps = defaultAsyncDeps,
+): Promise<ExportWorkspaceResult> {
+  return buildWorkspaceExport(options, await deps.loadStore());
+}
+
+function buildWorkspaceExport(
+  options: ExportWorkspaceOptions,
+  store: PacketAgentData,
+): ExportWorkspaceResult {
   const { workspaceId } = options;
-  const store = deps.loadStore();
   const workspace = store.workspaces.find((entry) => entry.id === workspaceId);
   if (!workspace) {
     throw Object.assign(new Error("workspace not found"), { status: 404 });
@@ -172,6 +213,15 @@ export function exportWorkspaceData(
     .filter((entry) => entry.workspaceId === workspaceId)
     .map((entry) => redactSensitiveValue(entry) as ActivityRecord);
 
+  const workerDefinitions = workspaceWorkerRecords(store.workerDefinitions, workspaceId);
+  const workerVersions = workspaceWorkerRecords(store.workerVersions, workspaceId);
+  const workerDeployments = workspaceWorkerRecords(store.workerDeployments, workspaceId);
+  const workerRuns = workspaceWorkerRecords(store.workerRuns, workspaceId);
+  const workerCheckpoints = workspaceWorkerRecords(store.workerCheckpoints, workspaceId);
+  const workerDeploymentRollouts = workspaceWorkerRecords(store.workerDeploymentRollouts, workspaceId);
+  const workerCommandReceipts = workspaceWorkerRecords(store.workerCommandReceipts, workspaceId);
+  const workerEvents = workspaceWorkerRecords(store.workerEvents, workspaceId);
+
   const activationFacts = store.activationFacts?.[workspaceId] ?? null;
   const activationSignals = (store.activationSignals ?? [])
     .filter((entry) => entry.workspaceId === workspaceId)
@@ -205,12 +255,29 @@ export function exportWorkspaceData(
       workspaceEnvVars,
       shareTokens,
       activities,
+      workerDefinitions,
+      workerVersions,
+      workerDeployments,
+      workerRuns,
+      workerCheckpoints,
+      workerDeploymentRollouts,
+      workerCommandReceipts,
+      workerEvents,
       activationFacts,
       activationSignals,
       activationMilestones,
       activationReadModel,
     },
   };
+}
+
+function workspaceWorkerRecords<TRecord extends { workspaceId: string }>(
+  records: readonly TRecord[] | undefined,
+  workspaceId: string,
+): TRecord[] {
+  return (records ?? [])
+    .filter((entry) => entry.workspaceId === workspaceId)
+    .map((entry) => redactSensitiveValue(entry) as TRecord);
 }
 
 function redactInvitation(invitation: WorkspaceInvitationRecord): RedactedInvitation {

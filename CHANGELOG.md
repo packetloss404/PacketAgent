@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Worker persistence, versioning, and activation (W2)
+
+- Added durable Worker definitions, versions, deployments, runs, checkpoints, rollout links, command receipts, and lifecycle events to every supported store.
+- Added the forward-only `0019_worker_lifecycle.sql` migration with workspace-scoped keys, immutable version identity, deployment revisions, one-active-deployment enforcement, idempotency uniqueness, event sequencing, foreign keys, and lifecycle indexes.
+- Added atomic lifecycle services and private RBAC-protected routes for definition/version creation, draft updates, validation, deployment, activation, pause/resume, retirement, and rollback to an older validated version.
+- Bound idempotent replay to workspace, operation, target, actor, and canonical request content; stale digests and revisions return stable conflicts.
+- Added JSON, SQLite, and managed-Postgres parity coverage for concurrent activation, rollback, reload, export, and JSON-to-SQLite backfill.
+
 ### 2026-07-27 - Canonical Worker contract (W1)
 
 - Added versioned, storage-neutral schemas and runtime validators for `WorkerDefinition`, `WorkerVersion`, `WorkerDeployment`, `WorkerTrigger`, `WorkerPolicy`, `WorkerRun`, and `WorkerCheckpoint`.

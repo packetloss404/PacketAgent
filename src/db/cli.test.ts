@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { backfillActivationSignals, backfillActivities, backfillAgentRuns, backfillAlertEvents, backfillAppDatabase, backfillInvitationEmailDeliveries, backfillJobMetricSnapshots, backfillJobs, backfillManagedPostgres, backfillProviderCalls, backupDatabase, compareManagedPostgresStores, loadManagedPostgresSource, managedPostgresStoreStats, migrateDatabase, migrationStatus, readAppData, resetAppDatabase, resetDatabase, restoreDatabase, seedAppDatabase, seedDatabase, verifyActivationSignals, verifyActivities, verifyAgentRuns, verifyAlertEvents, verifyInvitationEmailDeliveries, verifyJobMetricSnapshots, verifyJobs, verifyManagedPostgres, verifyProviderCalls, type ManagedPostgresDocumentStoreDeps } from "./cli";
 import type { ActivationSignalRecord, ActivityRecord, AgentRunRecord, AlertEventRecord, InvitationEmailDeliveryRecord, JobMetricSnapshotRecord, JobRecord, ProviderCallRecord, PacketAgentData } from "../packetagent-store";
 import { createSeedStore } from "../packetagent-store";
+import { makeWorkerDefinition, makeWorkerVersion } from "../workers/__tests__/fixtures.js";
 
 const expectedMigrations = readdirSync(resolve(process.cwd(), "src", "db", "migrations"))
   .filter((name) => name.endsWith(".sql"))
@@ -70,6 +71,14 @@ test("migrateDatabase creates runtime app tables", () => {
       "activation_signals",
       "activation_facts",
       "activation_read_models",
+      "worker_definitions",
+      "worker_versions",
+      "worker_deployments",
+      "worker_runs",
+      "worker_checkpoints",
+      "worker_deployment_rollouts",
+      "worker_command_receipts",
+      "worker_events",
     ];
 
     const db = new DatabaseSync(dbPath);
@@ -82,6 +91,66 @@ test("migrateDatabase creates runtime app tables", () => {
       `).all(...expectedTables) as Array<{ name: string }>;
 
       assert.deepEqual(rows.map((row) => row.name), [...expectedTables].sort());
+    } finally {
+      db.close();
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Worker migration enforces lifecycle identity and concurrency constraints", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
+  try {
+    const dbPath = join(tempDir, "packetagent.sqlite");
+    seedAppDatabase({ dbPath });
+    const db = new DatabaseSync(dbPath);
+    try {
+      db.exec("pragma foreign_keys = on");
+      db.prepare(`
+        insert into worker_definitions (
+          workspace_id, id, status, name, current_version_id, updated_at, payload
+        ) values (?, ?, ?, ?, ?, ?, json(?))
+      `).run("alpha", "worker-db", "active", "Database Worker", null, "2026-07-27T12:00:00.000Z", "{}");
+      db.prepare(`
+        insert into worker_versions (
+          workspace_id, id, worker_definition_id, version, status,
+          content_digest, created_at, payload
+        ) values (?, ?, ?, ?, ?, ?, ?, json(?))
+      `).run("alpha", "worker-db-v1", "worker-db", 1, "validated", "sha256:test", "2026-07-27T12:00:00.000Z", "{}");
+      db.prepare("update worker_definitions set current_version_id = ? where workspace_id = ? and id = ?")
+        .run("worker-db-v1", "alpha", "worker-db");
+
+      const insertDeployment = db.prepare(`
+        insert into worker_deployments (
+          workspace_id, id, worker_definition_id, worker_version_id,
+          status, revision, updated_at, payload
+        ) values (?, ?, ?, ?, ?, ?, ?, json(?))
+      `);
+      insertDeployment.run("alpha", "worker-db-deployment-1", "worker-db", "worker-db-v1", "active", 1, "2026-07-27T12:00:00.000Z", "{}");
+
+      assert.throws(
+        () => insertDeployment.run("alpha", "worker-db-deployment-2", "worker-db", "worker-db-v1", "active", 1, "2026-07-27T12:01:00.000Z", "{}"),
+        /UNIQUE constraint failed/,
+      );
+      assert.throws(
+        () => insertDeployment.run("alpha", "worker-db-invalid-revision", "worker-db", "worker-db-v1", "draft", 0, "2026-07-27T12:01:00.000Z", "{}"),
+        /CHECK constraint failed/,
+      );
+      assert.throws(
+        () => db.prepare(`
+          insert into worker_versions (
+            workspace_id, id, worker_definition_id, version, status,
+            content_digest, created_at, payload
+          ) values (?, ?, ?, ?, ?, ?, ?, json(?))
+        `).run("alpha", "worker-db-v1-duplicate-number", "worker-db", 1, "validated", "sha256:other", "2026-07-27T12:02:00.000Z", "{}"),
+        /UNIQUE constraint failed/,
+      );
+
+      const activeIndex = db.prepare("select name from sqlite_master where type = 'index' and name = ?")
+        .get("idx_worker_deployments_one_active_definition") as { name: string } | undefined;
+      assert.equal(activeIndex?.name, "idx_worker_deployments_one_active_definition");
+      assert.deepEqual(db.prepare("pragma foreign_key_check").all(), []);
     } finally {
       db.close();
     }
@@ -237,6 +306,19 @@ test("backfillAppDatabase reads a JSON store path into SQLite", () => {
         data: { source: "backfill" },
       }),
     ];
+    data.workerDefinitions = [
+      makeWorkerDefinition({
+        workspaceId: "alpha",
+        id: "worker-backfill",
+      }),
+    ];
+    data.workerVersions = [
+      makeWorkerVersion({
+        workspaceId: "alpha",
+        id: "worker-backfill-v1",
+        workerDefinitionId: "worker-backfill",
+      }),
+    ];
     writeFileSync(jsonPath, JSON.stringify(data));
 
     const result = backfillAppDatabase({ dbPath, jsonPath });
@@ -246,6 +328,8 @@ test("backfillAppDatabase reads a JSON store path into SQLite", () => {
     assert.equal(stored?.workspaces[0]?.name, "Backfilled Workspace");
     assert.equal(stored?.rateLimits?.[0]?.id, "auth:login:sha256:backfill");
     assert.deepEqual(stored?.activationSignals.map((entry) => entry.id), ["signal_backfill_cli"]);
+    assert.deepEqual(stored?.workerDefinitions.map((entry) => entry.id), ["worker-backfill"]);
+    assert.deepEqual(stored?.workerVersions.map((entry) => entry.id), ["worker-backfill-v1"]);
 
     const db = new DatabaseSync(dbPath);
     try {
@@ -253,10 +337,14 @@ test("backfillAppDatabase reads a JSON store path into SQLite", () => {
       const rateLimitAppRecordRows = db.prepare("select count(*) as count from app_records where collection = 'rateLimits'").get() as { count: number };
       const signalRows = db.prepare("select count(*) as count from activation_signals where id = 'signal_backfill_cli'").get() as { count: number };
       const signalAppRecordRows = db.prepare("select count(*) as count from app_records where collection = 'activationSignals'").get() as { count: number };
+      const workerDefinitionRows = db.prepare("select count(*) as count from worker_definitions where id = 'worker-backfill'").get() as { count: number };
+      const workerVersionRows = db.prepare("select count(*) as count from worker_versions where id = 'worker-backfill-v1'").get() as { count: number };
       assert.equal(bucketRows.count, 1);
       assert.equal(rateLimitAppRecordRows.count, 0);
       assert.equal(signalRows.count, 1);
       assert.equal(signalAppRecordRows.count, 0);
+      assert.equal(workerDefinitionRows.count, 1);
+      assert.equal(workerVersionRows.count, 1);
     } finally {
       db.close();
     }

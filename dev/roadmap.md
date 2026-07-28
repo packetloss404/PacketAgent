@@ -5,10 +5,10 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W2 - Worker persistence, versioning, and activation**. Repository/session state
+Current active loop: **W3 - Trigger and activation envelope**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
-Resume at W2.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w21---register-the-durable-data-shape).
+Resume at W3.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w31---define-the-envelope-and-inbox-records).
 
 ## North star
 
@@ -45,11 +45,11 @@ These pieces work, but they are not yet unified as one durable Worker lifecycle.
 
 The storage-neutral canonical Worker, WorkerVersion, WorkerDeployment, WorkerRun, WorkerCheckpoint, WorkerPolicy, and WorkerTrigger records, runtime validators, transition guards, immutable-version checks, and legacy agent/workflow projections are implemented under `src/workers/`.
 
-### 2. Worker persistence and activation - active
+### 2. Worker persistence and activation - complete
 
-Support draft, validated, deployed, active, paused, and retired deployments. Only validated immutable versions can activate. Persist version provenance and idempotency keys.
+Canonical Worker records persist in JSON, SQLite, and managed Postgres. Private lifecycle routes support immutable version validation plus draft, deploy, activate, pause, resume, retire, and rollback operations with durable command receipts, events, idempotent replay, and optimistic concurrency.
 
-### 3. Trigger adapters
+### 3. Trigger adapters - active
 
 Normalize manual, cron, webhook, alert, and queue activations into a single activation envelope. Deduplicate repeated delivery and record the trigger source.
 

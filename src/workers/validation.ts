@@ -863,26 +863,27 @@ function validateTrace(value: unknown, path: string, issues: IssueCollector): vo
   }
 }
 
-function canonicalJson(value: unknown): string {
+export function canonicalWorkerJson(value: unknown): string {
   if (value === null || typeof value === "string" || typeof value === "boolean")
     return JSON.stringify(value);
   if (typeof value === "number") {
     if (!Number.isFinite(value)) throw new Error("cannot digest a non-finite number");
     return JSON.stringify(value);
   }
-  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
+  if (Array.isArray(value))
+    return `[${value.map((entry) => canonicalWorkerJson(entry)).join(",")}]`;
   if (isRecord(value)) {
     const entries = Object.entries(value)
       .filter(([, entry]) => entry !== undefined)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`);
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalWorkerJson(entry)}`);
     return `{${entries.join(",")}}`;
   }
   throw new Error("cannot digest a non-JSON value");
 }
 
 export function computeWorkerVersionContentDigest(content: WorkerVersionContent): string {
-  return `sha256:${createHash("sha256").update(canonicalJson(content)).digest("hex")}`;
+  return `sha256:${createHash("sha256").update(canonicalWorkerJson(content)).digest("hex")}`;
 }
 
 function finish<T>(value: unknown, issues: IssueCollector): WorkerContractValidation<T> {

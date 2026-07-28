@@ -11,9 +11,9 @@ ledger without rebuilding the plan after every loop.
 
 ## Scope and authority
 
-- W1 is complete. Its decisions and verification live in
+- W1-W2 are complete. W1's decisions and verification live in
   [`worker-contract-plan.md`](worker-contract-plan.md).
-- W2-W10 are the active autonomous-Worker sequence.
+- W3-W10 are the active autonomous-Worker sequence.
 - R1-R8 below are the ordered continuation of the inherited backlog after W10.
 - Work explicitly marked "Later, not MVP" is decision-gated and is not part of
   the automatic queue.

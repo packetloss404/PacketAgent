@@ -3,6 +3,9 @@ import test from "node:test";
 import { exportWorkspaceData, type ExportWorkspaceDeps } from "./export-workspace.js";
 import type { PacketAgentData } from "../packetagent-store.js";
 import { maskSecret } from "../security/redaction.js";
+import { createWorkerRepository } from "../workers/repository.js";
+import { createWorkerLifecycleService } from "../workers/service.js";
+import { makeWorkerVersionContent } from "../workers/__tests__/fixtures.js";
 
 test("exportWorkspaceData throws 404 when the workspace does not exist", () => {
   const data = makeStore();
@@ -108,6 +111,49 @@ test("exportWorkspaceData recursively redacts nested sensitive values inside job
   assert.equal(payload.safe, "ok");
   const serialized = JSON.stringify(result);
   assert.equal(serialized.includes("abc-secret-token-7777"), false);
+});
+
+test("exportWorkspaceData includes only the selected workspace's Worker lifecycle", async () => {
+  const data = makeStore();
+  const repository = createWorkerRepository({
+    loadStore: () => data,
+    mutateStore: (mutator) => mutator(data),
+  });
+  const service = createWorkerLifecycleService({
+    repository,
+    now: () => new Date("2026-07-27T12:00:00.000Z"),
+    id: (kind) => `${kind}-export`,
+  });
+  await service.createDefinition({
+    workspaceId: "alpha",
+    actor: { type: "user", id: "user_alpha" },
+    idempotencyKey: "export-worker-alpha",
+    definitionId: "worker-export-alpha",
+    versionId: "worker-export-alpha-v1",
+    name: "Export Worker",
+    description: "Verifies Worker export coverage.",
+    content: makeWorkerVersionContent(),
+    source: { product: "PacketAgent", kind: "native" },
+  });
+  await service.createDefinition({
+    workspaceId: "beta",
+    actor: { type: "user", id: "user_beta" },
+    idempotencyKey: "export-worker-beta",
+    definitionId: "worker-export-beta",
+    versionId: "worker-export-beta-v1",
+    name: "Hidden Worker",
+    description: "Must not cross the workspace export boundary.",
+    content: makeWorkerVersionContent(),
+    source: { product: "PacketAgent", kind: "native" },
+  });
+
+  const result = exportWorkspaceData({ workspaceId: "alpha" }, makeDeps(data));
+
+  assert.deepEqual(result.data.workerDefinitions.map((record) => record.id), ["worker-export-alpha"]);
+  assert.deepEqual(result.data.workerVersions.map((record) => record.id), ["worker-export-alpha-v1"]);
+  assert.equal(result.data.workerCommandReceipts.length, 1);
+  assert.equal(result.data.workerEvents.length, 1);
+  assert.equal(JSON.stringify(result).includes("worker-export-beta"), false);
 });
 
 function makeDeps(data: PacketAgentData): ExportWorkspaceDeps {
@@ -388,6 +434,14 @@ function makeStore(): PacketAgentData {
         createdAt: "2026-04-20T10:00:00.000Z",
       },
     ],
+    workerDefinitions: [],
+    workerVersions: [],
+    workerDeployments: [],
+    workerRuns: [],
+    workerCheckpoints: [],
+    workerDeploymentRollouts: [],
+    workerCommandReceipts: [],
+    workerEvents: [],
     activationMilestones: {},
     activationReadModels: {},
   };
