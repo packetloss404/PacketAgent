@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W8 and W9.1-W9.2 are implemented as
+in foundation commit `d60cd47`. W1-W8 and W9.1-W9.3 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -164,6 +164,14 @@ Prompt-to-app generation remains a supported secondary capability.
   rate-limited writes are auditable without raw tokens. Migration `0023` and
   workspace export preserve JSON, SQLite, and managed-Postgres parity while
   omitting token digests from exports.
+- Completed W9.3's PacketADE deployment endpoints. The Packet-product API
+  validates without lifecycle writes; deploys, atomically updates, activates,
+  inspects, lists runs, pauses, resumes, rolls back, and revokes through the
+  W2/W3/W7/W8 services; returns field-addressed errors, local approval and
+  capability decisions, plus resulting IDs; and binds every deployment to its
+  accepted package receipt. Forward updates and rollbacks preserve locally
+  narrowed grants. Migration `0024` and workspace export pass JSON, SQLite,
+  and managed-Postgres parity.
 
 ## Current implementation truth
 
@@ -245,6 +253,10 @@ Implemented substrate:
   actors and operations, local capability acceptance, durable pre-deployment
   package receipts, per-credential write limits, token-safe audit, and
   three-backend persistence/export parity;
+- independently authenticated PacketADE validate/deploy/update/activate/
+  inspect/list-runs/pause/resume/rollback/revoke routes, immutable
+  package-to-deployment bindings, deterministic Worker IDs, atomic forward
+  rollouts, W3 manual admission, and W7 revocation;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -260,17 +272,17 @@ Not shipped:
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
 - external notification transports;
-- PacketADE-to-PacketAgent deployment/event endpoints and PacketChat/PacketPhone
-  delivery routes.
+- PacketADE reconnectable event/acknowledgement endpoints and
+  PacketChat/PacketPhone delivery routes.
 
 Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W9.3 - deployment endpoints** in
+Continue **W9.4 - reconnectable events** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W8 and W9.1-W9.2 are complete under `src/workers/`, the store, migrations,
+W1-W8 and W9.1-W9.3 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -350,10 +362,16 @@ digest-stored PacketADE bearer credentials bound to a workspace, actor,
 operation set, expiry/revocation status, and signature requirement. It
 requires an explicit local subset of the package capability upper bound and
 stores integrity, provenance, compiled policy, actor, and idempotency before
-deployment.
+deployment. W9.3 maps the accepted receipt to deterministic Worker identities,
+persists the package/deployment graph, and exposes authenticated validate,
+deploy, update, activate, inspect, list-runs, pause, resume, rollback, and
+revoke routes. It composes W2 lifecycle transitions, W3 activation admission,
+W7 revocation, and W8 run reads; its only W2 extension is the atomic forward
+rollout operation needed to retire the previous deployment without a
+competing-active gap or capability broadening.
 
 The exact next slice is
-[`W9.3 - Implement the deployment endpoints`](worker-implementation-loops.md#w93---implement-the-deployment-endpoints).
+[`W9.4 - Stream reconnectable events`](worker-implementation-loops.md#w94---stream-reconnectable-events).
 After each gate passes, continue through W9-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -379,7 +397,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,470 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,475 passed, 1 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -433,6 +451,12 @@ handoff, the roadmap, or the backlog.
   enforcement, pre-deployment idempotency receipts, durable rate-limit/audit
   outcomes, secret-free exports, persistence-integrity rejection, and
   JSON/SQLite/managed-Postgres parity checks - passed
+- focused W9.3 lifecycle-dry validation, field-addressed transport errors,
+  authenticated deploy/inspect/list/control, exact activation replay, atomic
+  forward update, locally narrowed update/rollback grants, unbound/
+  cross-workspace/stale rejection, durable package/deployment graph integrity,
+  secret-free export, migration, and JSON/SQLite/managed-Postgres parity
+  checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
@@ -462,6 +486,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W9.2 commit: clean. Stop if the active folder is
+Expected status after the W9.3 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

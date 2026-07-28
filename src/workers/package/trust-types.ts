@@ -9,6 +9,8 @@ export const PACKET_PRODUCT_CREDENTIAL_SCHEMA_VERSION =
   "packetagent.packet-product-credential/v1" as const;
 export const WORKER_PACKAGE_RECEIPT_SCHEMA_VERSION =
   "packetagent.worker-package-receipt/v1" as const;
+export const WORKER_PACKAGE_DEPLOYMENT_SCHEMA_VERSION =
+  "packetagent.worker-package-deployment/v1" as const;
 
 export const PACKET_PRODUCT_OPERATIONS = [
   "package.validate",
@@ -91,6 +93,25 @@ export interface WorkerPackageReceipt {
   readonly acceptedAt: string;
 }
 
+export interface WorkerPackageDeploymentRecord {
+  readonly schemaVersion: typeof WORKER_PACKAGE_DEPLOYMENT_SCHEMA_VERSION;
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly receiptId: string;
+  readonly packageId: string;
+  readonly packageVersion: number;
+  readonly packageDigest: string;
+  readonly workerDefinitionId: string;
+  readonly workerVersionId: string;
+  readonly workerDeploymentId: string;
+  readonly operation: "deploy" | "update" | "rollback";
+  readonly actor: WorkerActorReference & {
+    readonly type: "packet_product";
+    readonly product: "PacketADE";
+  };
+  readonly createdAt: string;
+}
+
 export function packetProductCredentialMetadata(
   record: PacketProductCredentialRecord,
 ): PacketProductCredentialMetadata {
@@ -155,6 +176,31 @@ export function assertValidWorkerPackageReceipt(record: WorkerPackageReceipt): v
     !validCapabilityDecision(record.capabilityDecision)
   ) {
     throw new Error("Worker package receipt is invalid.");
+  }
+}
+
+export function assertValidWorkerPackageDeploymentRecord(
+  record: WorkerPackageDeploymentRecord,
+): void {
+  if (
+    record.schemaVersion !== WORKER_PACKAGE_DEPLOYMENT_SCHEMA_VERSION ||
+    !isNonEmpty(record.id) ||
+    !isNonEmpty(record.workspaceId) ||
+    !isNonEmpty(record.receiptId) ||
+    !isNonEmpty(record.packageId) ||
+    !Number.isInteger(record.packageVersion) ||
+    record.packageVersion < 1 ||
+    !isSha256Digest(record.packageDigest) ||
+    !isNonEmpty(record.workerDefinitionId) ||
+    !isNonEmpty(record.workerVersionId) ||
+    !isNonEmpty(record.workerDeploymentId) ||
+    !["deploy", "update", "rollback"].includes(record.operation) ||
+    record.actor.type !== "packet_product" ||
+    record.actor.product !== "PacketADE" ||
+    !isNonEmpty(record.actor.id) ||
+    !isTimestamp(record.createdAt)
+  ) {
+    throw new Error("Worker package deployment record is invalid.");
   }
 }
 

@@ -134,7 +134,7 @@ Status: complete.
 Dependencies: W2-W7.
 
 Status: complete. Resume at
-[`W9.3 - Implement the deployment endpoints`](dev/worker-implementation-loops.md#w93---implement-the-deployment-endpoints).
+[`W9.4 - Stream reconnectable events`](dev/worker-implementation-loops.md#w94---stream-reconnectable-events).
 
 - [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
@@ -157,10 +157,11 @@ Status: complete. Resume at
 Dependencies: W1-W7. Contract design may proceed earlier.
 
 Status: active. Resume at
-[`W9.3 - Implement the deployment endpoints`](dev/worker-implementation-loops.md#w93---implement-the-deployment-endpoints).
+[`W9.4 - Stream reconnectable events`](dev/worker-implementation-loops.md#w94---stream-reconnectable-events).
 
 - [x] Implement the WorkerPackage contract in [`dev/packetade-packetagent-handoff.md`](dev/packetade-packetagent-handoff.md).
-- [ ] Add validate, deploy, update, activate, inspect, pause, and revoke endpoints.
+- [x] Add validate, deploy, update, activate, inspect, list-runs, pause, resume,
+      rollback, and revoke endpoints through W2/W3/W7/W8 services.
 - [x] Verify package provenance, schema version, integrity, local capability
       acceptance, and idempotency behind a workspace/actor-bound PacketADE
       credential.

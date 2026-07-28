@@ -34,6 +34,7 @@ export type WorkerLifecycleOperation =
   | "deployment.pause"
   | "deployment.resume"
   | "deployment.retire"
+  | "deployment.update"
   | "deployment.rollback"
   | "definition.retire";
 
@@ -168,6 +169,7 @@ export interface WorkerPersistenceCollections {
   readonly workerEffectReceipts: readonly WorkerEffectReceipt[];
   readonly packetProductCredentials: readonly import("./package/trust-types.js").PacketProductCredentialRecord[];
   readonly workerPackageReceipts: readonly import("./package/trust-types.js").WorkerPackageReceipt[];
+  readonly workerPackageDeployments: readonly import("./package/trust-types.js").WorkerPackageDeploymentRecord[];
   readonly workerBudgetReservations: readonly import("./budget-types.js").WorkerBudgetReservationRecord[];
   readonly workerAttentionRequests: readonly import("./control-types.js").WorkerAttentionRequest[];
   readonly workerApprovalGrants: readonly import("./control-types.js").WorkerApprovalGrant[];

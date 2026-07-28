@@ -87,6 +87,13 @@ export interface TransitionWorkerDeploymentInput extends WorkerCommandContext {
 export interface RollbackWorkerDeploymentInput extends TransitionWorkerDeploymentInput {
   readonly targetWorkerVersionId: string;
   readonly replacementDeploymentId?: string;
+  readonly capabilityGrants?: readonly WorkerDeploymentCapabilityGrant[];
+}
+
+export interface UpdateWorkerDeploymentInput extends TransitionWorkerDeploymentInput {
+  readonly targetWorkerVersionId: string;
+  readonly replacementDeploymentId?: string;
+  readonly capabilityGrants?: readonly WorkerDeploymentCapabilityGrant[];
 }
 
 export interface RetireWorkerDefinitionInput extends WorkerCommandContext {
@@ -132,6 +139,7 @@ export interface WorkerLifecycleService {
   pause(input: TransitionWorkerDeploymentInput): Promise<WorkerLifecycleCommandResponse>;
   resume(input: TransitionWorkerDeploymentInput): Promise<WorkerLifecycleCommandResponse>;
   retireDeployment(input: TransitionWorkerDeploymentInput): Promise<WorkerLifecycleCommandResponse>;
+  updateDeployment(input: UpdateWorkerDeploymentInput): Promise<WorkerLifecycleCommandResponse>;
   rollback(input: RollbackWorkerDeploymentInput): Promise<WorkerLifecycleCommandResponse>;
   retireDefinition(input: RetireWorkerDefinitionInput): Promise<WorkerLifecycleCommandResponse>;
 }
@@ -432,136 +440,11 @@ export function createWorkerLifecycleService(
     retireDeployment(input) {
       return transitionDeployment(repository, now, id, input, "deployment.retire", "retired");
     },
+    updateDeployment(input) {
+      return rolloutDeployment(repository, now, id, input, "update");
+    },
     rollback(input) {
-      return executeCommand(
-        repository,
-        now,
-        id,
-        input,
-        "deployment.rollback",
-        input.workerDeploymentId,
-        {
-          workerDeploymentId: input.workerDeploymentId,
-          targetWorkerVersionId: input.targetWorkerVersionId,
-          replacementDeploymentId: input.replacementDeploymentId,
-          expectedRevision: input.expectedRevision,
-          statusReason: input.statusReason,
-        },
-        (transaction, timestamp) => {
-          const previous = requireDeployment(transaction, input.workerDeploymentId);
-          assertExpectedRevision(previous, input.expectedRevision);
-          if (!["deployed", "active", "paused"].includes(previous.status))
-            throw new WorkerLifecycleError(
-              "invalid_transition",
-              `WorkerDeployment cannot roll back from ${previous.status}.`,
-            );
-          const version = requireVersion(transaction, input.targetWorkerVersionId);
-          const previousVersion = requireVersion(transaction, previous.workerVersionId);
-          assertWorkerVersionDeployable(version);
-          if (
-            version.workerDefinitionId !== previous.workerDefinitionId ||
-            version.version >= previousVersion.version
-          ) {
-            throw new WorkerLifecycleError(
-              "conflict",
-              "Rollback must select an older validated version of the same WorkerDefinition.",
-            );
-          }
-          if (
-            transaction
-              .listDeployments(previous.workerDefinitionId)
-              .some(
-                (deployment) =>
-                  deployment.id !== previous.id &&
-                  deployment.workerVersionId === version.id &&
-                  !["retired", "rejected", "revoked"].includes(deployment.status),
-              )
-          ) {
-            throw new WorkerLifecycleError(
-              "conflict",
-              "Rollback target already has a nonterminal deployment.",
-            );
-          }
-          const definition = requireDefinition(transaction, previous.workerDefinitionId);
-          const compiled = compileWorkerCapabilityPolicy({
-            workerVersionContentDigest: version.contentDigest,
-            requestedCapabilities: version.content.tools,
-            allowedCapabilityIds: version.content.policy.permissions.allowedCapabilityIds,
-            credentialRefs: version.content.credentialRefs,
-          });
-          const retired: WorkerDeployment = {
-            ...previous,
-            status: "retired",
-            revision: previous.revision + 1,
-            statusReason: input.statusReason ?? "Replaced by rollback.",
-            updatedAt: timestamp,
-            retiredAt: timestamp,
-          };
-          assertWorkerDeploymentUpdate(previous, retired);
-          transaction.replaceDeployment(retired);
-
-          const replacementStatus = previous.status;
-          const deployment: WorkerDeployment = {
-            schemaVersion: WORKER_CONTRACT_SCHEMA_VERSION,
-            id: input.replacementDeploymentId ?? id("deployment"),
-            workspaceId: input.workspaceId,
-            workerDefinitionId: definition.id,
-            workerVersionId: version.id,
-            status: replacementStatus,
-            revision: 1,
-            capabilityGrants: compiled.grants,
-            compiledPolicy: compiled.policy,
-            statusReason: input.statusReason ?? "Rollback deployment.",
-            createdBy: input.actor,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-            validatedAt: timestamp,
-            deployedAt: timestamp,
-            ...(replacementStatus === "active" || replacementStatus === "paused"
-              ? { activatedAt: timestamp }
-              : {}),
-            ...(replacementStatus === "paused" ? { pausedAt: timestamp } : {}),
-          };
-          assertValidWorkerDeployment(deployment);
-          transaction.insertDeployment(deployment);
-
-          const rollout: WorkerDeploymentRollout = {
-            schemaVersion: WORKER_ROLLOUT_SCHEMA_VERSION,
-            id: id("rollout"),
-            workspaceId: input.workspaceId,
-            workerDefinitionId: definition.id,
-            fromDeploymentId: previous.id,
-            toDeploymentId: deployment.id,
-            kind: "rollback",
-            createdBy: input.actor,
-            createdAt: timestamp,
-          };
-          transaction.insertRollout(rollout);
-          const updatedDefinition: WorkerDefinition = {
-            ...definition,
-            status: "active",
-            currentVersionId: version.id,
-            updatedAt: timestamp,
-          };
-          assertWorkerDefinitionUpdate(definition, updatedDefinition);
-          transaction.replaceDefinition(updatedDefinition);
-          appendEvent(transaction, id, timestamp, {
-            type: "worker.deployment.rolled_back",
-            definition: updatedDefinition,
-            version,
-            deployment,
-            actor: input.actor,
-            summary: `Worker ${definition.name} rolled back to version ${version.version}.`,
-          });
-          return {
-            definition: updatedDefinition,
-            version,
-            deployment,
-            previousDeployment: retired,
-            rollout,
-          };
-        },
-      );
+      return rolloutDeployment(repository, now, id, input, "rollback");
     },
     retireDefinition(input) {
       return executeCommand(
@@ -733,6 +616,156 @@ function transitionDeployment(
         summary: `Worker ${definition.name} deployment ${status}.`,
       });
       return { definition, version, deployment };
+    },
+  );
+}
+
+function rolloutDeployment(
+  repository: WorkerRepository,
+  now: () => Date,
+  id: NonNullable<WorkerLifecycleServiceDependencies["id"]>,
+  input: UpdateWorkerDeploymentInput | RollbackWorkerDeploymentInput,
+  kind: "update" | "rollback",
+): Promise<WorkerLifecycleCommandResponse> {
+  return executeCommand(
+    repository,
+    now,
+    id,
+    input,
+    kind === "update" ? "deployment.update" : "deployment.rollback",
+    input.workerDeploymentId,
+    {
+      workerDeploymentId: input.workerDeploymentId,
+      targetWorkerVersionId: input.targetWorkerVersionId,
+      replacementDeploymentId: input.replacementDeploymentId,
+      expectedRevision: input.expectedRevision,
+      statusReason: input.statusReason,
+      capabilityGrants: input.capabilityGrants,
+    },
+    (transaction, timestamp) => {
+      const previous = requireDeployment(transaction, input.workerDeploymentId);
+      assertExpectedRevision(previous, input.expectedRevision);
+      if (!["deployed", "active", "paused"].includes(previous.status)) {
+        throw new WorkerLifecycleError(
+          "invalid_transition",
+          `WorkerDeployment cannot ${kind === "update" ? "update" : "roll back"} from ${previous.status}.`,
+        );
+      }
+      const version = requireVersion(transaction, input.targetWorkerVersionId);
+      const previousVersion = requireVersion(transaction, previous.workerVersionId);
+      assertWorkerVersionDeployable(version);
+      const validDirection =
+        kind === "update"
+          ? version.version > previousVersion.version
+          : version.version < previousVersion.version;
+      if (version.workerDefinitionId !== previous.workerDefinitionId || !validDirection) {
+        throw new WorkerLifecycleError(
+          "conflict",
+          kind === "update"
+            ? "Update must select a newer validated version of the same WorkerDefinition."
+            : "Rollback must select an older validated version of the same WorkerDefinition.",
+        );
+      }
+      if (
+        transaction
+          .listDeployments(previous.workerDefinitionId)
+          .some(
+            (deployment) =>
+              deployment.id !== previous.id &&
+              deployment.workerVersionId === version.id &&
+              !["retired", "rejected", "revoked"].includes(deployment.status),
+          )
+      ) {
+        throw new WorkerLifecycleError(
+          "conflict",
+          `${kind === "update" ? "Update" : "Rollback"} target already has a nonterminal deployment.`,
+        );
+      }
+      const definition = requireDefinition(transaction, previous.workerDefinitionId);
+      const compiled = compileWorkerCapabilityPolicy({
+        workerVersionContentDigest: version.contentDigest,
+        requestedCapabilities: version.content.tools,
+        allowedCapabilityIds: version.content.policy.permissions.allowedCapabilityIds,
+        credentialRefs: version.content.credentialRefs,
+        ...(input.capabilityGrants ? { deploymentGrants: input.capabilityGrants } : {}),
+      });
+      const retired: WorkerDeployment = {
+        ...previous,
+        status: "retired",
+        revision: previous.revision + 1,
+        statusReason:
+          input.statusReason ??
+          (kind === "update" ? "Replaced by update." : "Replaced by rollback."),
+        updatedAt: timestamp,
+        retiredAt: timestamp,
+      };
+      assertWorkerDeploymentUpdate(previous, retired);
+      transaction.replaceDeployment(retired);
+
+      const replacementStatus = previous.status;
+      const deployment: WorkerDeployment = {
+        schemaVersion: WORKER_CONTRACT_SCHEMA_VERSION,
+        id: input.replacementDeploymentId ?? id("deployment"),
+        workspaceId: input.workspaceId,
+        workerDefinitionId: definition.id,
+        workerVersionId: version.id,
+        status: replacementStatus,
+        revision: 1,
+        capabilityGrants: compiled.grants,
+        compiledPolicy: compiled.policy,
+        statusReason:
+          input.statusReason ?? (kind === "update" ? "Update deployment." : "Rollback deployment."),
+        createdBy: input.actor,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        validatedAt: timestamp,
+        deployedAt: timestamp,
+        ...(replacementStatus === "active" || replacementStatus === "paused"
+          ? { activatedAt: timestamp }
+          : {}),
+        ...(replacementStatus === "paused" ? { pausedAt: timestamp } : {}),
+      };
+      assertValidWorkerDeployment(deployment);
+      transaction.insertDeployment(deployment);
+
+      const rollout: WorkerDeploymentRollout = {
+        schemaVersion: WORKER_ROLLOUT_SCHEMA_VERSION,
+        id: id("rollout"),
+        workspaceId: input.workspaceId,
+        workerDefinitionId: definition.id,
+        fromDeploymentId: previous.id,
+        toDeploymentId: deployment.id,
+        kind,
+        createdBy: input.actor,
+        createdAt: timestamp,
+      };
+      transaction.insertRollout(rollout);
+      const updatedDefinition: WorkerDefinition = {
+        ...definition,
+        status: "active",
+        currentVersionId: version.id,
+        updatedAt: timestamp,
+      };
+      assertWorkerDefinitionUpdate(definition, updatedDefinition);
+      transaction.replaceDefinition(updatedDefinition);
+      appendEvent(transaction, id, timestamp, {
+        type: kind === "update" ? "worker.deployment.updated" : "worker.deployment.rolled_back",
+        definition: updatedDefinition,
+        version,
+        deployment,
+        actor: input.actor,
+        summary:
+          kind === "update"
+            ? `Worker ${definition.name} updated to version ${version.version}.`
+            : `Worker ${definition.name} rolled back to version ${version.version}.`,
+      });
+      return {
+        definition: updatedDefinition,
+        version,
+        deployment,
+        previousDeployment: retired,
+        rollout,
+      };
     },
   );
 }

@@ -54,6 +54,7 @@ import {
   type WorkerRetentionPolicy,
 } from "../observability/retention-types.js";
 import { createPacketProductTrustService } from "../package/trust.js";
+import { createPacketProductDeploymentService } from "../package/deployment.js";
 import type { WorkerPackage } from "../package/types.js";
 
 const STORE_ENV_KEYS = [
@@ -118,8 +119,10 @@ interface BackendScenarioResult {
   readonly operationsReadModel: Awaited<ReturnType<typeof parityOperationsProjection>>;
   readonly packetProductCredentialCount: number;
   readonly workerPackageReceiptProjection: readonly string[];
+  readonly workerPackageDeploymentProjection: readonly string[];
   readonly exportedPacketProductCredentialCount: number;
   readonly exportedWorkerPackageReceiptCount: number;
+  readonly exportedWorkerPackageDeploymentCount: number;
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -184,6 +187,10 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     stored.packetProductCredentials.length,
   );
   assert.equal(exported.data.workerPackageReceipts.length, stored.workerPackageReceipts.length);
+  assert.equal(
+    exported.data.workerPackageDeployments.length,
+    stored.workerPackageDeployments.length,
+  );
   assert.equal(JSON.stringify(exported).includes("backend-parity-secret"), false);
   assert.equal(JSON.stringify(exported).includes(stored.workerCredentials[0].ciphertext), false);
   assert.equal(JSON.stringify(exported).includes(packetProductToken), false);
@@ -283,8 +290,15 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
           `${receipt.packageId}:${receipt.packageVersion}:${receipt.integrity.digestVerified}:${receipt.capabilityDecision.compiledPolicy.policyDigest}`,
       )
       .sort(),
+    workerPackageDeploymentProjection: stored.workerPackageDeployments
+      .map(
+        (binding) =>
+          `${binding.packageId}:${binding.packageVersion}:${binding.operation}:${binding.workerDefinitionId}:${binding.workerVersionId}:${binding.workerDeploymentId}`,
+      )
+      .sort(),
     exportedPacketProductCredentialCount: exported.data.packetProductCredentials.length,
     exportedWorkerPackageReceiptCount: exported.data.workerPackageReceipts.length,
+    exportedWorkerPackageDeploymentCount: exported.data.workerPackageDeployments.length,
   };
 }
 
@@ -293,7 +307,7 @@ async function runPacketProductTrustPersistence(): Promise<string> {
   const issued = await trust.issueCredential({
     workspaceId: "alpha",
     subjectId: "packetade:backend-parity",
-    allowedOperations: ["package.validate"],
+    allowedOperations: ["package.validate", "package.deploy"],
     createdBy: ACTOR,
   });
   const workerPackage = JSON.parse(
@@ -309,9 +323,11 @@ async function runPacketProductTrustPersistence(): Promise<string> {
       "utf8",
     ),
   ) as WorkerPackage;
-  await trust.acceptPackage({
+  const deploymentService = createPacketProductDeploymentService({ trust });
+  await deploymentService.deployPackage({
     authorization: `Bearer ${issued.token}`,
     workspaceId: "alpha",
+    idempotencyKey: "packetade-backend-parity-deploy",
     workerPackage,
     acceptedCapabilityIds: ["release-read"],
   });
@@ -1050,7 +1066,7 @@ async function withSqliteStore<T>(run: () => Promise<T>): Promise<T> {
       resetStoreForTests();
       const result = await run();
       const data = await loadStoreAsync();
-      assert.equal(data.workerDefinitions.length, 2);
+      assert.equal(data.workerDefinitions.length, 3);
       return result;
     },
     () => rmSync(directory, { recursive: true, force: true }),

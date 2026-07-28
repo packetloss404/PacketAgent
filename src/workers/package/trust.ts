@@ -47,6 +47,7 @@ export type PacketProductTrustErrorCode =
   | "unauthorized"
   | "forbidden"
   | "rate_limited"
+  | "not_found"
   | "invalid_input"
   | "invalid_package"
   | "capability_rejected"
@@ -57,7 +58,7 @@ export class PacketProductTrustError extends Error {
   constructor(
     readonly code: PacketProductTrustErrorCode,
     message: string,
-    readonly status: 400 | 401 | 403 | 409 | 429,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 429,
     readonly options: {
       readonly retryAt?: string;
       readonly issues?: readonly WorkerContractIssue[];

@@ -56,6 +56,7 @@ import type { WorkerCredentialMetadata } from "../workers/credential-types.js";
 import {
   packetProductCredentialMetadata,
   type PacketProductCredentialMetadata,
+  type WorkerPackageDeploymentRecord,
   type WorkerPackageReceipt,
 } from "../workers/package/trust-types.js";
 
@@ -115,6 +116,7 @@ export interface ExportedWorkspaceData {
   workerCredentials: WorkerCredentialMetadata[];
   packetProductCredentials: PacketProductCredentialMetadata[];
   workerPackageReceipts: WorkerPackageReceipt[];
+  workerPackageDeployments: WorkerPackageDeploymentRecord[];
   workerDefinitions: WorkerDefinition[];
   workerVersions: WorkerVersion[];
   workerDeployments: WorkerDeployment[];
@@ -257,6 +259,10 @@ function buildWorkspaceExport(
     workspaceId,
   ).map(packetProductCredentialMetadata);
   const workerPackageReceipts = workspaceWorkerRecords(store.workerPackageReceipts, workspaceId);
+  const workerPackageDeployments = workspaceWorkerRecords(
+    store.workerPackageDeployments,
+    workspaceId,
+  );
   const workerDefinitions = workspaceWorkerRecords(store.workerDefinitions, workspaceId);
   const workerVersions = workspaceWorkerRecords(store.workerVersions, workspaceId);
   const workerDeployments = workspaceWorkerRecords(store.workerDeployments, workspaceId);
@@ -334,6 +340,7 @@ function buildWorkspaceExport(
       workerCredentials,
       packetProductCredentials,
       workerPackageReceipts,
+      workerPackageDeployments,
       workerDefinitions,
       workerVersions,
       workerDeployments,

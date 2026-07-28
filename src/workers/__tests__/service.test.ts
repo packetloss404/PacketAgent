@@ -296,6 +296,57 @@ test("rollback creates a replacement deployment pinned to an older validated ver
   assert.equal(harness.data.workerDeploymentRollouts.length, 1);
 });
 
+test("update rollout atomically replaces a deployment with a newer version and narrowed grants", async () => {
+  const harness = createHarness();
+  const first = await createActiveDeployment(harness, "1");
+  const v2 = await harness.service.createVersion({
+    ...command("update-v2-create"),
+    workerDefinitionId: first.definition!.id,
+    versionId: "version-alpha-2",
+    content: content({ objective: "Second bounded release objective." }),
+    source: SOURCE,
+  });
+  const validatedV2 = await harness.service.validateVersion({
+    ...command("update-v2-validate"),
+    workerVersionId: v2.version!.id,
+    expectedContentDigest: v2.version!.contentDigest,
+  });
+  const input = {
+    ...command("update-rollout"),
+    workerDeploymentId: first.deployment!.id,
+    targetWorkerVersionId: validatedV2.version!.id,
+    replacementDeploymentId: "deployment-alpha-update",
+    expectedRevision: first.deployment!.revision,
+    capabilityGrants: [
+      {
+        capabilityId: "release-read",
+        verbs: ["GET"],
+        resources: ["https://releases.example.test/stable"],
+        approval: "always" as const,
+      },
+    ],
+  };
+
+  const updated = await harness.service.updateDeployment(input);
+  const replay = await harness.service.updateDeployment(input);
+
+  assert.deepEqual(replay, updated);
+  assert.equal(updated.previousDeployment?.status, "retired");
+  assert.equal(updated.deployment?.status, "active");
+  assert.equal(updated.deployment?.workerVersionId, validatedV2.version?.id);
+  assert.deepEqual(updated.deployment?.capabilityGrants, input.capabilityGrants);
+  assert.equal(updated.rollout?.kind, "update");
+  assert.equal(updated.rollout?.fromDeploymentId, first.deployment?.id);
+  assert.equal(updated.rollout?.toDeploymentId, updated.deployment?.id);
+  assert.equal(harness.data.workerDeploymentRollouts.length, 1);
+  assert.equal(
+    harness.data.workerCommandReceipts.filter(
+      (receipt) => receipt.operation === "deployment.update",
+    ).length,
+    1,
+  );
+});
+
 test("rollback rejects a newer target version", async () => {
   const harness = createHarness();
   const first = await createActiveDeployment(harness, "1");

@@ -82,6 +82,7 @@ test("migrateDatabase creates runtime app tables", () => {
       "worker_events",
       "packet_product_credentials",
       "worker_package_receipts",
+      "worker_package_deployments",
     ];
 
     const db = new DatabaseSync(dbPath);

@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W9 - PacketADE deployment handoff**. Repository/session state
+Current active loop: **W9.4 - PacketADE reconnectable events**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -21,8 +21,11 @@ cursor, tenant, and storage-parity gate are also complete. W9.1 freezes the
 strict, digest-bound WorkerPackage v1 contract and optional DSSE verification
 seam. W9.2 adds the workspace/actor-bound PacketADE credential, local
 capability acceptance, durable pre-deployment receipt, rate limit, audit, and
-storage parity. Resume at W9.3 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w93---implement-the-deployment-endpoints).
+storage parity. W9.3 adds the authenticated validate/deploy/update/activate/
+inspect/list/pause/resume/rollback/revoke API, immutable package/deployment
+bindings, atomic forward rollouts, and JSON/SQLite/managed Postgres parity.
+Resume at W9.4 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w94---stream-reconnectable-events).
 
 ## North star
 

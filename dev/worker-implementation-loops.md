@@ -734,7 +734,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: active. Resume at W9.3.
+Status: active. Resume at W9.4.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -775,6 +775,15 @@ managed Postgres pass the same persistence/export scenario.
 - Rate-limit and audit all package and control writes without logging tokens.
 
 ### W9.3 - Implement the deployment endpoints
+
+Status: complete as of 2026-07-28. The independently authenticated
+Packet-product API validates without lifecycle writes, deploys and updates
+through W2, optionally admits a manual run through W3, revokes through W7, and
+reads runs through W8. Immutable package/deployment bindings prove that later
+controls target a previously accepted receipt. Forward updates are atomic
+rollouts and both updates and rollbacks preserve locally narrowed grants.
+Migration `0024` and workspace export pass JSON, SQLite, and managed Postgres
+parity.
 
 - Implement validate, deploy, update, activate, inspect, list runs, pause,
   resume, rollback, and revoke through W2/W3/W7 services.

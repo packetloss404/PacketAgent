@@ -187,12 +187,46 @@ Initial endpoints:
 - `POST /api/worker-deployments/:id/activate`
 - `POST /api/worker-deployments/:id/pause`
 - `POST /api/worker-deployments/:id/resume`
+- `POST /api/worker-deployments/:id/rollback`
 - `POST /api/worker-deployments/:id/revoke`
 - `GET /api/worker-deployments/:id`
 - `GET /api/worker-deployments/:id/runs`
 - `GET /api/worker-runs/:id/events`
 
 Write endpoints require an idempotency key. Package IDs, deployment IDs, and run IDs remain distinct.
+
+### Packet-product request boundary
+
+These routes are service-to-service APIs, not browser-session routes.
+
+- Every request requires `Authorization: Bearer <PacketADE credential>` and
+  `PacketAgent-Workspace-Id: <workspace-id>`.
+- Every write requires `Idempotency-Key`. For validate, deploy, and update,
+  that header must equal the digest-bound `WorkerPackage.idempotencyKey`.
+- `POST /api/worker-packages/validate` accepts `workerPackage`,
+  `acceptedCapabilityIds`, and optional narrowed `capabilityGrants`. It stores
+  the trust receipt but performs no Worker lifecycle write and returns
+  `dryRun: true`.
+- `POST /api/worker-deployments` accepts the same body and advances the
+  accepted package through definition/version validation and deployment.
+- `PUT /api/worker-deployments/:id` additionally requires
+  `expectedRevision`; it creates an immutable newer WorkerVersion and performs
+  one atomic update rollout that retires the prior deployment without
+  broadening locally accepted grants.
+- Activate, pause, resume, rollback, and revoke bodies require
+  `expectedRevision`. Rollback additionally requires `targetPackageVersion`.
+  Activate defaults `startRun` to `true`, accepts optional `triggerId` and
+  `input`, and admits the manual occurrence through the canonical activation
+  inbox. Set `startRun: false` for a trigger-only deployment.
+- Run listing accepts the canonical `status`, `cursor`, and `limit` query
+  fields. The W9.4 event route is not implemented yet.
+
+Responses expose the durable receipt and package/deployment binding,
+requested/package-allowed/locally accepted/granted capabilities, local
+approval requirements, lifecycle records, and explicit `resultingIds`.
+Validation errors include stable `issues[]` entries with JSON/header/query
+paths. Authentication failures include `WWW-Authenticate`; rate-limit
+responses include `Retry-After`.
 
 ## Events returned to PacketADE
 
@@ -248,6 +282,14 @@ W9.3 must call this boundary for every package/control write and require the
 stored receipt before it invokes W2/W3/W7 lifecycle services. Transport TLS is
 an operator/deployment requirement; PacketAgent must not imply that a bearer
 token makes plaintext transport safe.
+
+W9.3 implements that rule with immutable
+`packetagent.worker-package-deployment/v1` bindings. Each binding joins one
+accepted receipt to the resulting Worker definition, immutable version, and
+deployment. Inspect/list authenticate through W9.2; lifecycle writes authorize
+their exact operation; manual activation uses W3; revoke uses W7. Migration
+`0024_worker_package_deployments.sql` persists the binding with referential
+constraints, and workspace exports include the secret-free record.
 
 ## Delivery order
 

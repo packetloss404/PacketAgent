@@ -31,6 +31,7 @@ import { WORKER_EFFECT_RECEIPT_SCHEMA_VERSION, type WorkerEffectReceipt } from "
 import { appendWorkerJournalEntry } from "./observability/journal.js";
 import {
   assertValidPacketProductCredentialRecord,
+  assertValidWorkerPackageDeploymentRecord,
   assertValidWorkerPackageReceipt,
 } from "./package/trust-types.js";
 import {
@@ -369,6 +370,7 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     data.workerCredentials.forEach(assertValidWorkerCredentialRecord);
     data.packetProductCredentials.forEach(assertValidPacketProductCredentialRecord);
     data.workerPackageReceipts.forEach(assertValidWorkerPackageReceipt);
+    data.workerPackageDeployments.forEach(assertValidWorkerPackageDeploymentRecord);
     data.workerDefinitions.forEach(assertValidWorkerDefinition);
     data.workerVersions.forEach(assertValidWorkerVersion);
     data.workerDeployments.forEach(assertValidWorkerDeployment);
@@ -390,6 +392,11 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     assertUnique(
       data.workerPackageReceipts,
       (record) => `${record.workspaceId}:${record.idempotencyKey}`,
+    );
+    assertUnique(data.workerPackageDeployments, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.workerPackageDeployments,
+      (record) => `${record.workspaceId}:${record.workerDeploymentId}`,
     );
     assertUnique(data.workerDefinitions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerVersions, (record) => `${record.workspaceId}:${record.id}`);
@@ -559,6 +566,53 @@ function validatePackageTrustReferences(data: PacketAgentData): void {
       );
     }
     packageDigests.set(coordinate, receipt.packageDigest);
+  }
+  for (const binding of data.workerPackageDeployments) {
+    const receipt = data.workerPackageReceipts.find(
+      (record) => record.workspaceId === binding.workspaceId && record.id === binding.receiptId,
+    );
+    const definition = data.workerDefinitions.find(
+      (record) =>
+        record.workspaceId === binding.workspaceId && record.id === binding.workerDefinitionId,
+    );
+    const version = data.workerVersions.find(
+      (record) =>
+        record.workspaceId === binding.workspaceId && record.id === binding.workerVersionId,
+    );
+    const deployment = data.workerDeployments.find(
+      (record) =>
+        record.workspaceId === binding.workspaceId && record.id === binding.workerDeploymentId,
+    );
+    if (!receipt || !definition || !version || !deployment) {
+      throw new Error(
+        `Worker package deployment ${binding.id} references a missing receipt or Worker record.`,
+      );
+    }
+    if (
+      binding.packageId !== receipt.packageId ||
+      binding.packageVersion !== receipt.packageVersion ||
+      binding.packageDigest !== receipt.packageDigest ||
+      canonicalWorkerJson(binding.actor) !== canonicalWorkerJson(receipt.authenticatedActor) ||
+      version.workerDefinitionId !== definition.id ||
+      deployment.workerDefinitionId !== definition.id ||
+      deployment.workerVersionId !== version.id ||
+      version.contentDigest !== receipt.workerVersionContentDigest ||
+      canonicalWorkerJson(version.source) !== canonicalWorkerJson(receipt.source)
+    ) {
+      throw new Error(
+        `Worker package deployment ${binding.id} is not bound to its accepted package and immutable Worker records.`,
+      );
+    }
+    if (
+      canonicalWorkerJson(deployment.capabilityGrants ?? []) !==
+        canonicalWorkerJson(receipt.capabilityDecision.grants) ||
+      deployment.compiledPolicy?.policyDigest !==
+        receipt.capabilityDecision.compiledPolicy.policyDigest
+    ) {
+      throw new Error(
+        `Worker package deployment ${binding.id} does not preserve its locally accepted capability decision.`,
+      );
+    }
   }
 }
 

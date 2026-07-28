@@ -23,6 +23,7 @@ import type {
 } from "../workers/observability/types.js";
 import type {
   PacketProductCredentialRecord,
+  WorkerPackageDeploymentRecord,
   WorkerPackageReceipt,
 } from "../workers/package/trust-types.js";
 import type {
@@ -64,6 +65,7 @@ export type DedicatedRelationalCollectionKey =
   | "activationSignals"
   | "packetProductCredentials"
   | "workerPackageReceipts"
+  | "workerPackageDeployments"
   | "workerDefinitions"
   | "workerVersions"
   | "workerDeployments"
@@ -108,6 +110,10 @@ export function loadDedicatedRelationalCollections(
     workerPackageReceipts: loadWorkerPayloads<WorkerPackageReceipt>(
       db,
       "select payload from worker_package_receipts order by workspace_id, accepted_at, id",
+    ),
+    workerPackageDeployments: loadWorkerPayloads<WorkerPackageDeploymentRecord>(
+      db,
+      "select payload from worker_package_deployments order by workspace_id, created_at, id",
     ),
     workerDefinitions: loadWorkerPayloads<WorkerDefinition>(
       db,
@@ -515,6 +521,7 @@ export function persistDedicatedRelationalRows(db: DatabaseSync, data: PacketAge
 
 function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData): void {
   db.exec(`
+    delete from worker_package_deployments;
     delete from worker_package_receipts;
     delete from packet_product_credentials;
     delete from worker_artifact_manifests;
@@ -626,6 +633,30 @@ function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData):
       record.status,
       record.revision,
       record.updatedAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const workerPackageDeploymentStatement = db.prepare(`
+    insert into worker_package_deployments (
+      workspace_id, id, receipt_id, package_id, package_version, package_digest,
+      worker_definition_id, worker_version_id, worker_deployment_id,
+      operation, created_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerPackageDeployments ?? []) {
+    workerPackageDeploymentStatement.run(
+      record.workspaceId,
+      record.id,
+      record.receiptId,
+      record.packageId,
+      record.packageVersion,
+      record.packageDigest,
+      record.workerDefinitionId,
+      record.workerVersionId,
+      record.workerDeploymentId,
+      record.operation,
+      record.createdAt,
       JSON.stringify(record),
     );
   }

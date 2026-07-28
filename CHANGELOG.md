@@ -6,6 +6,27 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - Packet-product trust and deployment API (W9.2-W9.3)
+
+- Added digest-only, workspace-bound PacketADE bearer credentials with fixed
+  service actors, operation grants, expiry/revocation state, optional DSSE
+  requirements, durable rate limiting, and token-safe audit records.
+- Persisted pre-deployment package integrity/provenance/idempotency receipts
+  and explicit local capability decisions that can only narrow the package
+  upper bound.
+- Added service-to-service validate, deploy, update, activate, inspect,
+  list-runs, pause, resume, rollback, and revoke endpoints over the canonical
+  lifecycle, activation, control, and observability services.
+- Added atomic forward deployment rollouts and immutable receipt-to-deployment
+  bindings. Updates and rollbacks preserve locally narrowed grants; W3 manual
+  admission and W7 revocation retain their durable replay semantics.
+- Added SQLite migrations `0023` and `0024`, secret-free workspace export, and
+  JSON/SQLite/managed-Postgres parity coverage.
+- The W9.3 baseline covers 1,476 API tests (1,475 passed and 1 intentionally
+  skipped) plus 28 web tests with zero lint errors.
+- Reconnectable PacketADE events and the final disconnect/restart handoff gate
+  remain W9.4-W9.5 work, so the unified lifecycle is not yet a shipped claim.
+
 ### 2026-07-28 - WorkerPackage v1 contract (W9.1)
 
 - Froze `packetagent.worker-package/v1` as a strict wire envelope mapping
