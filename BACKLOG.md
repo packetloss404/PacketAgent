@@ -115,8 +115,11 @@ rolling reservation, effect preparation, or external I/O.
 Dependencies: W4-W6.
 
 Status: active. Resume at
-[`W7.1 - Add durable control records`](dev/worker-implementation-loops.md#w71---add-durable-control-records).
+[`W7.2 - Implement the control service`](dev/worker-implementation-loops.md#w72---implement-the-control-service).
 
+- [x] Define and persist version-bound attention requests, approval grants,
+      control commands, and notification delivery references with durable replay
+      identities across JSON, SQLite, and managed Postgres.
 - [ ] Add pause, resume, stop, revoke, approve once, approve for run, and reject actions.
 - [ ] Persist pending attention state across restarts.
 - [ ] Add escalation deadlines and notification route references.

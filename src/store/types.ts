@@ -18,6 +18,12 @@ import type {
 } from "../workers/activation-types.js";
 import type { WorkerEffectReceipt } from "../workers/effect-types.js";
 import type { WorkerCredentialRecord } from "../workers/credential-types.js";
+import type {
+  WorkerApprovalGrant,
+  WorkerAttentionRequest,
+  WorkerControlCommand,
+  WorkerNotificationDeliveryReference,
+} from "../workers/control-types.js";
 export type { WorkerCredentialRecord } from "../workers/credential-types.js";
 
 export interface UserRecord {
@@ -711,6 +717,10 @@ export interface PacketAgentData {
   workerCheckpoints: WorkerCheckpoint[];
   workerEffectReceipts: WorkerEffectReceipt[];
   workerBudgetReservations: import("../workers/budget-types.js").WorkerBudgetReservationRecord[];
+  workerAttentionRequests: WorkerAttentionRequest[];
+  workerApprovalGrants: WorkerApprovalGrant[];
+  workerControlCommands: WorkerControlCommand[];
+  workerNotificationDeliveries: WorkerNotificationDeliveryReference[];
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];

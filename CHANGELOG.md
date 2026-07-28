@@ -6,6 +6,23 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Durable Worker control records (W7.1)
+
+- Added versioned attention-request, approval-grant, control-command, and
+  notification-delivery records with status-specific invariants and immutable
+  workspace/definition/deployment/run/version-digest bindings.
+- Bound approvals to capability and normalized-operation digests, scope,
+  actor, expiry, and a nonce digest; one-time consumption, revocation, and
+  expiration are represented durably without storing a bearer nonce.
+- Added unique attention request keys, approval nonce digests, control
+  idempotency keys, and notification delivery keys plus graph validation
+  across resolved attention, applied approval command, and active grant.
+- Persisted and workspace-exported the control collections across JSON,
+  SQLite, and managed Postgres, with legacy-store normalization and backend
+  parity coverage.
+- The W7.1 baseline passes 1,397 API tests, 1 skipped API test, and 25 web tests
+  with zero lint errors and 145 inherited warnings.
+
 ### 2026-07-27 - Worker permission bypass gate (W6.5)
 
 - Guarded every production registry handler with a one-shot, tool-bound permit

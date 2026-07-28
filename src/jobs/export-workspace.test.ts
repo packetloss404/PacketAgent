@@ -5,7 +5,13 @@ import type { PacketAgentData } from "../packetagent-store.js";
 import { maskSecret } from "../security/redaction.js";
 import { createWorkerRepository } from "../workers/repository.js";
 import { createWorkerLifecycleService } from "../workers/service.js";
-import { makeWorkerVersionContent } from "../workers/__tests__/fixtures.js";
+import {
+  makeWorkerApprovalGrant,
+  makeWorkerAttentionRequest,
+  makeWorkerControlCommand,
+  makeWorkerNotificationDelivery,
+  makeWorkerVersionContent,
+} from "../workers/__tests__/fixtures.js";
 
 test("exportWorkspaceData throws 404 when the workspace does not exist", () => {
   const data = makeStore();
@@ -160,13 +166,51 @@ test("exportWorkspaceData includes only the selected workspace's Worker lifecycl
     content: makeWorkerVersionContent(),
     source: { product: "PacketAgent", kind: "native" },
   });
+  data.workerAttentionRequests.push(
+    makeWorkerAttentionRequest({ id: "attention-alpha", workspaceId: "alpha" }),
+    makeWorkerAttentionRequest({ id: "attention-beta", workspaceId: "beta" }),
+  );
+  data.workerApprovalGrants.push(
+    makeWorkerApprovalGrant({ id: "approval-alpha", workspaceId: "alpha" }),
+    makeWorkerApprovalGrant({ id: "approval-beta", workspaceId: "beta" }),
+  );
+  data.workerControlCommands.push(
+    makeWorkerControlCommand({ id: "control-alpha", workspaceId: "alpha" }),
+    makeWorkerControlCommand({ id: "control-beta", workspaceId: "beta" }),
+  );
+  data.workerNotificationDeliveries.push(
+    makeWorkerNotificationDelivery({ id: "notification-alpha", workspaceId: "alpha" }),
+    makeWorkerNotificationDelivery({ id: "notification-beta", workspaceId: "beta" }),
+  );
 
   const result = exportWorkspaceData({ workspaceId: "alpha" }, makeDeps(data));
 
-  assert.deepEqual(result.data.workerDefinitions.map((record) => record.id), ["worker-export-alpha"]);
-  assert.deepEqual(result.data.workerVersions.map((record) => record.id), ["worker-export-alpha-v1"]);
+  assert.deepEqual(
+    result.data.workerDefinitions.map((record) => record.id),
+    ["worker-export-alpha"],
+  );
+  assert.deepEqual(
+    result.data.workerVersions.map((record) => record.id),
+    ["worker-export-alpha-v1"],
+  );
   assert.equal(result.data.workerCommandReceipts.length, 1);
   assert.equal(result.data.workerEvents.length, 1);
+  assert.deepEqual(
+    result.data.workerAttentionRequests.map((record) => record.id),
+    ["attention-alpha"],
+  );
+  assert.deepEqual(
+    result.data.workerApprovalGrants.map((record) => record.id),
+    ["approval-alpha"],
+  );
+  assert.deepEqual(
+    result.data.workerControlCommands.map((record) => record.id),
+    ["control-alpha"],
+  );
+  assert.deepEqual(
+    result.data.workerNotificationDeliveries.map((record) => record.id),
+    ["notification-alpha"],
+  );
   assert.deepEqual(result.data.workerActivationPayloads, [
     {
       schemaVersion: "packetagent.worker-activation-payload/v1",
@@ -234,8 +278,18 @@ function makeStore(): PacketAgentData {
       },
     ],
     memberships: [
-      { workspaceId: "alpha", userId: "user_alpha", role: "owner", joinedAt: "2026-04-20T10:00:00.000Z" },
-      { workspaceId: "beta", userId: "user_beta", role: "owner", joinedAt: "2026-04-20T10:00:00.000Z" },
+      {
+        workspaceId: "alpha",
+        userId: "user_alpha",
+        role: "owner",
+        joinedAt: "2026-04-20T10:00:00.000Z",
+      },
+      {
+        workspaceId: "beta",
+        userId: "user_beta",
+        role: "owner",
+        joinedAt: "2026-04-20T10:00:00.000Z",
+      },
     ],
     workspaceInvitations: [
       {
@@ -471,6 +525,10 @@ function makeStore(): PacketAgentData {
     workerCheckpoints: [],
     workerEffectReceipts: [],
     workerBudgetReservations: [],
+    workerAttentionRequests: [],
+    workerApprovalGrants: [],
+    workerControlCommands: [],
+    workerNotificationDeliveries: [],
     workerDeploymentRollouts: [],
     workerCommandReceipts: [],
     workerEvents: [],

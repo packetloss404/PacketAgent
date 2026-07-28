@@ -10,8 +10,8 @@ for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
 complete. W6.5 closes the adversarial bypass gate across every registered tool.
-Resume at W7.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w71---add-durable-control-records).
+W7.1's durable control records are also complete. Resume at W7.2 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w72---implement-the-control-service).
 
 ## North star
 
@@ -82,9 +82,10 @@ budget bypasses.
 
 ### 7. Attention and operator controls - active
 
-First add durable attention requests, approval grants, control commands, and
-notification-delivery references. Then add pause, resume, stop, revoke,
-approve-once, approve-for-run, and escalation routing.
+Durable attention requests, approval grants, control commands, and
+notification-delivery references are implemented across all storage modes.
+Next add the atomic pause, resume, stop, revoke, approve-once, approve-for-run,
+and reject service.
 
 ### 8. Worker health, cost, and evidence
 

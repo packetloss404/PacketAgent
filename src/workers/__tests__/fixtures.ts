@@ -12,6 +12,16 @@ import {
   type WorkerVersionStatus,
 } from "../types.js";
 import { computeWorkerVersionContentDigest } from "../validation.js";
+import {
+  WORKER_APPROVAL_GRANT_SCHEMA_VERSION,
+  WORKER_ATTENTION_REQUEST_SCHEMA_VERSION,
+  WORKER_CONTROL_COMMAND_SCHEMA_VERSION,
+  WORKER_NOTIFICATION_DELIVERY_SCHEMA_VERSION,
+  type WorkerApprovalGrant,
+  type WorkerAttentionRequest,
+  type WorkerControlCommand,
+  type WorkerNotificationDeliveryReference,
+} from "../control-types.js";
 
 export const TEST_NOW = "2026-07-27T12:00:00.000Z";
 export const TEST_LATER = "2026-07-27T12:05:00.000Z";
@@ -259,6 +269,107 @@ export function makeWorkerCheckpoint(overrides: Partial<WorkerCheckpoint> = {}):
     },
     createdAt: TEST_NOW,
     stateDigest: `sha256:${"a".repeat(64)}`,
+    ...overrides,
+  };
+}
+
+export function makeWorkerAttentionRequest(
+  overrides: Partial<WorkerAttentionRequest> = {},
+): WorkerAttentionRequest {
+  return {
+    schemaVersion: WORKER_ATTENTION_REQUEST_SCHEMA_VERSION,
+    id: "attention-1",
+    requestKey: "run-1:iteration-1:action-1",
+    workspaceId: "workspace-1",
+    workerDefinitionId: "worker-1",
+    workerDeploymentId: "deployment-1",
+    workerRunId: "run-1",
+    workerVersionId: "worker-version-1",
+    workerVersionContentDigest: `sha256:${"d".repeat(64)}`,
+    status: "open",
+    capabilityId: "release-read",
+    operationDigest: `sha256:${"e".repeat(64)}`,
+    requestedBy: { type: "system", id: "packetagent.worker-supervisor" },
+    requestedAt: TEST_NOW,
+    escalatesAt: "2026-07-27T12:30:00.000Z",
+    expiresAt: "2026-07-27T13:00:00.000Z",
+    notificationRouteIds: ["local-attention"],
+    ...overrides,
+  };
+}
+
+export function makeWorkerApprovalGrant(
+  overrides: Partial<WorkerApprovalGrant> = {},
+): WorkerApprovalGrant {
+  return {
+    schemaVersion: WORKER_APPROVAL_GRANT_SCHEMA_VERSION,
+    id: "approval-1",
+    attentionRequestId: "attention-1",
+    workspaceId: "workspace-1",
+    workerDefinitionId: "worker-1",
+    workerDeploymentId: "deployment-1",
+    workerRunId: "run-1",
+    workerVersionId: "worker-version-1",
+    workerVersionContentDigest: `sha256:${"d".repeat(64)}`,
+    capabilityId: "release-read",
+    operationDigest: `sha256:${"e".repeat(64)}`,
+    scope: "once",
+    status: "active",
+    nonceDigest: `sha256:${"9".repeat(64)}`,
+    grantedBy: { type: "user", id: "operator-1" },
+    grantedAt: TEST_NOW,
+    expiresAt: "2026-07-27T13:00:00.000Z",
+    ...overrides,
+  };
+}
+
+export function makeWorkerControlCommand(
+  overrides: Partial<WorkerControlCommand> = {},
+): WorkerControlCommand {
+  return {
+    schemaVersion: WORKER_CONTROL_COMMAND_SCHEMA_VERSION,
+    id: "control-command-1",
+    workspaceId: "workspace-1",
+    workerDefinitionId: "worker-1",
+    workerDeploymentId: "deployment-1",
+    workerRunId: "run-1",
+    workerVersionId: "worker-version-1",
+    workerVersionContentDigest: `sha256:${"d".repeat(64)}`,
+    kind: "pause_run",
+    status: "pending",
+    expectedRevision: 1,
+    idempotencyKey: "pause-run-1",
+    requestDigest: `sha256:${"f".repeat(64)}`,
+    actor: { type: "user", id: "operator-1" },
+    createdAt: TEST_NOW,
+    updatedAt: TEST_NOW,
+    ...overrides,
+  };
+}
+
+export function makeWorkerNotificationDelivery(
+  overrides: Partial<WorkerNotificationDeliveryReference> = {},
+): WorkerNotificationDeliveryReference {
+  return {
+    schemaVersion: WORKER_NOTIFICATION_DELIVERY_SCHEMA_VERSION,
+    id: "notification-1",
+    deliveryKey: "attention-1:local-attention:requested",
+    workspaceId: "workspace-1",
+    workerDefinitionId: "worker-1",
+    workerDeploymentId: "deployment-1",
+    workerRunId: "run-1",
+    workerVersionId: "worker-version-1",
+    workerVersionContentDigest: `sha256:${"d".repeat(64)}`,
+    event: "attention",
+    attentionRequestId: "attention-1",
+    notificationRouteId: "local-attention",
+    notificationRouteKind: "packetagent",
+    notificationRouteReference: "workspace:workspace-1",
+    status: "queued",
+    attemptCount: 0,
+    scheduledAt: TEST_NOW,
+    createdAt: TEST_NOW,
+    updatedAt: TEST_NOW,
     ...overrides,
   };
 }

@@ -87,6 +87,10 @@ export interface WorkerPersistenceCollections {
   readonly workerCheckpoints: readonly WorkerCheckpoint[];
   readonly workerEffectReceipts: readonly WorkerEffectReceipt[];
   readonly workerBudgetReservations: readonly import("./budget-types.js").WorkerBudgetReservationRecord[];
+  readonly workerAttentionRequests: readonly import("./control-types.js").WorkerAttentionRequest[];
+  readonly workerApprovalGrants: readonly import("./control-types.js").WorkerApprovalGrant[];
+  readonly workerControlCommands: readonly import("./control-types.js").WorkerControlCommand[];
+  readonly workerNotificationDeliveries: readonly import("./control-types.js").WorkerNotificationDeliveryReference[];
   readonly workerDeploymentRollouts: readonly WorkerDeploymentRollout[];
   readonly workerCommandReceipts: readonly WorkerLifecycleCommandReceipt[];
   readonly workerEvents: readonly WorkerEvent[];

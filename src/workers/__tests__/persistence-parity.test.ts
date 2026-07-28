@@ -23,7 +23,13 @@ import {
   type WorkerLifecycleService,
 } from "../service.js";
 import type { WorkerSourceProvenance } from "../types.js";
-import { makeWorkerVersionContent } from "./fixtures.js";
+import {
+  makeWorkerApprovalGrant,
+  makeWorkerAttentionRequest,
+  makeWorkerControlCommand,
+  makeWorkerNotificationDelivery,
+  makeWorkerVersionContent,
+} from "./fixtures.js";
 import { createWorkerActivationService } from "../activation.js";
 import { createWorkerRuntimeRepository } from "../runtime/repository.js";
 import { createWorkerEffectRepository } from "../effects.js";
@@ -83,6 +89,8 @@ interface BackendScenarioResult {
   readonly exportedWorkerCredentialRefs: readonly string[];
   readonly budgetReservationStatuses: readonly string[];
   readonly exportedBudgetReservationCount: number;
+  readonly controlRecordStatuses: readonly string[];
+  readonly exportedControlRecordCounts: readonly number[];
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -120,18 +128,19 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   );
   assert.equal(exported.data.workerCommandReceipts.length, stored.workerCommandReceipts.length);
   assert.equal(exported.data.workerEvents.length, stored.workerEvents.length);
-  assert.equal(
-    exported.data.workerEffectReceipts.length,
-    stored.workerEffectReceipts.length,
-  );
+  assert.equal(exported.data.workerEffectReceipts.length, stored.workerEffectReceipts.length);
   assert.equal(
     exported.data.workerBudgetReservations.length,
     stored.workerBudgetReservations.length,
   );
+  assert.equal(exported.data.workerAttentionRequests.length, stored.workerAttentionRequests.length);
+  assert.equal(exported.data.workerApprovalGrants.length, stored.workerApprovalGrants.length);
+  assert.equal(exported.data.workerControlCommands.length, stored.workerControlCommands.length);
   assert.equal(
-    exported.data.workerActivationInboxes.length,
-    stored.workerActivationInboxes.length,
+    exported.data.workerNotificationDeliveries.length,
+    stored.workerNotificationDeliveries.length,
   );
+  assert.equal(exported.data.workerActivationInboxes.length, stored.workerActivationInboxes.length);
   assert.equal(JSON.stringify(exported).includes("backend-parity-secret"), false);
   assert.equal(JSON.stringify(exported).includes(stored.workerCredentials[0].ciphertext), false);
 
@@ -191,6 +200,18 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       )
       .sort(),
     exportedBudgetReservationCount: exported.data.workerBudgetReservations.length,
+    controlRecordStatuses: [
+      ...stored.workerAttentionRequests.map((record) => `attention:${record.status}`),
+      ...stored.workerApprovalGrants.map((record) => `approval:${record.status}`),
+      ...stored.workerControlCommands.map((record) => `command:${record.status}`),
+      ...stored.workerNotificationDeliveries.map((record) => `notification:${record.status}`),
+    ].sort(),
+    exportedControlRecordCounts: [
+      exported.data.workerAttentionRequests.length,
+      exported.data.workerApprovalGrants.length,
+      exported.data.workerControlCommands.length,
+      exported.data.workerNotificationDeliveries.length,
+    ],
   };
 }
 
@@ -276,8 +297,7 @@ async function runActivationRace(service: WorkerLifecycleService): Promise<void>
 async function runActivationAdmissionRace(): Promise<void> {
   const data = await loadStoreAsync();
   const deployment = data.workerDeployments.find(
-    (record) =>
-      record.workerDefinitionId === "worker-race" && record.status === "active",
+    (record) => record.workerDefinitionId === "worker-race" && record.status === "active",
   );
   assert.ok(deployment);
   const services = ["process-a", "process-b"].map((processId) => {
@@ -297,22 +317,15 @@ async function runActivationAdmissionRace(): Promise<void> {
     actor: ACTOR,
     payload: { release_id: "release-parity" },
   };
-  const results = await Promise.all([
-    services[0].admit(input),
-    services[1].admit(input),
-  ]);
-  assert.deepEqual(
-    results.map((result) => result.disposition).sort(),
-    ["accepted", "duplicate"],
-  );
+  const results = await Promise.all([services[0].admit(input), services[1].admit(input)]);
+  assert.deepEqual(results.map((result) => result.disposition).sort(), ["accepted", "duplicate"]);
   assert.equal(results[0].runId, results[1].runId);
 }
 
 async function runActivationQueueFailureRollback(): Promise<void> {
   const before = await loadStoreAsync();
   const deployment = before.workerDeployments.find(
-    (record) =>
-      record.workerDefinitionId === "worker-race" && record.status === "active",
+    (record) => record.workerDefinitionId === "worker-race" && record.status === "active",
   );
   assert.ok(deployment);
   const service = createWorkerActivationService({
@@ -339,9 +352,7 @@ async function runActivationQueueFailureRollback(): Promise<void> {
   clearStoreCacheForTests();
   const after = await loadStoreAsync();
   assert.equal(
-    after.workerActivationInboxes.some(
-      (record) => record.deliveryId === "parity-queue-failure",
-    ),
+    after.workerActivationInboxes.some((record) => record.deliveryId === "parity-queue-failure"),
     false,
   );
   assert.equal(after.workerActivationInboxes.length, before.workerActivationInboxes.length);
@@ -369,6 +380,66 @@ async function runRuntimePersistence(): Promise<void> {
   });
   assert.equal(acquisition.disposition, "acquired");
   if (acquisition.disposition !== "acquired") return;
+  const binding = {
+    workspaceId: acquisition.context.run.workspaceId,
+    workerDefinitionId: acquisition.context.run.workerDefinitionId,
+    workerDeploymentId: acquisition.context.run.workerDeploymentId,
+    workerRunId: acquisition.context.run.id,
+    workerVersionId: acquisition.context.run.workerVersionId,
+    workerVersionContentDigest: acquisition.context.version.contentDigest,
+  };
+  const notificationRoute = acquisition.context.version.content.notificationRoutes[0];
+  assert.ok(notificationRoute);
+  await mutateStoreAsync((store) => {
+    store.workerAttentionRequests.push(
+      makeWorkerAttentionRequest({
+        ...binding,
+        id: "attention-parity",
+        requestKey: "parity:iteration-1:action-approval",
+        status: "approved",
+        notificationRouteIds: [notificationRoute.id],
+        resolvedAt: "2026-07-27T12:01:00.000Z",
+        resolvedBy: { type: "user", id: "operator-1" },
+        resolutionCommandId: "control-parity",
+      }),
+    );
+    store.workerApprovalGrants.push(
+      makeWorkerApprovalGrant({
+        ...binding,
+        id: "approval-parity",
+        attentionRequestId: "attention-parity",
+        nonceDigest: `sha256:${"9".repeat(64)}`,
+      }),
+    );
+    store.workerControlCommands.push(
+      makeWorkerControlCommand({
+        ...binding,
+        id: "control-parity",
+        kind: "approve_once",
+        status: "applied",
+        idempotencyKey: "control-parity-approve",
+        expectedRevision: acquisition.context.run.revision,
+        attentionRequestId: "attention-parity",
+        capabilityId: "release-read",
+        operationDigest: `sha256:${"e".repeat(64)}`,
+        appliedAt: "2026-07-27T12:01:00.000Z",
+        appliedRevision: acquisition.context.run.revision,
+        approvalGrantId: "approval-parity",
+        updatedAt: "2026-07-27T12:01:00.000Z",
+      }),
+    );
+    store.workerNotificationDeliveries.push(
+      makeWorkerNotificationDelivery({
+        ...binding,
+        id: "notification-parity",
+        deliveryKey: "attention-parity:local-attention:requested",
+        attentionRequestId: "attention-parity",
+        notificationRouteId: notificationRoute.id,
+        notificationRouteKind: notificationRoute.kind,
+        notificationRouteReference: notificationRoute.reference,
+      }),
+    );
+  });
   const effects = createWorkerEffectRepository({
     now: () => acquiredAt,
     id: (kind) => `${kind}-parity-${++nextRuntimeId}`,
@@ -475,9 +546,7 @@ async function runRuntimePersistence(): Promise<void> {
   });
   await mutateStoreAsync((store) => {
     const job = store.jobs.find(
-      (record) =>
-        record.type === "worker.run" &&
-        record.payload.workerRunId === run.id,
+      (record) => record.type === "worker.run" && record.payload.workerRunId === run.id,
     );
     assert.ok(job);
     job.status = "running";

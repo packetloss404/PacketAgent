@@ -6,13 +6,14 @@ This plan verifies the inherited workbench plus W2's durable Worker lifecycle,
 W3's trigger-intake boundary, W4's bounded supervisor, W5's checkpoint,
 recovery, and effect-safety boundary, W6.1's capability compilation, W6.2's
 immediate runtime policy enforcement, W6.3's credential/network/process
-hardening, W6.4's atomic rolling budgets, and W6.5's adversarial bypass gate.
-Attention and PacketADE handoff
-cases must be added as W7-W9 ship; they are not current product claims.
+hardening, W6.4's atomic rolling budgets, W6.5's adversarial bypass gate, and
+W7.1's durable control records. Executable control-service, supervisor
+attention, operator API, and PacketADE handoff cases must be added as W7.2-W9
+ship; they are not current product claims.
 
-Last automated W6.5 baseline (2026-07-27):
+Last automated W7.1 baseline (2026-07-27):
 
-- API: 1,390 passed, 1 skipped, 0 failed
+- API: 1,397 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -225,6 +226,29 @@ and executes that job through the bounded supervisor.
 8. Repeat stale/tampered policy and concurrent rolling-reservation races.
    Confirm no registered path performs an undeclared action or exceeds a
    committed budget.
+
+## W7.1 Durable Control Record Smoke
+
+1. Create an attention request bound to one workspace, definition, deployment,
+   run, immutable version digest, capability, and normalized operation digest.
+   Confirm its escalation and expiry timestamps are bounded and its request
+   key is unique.
+2. Resolve it with an applied approve-once or approve-for-run command and an
+   active approval grant. Confirm all three records agree on run, capability,
+   operation, actor, scope, and version digest.
+3. Confirm only the nonce digest is stored. Reuse that digest or a control
+   idempotency key and verify repository integrity rejects the duplicate.
+4. Exercise pending/applied/rejected commands and
+   active/consumed/revoked/expired grants. Confirm terminal fields are required
+   only for the matching status and one-time consumption requires an action ID.
+5. Persist a notification delivery reference against a route declared by the
+   immutable Worker version. Change its route kind/reference/event and confirm
+   graph validation rejects it.
+6. Reload and export the four collections in JSON, SQLite, and managed
+   Postgres. Confirm backend results match and another workspace's records are
+   excluded.
+7. Do not treat these records as executable operator controls until W7.2's
+   atomic control service is complete.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

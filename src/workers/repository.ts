@@ -8,6 +8,13 @@ import { assertWorkerDeploymentPolicyIntegrity } from "./capabilities.js";
 import { assertValidWorkerCredentialRecord } from "./credential-types.js";
 import { assertValidWorkerBudgetReservationRecord } from "./budget-types.js";
 import {
+  assertValidWorkerApprovalGrant,
+  assertValidWorkerAttentionRequest,
+  assertValidWorkerControlCommand,
+  assertValidWorkerNotificationDeliveryReference,
+  type WorkerControlRunBinding,
+} from "./control-types.js";
+import {
   WORKER_COMMAND_SCHEMA_VERSION,
   WORKER_EVENT_SCHEMA_VERSION,
   WORKER_ROLLOUT_SCHEMA_VERSION,
@@ -15,15 +22,8 @@ import {
   type WorkerEvent,
   type WorkerLifecycleCommandReceipt,
 } from "./persistence-types.js";
-import {
-  WORKER_EFFECT_RECEIPT_SCHEMA_VERSION,
-  type WorkerEffectReceipt,
-} from "./effect-types.js";
-import type {
-  WorkerDefinition,
-  WorkerDeployment,
-  WorkerVersion,
-} from "./types.js";
+import { WORKER_EFFECT_RECEIPT_SCHEMA_VERSION, type WorkerEffectReceipt } from "./effect-types.js";
+import type { WorkerDefinition, WorkerDeployment, WorkerVersion } from "./types.js";
 import {
   assertValidWorkerCheckpoint,
   assertValidWorkerDefinition,
@@ -358,12 +358,13 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     data.workerCheckpoints.forEach(assertValidWorkerCheckpoint);
     data.workerEffectReceipts.forEach(assertValidWorkerEffectReceipt);
     data.workerBudgetReservations.forEach(assertValidWorkerBudgetReservationRecord);
+    data.workerAttentionRequests.forEach(assertValidWorkerAttentionRequest);
+    data.workerApprovalGrants.forEach(assertValidWorkerApprovalGrant);
+    data.workerControlCommands.forEach(assertValidWorkerControlCommand);
+    data.workerNotificationDeliveries.forEach(assertValidWorkerNotificationDeliveryReference);
 
     assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.id}`);
-    assertUnique(
-      data.workerCredentials,
-      (record) => `${record.workspaceId}:${record.reference}`,
-    );
+    assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.reference}`);
     assertUnique(data.workerDefinitions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerVersions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(
@@ -387,13 +388,33 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
       (record) =>
         `${record.workspaceId}:${record.workerRunId}:${record.iteration}:${record.actionId}`,
     );
-    assertUnique(
-      data.workerBudgetReservations,
-      (record) => `${record.workspaceId}:${record.id}`,
-    );
+    assertUnique(data.workerBudgetReservations, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(
       data.workerBudgetReservations,
       (record) => `${record.workspaceId}:${record.reservationKey}`,
+    );
+    assertUnique(data.workerAttentionRequests, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.workerAttentionRequests,
+      (record) => `${record.workspaceId}:${record.requestKey}`,
+    );
+    assertUnique(data.workerApprovalGrants, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.workerApprovalGrants,
+      (record) => `${record.workspaceId}:${record.nonceDigest}`,
+    );
+    assertUnique(data.workerControlCommands, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.workerControlCommands,
+      (record) => `${record.workspaceId}:${record.idempotencyKey}`,
+    );
+    assertUnique(
+      data.workerNotificationDeliveries,
+      (record) => `${record.workspaceId}:${record.id}`,
+    );
+    assertUnique(
+      data.workerNotificationDeliveries,
+      (record) => `${record.workspaceId}:${record.deliveryKey}`,
     );
     assertUnique(
       data.workerCommandReceipts,
@@ -520,8 +541,7 @@ function validateCoreReferences(data: PacketAgentData): void {
   }
   for (const receipt of data.workerEffectReceipts) {
     const run = data.workerRuns.find(
-      (record) =>
-        record.workspaceId === receipt.workspaceId && record.id === receipt.workerRunId,
+      (record) => record.workspaceId === receipt.workspaceId && record.id === receipt.workerRunId,
     );
     if (
       !run ||
@@ -536,8 +556,7 @@ function validateCoreReferences(data: PacketAgentData): void {
   for (const reservation of data.workerBudgetReservations) {
     const run = data.workerRuns.find(
       (record) =>
-        record.workspaceId === reservation.workspaceId &&
-        record.id === reservation.workerRunId,
+        record.workspaceId === reservation.workspaceId && record.id === reservation.workerRunId,
     );
     if (
       !run ||
@@ -548,6 +567,204 @@ function validateCoreReferences(data: PacketAgentData): void {
         `Worker budget reservation ${reservation.id} references an inconsistent run, version, or deployment.`,
       );
     }
+  }
+  for (const attention of data.workerAttentionRequests) {
+    assertControlRunBinding(data, attention, "Worker attention request");
+    if (attention.resolutionCommandId) {
+      const command = data.workerControlCommands.find(
+        (record) =>
+          record.workspaceId === attention.workspaceId &&
+          record.workerRunId === attention.workerRunId &&
+          record.attentionRequestId === attention.id &&
+          record.id === attention.resolutionCommandId,
+      );
+      const expectedKinds =
+        attention.status === "approved"
+          ? ["approve_once", "approve_for_run"]
+          : attention.status === "rejected"
+            ? ["reject_attention"]
+            : [];
+      if (
+        !command ||
+        command.status !== "applied" ||
+        !expectedKinds.includes(command.kind) ||
+        command.actor.type !== attention.resolvedBy?.type ||
+        command.actor.id !== attention.resolvedBy.id
+      ) {
+        throw new Error(
+          `Worker attention request ${attention.id} references an inconsistent resolution command.`,
+        );
+      }
+    }
+  }
+  for (const grant of data.workerApprovalGrants) {
+    assertControlRunBinding(data, grant, "Worker approval grant");
+    const attention = data.workerAttentionRequests.find(
+      (record) =>
+        record.workspaceId === grant.workspaceId && record.id === grant.attentionRequestId,
+    );
+    if (
+      !attention ||
+      attention.workerRunId !== grant.workerRunId ||
+      attention.capabilityId !== grant.capabilityId ||
+      attention.operationDigest !== grant.operationDigest ||
+      attention.status !== "approved" ||
+      !data.workerControlCommands.some(
+        (record) =>
+          record.workspaceId === grant.workspaceId &&
+          record.id === attention.resolutionCommandId &&
+          record.approvalGrantId === grant.id &&
+          record.kind === (grant.scope === "once" ? "approve_once" : "approve_for_run") &&
+          record.status === "applied" &&
+          record.actor.type === grant.grantedBy.type &&
+          record.actor.id === grant.grantedBy.id,
+      )
+    ) {
+      throw new Error(
+        `Worker approval grant ${grant.id} references an inconsistent attention request.`,
+      );
+    }
+  }
+  for (const command of data.workerControlCommands) {
+    const deployment = data.workerDeployments.find(
+      (record) =>
+        record.workspaceId === command.workspaceId && record.id === command.workerDeploymentId,
+    );
+    const version = data.workerVersions.find(
+      (record) =>
+        record.workspaceId === command.workspaceId && record.id === command.workerVersionId,
+    );
+    if (
+      !deployment ||
+      !version ||
+      deployment.workerDefinitionId !== command.workerDefinitionId ||
+      deployment.workerVersionId !== command.workerVersionId ||
+      version.workerDefinitionId !== command.workerDefinitionId ||
+      version.contentDigest !== command.workerVersionContentDigest
+    ) {
+      throw new Error(
+        `Worker control command ${command.id} references an inconsistent deployment or version.`,
+      );
+    }
+    if (command.workerRunId) {
+      const run = data.workerRuns.find(
+        (record) => record.workspaceId === command.workspaceId && record.id === command.workerRunId,
+      );
+      if (
+        !run ||
+        run.workerDefinitionId !== command.workerDefinitionId ||
+        run.workerDeploymentId !== command.workerDeploymentId ||
+        run.workerVersionId !== command.workerVersionId
+      ) {
+        throw new Error(`Worker control command ${command.id} references an inconsistent run.`);
+      }
+    }
+    if (command.attentionRequestId) {
+      const attention = data.workerAttentionRequests.find(
+        (record) =>
+          record.workspaceId === command.workspaceId &&
+          record.workerRunId === command.workerRunId &&
+          record.id === command.attentionRequestId,
+      );
+      if (
+        !attention ||
+        attention.capabilityId !== command.capabilityId ||
+        attention.operationDigest !== command.operationDigest
+      ) {
+        throw new Error(
+          `Worker control command ${command.id} references an inconsistent attention request.`,
+        );
+      }
+    }
+    if (command.approvalGrantId) {
+      const grant = data.workerApprovalGrants.find(
+        (record) =>
+          record.workspaceId === command.workspaceId &&
+          record.attentionRequestId === command.attentionRequestId &&
+          record.id === command.approvalGrantId,
+      );
+      if (
+        !grant ||
+        grant.workerRunId !== command.workerRunId ||
+        grant.capabilityId !== command.capabilityId ||
+        grant.operationDigest !== command.operationDigest ||
+        grant.scope !== (command.kind === "approve_once" ? "once" : "run")
+      ) {
+        throw new Error(
+          `Worker control command ${command.id} references an inconsistent approval grant.`,
+        );
+      }
+    }
+  }
+  for (const delivery of data.workerNotificationDeliveries) {
+    assertControlRunBinding(data, delivery, "Worker notification delivery");
+    const version = data.workerVersions.find(
+      (record) =>
+        record.workspaceId === delivery.workspaceId && record.id === delivery.workerVersionId,
+    )!;
+    const route = version.content.notificationRoutes.find(
+      (record) => record.id === delivery.notificationRouteId,
+    );
+    if (
+      !route ||
+      route.kind !== delivery.notificationRouteKind ||
+      route.reference !== delivery.notificationRouteReference ||
+      !route.events.includes(delivery.event)
+    ) {
+      throw new Error(
+        `Worker notification delivery ${delivery.id} references an inconsistent notification route.`,
+      );
+    }
+    if (
+      delivery.attentionRequestId &&
+      !data.workerAttentionRequests.some(
+        (record) =>
+          record.workspaceId === delivery.workspaceId &&
+          record.workerRunId === delivery.workerRunId &&
+          record.id === delivery.attentionRequestId,
+      )
+    ) {
+      throw new Error(
+        `Worker notification delivery ${delivery.id} references a missing attention request.`,
+      );
+    }
+    if (
+      delivery.controlCommandId &&
+      !data.workerControlCommands.some(
+        (record) =>
+          record.workspaceId === delivery.workspaceId &&
+          record.id === delivery.controlCommandId &&
+          (record.workerRunId === undefined || record.workerRunId === delivery.workerRunId),
+      )
+    ) {
+      throw new Error(
+        `Worker notification delivery ${delivery.id} references a missing control command.`,
+      );
+    }
+  }
+}
+
+function assertControlRunBinding(
+  data: PacketAgentData,
+  binding: WorkerControlRunBinding,
+  label: string,
+): void {
+  const run = data.workerRuns.find(
+    (record) => record.workspaceId === binding.workspaceId && record.id === binding.workerRunId,
+  );
+  const version = data.workerVersions.find(
+    (record) => record.workspaceId === binding.workspaceId && record.id === binding.workerVersionId,
+  );
+  if (
+    !run ||
+    !version ||
+    run.workerDefinitionId !== binding.workerDefinitionId ||
+    run.workerDeploymentId !== binding.workerDeploymentId ||
+    run.workerVersionId !== binding.workerVersionId ||
+    version.workerDefinitionId !== binding.workerDefinitionId ||
+    version.contentDigest !== binding.workerVersionContentDigest
+  ) {
+    throw new Error(`${label} references an inconsistent run, deployment, or version.`);
   }
 }
 
@@ -647,11 +864,9 @@ function assertValidWorkerEffectReceipt(receipt: WorkerEffectReceipt): void {
     !receipt.capabilityId ||
     !receipt.toolName ||
     !receipt.operation ||
-    ![
-      "idempotent_mutation",
-      "reconcilable_mutation",
-      "non_replayable_mutation",
-    ].includes(receipt.classification) ||
+    !["idempotent_mutation", "reconcilable_mutation", "non_replayable_mutation"].includes(
+      receipt.classification,
+    ) ||
     !["prepared", "completed"].includes(receipt.status) ||
     !Number.isFinite(Date.parse(receipt.preparedAt))
   ) {

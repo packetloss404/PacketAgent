@@ -108,6 +108,10 @@ export interface ExportedWorkspaceData {
   workerCheckpoints: WorkerCheckpoint[];
   workerEffectReceipts: WorkerEffectReceipt[];
   workerBudgetReservations: import("../workers/budget-types.js").WorkerBudgetReservationRecord[];
+  workerAttentionRequests: import("../workers/control-types.js").WorkerAttentionRequest[];
+  workerApprovalGrants: import("../workers/control-types.js").WorkerApprovalGrant[];
+  workerControlCommands: import("../workers/control-types.js").WorkerControlCommand[];
+  workerNotificationDeliveries: import("../workers/control-types.js").WorkerNotificationDeliveryReference[];
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];
@@ -244,6 +248,10 @@ function buildWorkspaceExport(
     store.workerBudgetReservations,
     workspaceId,
   );
+  const workerAttentionRequests = workspaceWorkerRecords(store.workerAttentionRequests, workspaceId);
+  const workerApprovalGrants = workspaceWorkerRecords(store.workerApprovalGrants, workspaceId);
+  const workerControlCommands = workspaceWorkerRecords(store.workerControlCommands, workspaceId);
+  const workerNotificationDeliveries = workspaceWorkerRecords(store.workerNotificationDeliveries, workspaceId);
   const workerDeploymentRollouts = workspaceWorkerRecords(store.workerDeploymentRollouts, workspaceId);
   const workerCommandReceipts = workspaceWorkerRecords(store.workerCommandReceipts, workspaceId);
   const workerEvents = workspaceWorkerRecords(store.workerEvents, workspaceId);
@@ -297,6 +305,10 @@ function buildWorkspaceExport(
       workerCheckpoints,
       workerEffectReceipts,
       workerBudgetReservations,
+      workerAttentionRequests,
+      workerApprovalGrants,
+      workerControlCommands,
+      workerNotificationDeliveries,
       workerDeploymentRollouts,
       workerCommandReceipts,
       workerEvents,

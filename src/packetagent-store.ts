@@ -242,6 +242,12 @@ export type {
 } from "./store/types.js";
 export type { WorkerCredentialRecord } from "./workers/credential-types.js";
 export type { WorkerBudgetReservationRecord } from "./workers/budget-types.js";
+export type {
+  WorkerApprovalGrant,
+  WorkerAttentionRequest,
+  WorkerControlCommand,
+  WorkerNotificationDeliveryReference,
+} from "./workers/control-types.js";
 export {
   ManagedDatabaseStoreBoundaryError,
   ManagedPostgresStoreConfigurationError,

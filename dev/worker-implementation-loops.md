@@ -530,11 +530,15 @@ committed budget.
 Outcome: approvals and operator commands are durable, independently available,
 audited, and safe across restarts and replay.
 
-Status: active. Resume at W7.1.
+Status: active. W7.1 is complete; resume at W7.2.
 
 ### W7.1 - Add durable control records
 
-Status: active. This is the exact resume point after W6.
+Status: complete. Attention requests, approval grants, control commands, and
+notification delivery references now have versioned schemas, immutable
+run/deployment/version-digest bindings, status-specific validation, durable
+request/idempotency/delivery keys, nonce digests, repository graph integrity,
+workspace export, and JSON/SQLite/managed-Postgres parity.
 
 - Define and persist attention requests, approval grants, control commands, and
   notification delivery references.
@@ -546,12 +550,23 @@ Status: active. This is the exact resume point after W6.
 
 ### W7.2 - Implement the control service
 
+Status: active. This is the exact resume point after W7.1.
+
 - Add pause, resume, stop, revoke, approve once, approve for run, and reject.
 - Pause/stop/revoke updates durable desired state first; running supervisors
   observe it before further action.
 - Revoke blocks future activation and stops active runs. Stop affects one run.
   Pause preserves the checkpoint and remaining budget.
 - Use expected revisions and idempotency keys for every command.
+
+Design basis: authorization remains server-side and bound to the exact
+operation, actor, and state transition; approval credentials are unique and
+time-limited, and revocation is a normal independently available operation.
+See the
+[OWASP Transaction Authorization guidance](https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html),
+[OAuth token revocation semantics](https://datatracker.ietf.org/doc/html/rfc7009),
+and
+[PostgreSQL uniqueness constraints](https://www.postgresql.org/docs/current/ddl-constraints.html).
 
 ### W7.3 - Integrate supervisor attention
 
