@@ -17,11 +17,13 @@ Worker health/list/detail read model, filter-bound cursor APIs, bounded
 resumable event stream, and canonical Worker workbench. W8.5 closes one-read
 answerability, source-order/backend parity, tenant-bound cursors, accessible
 loading/error/empty states, and the documented screenshot/manual matrix.
-PacketADE handoff cases remain W9 work and are not current product claims.
+W9.1 adds the checked WorkerPackage v1 contract fixtures and integrity cases;
+authenticated PacketADE deployment/reconnection cases remain W9.2-W9.5 work
+and are not current product claims.
 
-Last automated W8.5 baseline (2026-07-28):
+Last automated W9.1 baseline (2026-07-28):
 
-- API: 1,459 passed, 1 skipped, 0 failed
+- API: 1,465 passed, 1 skipped, 0 failed
 - Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -67,6 +69,11 @@ Last automated W8.5 baseline (2026-07-28):
   JSON/SQLite/managed-Postgres read-model parity, filter- and tenant-bound
   attention cursors, secret-free detail projections, and accessible Worker
   loading/error/empty/ready state semantics: passed
+- Focused strict WorkerPackage shape, W1 content/provenance reuse, canonical
+  byte and digest reproducibility, property-order independence, Unicode and
+  non-JSON rejection, tamper/missing-bound/undeclared-field failures,
+  unsupported-major compatibility, DSSE payload binding, and
+  required/untrusted signature policy: passed
 - Signed-in browser pass for the canonical `/runs` empty state, accessible
   labels and filters, `/activity` preservation and two-way navigation, missing
   Worker detail error state, and console warnings/errors: passed
@@ -561,6 +568,29 @@ match this view.` Capture `w8-worker-list-empty.png`.
 6. Repeat health, detail, evidence, artifact, cursor, and tenant-isolation
    reads through JSON, SQLite, and managed Postgres loaders. A storage-specific
    answer or ordering fails the gate.
+
+## W9.1 WorkerPackage v1 Contract
+
+1. Validate
+   `src/workers/package/fixtures/worker-package-v1.valid.json`. Confirm every
+   field maps to W1 provenance or `WorkerVersionContent`, artifact descriptors
+   contain only references and digests, and no secret value appears.
+2. Reorder object properties without changing array order. Confirm the
+   canonical UTF-8 bytes and SHA-256 digest remain identical.
+3. Change the objective, a capability resource, an artifact digest, or a
+   policy bound without resealing. Confirm mandatory digest verification fails.
+4. Remove every required Worker budget in turn, remove all exit predicates, or
+   add an undeclared `apiKey`/token field. Confirm validation returns
+   field-addressed failures before any deployment call exists.
+5. Validate the unsupported-v2 fixture and confirm the unknown major fails
+   closed at `$.schemaVersion`.
+6. Attach a DSSE envelope whose payload is the exact canonical subject. Under
+   optional trust policy, confirm the package remains digest-valid; under
+   required trust policy, confirm at least one signature must pass the injected
+   verifier.
+7. Substitute different DSSE payload bytes, payload type, or an untrusted
+   signature. Confirm validation or verification fails without treating
+   `keyid` as authority.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

@@ -17,8 +17,10 @@ deterministic version/deployment/run rollups, and W8.3's bounded retention,
 redaction, and deletion-evidence jobs are complete. W8.4's consolidated
 operations read model, cursor APIs, bounded resumable event stream, and
 canonical Worker list/detail workbench and W8.5's answerability, accessibility,
-cursor, tenant, and storage-parity gate are also complete. Resume at W9.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w91---freeze-workerpackage-v1).
+cursor, tenant, and storage-parity gate are also complete. W9.1 freezes the
+strict, digest-bound WorkerPackage v1 contract and optional DSSE verification
+seam. Resume at W9.2 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w92---add-the-packet-product-trust-boundary).
 
 ## North star
 
@@ -119,7 +121,11 @@ list/detail workbench without client-side raw-table joins.
 
 ### 9. PacketADE handoff - active
 
-Implement the versioned deployment contract in [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md): **Deploy to PacketAgent**, **Keep running**, update, inspect, pause, and revoke. Return progress and approval events to PacketADE.
+WorkerPackage v1 now freezes the strict W1-aligned envelope, canonical digest
+bytes, artifact references, compatibility fixtures, and optional DSSE
+verification seam. Next add the Packet-product trust boundary, then implement
+**Deploy to PacketAgent**, **Keep running**, update, inspect, pause, revoke, and
+reconnectable progress/approval events.
 
 ### 10. PacketChat and PacketPhone routes
 

@@ -6,6 +6,27 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - WorkerPackage v1 contract (W9.1)
+
+- Froze `packetagent.worker-package/v1` as a strict wire envelope mapping
+  PacketADE provenance, Worker identity, complete W1 version content, artifact
+  references, idempotency, and integrity metadata without workspace-assigned
+  lifecycle IDs or secret values.
+- Added deterministic canonical JSON subject bytes and mandatory SHA-256
+  verification with property-order independence, finite/I-JSON scalar guards,
+  exact UTF-8 encoding, and constant-time digest comparison.
+- Added optional DSSE envelopes bound byte-for-byte to the same canonical
+  subject plus a verifier seam for W9.2 trust policy; required or untrusted
+  signature cases fail closed.
+- Added checked valid-v1 and unsupported-v2 fixtures plus tamper,
+  missing-bound, undeclared-field, Unicode, canonical-order, payload
+  substitution, and signature-policy tests.
+- The W9.1 baseline covers 1,466 API tests (1,465 passed and 1 intentionally
+  skipped) plus 28 web tests with zero lint errors.
+- W9.1 defines the contract only. Packet-product authentication, durable
+  package receipts, deployment endpoints, and reconnectable PacketADE events
+  remain W9.2-W9.5 work, so the unified lifecycle is not yet a shipped claim.
+
 ### 2026-07-28 - Worker answerability gate (W8.5)
 
 - Closed W8 with one-read tests proving the operations detail answers Worker

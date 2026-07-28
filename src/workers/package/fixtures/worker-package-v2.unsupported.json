@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "packetagent.worker-package/v2",
+  "packageId": "packetade:future-package",
+  "packageVersion": 1,
+  "idempotencyKey": "packetade:future-package:v1",
+  "createdAt": "2026-07-28T15:00:00.000Z",
+  "createdBy": {
+    "type": "packet_product",
+    "id": "packetade:future",
+    "product": "PacketADE"
+  },
+  "source": {
+    "product": "PacketADE",
+    "kind": "packetade",
+    "sourceId": "future-task"
+  },
+  "worker": {
+    "name": "Future Worker",
+    "description": "A package from an unsupported future major schema.",
+    "content": {}
+  },
+  "artifacts": [],
+  "integrity": {
+    "canonicalization": "packetagent.worker-package-canonical-json/v1",
+    "algorithm": "sha256",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

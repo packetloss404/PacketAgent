@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W8 are implemented as
+in foundation commit `d60cd47`. W1-W8 and W9.1 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -147,6 +147,13 @@ Prompt-to-app generation remains a supported secondary capability.
   filter/tenant-bound cursors, accessible loading/error/empty states, and
   JSON/SQLite/managed-Postgres parity. The screenshot/manual matrix is recorded
   in `dev/TESTING.md`.
+- Completed W9.1's WorkerPackage v1 contract. The strict envelope maps
+  PacketADE provenance and authored Worker data directly to W1 version content,
+  carries digest-bound artifact descriptors and no secret values, and rejects
+  undeclared fields or unknown major versions. Mandatory SHA-256 covers exact
+  deterministic UTF-8 subject bytes. Optional DSSE envelopes must contain the
+  same bytes and pass an injected trust-policy verifier when signatures are
+  required. Checked v1 and unsupported-v2 fixtures are committed.
 
 ## Current implementation truth
 
@@ -221,6 +228,9 @@ Implemented substrate:
 - a consolidated Worker operations read model, cursor-paginated health,
   attention, event, evidence, and artifact APIs, bounded resumable SSE, and
   canonical Worker list/detail workbench;
+- a strict WorkerPackage v1 contract with W1-aligned content/provenance,
+  canonical SHA-256 verification, artifact descriptors, compatibility
+  fixtures, and optional DSSE payload/signature verification;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -243,10 +253,10 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W9 - PacketADE deployment handoff** in
+Continue **W9.2 - Packet-product trust boundary** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W8 are complete under `src/workers/`, the store, migrations,
+W1-W8 and W9.1 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -317,9 +327,14 @@ version/deployment, hard-budget use, provider cost, checkpoint, attention,
 evidence, artifact, source-gap, and outcome assertions. It also proves
 source-order replay, secret-free reads, filter/tenant-bound cursors, accessible
 state semantics, and JSON/SQLite/managed-Postgres projection parity.
+W9.1 freezes `packetagent.worker-package/v1` as a strict W1-aligned wire
+contract. Package validation rejects undeclared fields and unknown majors,
+verifies the canonical SHA-256 digest, binds optional DSSE envelopes to the
+same exact bytes, and exposes a verifier callback for the authenticated trust
+policy W9.2 will supply.
 
 The exact next slice is
-[`W9.1 - Freeze WorkerPackage v1`](worker-implementation-loops.md#w91---freeze-workerpackage-v1).
+[`W9.2 - Add the Packet-product trust boundary`](worker-implementation-loops.md#w92---add-the-packet-product-trust-boundary).
 After each gate passes, continue through W9-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -345,7 +360,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,459 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,465 passed, 1 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -389,6 +404,11 @@ handoff, the roadmap, or the backlog.
   authorization, bounded `Last-Event-ID` SSE reconnect, source-order rebuild,
   secret-free reads, accessible loading/error/empty/ready states, and
   JSON/SQLite/managed-Postgres operations-read-model parity checks - passed
+- focused W9.1 strict package shape, W1 content/provenance reuse, canonical
+  byte/digest reproducibility, property-order independence, Unicode and
+  non-JSON rejection, changed-content detection, missing-bound rejection,
+  unsupported-major compatibility, undeclared secret-field rejection, DSSE
+  payload substitution, and required/untrusted signature checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
@@ -418,6 +438,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W8.5 commit: clean. Stop if the active folder is
+Expected status after the W9.1 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

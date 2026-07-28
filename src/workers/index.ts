@@ -17,5 +17,8 @@ export * from "./observability/repository.js";
 export * from "./observability/rollup-types.js";
 export * from "./observability/rollups.js";
 export * from "./observability/validation.js";
+export * from "./package/types.js";
+export * from "./package/canonical.js";
+export * from "./package/validation.js";
 export * from "./repository.js";
 export * from "./service.js";

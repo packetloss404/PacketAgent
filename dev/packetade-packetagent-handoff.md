@@ -1,9 +1,14 @@
 # PacketADE to PacketAgent handoff
 
-Status: design input for backlog loop W9. The exact executable slices are in
+Status: W9 contract record. W9.1 is implemented; deployment trust and endpoints
+remain W9.2-W9.5 work. The exact executable slices are in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#w9---packetade-deployment-handoff).
-The TypeScript envelope below is illustrative until W9.1 freezes the wire
-schema against the completed W1 domain contract.
+
+The normative executable v1 contract is
+[`src/workers/package/types.ts`](../src/workers/package/types.ts), with strict
+validation, canonical bytes, digest verification, and the DSSE verification
+seam in [`src/workers/package/validation.ts`](../src/workers/package/validation.ts)
+and [`src/workers/package/canonical.ts`](../src/workers/package/canonical.ts).
 
 ## Goal
 
@@ -16,54 +21,123 @@ Primary user actions:
 - **Inspect in PacketAgent** opens the deployment, active run, evidence, and attention state.
 - **Pause**, **resume**, and **revoke** operate on the durable deployment rather than a local UI process.
 
-## WorkerPackage envelope
+## Research basis
+
+- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html) requires invariant
+  JSON bytes for reliable hashing and describes recursive property ordering,
+  ECMAScript primitive serialization, Unicode constraints, and UTF-8 output.
+  WorkerPackage v1 freezes those relevant mechanics in a PacketAgent-owned
+  canonicalization identifier instead of claiming general RFC 8785
+  conformance.
+- [JSON Schema draft
+  2020-12](https://json-schema.org/draft/2020-12/json-schema-core.html)
+  separates schema identity from validation vocabularies and supports closed
+  object shapes. WorkerPackage v1 likewise uses an explicit major version and
+  rejects undeclared fields at every package-controlled object boundary.
+- [DSSE 1.0.2](https://github.com/secure-systems-lab/dsse/blob/master/protocol.md)
+  binds an application-specific payload type to exact serialized bytes through
+  pre-authentication encoding. Optional WorkerPackage signatures therefore use
+  a standard DSSE JSON envelope rather than a custom signature string.
+- [SLSA provenance](https://slsa.dev/spec/v1.2/build-provenance) keeps subjects,
+  digests, dependencies, and provenance roles distinct. WorkerPackage artifact
+  references similarly carry an opaque reference, media type, byte length,
+  content digest, role, and classification while W1 provenance identifies the
+  originating PacketADE work.
+
+## WorkerPackage v1 wire schema
 
 The wire format must be versioned, validated, integrity-protected, and idempotent.
 
 ```ts
-interface WorkerPackage {
-  schemaVersion: string;
+interface WorkerPackageV1 {
+  schemaVersion: "packetagent.worker-package/v1";
   packageId: string;
-  packageVersion: string;
+  packageVersion: number; // positive safe integer
   idempotencyKey: string;
-  createdAt: string;
-  createdBy: ActorReference;
-
-  source: {
+  createdAt: string; // canonical UTC ISO-8601
+  createdBy: WorkerActorReference;
+  source: WorkerSourceProvenance & {
     product: "PacketADE";
-    flightId?: string;
-    issueId?: string;
-    conversationId?: string;
-    projectId?: string;
-    repository?: string;
-    revision?: string;
+    kind: "packetade";
   };
-
   worker: {
     name: string;
-    objective: string;
-    instructions: string;
-    providerProfile: string;
-    executionTarget: ExecutionTargetReference;
-    tools: ToolCapabilityRequest[];
-    credentialRefs: string[];
-    triggers: WorkerTrigger[];
-    policy: WorkerPolicy;
-    exitPredicates: ExitPredicate[];
-    acceptanceCommands: string[];
-    notificationRoutes: NotificationRouteReference[];
+    description: string;
+    content: WorkerVersionContent;
   };
-
-  artifacts: ArtifactReference[];
+  artifacts: WorkerPackageArtifactReference[];
   integrity: {
-    algorithm: string;
-    digest: string;
-    signature?: string;
+    canonicalization: "packetagent.worker-package-canonical-json/v1";
+    algorithm: "sha256";
+    digest: `sha256:${string}`;
+    dsseEnvelope?: {
+      payloadType: "application/vnd.packetagent.worker-package.v1+json";
+      payload: string; // base64 canonical subject bytes
+      signatures: Array<{ keyid?: string; sig: string }>;
+    };
   };
 }
 ```
 
-Secret values are never part of the package. `credentialRefs` name PacketAgent-side vault entries that the receiving operator is authorized to resolve.
+`WorkerVersionContent` is the exact W1 content shape: objective, instructions,
+typed input schema, provider route and execution target, verb/resource-scoped
+tool capability requests, opaque credential references, triggers, bounded
+policy, exit predicates, acceptance commands, and notification route
+references. PacketAgent validates that content through the same W1 validator
+used before an immutable version can deploy. The package carries no
+workspace, definition, version, deployment, or run ID; PacketAgent assigns
+those only after W9.2 authenticates and maps the request.
+
+`WorkerPackageArtifactReference` contains `reference`, optional `name`,
+`mediaType`, non-negative `byteLength`, `contentDigest`, `role`
+(`source | configuration | acceptance | input | other`), and redaction
+`classification`. References are unique inside a package.
+
+Secret values are never part of the package. `credentialRefs` name
+PacketAgent-side vault entries that the receiving operator is authorized to
+resolve. Strict undeclared-field rejection prevents a producer from adding an
+inline `apiKey`, token, or alternative execution instruction outside the W1
+contract.
+
+## Canonical bytes and integrity
+
+WorkerPackage v1 computes its digest over a `WorkerPackageDigestSubject`:
+
+1. Copy every top-level field except `integrity`.
+2. Add `integrity` containing only
+   `canonicalization: "packetagent.worker-package-canonical-json/v1"` and
+   `algorithm: "sha256"`.
+3. Serialize recursively with object property names sorted by UTF-16 code
+   units, array order preserved, ECMAScript JSON primitive serialization, no
+   whitespace, finite numbers only, no `undefined`, no non-plain objects, and
+   no unpaired Unicode surrogates.
+4. Encode the canonical string as UTF-8 without a byte-order mark.
+5. SHA-256 those bytes and encode lowercase hexadecimal as `sha256:<64 hex>`.
+
+The digest and optional DSSE envelope are excluded from the subject, avoiding
+self-reference while binding the canonicalization and digest algorithms.
+Digest verification is mandatory for every validation or deployment request.
+
+When a Packet-product trust relationship requires a signature, `payload`
+must be base64 of those exact canonical subject bytes. DSSE signs
+`PAE(UTF8(payloadType), payloadBytes)`. The receiver first checks schema,
+digest, payload type, and byte-for-byte payload equality, then passes each DSSE
+signature to the W9.2 trust-policy verifier. An untrusted key hint never
+authorizes a package.
+
+Checked compatibility fixtures:
+
+- [`worker-package-v1.valid.json`](../src/workers/package/fixtures/worker-package-v1.valid.json)
+  is the canonical accepted v1 example.
+- [`worker-package-v2.unsupported.json`](../src/workers/package/fixtures/worker-package-v2.unsupported.json)
+  proves unknown major versions fail closed.
+
+The v1 fixture digest is
+`sha256:fcea4fc3eb7cf0598c8d2312b1374bddd1a07c953380bd7a15792e35422e143d`.
+Automated contract tests check it after property reordering, validate every W1
+field family, reject undeclared fields and missing bounds, detect content
+tampering, bind DSSE to the same bytes, and exercise required/untrusted
+signature policy.
 
 ## Required policy
 

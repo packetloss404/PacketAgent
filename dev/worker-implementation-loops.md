@@ -734,9 +734,15 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: active. Resume at W9.1.
+Status: active. Resume at W9.2.
 
 ### W9.1 - Freeze WorkerPackage v1
+
+Status: complete as of 2026-07-28. The strict v1 envelope maps directly to W1
+version content and provenance, uses mandatory canonical SHA-256 package
+digests, supports byte-bound DSSE verification when trust policy requires it,
+and rejects undeclared fields plus unknown major versions. Checked fixtures
+live under `src/workers/package/fixtures/`.
 
 - Replace the illustrative TypeScript block in
   `dev/packetade-packetagent-handoff.md` with the exact versioned schema and

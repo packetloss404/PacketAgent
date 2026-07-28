@@ -1,0 +1,135 @@
+{
+  "schemaVersion": "packetagent.worker-package/v1",
+  "packageId": "packetade:flight-42:release-watcher",
+  "packageVersion": 1,
+  "idempotencyKey": "packetade:flight-42:release-watcher:v1",
+  "createdAt": "2026-07-28T15:00:00.000Z",
+  "createdBy": {
+    "type": "packet_product",
+    "id": "packetade:flight-42",
+    "displayName": "PacketADE flight 42",
+    "product": "PacketADE"
+  },
+  "source": {
+    "product": "PacketADE",
+    "kind": "packetade",
+    "sourceId": "task-101",
+    "flightId": "flight-42",
+    "projectId": "packet-suite",
+    "conversationId": "conversation-9",
+    "repository": "https://github.com/example/packet-suite",
+    "revision": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "worker": {
+    "name": "Release watcher",
+    "description": "Verify release evidence and report a bounded readiness decision.",
+    "content": {
+      "objective": "Verify release readiness and report a bounded result.",
+      "instructions": "Inspect the supplied evidence, report blockers, and stop when the release decision is clear.",
+      "inputSchema": {
+        "fields": [
+          {
+            "key": "release_id",
+            "label": "Release ID",
+            "type": "string",
+            "required": true,
+            "description": "The immutable release identifier to inspect."
+          }
+        ],
+        "additionalProperties": false
+      },
+      "execution": {
+        "routeKey": "smart",
+        "target": {
+          "kind": "packetagent"
+        }
+      },
+      "tools": [
+        {
+          "id": "release-read",
+          "tool": "http_fetch",
+          "verbs": ["GET"],
+          "resources": ["https://releases.example.test/*"],
+          "effect": "read",
+          "approval": "never"
+        }
+      ],
+      "credentialRefs": ["vault:release-api"],
+      "triggers": [
+        {
+          "id": "manual",
+          "kind": "manual",
+          "enabled": true,
+          "description": "Start after PacketADE requests handoff."
+        }
+      ],
+      "policy": {
+        "budgets": {
+          "maxElapsedMs": 300000,
+          "maxIterations": 8,
+          "maxProviderCostUsd": 2,
+          "maxConsecutiveFailures": 3,
+          "maxToolCalls": 20,
+          "rolling": {
+            "windowMs": 86400000,
+            "workspace": {
+              "maxProviderCostUsd": 200,
+              "maxBillableActions": 2000
+            },
+            "deployment": {
+              "maxProviderCostUsd": 20,
+              "maxBillableActions": 200
+            }
+          }
+        },
+        "retry": {
+          "maxAttempts": 2,
+          "initialBackoffMs": 1000,
+          "maxBackoffMs": 30000,
+          "backoffMultiplier": 2
+        },
+        "permissions": {
+          "default": "deny",
+          "allowedCapabilityIds": ["release-read"]
+        },
+        "attention": {
+          "approvalTimeoutMs": 1800000,
+          "escalationAfterMs": 600000,
+          "onExpiration": "pause"
+        }
+      },
+      "exitPredicates": [
+        {
+          "id": "release-decision",
+          "kind": "objective_satisfied",
+          "description": "A release-ready or blocked decision has been produced with evidence."
+        }
+      ],
+      "acceptanceCommands": ["npm run typecheck", "npm run test:api"],
+      "notificationRoutes": [
+        {
+          "id": "packetagent-operations",
+          "kind": "packetagent",
+          "reference": "workspace:receiving-workspace",
+          "events": ["attention", "terminal"]
+        }
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "reference": "git:https://github.com/example/packet-suite#0123456789abcdef0123456789abcdef01234567",
+      "name": "Packet suite source revision",
+      "mediaType": "application/vnd.git.commit",
+      "byteLength": 0,
+      "contentDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "role": "source",
+      "classification": "internal"
+    }
+  ],
+  "integrity": {
+    "canonicalization": "packetagent.worker-package-canonical-json/v1",
+    "algorithm": "sha256",
+    "digest": "sha256:fcea4fc3eb7cf0598c8d2312b1374bddd1a07c953380bd7a15792e35422e143d"
+  }
+}

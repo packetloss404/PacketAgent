@@ -1053,6 +1053,30 @@ export function validateWorkerDefinition(
   return finish(value, issues);
 }
 
+export function validateWorkerVersionContent(
+  value: unknown,
+): WorkerContractValidation<WorkerVersionContent> {
+  const issues: IssueCollector = [];
+  validateVersionContent(value, "$", issues);
+  return finish(value, issues);
+}
+
+export function validateWorkerActorReference(
+  value: unknown,
+): WorkerContractValidation<WorkerActorReference> {
+  const issues: IssueCollector = [];
+  validateActor(value, "$", issues);
+  return finish(value, issues);
+}
+
+export function validateWorkerSourceProvenance(
+  value: unknown,
+): WorkerContractValidation<WorkerSourceProvenance> {
+  const issues: IssueCollector = [];
+  validateProvenance(value, "$", issues);
+  return finish(value, issues);
+}
+
 export function validateWorkerVersion(value: unknown): WorkerContractValidation<WorkerVersion> {
   const issues: IssueCollector = [];
   const record = recordAt(value, "$", issues);
@@ -1405,6 +1429,12 @@ export function assertValidWorkerDefinition(value: unknown): asserts value is Wo
 
 export function assertValidWorkerVersion(value: unknown): asserts value is WorkerVersion {
   assertValidation("WorkerVersion", validateWorkerVersion(value));
+}
+
+export function assertValidWorkerVersionContent(
+  value: unknown,
+): asserts value is WorkerVersionContent {
+  assertValidation("WorkerVersionContent", validateWorkerVersionContent(value));
 }
 
 export function assertValidWorkerDeployment(value: unknown): asserts value is WorkerDeployment {
