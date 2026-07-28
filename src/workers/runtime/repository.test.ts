@@ -111,6 +111,47 @@ test("runtime repository fences leases and run revisions atomically", async () =
   );
 });
 
+test("runtime finalization observes an operator-terminalized run idempotently", async () => {
+  const harness = repositoryHarness();
+  const acquisition = await harness.repository.acquire({
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    ownerId: "operator-race-owner",
+    now: new Date(TEST_NOW),
+  });
+  assert.equal(acquisition.disposition, "acquired");
+  if (acquisition.disposition !== "acquired") return;
+
+  const current = harness.data.workerRuns[0];
+  const { runtimeLease: _lease, ...withoutLease } = current;
+  harness.data.workerRuns[0] = {
+    ...withoutLease,
+    status: "cancelled",
+    revision: current.revision + 1,
+    terminalReason: "operator_cancelled",
+    updatedAt: "2026-07-27T12:00:01.000Z",
+    completedAt: "2026-07-27T12:00:01.000Z",
+  };
+  const eventCount = harness.data.workerEvents.length;
+
+  const observed = await harness.repository.finalize({
+    context: acquisition.context,
+    finalization: {
+      expectedRunRevision: acquisition.context.run.revision,
+      fencingToken: acquisition.lease.fencingToken,
+      status: "cancelled",
+      terminalReason: "operator_cancelled",
+      budgetUsage: acquisition.context.run.budgetUsage,
+    },
+    now: new Date("2026-07-27T12:00:02.000Z"),
+  });
+
+  assert.equal(observed.status, "cancelled");
+  assert.equal(observed.revision, current.revision + 1);
+  assert.equal(observed.runtimeLease, undefined);
+  assert.equal(harness.data.workerEvents.length, eventCount);
+});
+
 test("checkpoint append enforces expected sequence, digest chaining, and monotonic budgets", async () => {
   const harness = repositoryHarness();
   const acquisition = await harness.repository.acquire({
@@ -266,6 +307,46 @@ test("released work retains its fence before the next owner acquires", async () 
   if (second.disposition !== "acquired") return;
   assert.equal(second.lease.fencingToken, 2);
   assert.equal(second.context.run.revision, 4);
+});
+
+test("worker.run job handler consumes paused work without starting a supervisor", async () => {
+  const harness = repositoryHarness();
+  harness.data.workerRuns[0] = makeWorkerRun({
+    status: "paused",
+    revision: 2,
+    startedAt: TEST_NOW,
+    updatedAt: TEST_NOW,
+  });
+  const handler = createWorkerExecutionJobHandler({
+    repository: harness.repository,
+    ownerId: () => "paused-job-owner",
+  });
+  const job: JobRecord = {
+    id: "job-paused",
+    workspaceId: "workspace-1",
+    type: "worker.run",
+    payload: {
+      workerRunId: "run-1",
+      workerDeploymentId: "deployment-1",
+      workerVersionId: "worker-version-1",
+    },
+    status: "running",
+    attempts: 1,
+    maxAttempts: 2,
+    scheduledAt: TEST_NOW,
+    startedAt: TEST_NOW,
+    createdAt: TEST_NOW,
+    updatedAt: TEST_NOW,
+  };
+
+  const result = (await handler.handle(job, {
+    signal: new AbortController().signal,
+  })) as { status: string; pausedExecution: boolean };
+
+  assert.equal(result.status, "paused");
+  assert.equal(result.pausedExecution, true);
+  assert.equal(harness.data.workerRuns[0].status, "paused");
+  assert.equal(harness.data.workerRuns[0].runtimeLease, undefined);
 });
 
 test("worker.run job handler executes the canonical supervisor and persists terminal state", async () => {

@@ -74,7 +74,7 @@ const DEPLOYMENT_TRANSITIONS: Readonly<
 };
 
 const RUN_TRANSITIONS: Readonly<Record<WorkerRunStatus, ReadonlySet<WorkerRunStatus>>> = {
-  queued: new Set(["running", "cancelled"]),
+  queued: new Set(["running", "paused", "cancelled"]),
   running: new Set([
     "waiting_for_approval",
     "paused",
@@ -85,7 +85,7 @@ const RUN_TRANSITIONS: Readonly<Record<WorkerRunStatus, ReadonlySet<WorkerRunSta
     "quarantined",
   ]),
   waiting_for_approval: new Set(["running", "paused", "failed", "cancelled", "quarantined"]),
-  paused: new Set(["running", "failed", "cancelled", "quarantined"]),
+  paused: new Set(["queued", "running", "failed", "cancelled", "quarantined"]),
   completed: new Set(),
   failed: new Set(),
   budget_exhausted: new Set(),

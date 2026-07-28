@@ -77,10 +77,12 @@ test("terminal WorkerDeployment states cannot transition", () => {
 test("WorkerRun transition map covers approval, pause, and explicit terminal outcomes", () => {
   const allowed: Array<[WorkerRunStatus, WorkerRunStatus]> = [
     ["queued", "running"],
+    ["queued", "paused"],
     ["running", "waiting_for_approval"],
     ["waiting_for_approval", "running"],
     ["running", "paused"],
     ["paused", "running"],
+    ["paused", "queued"],
     ["running", "completed"],
     ["running", "failed"],
     ["running", "budget_exhausted"],

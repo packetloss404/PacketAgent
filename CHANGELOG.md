@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Atomic Worker control service (W7.2)
+
+- Added one atomic service for pause, resume, stop, deployment revoke,
+  approve-once, approve-for-run, and attention rejection, with an expected
+  revision and idempotency key on every command.
+- Pause now fences live execution while preserving the last checkpoint and
+  remaining budget; resume queues the same run with a new runtime fence. Stop
+  terminalizes one run, while revoke makes the deployment inadmissible and
+  terminalizes all of its nonterminal runs.
+- Persisted applied and rejected command outcomes plus audit events. Concurrent
+  stale commands reject durably, exact retries replay without a second state
+  transition or execution job, and transaction failures roll back the command,
+  target, job, and event together.
+- Added actor-, version-, capability-, operation-, scope-, and expiry-bound
+  approvals. Raw approval nonces are returned only on first application and
+  never stored or emitted.
+- Added paused-job draining, supervisor control checks after fenced checkpoint
+  conflicts, externally terminalized-run convergence, cross-workspace job
+  isolation, and JSON/SQLite/managed-Postgres service parity coverage.
+- The W7.2 baseline passes 1,409 API tests, 1 skipped API test, and 25 web tests
+  with zero lint errors and 145 inherited warnings.
+
 ### 2026-07-27 - Durable Worker control records (W7.1)
 
 - Added versioned attention-request, approval-grant, control-command, and

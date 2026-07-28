@@ -72,6 +72,13 @@ export function createWorkerExecutionJobHandler(
           duplicateExecution: true,
         };
       }
+      if (acquisition.disposition === "paused") {
+        return {
+          workerRunId: acquisition.run.id,
+          status: acquisition.run.status,
+          pausedExecution: true,
+        };
+      }
       if (
         acquisition.context.run.workerDeploymentId !== workerDeploymentId ||
         acquisition.context.run.workerVersionId !== workerVersionId

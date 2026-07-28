@@ -62,6 +62,10 @@ export type WorkerLeaseAcquisition =
   | {
       readonly disposition: "terminal";
       readonly run: WorkerRun;
+    }
+  | {
+      readonly disposition: "paused";
+      readonly run: WorkerRun;
     };
 
 export interface WorkerRuntimeRepository
@@ -98,6 +102,9 @@ export function createWorkerRuntimeRepository(
         const run = requireRun(data, input.workspaceId, input.workerRunId);
         if (isTerminalWorkerRunStatus(run.status)) {
           return { disposition: "terminal" as const, run: clone(run) };
+        }
+        if (run.status === "paused") {
+          return { disposition: "paused" as const, run: clone(run) };
         }
         if (run.status !== "queued" && run.status !== "running") {
           throw new WorkerLifecycleError(
@@ -250,7 +257,15 @@ export function createWorkerRuntimeRepository(
       if (deployment.status === "revoked" || deployment.status === "retired") {
         return { kind: "deployment_revoked" as const };
       }
-      if (run.status === "cancelled") return { kind: "operator_cancelled" as const };
+      if (run.status === "paused") return { kind: "paused" as const };
+      if (run.status === "cancelled") {
+        return {
+          kind:
+            run.terminalReason === "deployment_revoked"
+              ? ("deployment_revoked" as const)
+              : ("operator_cancelled" as const),
+        };
+      }
       return { kind: "active" as const };
     },
 
@@ -385,6 +400,10 @@ export function createWorkerRuntimeRepository(
     async finalize(input) {
       return await mutateStore((data) => {
         validateWorkerPersistence(data);
+        const existing = requireRun(data, input.context.run.workspaceId, input.context.run.id);
+        if (isTerminalWorkerRunStatus(existing.status)) {
+          return clone(existing);
+        }
         const run = requireFencedRun(
           data,
           input.context.run.workspaceId,

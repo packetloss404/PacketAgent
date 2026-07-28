@@ -7,13 +7,13 @@ W3's trigger-intake boundary, W4's bounded supervisor, W5's checkpoint,
 recovery, and effect-safety boundary, W6.1's capability compilation, W6.2's
 immediate runtime policy enforcement, W6.3's credential/network/process
 hardening, W6.4's atomic rolling budgets, W6.5's adversarial bypass gate, and
-W7.1's durable control records. Executable control-service, supervisor
-attention, operator API, and PacketADE handoff cases must be added as W7.2-W9
-ship; they are not current product claims.
+W7.1's durable control records plus W7.2's atomic control service. Supervisor
+attention, independent operator API, restart/kill, and PacketADE handoff cases
+must be added as W7.3-W9 ship; they are not current product claims.
 
-Last automated W7.1 baseline (2026-07-27):
+Last automated W7.2 baseline (2026-07-27):
 
-- API: 1,397 passed, 1 skipped, 0 failed
+- API: 1,409 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -22,7 +22,9 @@ Last automated W7.1 baseline (2026-07-27):
   idempotent settlement/release, lease-expiry reconciliation, Worker
   credential isolation, A/AAAA and connected-address validation, redirect
   denial, Docker-only execution, capability compilation/narrowing, activation,
-  supervisor, checkpoint-chain, effect-replay,
+  supervisor, checkpoint-chain, effect-replay, atomic control-command races,
+  pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
+  paused-job draining,
   recovery/quarantine, lease/revision, scheduler, and JSON/SQLite/managed-Postgres
   parity checks: passed
 - Typecheck: passed
@@ -247,8 +249,37 @@ and executes that job through the bounded supervisor.
 6. Reload and export the four collections in JSON, SQLite, and managed
    Postgres. Confirm backend results match and another workspace's records are
    excluded.
-7. Do not treat these records as executable operator controls until W7.2's
-   atomic control service is complete.
+7. Confirm W7.2's service, rather than direct record mutation, is the only path
+   used to execute these operator controls.
+
+## W7.2 Atomic Control Service Smoke
+
+1. Pause queued, running, and approval-waiting runs with the current run
+   revision. Confirm the command applies atomically, the run becomes paused,
+   its lease is fenced, queued execution work is canceled, and its checkpoint
+   pointer and budget usage do not change.
+2. Resume the paused run with its new revision. Confirm the same run becomes
+   queued, exactly one command-bound execution job is added, and exact
+   idempotent replay adds neither another transition nor another job.
+3. Race two stop commands at the same expected revision. Confirm one
+   terminalizes only that run and the stale command persists as rejected.
+4. Revoke a deployed or active deployment. Confirm its revision advances to
+   revoked, future activation fails, and all nonterminal runs become canceled
+   with `deployment_revoked` while already terminal runs remain unchanged.
+5. Approve once and approve for run against an open request and exact run
+   revision. Confirm the capability and operation bindings match, the raw
+   nonce appears only in the first service response, and only its digest
+   persists. Reject a separate request and confirm no grant is created.
+6. Attempt approval after expiry, beyond the request expiry, while the run is
+   not waiting, and after another resolution won. Confirm every case fails
+   closed with a durable rejection code.
+7. Inject a failure after the target update. Confirm the command, target, job,
+   and event all roll back. Repeat pause/approval/resume in JSON, SQLite, and
+   managed Postgres and compare the resulting records.
+8. Pause during a live provider phase and force the subsequent checkpoint
+   write to encounter the control revision. Confirm the supervisor releases
+   without another tool call or terminal write and a paused job is consumed
+   without restarting execution.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

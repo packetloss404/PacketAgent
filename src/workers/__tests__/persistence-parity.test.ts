@@ -24,9 +24,7 @@ import {
 } from "../service.js";
 import type { WorkerSourceProvenance } from "../types.js";
 import {
-  makeWorkerApprovalGrant,
   makeWorkerAttentionRequest,
-  makeWorkerControlCommand,
   makeWorkerNotificationDelivery,
   makeWorkerVersionContent,
 } from "./fixtures.js";
@@ -38,6 +36,7 @@ import { WORKER_MEMORY_SCHEMA_VERSION } from "../runtime/checkpoint.js";
 import { createWorkerCredentialService } from "../credentials.js";
 import { resolveWorkerRollingBudgetPolicy } from "../budget-types.js";
 import { createWorkerRollingBudgetService } from "../rolling-budget.js";
+import { createWorkerControlService } from "../control-service.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -362,8 +361,71 @@ async function runActivationQueueFailureRollback(): Promise<void> {
 }
 
 async function runRuntimePersistence(): Promise<void> {
-  const data = await loadStoreAsync();
-  const run = data.workerRuns.find((record) => record.status === "queued");
+  let data = await loadStoreAsync();
+  const admittedRun = data.workerRuns.find((record) => record.status === "queued");
+  assert.ok(admittedRun);
+  const admittedVersion = data.workerVersions.find(
+    (record) =>
+      record.workspaceId === admittedRun.workspaceId && record.id === admittedRun.workerVersionId,
+  );
+  assert.ok(admittedVersion);
+  const controlAt = new Date("2026-07-27T15:00:30.000Z");
+  let nextControlId = 0;
+  const controls = createWorkerControlService({
+    now: () => controlAt,
+    id: (kind) => `${kind}-parity-control-${++nextControlId}`,
+    nonce: () => "parity-approval-nonce",
+  });
+  const paused = await controls.pauseRun({
+    workspaceId: admittedRun.workspaceId,
+    workerRunId: admittedRun.id,
+    actor: ACTOR,
+    idempotencyKey: "parity-pause",
+    expectedRevision: admittedRun.revision,
+  });
+  assert.equal(paused.run?.status, "paused");
+  const controlBinding = {
+    workspaceId: admittedRun.workspaceId,
+    workerDefinitionId: admittedRun.workerDefinitionId,
+    workerDeploymentId: admittedRun.workerDeploymentId,
+    workerRunId: admittedRun.id,
+    workerVersionId: admittedRun.workerVersionId,
+    workerVersionContentDigest: admittedVersion.contentDigest,
+  };
+  const notificationRoute = admittedVersion.content.notificationRoutes[0];
+  assert.ok(notificationRoute);
+  await mutateStoreAsync((store) => {
+    store.workerAttentionRequests.push(
+      makeWorkerAttentionRequest({
+        ...controlBinding,
+        id: "attention-parity",
+        requestKey: "parity:iteration-1:action-approval",
+        notificationRouteIds: [notificationRoute.id],
+        requestedAt: "2026-07-27T15:00:10.000Z",
+        escalatesAt: "2026-07-27T15:30:00.000Z",
+        expiresAt: "2026-07-27T16:00:00.000Z",
+      }),
+    );
+  });
+  const approved = await controls.approveOnce({
+    workspaceId: admittedRun.workspaceId,
+    attentionRequestId: "attention-parity",
+    actor: ACTOR,
+    idempotencyKey: "parity-approve",
+    expectedRevision: paused.run!.revision,
+    expiresAt: "2026-07-27T15:45:00.000Z",
+  });
+  assert.equal(approved.approvalGrant?.scope, "once");
+  const resumed = await controls.resumeRun({
+    workspaceId: admittedRun.workspaceId,
+    workerRunId: admittedRun.id,
+    actor: ACTOR,
+    idempotencyKey: "parity-resume",
+    expectedRevision: paused.run!.revision,
+  });
+  assert.equal(resumed.run?.status, "queued");
+  data = await loadStoreAsync();
+  const run = data.workerRuns.find((record) => record.id === admittedRun.id);
   assert.ok(run);
   const acquiredAt = new Date("2026-07-27T15:01:00.000Z");
   let nextRuntimeId = 0;
@@ -380,63 +442,19 @@ async function runRuntimePersistence(): Promise<void> {
   });
   assert.equal(acquisition.disposition, "acquired");
   if (acquisition.disposition !== "acquired") return;
-  const binding = {
-    workspaceId: acquisition.context.run.workspaceId,
-    workerDefinitionId: acquisition.context.run.workerDefinitionId,
-    workerDeploymentId: acquisition.context.run.workerDeploymentId,
-    workerRunId: acquisition.context.run.id,
-    workerVersionId: acquisition.context.run.workerVersionId,
-    workerVersionContentDigest: acquisition.context.version.contentDigest,
-  };
-  const notificationRoute = acquisition.context.version.content.notificationRoutes[0];
-  assert.ok(notificationRoute);
   await mutateStoreAsync((store) => {
-    store.workerAttentionRequests.push(
-      makeWorkerAttentionRequest({
-        ...binding,
-        id: "attention-parity",
-        requestKey: "parity:iteration-1:action-approval",
-        status: "approved",
-        notificationRouteIds: [notificationRoute.id],
-        resolvedAt: "2026-07-27T12:01:00.000Z",
-        resolvedBy: { type: "user", id: "operator-1" },
-        resolutionCommandId: "control-parity",
-      }),
-    );
-    store.workerApprovalGrants.push(
-      makeWorkerApprovalGrant({
-        ...binding,
-        id: "approval-parity",
-        attentionRequestId: "attention-parity",
-        nonceDigest: `sha256:${"9".repeat(64)}`,
-      }),
-    );
-    store.workerControlCommands.push(
-      makeWorkerControlCommand({
-        ...binding,
-        id: "control-parity",
-        kind: "approve_once",
-        status: "applied",
-        idempotencyKey: "control-parity-approve",
-        expectedRevision: acquisition.context.run.revision,
-        attentionRequestId: "attention-parity",
-        capabilityId: "release-read",
-        operationDigest: `sha256:${"e".repeat(64)}`,
-        appliedAt: "2026-07-27T12:01:00.000Z",
-        appliedRevision: acquisition.context.run.revision,
-        approvalGrantId: "approval-parity",
-        updatedAt: "2026-07-27T12:01:00.000Z",
-      }),
-    );
     store.workerNotificationDeliveries.push(
       makeWorkerNotificationDelivery({
-        ...binding,
+        ...controlBinding,
         id: "notification-parity",
         deliveryKey: "attention-parity:local-attention:requested",
         attentionRequestId: "attention-parity",
         notificationRouteId: notificationRoute.id,
         notificationRouteKind: notificationRoute.kind,
         notificationRouteReference: notificationRoute.reference,
+        scheduledAt: controlAt.toISOString(),
+        createdAt: controlAt.toISOString(),
+        updatedAt: controlAt.toISOString(),
       }),
     );
   });
@@ -588,7 +606,7 @@ async function runRuntimePersistence(): Promise<void> {
     },
     now: new Date("2026-07-27T15:01:01.000Z"),
   });
-  assert.equal(terminal.revision, 6);
+  assert.equal(terminal.revision, reacquired.context.run.revision + 1);
   assert.equal(terminal.runtimeLease, undefined);
 }
 

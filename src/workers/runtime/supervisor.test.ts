@@ -10,6 +10,7 @@ import {
 import { createPermissiveWorkerBudgetPort } from "../__tests__/budget-port.js";
 import type { WorkerRollingBudgetPort } from "../budget-types.js";
 import { compileWorkerCapabilityPolicy } from "../capabilities.js";
+import { WorkerLifecycleError } from "../errors.js";
 import type {
   JsonObject,
   WorkerBudgetPolicy,
@@ -398,6 +399,47 @@ test("deployment revocation is a distinct cancellation outcome", async () => {
   assert.equal(harness.toolCalls, 0);
 });
 
+test("durable pause releases the supervisor before another action or terminal write", async () => {
+  const harness = runtimeHarness({
+    cancelAtPhase: "plan",
+    cancellationKind: "paused",
+    provider: async () =>
+      providerResult({
+        toolCalls: [{ id: "call-1", name: "http_fetch", input: { url: "https://test" } }],
+      }),
+  });
+
+  await assert.rejects(
+    runWorkerSupervisor(harness.input),
+    (error: unknown) =>
+      error instanceof WorkerRuntimeReleasedError && error.reason === "operator_paused",
+  );
+  assert.equal(harness.providerCalls, 0);
+  assert.equal(harness.toolCalls, 0);
+  assert.equal(harness.finalizations, 0);
+});
+
+test("pause detected through a fenced checkpoint conflict releases in-flight planning", async () => {
+  const harness = runtimeHarness({
+    cancellationKind: "paused",
+    cancelAfterProviderCall: true,
+    rejectCheckpointWhenCancelled: true,
+    provider: async () =>
+      providerResult({
+        toolCalls: [{ id: "call-1", name: "http_fetch", input: { url: "https://test" } }],
+      }),
+  });
+
+  await assert.rejects(
+    runWorkerSupervisor(harness.input),
+    (error: unknown) =>
+      error instanceof WorkerRuntimeReleasedError && error.reason === "operator_paused",
+  );
+  assert.equal(harness.providerCalls, 1);
+  assert.equal(harness.toolCalls, 0);
+  assert.equal(harness.finalizations, 0);
+});
+
 test("lease theft releases execution without a post-theft tool or terminal write", async () => {
   const harness = runtimeHarness({
     loseLeaseAfterRenewals: 3,
@@ -424,7 +466,9 @@ interface RuntimeHarnessOptions {
     request: WorkerRuntimeProviderRequest,
   ) => Promise<WorkerRuntimeProviderResult>;
   readonly cancelAtPhase?: WorkerSupervisorPhase;
-  readonly cancellationKind?: "operator_cancelled" | "deployment_revoked";
+  readonly cancellationKind?: "paused" | "operator_cancelled" | "deployment_revoked";
+  readonly cancelAfterProviderCall?: boolean;
+  readonly rejectCheckpointWhenCancelled?: boolean;
   readonly loseLeaseAfterRenewals?: number;
   readonly rollingBudgets?: WorkerRollingBudgetPort;
   readonly toolError?: Error;
@@ -506,11 +550,14 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
     provider: {
       async call(request) {
         providerCalls += 1;
-        return options.provider
+        const result = options.provider
           ? options.provider(request)
           : providerResult({
               content: '{"predicateId":"release-decision","matched":true,"evidence":"done"}',
             });
+        const resolved = await result;
+        if (options.cancelAfterProviderCall) cancelled = true;
+        return resolved;
       },
     },
     tools: {
@@ -601,6 +648,9 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
     },
     checkpoints: {
       async save() {
+        if (cancelled && options.rejectCheckpointWhenCancelled) {
+          throw new WorkerLifecycleError("conflict", "run revision changed by control command");
+        }
         checkpoints += 1;
         revision += 1;
         return {

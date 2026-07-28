@@ -31,7 +31,7 @@ const WORKER_TOOL_ACTOR = {
 };
 
 export class WorkerRuntimeReleasedError extends Error {
-  readonly reason: "scheduler_shutdown" | "lease_lost";
+  readonly reason: "scheduler_shutdown" | "lease_lost" | "operator_paused" | "operator_controlled";
 
   constructor(reason: WorkerRuntimeReleasedError["reason"]) {
     super(`Worker runtime released: ${reason}`);
@@ -188,6 +188,9 @@ export async function runWorkerSupervisor(
         workerDeploymentId: context.run.workerDeploymentId,
       }),
     );
+    if (cancellation.kind === "paused") {
+      throw new WorkerRuntimeReleasedError("operator_paused");
+    }
     if (cancellation.kind !== "active") {
       state = reduceWorkerSupervisor(state, {
         type: "cancelled",
@@ -247,6 +250,16 @@ export async function runWorkerSupervisor(
         error instanceof WorkerOperationAbortedError
       ) {
         throw error;
+      }
+      const control = await ports.cancellation.inspect({
+        workspaceId: context.run.workspaceId,
+        workerRunId: context.run.id,
+        workerDeploymentId: context.run.workerDeploymentId,
+      });
+      if (control.kind !== "active") {
+        throw new WorkerRuntimeReleasedError(
+          control.kind === "paused" ? "operator_paused" : "operator_controlled",
+        );
       }
       throw new WorkerCheckpointPersistenceError(error);
     }

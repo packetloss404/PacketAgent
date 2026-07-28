@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W6 and W7.1 are implemented as
+in foundation commit `d60cd47`. W1-W6 and W7.1-W7.2 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -86,6 +86,11 @@ Prompt-to-app generation remains a supported secondary capability.
 - Completed W7.1's version-bound attention, approval-grant, control-command,
   and notification-delivery records, including nonce digests, durable replay
   identities, graph integrity, workspace export, and storage parity.
+- Completed W7.2's atomic, actor-bound, expected-revision and idempotency
+  control service for pause, resume, stop, revoke, approve once, approve for
+  run, and reject. Paused runs retain checkpoints and budgets while losing
+  their lease; resumed runs queue exactly once per command; stop/revoke
+  terminal state is observed safely by live supervisors.
 
 ## Current implementation truth
 
@@ -153,8 +158,8 @@ Not shipped:
 
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
-- the W7 control service, supervisor attention flow, independent operator APIs,
-  restart/kill gate, Worker-level evidence, and cost rollups; and
+- the W7 supervisor attention flow, independent operator APIs, restart/kill
+  gate, Worker-level evidence, and cost rollups; and
 - PacketADE-to-PacketAgent deployment endpoints.
 
 Do not describe those missing Worker features as implemented.
@@ -164,8 +169,8 @@ Do not describe those missing Worker features as implemented.
 Continue **W7 - Attention, approval, and kill controls** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W6 and W7.1 are complete under `src/workers/`, the store, migrations, jobs, alerts,
-webhooks, and private
+W1-W6 and W7.1-W7.2 are complete under `src/workers/`, the store, migrations,
+jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
 storage-neutral domain model while adding the repository and control-plane
@@ -189,11 +194,14 @@ lease expiry. W6.5 binds registered Worker handlers to a one-shot executor
 permit and closes the catalog-wide direct-access, network, filesystem, command,
 credential, stale-policy, effect-ordering, and concurrent-budget bypass matrix.
 W7.1 adds the durable record graph needed for attention, approval, control,
-and notification state, but it does not yet mutate run/deployment desired
-state or authorize an operation.
+and notification state. W7.2 atomically applies or rejects every run,
+deployment, and approval control with expected revisions, durable idempotency,
+audit events, fenced pause, exact-run resume, and digest-only approval nonces.
+The service is internal until W7.4; W7.3 must still create attention from the
+supervisor and consume valid grants.
 
 The exact next slice is
-[`W7.2 - Implement the control service`](worker-implementation-loops.md#w72---implement-the-control-service).
+[`W7.3 - Integrate supervisor attention`](worker-implementation-loops.md#w73---integrate-supervisor-attention).
 After each gate passes, continue through W7-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -218,9 +226,11 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,397 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,409 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
-- focused W7 control-schema, graph-integrity, export-isolation, and
+- focused W7 control-schema, graph-integrity, atomic command races,
+  pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
+  supervisor fencing, paused-job draining, export-isolation, and
   JSON/SQLite/managed-Postgres parity checks; production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked/case-aliased
   host paths, hostile command arguments, stale/tampered policy, atomic
@@ -259,6 +269,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W7.1 commit: clean. Stop if the active folder is
+Expected status after the W7.2 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

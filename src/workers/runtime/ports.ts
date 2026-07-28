@@ -184,6 +184,7 @@ export interface WorkerLeasePort {
 
 export type WorkerCancellationState =
   | { readonly kind: "active" }
+  | { readonly kind: "paused" }
   | { readonly kind: "operator_cancelled" }
   | { readonly kind: "deployment_revoked" };
 

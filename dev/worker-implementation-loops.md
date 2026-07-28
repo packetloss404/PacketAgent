@@ -530,7 +530,7 @@ committed budget.
 Outcome: approvals and operator commands are durable, independently available,
 audited, and safe across restarts and replay.
 
-Status: active. W7.1 is complete; resume at W7.2.
+Status: active. W7.1-W7.2 are complete; resume at W7.3.
 
 ### W7.1 - Add durable control records
 
@@ -550,7 +550,15 @@ workspace export, and JSON/SQLite/managed-Postgres parity.
 
 ### W7.2 - Implement the control service
 
-Status: active. This is the exact resume point after W7.1.
+Status: complete. The atomic control service now applies or durably rejects
+pause, resume, stop, deployment revoke, approve-once, approve-for-run, and
+attention rejection commands. Every command is actor-bound, revision-checked,
+and idempotent. Pause fences live execution while retaining its checkpoint and
+budget; resume queues the same run; stop terminalizes one run; revoke blocks
+activation and terminalizes every nonterminal run on the deployment. Approval
+nonces are returned only on first application and only their digests persist.
+Running supervisors and queued jobs observe paused or externally terminalized
+state without performing another action.
 
 - Add pause, resume, stop, revoke, approve once, approve for run, and reject.
 - Pause/stop/revoke updates durable desired state first; running supervisors
@@ -569,6 +577,8 @@ and
 [PostgreSQL uniqueness constraints](https://www.postgresql.org/docs/current/ddl-constraints.html).
 
 ### W7.3 - Integrate supervisor attention
+
+Status: active. This is the exact resume point after W7.2.
 
 - A missing required approval creates an attention request, checkpoints, emits
   an event, and transitions to `waiting_for_approval`.
