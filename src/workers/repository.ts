@@ -34,6 +34,7 @@ import {
   assertValidWorkerPackageDeploymentRecord,
   assertValidWorkerPackageReceipt,
 } from "./package/trust-types.js";
+import { assertValidPacketProductEventAcknowledgementRecord } from "./package/event-types.js";
 import {
   assertValidWorkerArtifactManifest,
   assertValidWorkerEvidenceEntry,
@@ -371,6 +372,9 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     data.packetProductCredentials.forEach(assertValidPacketProductCredentialRecord);
     data.workerPackageReceipts.forEach(assertValidWorkerPackageReceipt);
     data.workerPackageDeployments.forEach(assertValidWorkerPackageDeploymentRecord);
+    data.packetProductEventAcknowledgements.forEach(
+      assertValidPacketProductEventAcknowledgementRecord,
+    );
     data.workerDefinitions.forEach(assertValidWorkerDefinition);
     data.workerVersions.forEach(assertValidWorkerVersion);
     data.workerDeployments.forEach(assertValidWorkerDeployment);
@@ -397,6 +401,14 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     assertUnique(
       data.workerPackageDeployments,
       (record) => `${record.workspaceId}:${record.workerDeploymentId}`,
+    );
+    assertUnique(
+      data.packetProductEventAcknowledgements,
+      (record) => `${record.workspaceId}:${record.id}`,
+    );
+    assertUnique(
+      data.packetProductEventAcknowledgements,
+      (record) => `${record.workspaceId}:${record.idempotencyKey}`,
     );
     assertUnique(data.workerDefinitions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerVersions, (record) => `${record.workspaceId}:${record.id}`);
@@ -611,6 +623,38 @@ function validatePackageTrustReferences(data: PacketAgentData): void {
     ) {
       throw new Error(
         `Worker package deployment ${binding.id} does not preserve its locally accepted capability decision.`,
+      );
+    }
+  }
+  for (const acknowledgement of data.packetProductEventAcknowledgements) {
+    const credential = data.packetProductCredentials.find(
+      (record) =>
+        record.workspaceId === acknowledgement.workspaceId &&
+        record.id === acknowledgement.credentialId,
+    );
+    const binding = data.workerPackageDeployments.find(
+      (record) =>
+        record.workspaceId === acknowledgement.workspaceId &&
+        record.id === acknowledgement.packageDeploymentId,
+    );
+    const run = acknowledgement.workerRunId
+      ? data.workerRuns.find(
+          (record) =>
+            record.workspaceId === acknowledgement.workspaceId &&
+            record.id === acknowledgement.workerRunId,
+        )
+      : undefined;
+    if (
+      !credential ||
+      !binding ||
+      binding.workerDeploymentId !== acknowledgement.workerDeploymentId ||
+      acknowledgement.actor.id !== credential.subjectId ||
+      acknowledgement.actor.product !== credential.product ||
+      (acknowledgement.streamKind === "run" &&
+        (!run || run.workerDeploymentId !== acknowledgement.workerDeploymentId))
+    ) {
+      throw new Error(
+        `Packet-product event acknowledgement ${acknowledgement.id} has an invalid credential, deployment, or run binding.`,
       );
     }
   }

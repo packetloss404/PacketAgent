@@ -59,6 +59,7 @@ import {
   type WorkerPackageDeploymentRecord,
   type WorkerPackageReceipt,
 } from "../workers/package/trust-types.js";
+import type { PacketProductEventAcknowledgementRecord } from "../workers/package/event-types.js";
 
 export interface ExportWorkspaceOptions {
   workspaceId: string;
@@ -117,6 +118,7 @@ export interface ExportedWorkspaceData {
   packetProductCredentials: PacketProductCredentialMetadata[];
   workerPackageReceipts: WorkerPackageReceipt[];
   workerPackageDeployments: WorkerPackageDeploymentRecord[];
+  packetProductEventAcknowledgements: PacketProductEventAcknowledgementRecord[];
   workerDefinitions: WorkerDefinition[];
   workerVersions: WorkerVersion[];
   workerDeployments: WorkerDeployment[];
@@ -263,6 +265,10 @@ function buildWorkspaceExport(
     store.workerPackageDeployments,
     workspaceId,
   );
+  const packetProductEventAcknowledgements = workspaceWorkerRecords(
+    store.packetProductEventAcknowledgements,
+    workspaceId,
+  );
   const workerDefinitions = workspaceWorkerRecords(store.workerDefinitions, workspaceId);
   const workerVersions = workspaceWorkerRecords(store.workerVersions, workspaceId);
   const workerDeployments = workspaceWorkerRecords(store.workerDeployments, workspaceId);
@@ -341,6 +347,7 @@ function buildWorkspaceExport(
       packetProductCredentials,
       workerPackageReceipts,
       workerPackageDeployments,
+      packetProductEventAcknowledgements,
       workerDefinitions,
       workerVersions,
       workerDeployments,

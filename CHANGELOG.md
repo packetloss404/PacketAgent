@@ -6,6 +6,25 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - PacketADE reconnectable events (W9.4)
+
+- Added versioned PacketADE deployment/run event projections over the W8
+  journal for progress, approval, checkpoint, completion, failure, budget,
+  pause, and revoke outcomes, with immutable Worker-version identity and
+  linked evidence.
+- Added stable opaque event IDs, cursor-paginated reads, bounded SSE with
+  `Last-Event-ID`, heartbeat/close frames, explicit trace gaps, and recoverable
+  `410` retention-window responses.
+- Added explicit monotonic cursor advancement guarded by strong `If-Match`
+  ETags and durable idempotent acknowledgement records. SSE delivery never
+  mutates the acknowledgement.
+- Added SQLite migration `0025`, secret-free workspace export, repository
+  integrity checks, and JSON/SQLite/managed-Postgres parity.
+- The W9.4 baseline covers 1,480 API tests (1,479 passed and 1 intentionally
+  skipped) with zero lint errors.
+- W9.5 remains the serialized disconnect/process-restart handoff gate, so the
+  unified lifecycle is not yet a shipped claim.
+
 ### 2026-07-28 - Packet-product trust and deployment API (W9.2-W9.3)
 
 - Added digest-only, workspace-bound PacketADE bearer credentials with fixed

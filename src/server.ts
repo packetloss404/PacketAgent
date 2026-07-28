@@ -74,6 +74,7 @@ import { workerRoutes } from "./worker-routes.js";
 import { workerObservabilityRoutes } from "./worker-observability-routes.js";
 import { workerOperatorRoutes } from "./worker-operator-routes.js";
 import { workerPackageRoutes } from "./worker-package-routes.js";
+import { workerPackageEventRoutes } from "./worker-package-event-routes.js";
 import {
   ALERTS_EVALUATE_JOB_TYPE,
   ensureAlertsCronJobAsync,
@@ -397,6 +398,7 @@ app.route("/api/app/workers", workerObservabilityRoutes);
 app.route("/api/app/workers", workerRoutes);
 app.route("/api/app/workers", workerOperatorRoutes);
 app.route("/api", workerPackageRoutes);
+app.route("/api", workerPackageEventRoutes);
 
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
 const workerExecutionJobHandler = createWorkerExecutionJobHandler();

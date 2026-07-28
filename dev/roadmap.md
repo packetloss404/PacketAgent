@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W9.4 - PacketADE reconnectable events**. Repository/session state
+Current active loop: **W9.5 - close the PacketADE handoff gate**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -24,8 +24,11 @@ capability acceptance, durable pre-deployment receipt, rate limit, audit, and
 storage parity. W9.3 adds the authenticated validate/deploy/update/activate/
 inspect/list/pause/resume/rollback/revoke API, immutable package/deployment
 bindings, atomic forward rollouts, and JSON/SQLite/managed Postgres parity.
-Resume at W9.4 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w94---stream-reconnectable-events).
+W9.4 projects W8 evidence events through versioned JSON and bounded SSE,
+supports stable `Last-Event-ID` reconnect, exposes retention-window recovery,
+and persists explicit idempotent cursor acknowledgements behind strong ETags.
+Resume at W9.5 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w95---close-the-handoff-gate).
 
 ## North star
 
@@ -130,9 +133,11 @@ WorkerPackage v1 now freezes the strict W1-aligned envelope, canonical digest
 bytes, artifact references, compatibility fixtures, and optional DSSE
 verification seam. The Packet-product trust boundary now authenticates
 workspace-bound PacketADE service actors, narrows package capabilities through
-local policy, and persists token-safe integrity/idempotency receipts. Next
-implement **Deploy to PacketAgent**, **Keep running**, update, inspect, pause,
-revoke, and reconnectable progress/approval events.
+local policy, persists token-safe integrity/idempotency receipts, composes the
+canonical deployment/control services, and projects reconnectable progress,
+approval, completion, failure, and budget events with durable acknowledgements.
+The remaining W9.5 gate exercises the serialized PacketADE handoff through
+disconnect and process restart.
 
 ### 10. PacketChat and PacketPhone routes
 

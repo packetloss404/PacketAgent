@@ -53,6 +53,13 @@ Primary user actions:
   `429 Too Many Requests` and `Retry-After`. Packet-product writes consume a
   durable per-workspace/per-credential bucket before package or lifecycle
   mutation; W9.3 maps exhausted decisions to that response shape.
+- [WHATWG Server-sent events](https://html.spec.whatwg.org/dev/server-sent-events.html)
+  defines opaque UTF-8 event IDs and browser `Last-Event-ID` reconnect
+  behavior. W9.4 uses the same resume boundary with bounded connections.
+- [RFC 9110 conditional requests](https://www.rfc-editor.org/rfc/rfc9110.html)
+  defines strong validators, `If-Match`, and `412 Precondition Failed`. W9.4
+  uses those semantics to prevent concurrent durable cursor advancement from
+  silently overwriting another consumer decision.
 
 ## WorkerPackage v1 wire schema
 
@@ -191,7 +198,13 @@ Initial endpoints:
 - `POST /api/worker-deployments/:id/revoke`
 - `GET /api/worker-deployments/:id`
 - `GET /api/worker-deployments/:id/runs`
+- `GET /api/worker-deployments/:id/events`
+- `GET /api/worker-deployments/:id/events/stream`
+- `PUT /api/worker-deployments/:id/events/cursor`
 - `GET /api/worker-runs/:id/events`
+- `GET /api/worker-runs/:id/events/stream`
+- `PUT /api/worker-runs/:id/events/cursor`
+- `GET /api/worker-events/:eventId/evidence`
 
 Write endpoints require an idempotency key. Package IDs, deployment IDs, and run IDs remain distinct.
 
@@ -219,7 +232,18 @@ These routes are service-to-service APIs, not browser-session routes.
   `input`, and admits the manual occurrence through the canonical activation
   inbox. Set `startRun: false` for a trigger-only deployment.
 - Run listing accepts the canonical `status`, `cursor`, and `limit` query
-  fields. The W9.4 event route is not implemented yet.
+  fields.
+- Event pages accept an opaque stable `cursor`, `limit`, and
+  `from=beginning`. Without either origin, they resume after the authenticated
+  credential's durable acknowledgement.
+- Event streams use `text/event-stream`, accept `Last-Event-ID`, emit bounded
+  heartbeats and an explicit close reason, and never advance durable state.
+- Cursor writes require `Idempotency-Key`, a strong `If-Match` event-cursor
+  ETag, and `{ "cursor": "<event-id>" }`. They advance monotonically; exact
+  retries return the original acknowledgement and stale revisions return
+  `412`.
+- A cursor whose exact source event has left the retention window returns
+  `410` with the minimum retained cursor and workspace sequence.
 
 Responses expose the durable receipt and package/deployment binding,
 requested/package-allowed/locally accepted/granted capabilities, local
@@ -246,7 +270,14 @@ PacketAgent emits versioned events:
 - `worker.deployment.paused`
 - `worker.deployment.revoked`
 
-Each event includes deployment ID, Worker version, run ID when applicable, monotonic sequence, timestamp, trace ID, summary, and an evidence link. Consumers acknowledge a cursor so reconnecting does not lose events.
+Each event includes deployment ID, Worker version, run ID when applicable,
+monotonic workspace/deployment/run sequences, timestamp, trace ID (or an
+explicit source-trace gap), summary, and an evidence link. Stable event IDs
+are opaque stream-bound cursors. Delivery is at least once: consumers
+explicitly acknowledge a cursor so reconnecting does not lose events, while an
+SSE connection alone is never treated as durable progress. This follows the
+WHATWG `Last-Event-ID` reconnect model and RFC 9110 strong conditional-request
+semantics.
 
 ## Trust boundary
 

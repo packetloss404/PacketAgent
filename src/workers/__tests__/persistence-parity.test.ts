@@ -55,6 +55,7 @@ import {
 } from "../observability/retention-types.js";
 import { createPacketProductTrustService } from "../package/trust.js";
 import { createPacketProductDeploymentService } from "../package/deployment.js";
+import { createPacketProductEventService } from "../package/events.js";
 import type { WorkerPackage } from "../package/types.js";
 
 const STORE_ENV_KEYS = [
@@ -123,6 +124,8 @@ interface BackendScenarioResult {
   readonly exportedPacketProductCredentialCount: number;
   readonly exportedWorkerPackageReceiptCount: number;
   readonly exportedWorkerPackageDeploymentCount: number;
+  readonly packetProductEventAcknowledgementProjection: readonly string[];
+  readonly exportedPacketProductEventAcknowledgementCount: number;
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -190,6 +193,10 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   assert.equal(
     exported.data.workerPackageDeployments.length,
     stored.workerPackageDeployments.length,
+  );
+  assert.equal(
+    exported.data.packetProductEventAcknowledgements.length,
+    stored.packetProductEventAcknowledgements.length,
   );
   assert.equal(JSON.stringify(exported).includes("backend-parity-secret"), false);
   assert.equal(JSON.stringify(exported).includes(stored.workerCredentials[0].ciphertext), false);
@@ -299,6 +306,14 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     exportedPacketProductCredentialCount: exported.data.packetProductCredentials.length,
     exportedWorkerPackageReceiptCount: exported.data.workerPackageReceipts.length,
     exportedWorkerPackageDeploymentCount: exported.data.workerPackageDeployments.length,
+    packetProductEventAcknowledgementProjection: stored.packetProductEventAcknowledgements
+      .map(
+        (record) =>
+          `${record.streamKind}:${record.disposition}:${record.workspaceSequence}:${record.appliedRevision}`,
+      )
+      .sort(),
+    exportedPacketProductEventAcknowledgementCount:
+      exported.data.packetProductEventAcknowledgements.length,
   };
 }
 
@@ -307,7 +322,7 @@ async function runPacketProductTrustPersistence(): Promise<string> {
   const issued = await trust.issueCredential({
     workspaceId: "alpha",
     subjectId: "packetade:backend-parity",
-    allowedOperations: ["package.validate", "package.deploy"],
+    allowedOperations: ["package.validate", "package.deploy", "run.list_events", "run.ack_events"],
     createdBy: ACTOR,
   });
   const workerPackage = JSON.parse(
@@ -324,12 +339,30 @@ async function runPacketProductTrustPersistence(): Promise<string> {
     ),
   ) as WorkerPackage;
   const deploymentService = createPacketProductDeploymentService({ trust });
-  await deploymentService.deployPackage({
+  const deployed = await deploymentService.deployPackage({
     authorization: `Bearer ${issued.token}`,
     workspaceId: "alpha",
     idempotencyKey: "packetade-backend-parity-deploy",
     workerPackage,
     acceptedCapabilityIds: ["release-read"],
+  });
+  assert.ok(deployed.deployment);
+  const eventService = createPacketProductEventService({ trust });
+  const eventPage = await eventService.listEvents({
+    authorization: `Bearer ${issued.token}`,
+    workspaceId: "alpha",
+    workerDeploymentId: deployed.deployment.id,
+    resumeFromAcknowledgement: false,
+  });
+  const cursor = eventPage.events.at(-1)?.id;
+  assert.ok(cursor);
+  await eventService.acknowledge({
+    authorization: `Bearer ${issued.token}`,
+    workspaceId: "alpha",
+    workerDeploymentId: deployed.deployment.id,
+    cursor,
+    idempotencyKey: "packetade-backend-parity-event-ack",
+    expectedRevision: 0,
   });
   return issued.token;
 }

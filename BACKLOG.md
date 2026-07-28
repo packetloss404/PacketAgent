@@ -134,7 +134,7 @@ Status: complete.
 Dependencies: W2-W7.
 
 Status: complete. Resume at
-[`W9.4 - Stream reconnectable events`](dev/worker-implementation-loops.md#w94---stream-reconnectable-events).
+[`W9.5 - Close the handoff gate`](dev/worker-implementation-loops.md#w95---close-the-handoff-gate).
 
 - [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
@@ -157,7 +157,7 @@ Status: complete. Resume at
 Dependencies: W1-W7. Contract design may proceed earlier.
 
 Status: active. Resume at
-[`W9.4 - Stream reconnectable events`](dev/worker-implementation-loops.md#w94---stream-reconnectable-events).
+[`W9.5 - Close the handoff gate`](dev/worker-implementation-loops.md#w95---close-the-handoff-gate).
 
 - [x] Implement the WorkerPackage contract in [`dev/packetade-packetagent-handoff.md`](dev/packetade-packetagent-handoff.md).
 - [x] Add validate, deploy, update, activate, inspect, list-runs, pause, resume,
@@ -165,7 +165,10 @@ Status: active. Resume at
 - [x] Verify package provenance, schema version, integrity, local capability
       acceptance, and idempotency behind a workspace/actor-bound PacketADE
       credential.
-- [ ] Return progress, approval, completion, failure, and budget events to PacketADE.
+- [x] Return progress, approval, completion, failure, and budget events to
+      PacketADE through versioned pages and bounded SSE, with stable opaque
+      IDs, `Last-Event-ID`, retention-window errors, and durable idempotent
+      cursor acknowledgements.
 - Gate: a PacketADE task can choose **Keep running**, close PacketADE, and later reconnect to the same durable Worker deployment and evidence trail.
 
 ### W10 - PacketChat and PacketPhone routes

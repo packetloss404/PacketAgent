@@ -34,6 +34,7 @@ import type {
   WorkerPackageDeploymentRecord,
   WorkerPackageReceipt,
 } from "../workers/package/trust-types.js";
+import type { PacketProductEventAcknowledgementRecord } from "../workers/package/event-types.js";
 export type { WorkerCredentialRecord } from "../workers/credential-types.js";
 
 export interface UserRecord {
@@ -758,6 +759,7 @@ export interface PacketAgentData {
   packetProductCredentials: PacketProductCredentialRecord[];
   workerPackageReceipts: WorkerPackageReceipt[];
   workerPackageDeployments: WorkerPackageDeploymentRecord[];
+  packetProductEventAcknowledgements: PacketProductEventAcknowledgementRecord[];
   workerDefinitions: WorkerDefinition[];
   workerVersions: WorkerVersion[];
   workerDeployments: WorkerDeployment[];

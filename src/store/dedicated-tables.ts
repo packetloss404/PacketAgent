@@ -26,6 +26,7 @@ import type {
   WorkerPackageDeploymentRecord,
   WorkerPackageReceipt,
 } from "../workers/package/trust-types.js";
+import type { PacketProductEventAcknowledgementRecord } from "../workers/package/event-types.js";
 import type {
   ActivationSignalKind,
   ActivationSignalOrigin,
@@ -66,6 +67,7 @@ export type DedicatedRelationalCollectionKey =
   | "packetProductCredentials"
   | "workerPackageReceipts"
   | "workerPackageDeployments"
+  | "packetProductEventAcknowledgements"
   | "workerDefinitions"
   | "workerVersions"
   | "workerDeployments"
@@ -114,6 +116,10 @@ export function loadDedicatedRelationalCollections(
     workerPackageDeployments: loadWorkerPayloads<WorkerPackageDeploymentRecord>(
       db,
       "select payload from worker_package_deployments order by workspace_id, created_at, id",
+    ),
+    packetProductEventAcknowledgements: loadWorkerPayloads<PacketProductEventAcknowledgementRecord>(
+      db,
+      "select payload from packet_product_event_acknowledgements order by workspace_id, acknowledged_at, id",
     ),
     workerDefinitions: loadWorkerPayloads<WorkerDefinition>(
       db,
@@ -521,6 +527,7 @@ export function persistDedicatedRelationalRows(db: DatabaseSync, data: PacketAge
 
 function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData): void {
   db.exec(`
+    delete from packet_product_event_acknowledgements;
     delete from worker_package_deployments;
     delete from worker_package_receipts;
     delete from packet_product_credentials;
@@ -677,6 +684,38 @@ function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData):
       record.status,
       record.attempt,
       record.updatedAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const packetProductEventAcknowledgementStatement = db.prepare(`
+    insert into packet_product_event_acknowledgements (
+      workspace_id, id, credential_id, package_deployment_id,
+      worker_deployment_id, stream_kind, worker_run_id, idempotency_key,
+      request_digest, event_id, workspace_sequence, effective_event_id,
+      effective_workspace_sequence, expected_revision, disposition,
+      applied_revision, acknowledged_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.packetProductEventAcknowledgements ?? []) {
+    packetProductEventAcknowledgementStatement.run(
+      record.workspaceId,
+      record.id,
+      record.credentialId,
+      record.packageDeploymentId,
+      record.workerDeploymentId,
+      record.streamKind,
+      record.workerRunId ?? null,
+      record.idempotencyKey,
+      record.requestDigest,
+      record.eventId,
+      record.workspaceSequence,
+      record.effectiveEventId,
+      record.effectiveWorkspaceSequence,
+      record.expectedRevision,
+      record.disposition,
+      record.appliedRevision,
+      record.acknowledgedAt,
       JSON.stringify(record),
     );
   }

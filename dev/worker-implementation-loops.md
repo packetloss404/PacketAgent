@@ -734,7 +734,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: active. Resume at W9.4.
+Status: active. Resume at W9.5.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -795,6 +795,13 @@ Primary seams: new `src/workers/package/` and `src/worker-package-routes.ts`,
 `src/server.ts`, `src/rbac.ts`, and the Packet product credential store.
 
 ### W9.4 - Stream reconnectable events
+
+Status: complete as of 2026-07-28. Versioned deployment/run event pages and
+bounded SSE project the W8 journal with stable opaque IDs, evidence links,
+trace gaps, `Last-Event-ID`, heartbeat/close frames, and recoverable retention
+windows. Explicit idempotent cursor acknowledgements advance monotonically
+behind strong ETags and persist across JSON, SQLite migration `0025`, and
+managed Postgres; opening SSE never mutates durable delivery state.
 
 - Project W8 events to the versioned PacketADE event contract.
 - Support cursor/`Last-Event-ID` resume, heartbeat, retention-bound cursor

@@ -20,12 +20,14 @@ loading/error/empty states, and the documented screenshot/manual matrix.
 W9.1 adds the checked WorkerPackage v1 contract fixtures and integrity cases.
 W9.2 adds workspace/actor/operation-bound PacketADE credentials, local
 capability acceptance, durable pre-deployment receipts, rate limiting,
-token-safe audit, and three-backend parity. PacketADE deployment/reconnection
-cases remain W9.3-W9.5 work and are not current product claims.
+token-safe audit, and three-backend parity. W9.3 adds receipt-bound
+deployment/control routes, and W9.4 adds reconnectable event streams plus
+durable cursor acknowledgement. The serialized disconnect/process-restart
+gate remains W9.5 work and is not yet a current product claim.
 
-Last automated W9.2 baseline (2026-07-28):
+Last automated W9.4 baseline (2026-07-28):
 
-- API: 1,470 passed, 1 skipped, 0 failed
+- API: 1,479 passed, 1 skipped, 0 failed
 - Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -80,6 +82,17 @@ Last automated W9.2 baseline (2026-07-28):
   revocation, digest-only token storage, local capability narrowing,
   signature-policy enforcement, pre-deployment receipt idempotency and
   integrity, durable rate-limit/audit outcomes, secret-free export, and
+  JSON/SQLite/managed-Postgres parity: passed
+- Focused lifecycle-dry validation, field-addressed transport errors,
+  authenticated deploy/inspect/list/control, exact activation replay, atomic
+  forward update, locally narrowed update/rollback grants, unbound/
+  cross-workspace/stale rejection, immutable package/deployment graph,
+  migration, export isolation, and JSON/SQLite/managed-Postgres parity: passed
+- Focused versioned event projection, progress/approval/completion/failure/
+  budget mapping, linked evidence, stable IDs, cursor and `Last-Event-ID`
+  resume, bounded SSE heartbeat/close, no-ack streaming, idempotent monotonic
+  cursor acknowledgement, ETag conflicts, restart reconstruction,
+  stream-bound cursors, retention-window recovery, secret isolation, and
   JSON/SQLite/managed-Postgres parity: passed
 - Signed-in browser pass for the canonical `/runs` empty state, accessible
   labels and filters, `/activity` preservation and two-way navigation, missing
@@ -598,6 +611,42 @@ match this view.` Capture `w8-worker-list-empty.png`.
 7. Substitute different DSSE payload bytes, payload type, or an untrusted
    signature. Confirm validation or verification fails without treating
    `keyid` as authority.
+
+## W9.2-W9.4 PacketADE Trust, Deployment, and Event Smoke
+
+Use a PacketADE service credential scoped to the local workspace and only the
+operations exercised below. Send it through `Authorization: Bearer`; never put
+it in a URL, package, log, event, or evidence payload.
+
+1. Validate the checked v1 fixture with its exact package idempotency key,
+   explicit local capability IDs, and narrowed grants. Confirm a durable
+   integrity/provenance receipt is returned without a Worker lifecycle write.
+2. Deploy the same accepted package, activate its manual trigger, inspect the
+   deployment, and list its runs. Replay each write with the same key and
+   confirm the original IDs return without duplicate lifecycle effects.
+3. Read the deployment and run event pages with `from=beginning`. Confirm every
+   event uses `packetagent.packet-product-worker-event/v1`, has a stable opaque
+   ID, immutable version identity, monotonic sequences, a trace ID or explicit
+   trace gap, and a resolvable evidence link.
+4. Open the SSE route, disconnect after an event, and reconnect with that
+   event's `Last-Event-ID`. Confirm earlier events are not resent, later events
+   retain their IDs, heartbeat and bounded-close frames arrive, and no durable
+   acknowledgement was created.
+5. Advance the cursor with `PUT .../events/cursor`, a fresh
+   `Idempotency-Key`, and the page's strong `ETag` in `If-Match`. Confirm an
+   exact retry returns the same acknowledgement, a concurrent stale ETag gets
+   `412`, and acknowledging an older event never moves the effective cursor
+   backward.
+6. Construct a new service instance over the same durable store and read
+   without an explicit cursor. Confirm delivery resumes after the
+   acknowledgement. Remove the acknowledged source through the configured
+   retention path and confirm `410` returns the minimum retained cursor.
+7. Update to package v2, pause/resume it, roll back to the accepted v1 package,
+   and revoke the resulting deployment. Confirm locally narrowed grants never
+   broaden and deployment events project each transition.
+8. Repeat receipt, binding, event acknowledgement, reload, and export checks
+   through JSON, SQLite, and managed Postgres. Confirm the bearer secret and
+   stored token digest are absent from every export and response.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

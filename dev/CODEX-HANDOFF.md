@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W8 and W9.1-W9.3 are implemented as
+in foundation commit `d60cd47`. W1-W8 and W9.1-W9.4 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -272,17 +272,16 @@ Not shipped:
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
 - external notification transports;
-- PacketADE reconnectable event/acknowledgement endpoints and
-  PacketChat/PacketPhone delivery routes.
+- PacketChat/PacketPhone delivery routes.
 
 Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W9.4 - reconnectable events** in
+Continue **W9.5 - close the PacketADE handoff gate** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W8 and W9.1-W9.3 are complete under `src/workers/`, the store, migrations,
+W1-W8 and W9.1-W9.4 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -369,9 +368,15 @@ revoke routes. It composes W2 lifecycle transitions, W3 activation admission,
 W7 revocation, and W8 run reads; its only W2 extension is the atomic forward
 rollout operation needed to retire the previous deployment without a
 competing-active gap or capability broadening.
+W9.4 projects the W8 journal into stable versioned PacketADE deployment and
+run event streams with immutable version identity, evidence links, and
+explicit trace gaps. JSON pages and bounded SSE support opaque cursor and
+`Last-Event-ID` resume, heartbeat/close frames, and recoverable retention
+windows. Durable cursor advancement is an explicit idempotent write guarded by
+a strong ETag; opening or closing SSE never acknowledges delivery.
 
 The exact next slice is
-[`W9.4 - Stream reconnectable events`](worker-implementation-loops.md#w94---stream-reconnectable-events).
+[`W9.5 - Close the handoff gate`](worker-implementation-loops.md#w95---close-the-handoff-gate).
 After each gate passes, continue through W9-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -397,7 +402,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,475 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,479 passed, 1 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -457,6 +462,12 @@ handoff, the roadmap, or the backlog.
   cross-workspace/stale rejection, durable package/deployment graph integrity,
   secret-free export, migration, and JSON/SQLite/managed-Postgres parity
   checks - passed
+- focused W9.4 stable versioned event projection, progress/approval/terminal/
+  budget mapping, evidence links, trace gaps, cursor and `Last-Event-ID`
+  resume, bounded SSE heartbeat/close, no-ack streaming, idempotent monotonic
+  acknowledgement, strong ETag conflicts, restart reconstruction,
+  stream-bound cursors, retention-window recovery, secret isolation, and
+  JSON/SQLite/managed-Postgres parity checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 

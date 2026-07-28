@@ -23,6 +23,8 @@ export const PACKET_PRODUCT_OPERATIONS = [
   "deployment.resume",
   "deployment.rollback",
   "deployment.revoke",
+  "run.list_events",
+  "run.ack_events",
 ] as const;
 
 export type PacketProductOperation = (typeof PACKET_PRODUCT_OPERATIONS)[number];

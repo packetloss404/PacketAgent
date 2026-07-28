@@ -170,6 +170,7 @@ export interface WorkerPersistenceCollections {
   readonly packetProductCredentials: readonly import("./package/trust-types.js").PacketProductCredentialRecord[];
   readonly workerPackageReceipts: readonly import("./package/trust-types.js").WorkerPackageReceipt[];
   readonly workerPackageDeployments: readonly import("./package/trust-types.js").WorkerPackageDeploymentRecord[];
+  readonly packetProductEventAcknowledgements: readonly import("./package/event-types.js").PacketProductEventAcknowledgementRecord[];
   readonly workerBudgetReservations: readonly import("./budget-types.js").WorkerBudgetReservationRecord[];
   readonly workerAttentionRequests: readonly import("./control-types.js").WorkerAttentionRequest[];
   readonly workerApprovalGrants: readonly import("./control-types.js").WorkerApprovalGrant[];
