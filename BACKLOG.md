@@ -84,7 +84,11 @@ Dependencies: W4.
 Dependencies: W1, W4.
 
 Status: active. Resume at
-[`W6.1 - Compile typed capabilities`](dev/worker-implementation-loops.md#w61---compile-typed-capabilities).
+[`W6.2 - Enforce immediately before execution`](dev/worker-implementation-loops.md#w62---enforce-immediately-before-execution).
+
+W6.1 is complete: validated versions now compile normalized tool/verb/resource
+tuples, and deployments persist only version-bounded narrowed grants plus a
+version-digest-bound compiled policy.
 
 - [ ] Replace whole-tool grants with verb/resource-scoped capabilities.
 - [ ] Resolve credentials by reference at execution time; never embed secret values in Worker packages.

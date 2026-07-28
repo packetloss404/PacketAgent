@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { WorkerLifecycleError } from "./errors.js";
 import {
+  compileWorkerCapabilityPolicy,
+  WorkerCapabilityCompilationError,
+} from "./capabilities.js";
+import {
   WORKER_COMMAND_SCHEMA_VERSION,
   WORKER_EVENT_SCHEMA_VERSION,
   WORKER_ROLLOUT_SCHEMA_VERSION,
@@ -25,6 +29,7 @@ import {
   type WorkerActorReference,
   type WorkerDefinition,
   type WorkerDeployment,
+  type WorkerDeploymentCapabilityGrant,
   type WorkerSourceProvenance,
   type WorkerVersion,
   type WorkerVersionContent,
@@ -74,6 +79,7 @@ export interface ChangeWorkerVersionStatusInput extends WorkerCommandContext {
 export interface CreateWorkerDeploymentInput extends WorkerCommandContext {
   readonly deploymentId?: string;
   readonly workerVersionId: string;
+  readonly capabilityGrants?: readonly WorkerDeploymentCapabilityGrant[];
 }
 
 export interface TransitionWorkerDeploymentInput extends WorkerCommandContext {
@@ -344,6 +350,7 @@ export function createWorkerLifecycleService(
         {
           workerVersionId: input.workerVersionId,
           deploymentId: input.deploymentId,
+          capabilityGrants: input.capabilityGrants,
         },
         (transaction, timestamp) => {
           const version = requireVersion(transaction, input.workerVersionId);
@@ -368,6 +375,15 @@ export function createWorkerLifecycleService(
               "This WorkerVersion already has a nonterminal deployment.",
             );
           }
+          const compiled = compileWorkerCapabilityPolicy({
+            workerVersionContentDigest: version.contentDigest,
+            requestedCapabilities: version.content.tools,
+            allowedCapabilityIds: version.content.policy.permissions.allowedCapabilityIds,
+            credentialRefs: version.content.credentialRefs,
+            ...(input.capabilityGrants
+              ? { deploymentGrants: input.capabilityGrants }
+              : {}),
+          });
           const deployment: WorkerDeployment = {
             schemaVersion: WORKER_CONTRACT_SCHEMA_VERSION,
             id: input.deploymentId ?? id("deployment"),
@@ -376,6 +392,8 @@ export function createWorkerLifecycleService(
             workerVersionId: version.id,
             status: "draft",
             revision: 1,
+            capabilityGrants: compiled.grants,
+            compiledPolicy: compiled.policy,
             createdBy: input.actor,
             createdAt: timestamp,
             updatedAt: timestamp,
@@ -471,6 +489,12 @@ export function createWorkerLifecycleService(
             );
           }
           const definition = requireDefinition(transaction, previous.workerDefinitionId);
+          const compiled = compileWorkerCapabilityPolicy({
+            workerVersionContentDigest: version.contentDigest,
+            requestedCapabilities: version.content.tools,
+            allowedCapabilityIds: version.content.policy.permissions.allowedCapabilityIds,
+            credentialRefs: version.content.credentialRefs,
+          });
           const retired: WorkerDeployment = {
             ...previous,
             status: "retired",
@@ -491,6 +515,8 @@ export function createWorkerLifecycleService(
             workerVersionId: version.id,
             status: replacementStatus,
             revision: 1,
+            capabilityGrants: compiled.grants,
+            compiledPolicy: compiled.policy,
             statusReason: input.statusReason ?? "Rollback deployment.",
             createdBy: input.actor,
             createdAt: timestamp,
@@ -774,6 +800,11 @@ async function executeCommand(
       });
     }
     if (error instanceof WorkerContractValidationError) {
+      throw new WorkerLifecycleError("invalid_input", error.message, {
+        cause: error,
+      });
+    }
+    if (error instanceof WorkerCapabilityCompilationError) {
       throw new WorkerLifecycleError("invalid_input", error.message, {
         cause: error,
       });

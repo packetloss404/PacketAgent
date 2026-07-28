@@ -3,16 +3,17 @@
 End-to-end test plan run before cutting a release. Covers the builder loop, agent loop, workspace setup, providers, sandbox, operations, self-host publish handoff, and the backup round-trip.
 
 This plan verifies the inherited workbench plus W2's durable Worker lifecycle,
-W3's trigger-intake boundary, W4's bounded supervisor, and W5's checkpoint,
-recovery, and effect-safety boundary. Permission, attention, and PacketADE
-handoff cases must be added as W6-W9 ship; they are not current product claims.
+W3's trigger-intake boundary, W4's bounded supervisor, W5's checkpoint,
+recovery, and effect-safety boundary, and W6.1's capability compilation.
+Runtime policy enforcement, attention, and PacketADE handoff cases must be
+added as W6.2-W9 ship; they are not current product claims.
 
-Last automated W5 baseline (2026-07-27):
+Last automated W6.1 baseline (2026-07-27):
 
-- API: 1,348 passed, 1 skipped, 0 failed
+- API: 1,355 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused Worker activation, supervisor, checkpoint-chain, effect-replay,
-  recovery/quarantine, lease/revision, scheduler, and
+- Focused Worker capability compilation/narrowing, activation, supervisor,
+  checkpoint-chain, effect-replay, recovery/quarantine, lease/revision, scheduler, and
   JSON/SQLite/managed-Postgres parity checks: passed
 - Typecheck: passed
 - Production web build: passed
@@ -112,6 +113,17 @@ and executes that job through the bounded supervisor.
 7. Repeat the prepared-receipt case with an idempotent mutator and a reconcilable mutator. Confirm the idempotent retry reuses one effect key, while reconciliation records proven completion without a second external call.
 8. Corrupt a checkpoint digest, chain link, version reference, remaining budget, or action cursor. Confirm recovery quarantines the run with a redacted reason and never advances it.
 9. Repeat the checkpoint/effect/recovery scenario against JSON, SQLite, and managed Postgres. Confirm equivalent receipt status, checkpoint count, run revisions, reacquisition, and terminal result.
+
+## W6.1 Compiled Capability Policy Smoke
+
+1. Validate a version containing `http_fetch`/`GET` and an uppercase-host HTTPS path scope ending in `/*`. Confirm the compiled tuple normalizes the verb, host, default port, and resource while retaining the version content digest.
+2. Submit an unknown tool or verb, `*`, a host wildcard, FTP URL, URL with credentials/query/fragment, relative filesystem path, traversal segment, or non-`vault:` credential value. Confirm version validation fails with a path-addressable capability error.
+3. Create a deployment without explicit grants. Confirm PacketAgent materializes the version policy's allowed capabilities as normalized grants and stores a deterministic compiled-policy digest.
+4. Create another deployment with a subset of verbs/resources and change `approval` from `never` to `always`. Confirm the narrowed policy compiles. Attempt a new verb/resource or change required approval from `always` to `never`; confirm `invalid_input` and no deployment write.
+5. Define overlapping grants for the same tool/verb/resource prefix with different approval requirements. Confirm compilation rejects the contradictory overlap.
+6. Modify the stored policy digest, capability tuple, version digest, or deployment grant after creation. Confirm repository integrity rejects the record. Transition a valid deployment and confirm its grant and compiled policy remain immutable.
+7. Repeat deployment creation, reload, export, and rollback through JSON, SQLite, and managed Postgres. Confirm the same normalized grants and compiled policy persist in every backend.
+8. Treat this as compilation evidence only. Until W6.2 passes, confirm product copy does not claim that every production tool invocation is authorized against the compiled tuple immediately before execution.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

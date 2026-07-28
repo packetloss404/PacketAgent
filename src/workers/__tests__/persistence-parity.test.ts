@@ -73,6 +73,8 @@ interface BackendScenarioResult {
   readonly terminalRunStatuses: readonly string[];
   readonly checkpointCount: number;
   readonly effectReceiptStatuses: readonly string[];
+  readonly compiledPolicyDigests: readonly string[];
+  readonly capabilityGrantCounts: readonly string[];
   readonly runRevisions: readonly number[];
 }
 
@@ -95,6 +97,12 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   assert.equal(race.deployments.filter((deployment) => deployment.status === "active").length, 1);
   assert.equal(rollback.rollouts.length, 1);
   assert.equal(rollback.rollouts[0].kind, "rollback");
+  assert.equal(
+    stored.workerDeployments.every(
+      (deployment) => deployment.compiledPolicy && deployment.capabilityGrants,
+    ),
+    true,
+  );
   assert.equal(exported.data.workerCommandReceipts.length, stored.workerCommandReceipts.length);
   assert.equal(exported.data.workerEvents.length, stored.workerEvents.length);
   assert.equal(
@@ -141,6 +149,12 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     checkpointCount: stored.workerCheckpoints.length,
     effectReceiptStatuses: stored.workerEffectReceipts
       .map((receipt) => `${receipt.toolName}:${receipt.status}`)
+      .sort(),
+    compiledPolicyDigests: stored.workerDeployments
+      .map((deployment) => `${deployment.id}:${deployment.compiledPolicy!.policyDigest}`)
+      .sort(),
+    capabilityGrantCounts: stored.workerDeployments
+      .map((deployment) => `${deployment.id}:${deployment.capabilityGrants!.length}`)
       .sort(),
     runRevisions: stored.workerRuns.map((run) => run.revision).sort((a, b) => a - b),
   };

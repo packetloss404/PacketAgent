@@ -82,14 +82,36 @@ test("Worker routes return stable validation and revision conflict codes", async
     {
       deploymentId: "worker-route-deployment",
       workerVersionId: version.id,
+      capabilityGrants: [
+        {
+          capabilityId: "release-read",
+          verbs: ["get"],
+          resources: ["https://releases.example.test/releases"],
+          approval: "always",
+        },
+      ],
     },
     "create-deployment",
   );
   const deployment = (
     (await deploymentResponse.json()) as {
-      deployment: { id: string; revision: number };
+      deployment: {
+        id: string;
+        revision: number;
+        capabilityGrants: Array<{ resources: string[]; approval: string }>;
+        compiledPolicy: { workerVersionContentDigest: string };
+      };
     }
   ).deployment;
+  assert.deepEqual(deployment.capabilityGrants, [
+    {
+      capabilityId: "release-read",
+      verbs: ["GET"],
+      resources: ["https://releases.example.test/releases"],
+      approval: "always",
+    },
+  ]);
+  assert.equal(deployment.compiledPolicy.workerVersionContentDigest, version.contentDigest);
   const validatedDeployment = await postJson(
     harness.routes,
     `/deployments/${deployment.id}/validate`,

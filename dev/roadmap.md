@@ -7,8 +7,8 @@ continuation order live in
 
 Current active loop: **W6 - Permission and budget policy**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
-Resume at W6.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w61---compile-typed-capabilities).
+W6.1 capability compilation is complete. Resume at W6.2 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w62---enforce-immediately-before-execution).
 
 ## North star
 
@@ -65,7 +65,7 @@ Digest-chained immutable snapshots persist the run cursor, full working memory, 
 
 ### 6. Permission and budget policy - active
 
-Compile whole-tool requests into version-digest-bound verb/resource capabilities, enforce them immediately before every provider/tool action, resolve credentials by reference, default network/filesystem/shell/external writes to deny, and add atomic rolling budgets.
+Version-digest-bound verb/resource capability compilation and deployment narrowing are complete. Next, enforce the compiled policy immediately before every provider/tool action, then resolve credentials by reference, default network/filesystem/shell/external writes to deny, and add atomic rolling budgets.
 
 ### 7. Attention and operator controls
 

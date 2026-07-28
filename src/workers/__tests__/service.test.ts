@@ -51,6 +51,18 @@ test("Worker lifecycle executes draft through retirement with optimistic revisio
     workerVersionId: "version-alpha-1",
   });
   assert.equal(draftedDeployment.deployment?.revision, 1);
+  assert.equal(
+    draftedDeployment.deployment?.compiledPolicy?.workerVersionContentDigest,
+    validated.version?.contentDigest,
+  );
+  assert.deepEqual(draftedDeployment.deployment?.capabilityGrants, [
+    {
+      capabilityId: "release-read",
+      verbs: ["GET"],
+      resources: ["https://releases.example.test/*"],
+      approval: "never",
+    },
+  ]);
 
   const validatedDeployment = await harness.service.validateDeployment({
     ...command("validate-deployment"),
@@ -162,6 +174,36 @@ test("validated versions are immutable and stale draft digests conflict", async 
     }),
     (error: unknown) => error instanceof WorkerLifecycleError && error.code === "conflict",
   );
+});
+
+test("deployment creation rejects a capability grant that broadens its version", async () => {
+  const harness = createHarness();
+  const created = await createDefinition(harness);
+  const validated = await harness.service.validateVersion({
+    ...command("validate-for-narrowing"),
+    workerVersionId: created.version!.id,
+    expectedContentDigest: created.version!.contentDigest,
+  });
+
+  await assert.rejects(
+    harness.service.createDeployment({
+      ...command("broad-deployment-grant"),
+      workerVersionId: validated.version!.id,
+      capabilityGrants: [
+        {
+          capabilityId: "release-read",
+          verbs: ["GET"],
+          resources: ["https://admin.example.test/*"],
+          approval: "never",
+        },
+      ],
+    }),
+    (error: unknown) =>
+      error instanceof WorkerLifecycleError &&
+      error.code === "invalid_input" &&
+      /outside the version request/.test(error.message),
+  );
+  assert.equal(harness.data.workerDeployments.length, 0);
 });
 
 test("deployment commands reject stale revisions and competing active deployments", async () => {

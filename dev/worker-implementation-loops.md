@@ -422,9 +422,16 @@ Outcome: the W1 policy becomes an enforceable, deny-by-default runtime boundary
 for every provider, tool, credential, network, filesystem, shell, and external
 write action.
 
-Status: active. Resume at W6.1.
+Status: active. W6.1 is complete; resume at W6.2.
 
 ### W6.1 - Compile typed capabilities
+
+Status: complete. Version validation now rejects unknown tools/verbs, unsafe
+wildcards, non-HTTP network schemes, relative filesystem escapes, raw
+credential values, effect mismatches, and contradictory overlaps. Deployment
+grants can only narrow the requested upper bound, and the resulting normalized
+tuples are persisted with a deterministic policy digest tied to the immutable
+Worker version digest.
 
 - Parse each Worker tool capability into a normalized tuple of tool, verb,
   resource, effect, and approval requirement.

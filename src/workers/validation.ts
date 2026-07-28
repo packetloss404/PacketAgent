@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { parseCron } from "../jobs/cron.js";
 import {
+  compileWorkerCapabilityPolicy,
+  WorkerCapabilityCompilationError,
+} from "./capabilities.js";
+import {
+  WORKER_COMPILED_POLICY_SCHEMA_VERSION,
   WORKER_CONTRACT_SCHEMA_VERSION,
   type WorkerActorReference,
   type WorkerCheckpoint,
@@ -485,6 +490,70 @@ function validateCapability(
   return id;
 }
 
+function validateDeploymentCapabilityGrants(
+  value: unknown,
+  path: string,
+  issues: IssueCollector,
+): void {
+  if (!Array.isArray(value)) {
+    issue(issues, path, "type.array", "must be an array");
+    return;
+  }
+  const seen = new Set<string>();
+  value.forEach((entry, index) => {
+    const grantPath = `${path}[${index}]`;
+    const grant = recordAt(entry, grantPath, issues);
+    if (!grant) return;
+    const capabilityId = stringAt(grant, "capabilityId", grantPath, issues);
+    if (capabilityId && seen.has(capabilityId)) {
+      issue(
+        issues,
+        `${grantPath}.capabilityId`,
+        "array.unique",
+        `duplicates ${JSON.stringify(capabilityId)}`,
+      );
+    }
+    if (capabilityId) seen.add(capabilityId);
+    stringArrayAt(grant, "verbs", grantPath, issues, { minLength: 1, unique: true });
+    stringArrayAt(grant, "resources", grantPath, issues, {
+      minLength: 1,
+      unique: true,
+    });
+    enumAt(grant, "approval", ["never", "always"], grantPath, issues);
+  });
+}
+
+function validateCompiledPolicy(value: unknown, path: string, issues: IssueCollector): void {
+  const policy = recordAt(value, path, issues);
+  if (!policy) return;
+  if (policy.schemaVersion !== WORKER_COMPILED_POLICY_SCHEMA_VERSION) {
+    issue(
+      issues,
+      `${path}.schemaVersion`,
+      "compiled_policy.schema_version",
+      `must equal ${JSON.stringify(WORKER_COMPILED_POLICY_SCHEMA_VERSION)}`,
+    );
+  }
+  for (const key of ["workerVersionContentDigest", "policyDigest"]) {
+    const digest = stringAt(policy, key, path, issues);
+    if (digest && !/^sha256:[a-f0-9]{64}$/.test(digest)) {
+      issue(issues, `${path}.${key}`, "compiled_policy.digest", "must be a sha256 digest");
+    }
+  }
+  const capabilities = arrayAt(policy, "capabilities", path, issues);
+  capabilities?.forEach((entry, index) => {
+    const capabilityPath = `${path}.capabilities[${index}]`;
+    const capability = recordAt(entry, capabilityPath, issues);
+    if (!capability) return;
+    stringAt(capability, "capabilityId", capabilityPath, issues);
+    stringAt(capability, "tool", capabilityPath, issues);
+    stringAt(capability, "verb", capabilityPath, issues);
+    stringAt(capability, "resource", capabilityPath, issues);
+    enumAt(capability, "effect", ["read", "write", "execute"], capabilityPath, issues);
+    enumAt(capability, "approval", ["never", "always"], capabilityPath, issues);
+  });
+}
+
 function validatePolicy(
   value: unknown,
   declaredCapabilityIds: ReadonlySet<string>,
@@ -957,6 +1026,31 @@ export function validateWorkerVersion(value: unknown): WorkerContractValidation<
   if (status === "retired" && !retiredAt) {
     issue(issues, "$.retiredAt", "version.retired_at_required", "is required for retired versions");
   }
+  if (
+    (status === "validated" || status === "retired") &&
+    contentDigest &&
+    isRecord(record.content) &&
+    issues.filter((entry) => entry.path.startsWith("$.content")).length === 0
+  ) {
+    const content = record.content as unknown as WorkerVersionContent;
+    try {
+      compileWorkerCapabilityPolicy({
+        workerVersionContentDigest: contentDigest,
+        requestedCapabilities: content.tools,
+        allowedCapabilityIds: content.policy.permissions.allowedCapabilityIds,
+        credentialRefs: content.credentialRefs,
+      });
+    } catch (error) {
+      if (!(error instanceof WorkerCapabilityCompilationError)) throw error;
+      for (const compilationIssue of error.issues) {
+        const path =
+          compilationIssue.path === "workerVersionContentDigest"
+            ? "$.contentDigest"
+            : `$.content.${compilationIssue.path}`;
+        issue(issues, path, compilationIssue.code, compilationIssue.message);
+      }
+    }
+  }
   return finish(value, issues);
 }
 
@@ -993,6 +1087,23 @@ export function validateWorkerDeployment(
   stringAt(record, "workerVersionId", "$", issues);
   const status = enumAt(record, "status", DEPLOYMENT_STATUSES, "$", issues);
   numberAt(record, "revision", "$", issues, { integer: true, exclusiveMinimum: 0 });
+  if (record.capabilityGrants !== undefined) {
+    validateDeploymentCapabilityGrants(record.capabilityGrants, "$.capabilityGrants", issues);
+  }
+  if (record.compiledPolicy !== undefined) {
+    validateCompiledPolicy(record.compiledPolicy, "$.compiledPolicy", issues);
+  }
+  if (
+    (record.capabilityGrants === undefined) !==
+    (record.compiledPolicy === undefined)
+  ) {
+    issue(
+      issues,
+      "$.compiledPolicy",
+      "compiled_policy.incomplete",
+      "must be stored together with capabilityGrants",
+    );
+  }
   stringAt(record, "statusReason", "$", issues, { optional: true });
   validateActor(record.createdBy, "$.createdBy", issues);
   timestampAt(record, "createdAt", "$", issues);

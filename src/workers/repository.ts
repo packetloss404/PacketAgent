@@ -4,6 +4,7 @@ import {
   type PacketAgentData,
 } from "../packetagent-store.js";
 import { WorkerLifecycleError } from "./errors.js";
+import { assertWorkerDeploymentPolicyIntegrity } from "./capabilities.js";
 import {
   WORKER_COMMAND_SCHEMA_VERSION,
   WORKER_EVENT_SCHEMA_VERSION,
@@ -475,6 +476,7 @@ function validateCoreReferences(data: PacketAgentData): void {
         `WorkerDeployment ${deployment.id} references an inconsistent definition or version.`,
       );
     }
+    assertWorkerDeploymentPolicyIntegrity(deployment, version);
   }
   for (const run of data.workerRuns) {
     const deployment = data.workerDeployments.find(

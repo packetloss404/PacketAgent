@@ -4,6 +4,7 @@ import { redactedErrorMessage } from "./security/redaction.js";
 import { createWorkerLifecycleService, type WorkerLifecycleService } from "./workers/service.js";
 import type {
   WorkerActorReference,
+  WorkerDeploymentCapabilityGrant,
   WorkerSourceProvenance,
   WorkerVersionContent,
 } from "./workers/types.js";
@@ -163,6 +164,7 @@ export function createWorkerRoutes(dependencies: WorkerRoutesDependencies = {}):
           ...commandContext(auth, requireIdempotencyKey(c)),
           deploymentId: optionalString(body.deploymentId, "deploymentId"),
           workerVersionId: requiredString(body.workerVersionId, "workerVersionId"),
+          capabilityGrants: optionalCapabilityGrants(body.capabilityGrants),
         }),
         201,
       );
@@ -428,6 +430,39 @@ function optionalTimestamp(value: unknown, name: string): string | undefined {
     throw invalidRequest(`${name} must be a canonical UTC ISO-8601 timestamp.`);
   }
   return timestamp;
+}
+
+function optionalCapabilityGrants(
+  value: unknown,
+): readonly WorkerDeploymentCapabilityGrant[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) {
+    throw invalidRequest("capabilityGrants must be an array when supplied.");
+  }
+  return value.map((entry, index) => {
+    const grant = requiredObject(entry, `capabilityGrants[${index}]`);
+    if (!Array.isArray(grant.verbs) || !grant.verbs.every((verb) => typeof verb === "string")) {
+      throw invalidRequest(`capabilityGrants[${index}].verbs must be an array of strings.`);
+    }
+    if (
+      !Array.isArray(grant.resources) ||
+      !grant.resources.every((resource) => typeof resource === "string")
+    ) {
+      throw invalidRequest(`capabilityGrants[${index}].resources must be an array of strings.`);
+    }
+    if (grant.approval !== "never" && grant.approval !== "always") {
+      throw invalidRequest(`capabilityGrants[${index}].approval must be never or always.`);
+    }
+    return {
+      capabilityId: requiredString(
+        grant.capabilityId,
+        `capabilityGrants[${index}].capabilityId`,
+      ),
+      verbs: grant.verbs,
+      resources: grant.resources,
+      approval: grant.approval,
+    };
+  });
 }
 
 function optionalLimit(value: unknown): number | undefined {

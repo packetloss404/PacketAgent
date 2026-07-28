@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Compiled Worker capability policy (W6.1)
+
+- Added a pure capability compiler that expands validated Worker requests into deterministic tool, verb, resource, effect, and approval tuples tied to the immutable version content digest.
+- Added the built-in Worker tool verb/effect catalog plus canonical HTTPS, opaque-resource, command, and absolute-filesystem normalization.
+- Version validation now rejects unknown tools/verbs, effect mismatches, broad or ambiguous wildcards, non-HTTP network schemes, URL credentials/query/fragment data, relative filesystem escapes, raw credential values, and contradictory overlaps.
+- Deployments now persist normalized capability grants and a compiled policy digest. Explicit grants may remove capabilities, narrow verbs/resources, or require more approval, but cannot exceed their version's requested upper bound.
+- Added compiled-policy integrity checks across lifecycle transitions, rollback, repository reload, routes, exports, and JSON/SQLite/managed-Postgres parity.
+- Added bounded retries for transient Windows `EPERM`, `EACCES`, and `EBUSY` errors while atomically replacing the JSON store, eliminating a reproduced full-suite persistence race.
+
 ### 2026-07-27 - Checkpoint, recovery, and side-effect safety (W5)
 
 - Upgraded phase cursors to immutable digest-chained checkpoints containing redacted supervisor memory, completed actions, pending approvals, artifacts, effect receipt IDs, trace context, and exact remaining budgets.

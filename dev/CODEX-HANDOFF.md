@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W5 are implemented as isolated changes
+in foundation commit `d60cd47`. W1-W5 and W6.1 are implemented as isolated changes
 on this branch. Do not reset this branch to the historical source remote.
 
 ## Product decision
@@ -66,6 +66,9 @@ Prompt-to-app generation remains a supported secondary capability.
 - Completed W5's digest-chained full-state checkpoints, prepared/completed
   mutation effect receipts, exact-cursor restart recovery, corrupt/uncertain
   replay quarantine, startup reconciliation, and cross-backend crash gate.
+- Completed W6.1's tool/verb/resource capability compiler, version-digest-bound
+  deterministic policy, deployment grant narrowing, validation failures for
+  unsafe resource syntax, and compiled-policy persistence integrity checks.
 
 ## Current implementation truth
 
@@ -95,6 +98,9 @@ Implemented substrate:
   valid action cursor or quarantines corrupt and unsafe replay state;
 - tool-boundary effect classification plus prepared/completed redacted
   receipts, deterministic effect keys, safe replay, and reconciliation hooks;
+- validated-version capability compilation with a built-in tool verb/effect
+  catalog, normalized resources, opaque vault references, immutable deployment
+  grants, and deterministic compiled-policy digests;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -107,7 +113,7 @@ Implemented substrate:
 
 Not shipped:
 
-- resource/verb-scoped capabilities;
+- mandatory compiled-policy enforcement at every execution path;
 - credential-reference, deny-by-default network/process, and rolling-budget
   enforcement;
 - Worker-level attention, evidence, and cost rollups; and
@@ -117,10 +123,10 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Start with **W6 - Permission and budget policy** in
+Continue **W6 - Permission and budget policy** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W5 are complete under `src/workers/`, the store, migrations, jobs, alerts,
+W1-W5 and W6.1 are complete under `src/workers/`, the store, migrations, jobs, alerts,
 webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -130,10 +136,12 @@ does not execute them. W4 executes those jobs through the bounded supervisor
 and persists optimistic run, lease, cursor-checkpoint, event, and terminal
 state. W5 upgrades those checkpoints to complete digest-chained snapshots,
 adds mutation effect receipts, and recovers expired work without repeating a
-completed effect.
+completed effect. W6.1 compiles the version's requested tools into normalized
+tool/verb/resource tuples and persists a deployment grant that cannot exceed
+that version-bound upper limit.
 
-The exact first slice is
-[`W6.1 - Compile typed capabilities`](worker-implementation-loops.md#w61---compile-typed-capabilities).
+The exact next slice is
+[`W6.2 - Enforce immediately before execution`](worker-implementation-loops.md#w62---enforce-immediately-before-execution).
 After each gate passes, continue through W6-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.
@@ -158,10 +166,11 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,348 passed, 1 skipped, 0 failed
+- `npm run test:api` - 1,355 passed, 1 skipped, 0 failed
 - `npm run test:web` - 25 passed, 0 failed
-- focused Worker activation, supervisor, checkpoint-chain, effect replay,
-  recovery/quarantine, lease/revision, scheduler, route, and
+- focused Worker capability compilation/narrowing, activation, supervisor,
+  checkpoint-chain, effect replay, recovery/quarantine, lease/revision,
+  scheduler, route, and
   JSON/SQLite/managed-Postgres parity checks - passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
@@ -191,6 +200,6 @@ Expected branch: `codex/packetagent-foundation`.
 
 Expected remote: `taskloom-source` only.
 
-Expected status after the W5 commit: clean. Stop if the active folder is
+Expected status after the W6.1 commit: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

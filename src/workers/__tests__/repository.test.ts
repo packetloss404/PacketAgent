@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createSeedStore, normalizeStore, type PacketAgentData } from "../../packetagent-store.js";
 import { WorkerLifecycleError } from "../errors.js";
+import { compileWorkerCapabilityPolicy } from "../capabilities.js";
 import { validateWorkerPersistence } from "../repository.js";
 import { makeWorkerDefinition, makeWorkerDeployment, makeWorkerVersion } from "./fixtures.js";
 
@@ -59,6 +60,41 @@ test("Worker repository integrity rejects multiple active deployments", () => {
   );
 
   assertIntegrityFailure(data, /more than one active deployment/);
+});
+
+test("Worker repository integrity rejects a compiled policy that drifts from its version", () => {
+  const data = createSeedStore();
+  const version = makeWorkerVersion({
+    workspaceId: "alpha",
+    status: "validated",
+  });
+  const compiled = compileWorkerCapabilityPolicy({
+    workerVersionContentDigest: version.contentDigest,
+    requestedCapabilities: version.content.tools,
+    allowedCapabilityIds: version.content.policy.permissions.allowedCapabilityIds,
+    credentialRefs: version.content.credentialRefs,
+  });
+  data.workerDefinitions.push(
+    makeWorkerDefinition({
+      workspaceId: "alpha",
+      status: "active",
+      currentVersionId: version.id,
+    }),
+  );
+  data.workerVersions.push(version);
+  data.workerDeployments.push(
+    makeWorkerDeployment({
+      workspaceId: "alpha",
+      status: "active",
+      capabilityGrants: compiled.grants,
+      compiledPolicy: {
+        ...compiled.policy,
+        policyDigest: `sha256:${"0".repeat(64)}`,
+      },
+    }),
+  );
+
+  assertIntegrityFailure(data, /does not match the pinned WorkerVersion/);
 });
 
 function assertIntegrityFailure(data: PacketAgentData, message: RegExp): void {

@@ -75,6 +75,32 @@ export interface WorkerToolCapability {
   readonly approval: WorkerCapabilityApproval;
 }
 
+export const WORKER_COMPILED_POLICY_SCHEMA_VERSION =
+  "packetagent.worker-compiled-policy/v1" as const;
+
+export interface WorkerDeploymentCapabilityGrant {
+  readonly capabilityId: string;
+  readonly verbs: readonly string[];
+  readonly resources: readonly string[];
+  readonly approval: WorkerCapabilityApproval;
+}
+
+export interface WorkerCompiledCapability {
+  readonly capabilityId: string;
+  readonly tool: string;
+  readonly verb: string;
+  readonly resource: string;
+  readonly effect: WorkerCapabilityEffect;
+  readonly approval: WorkerCapabilityApproval;
+}
+
+export interface WorkerCompiledPolicy {
+  readonly schemaVersion: typeof WORKER_COMPILED_POLICY_SCHEMA_VERSION;
+  readonly workerVersionContentDigest: string;
+  readonly capabilities: readonly WorkerCompiledCapability[];
+  readonly policyDigest: string;
+}
+
 export interface WorkerBudgetPolicy {
   readonly maxElapsedMs: number;
   readonly maxIterations: number;
@@ -239,6 +265,8 @@ export interface WorkerDeployment {
   readonly workerVersionId: string;
   readonly status: WorkerDeploymentStatus;
   readonly revision: number;
+  readonly capabilityGrants?: readonly WorkerDeploymentCapabilityGrant[];
+  readonly compiledPolicy?: WorkerCompiledPolicy;
   readonly statusReason?: string;
   readonly createdBy: WorkerActorReference;
   readonly createdAt: string;

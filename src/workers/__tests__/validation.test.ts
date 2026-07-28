@@ -131,6 +131,27 @@ test("WorkerVersion verifies its canonical content digest", () => {
     assert.ok(result.issues.some((entry) => entry.code === "version.digest_mismatch"));
 });
 
+test("validated WorkerVersion rejects capabilities that cannot compile", () => {
+  const content = makeWorkerVersionContent({
+    tools: [
+      {
+        ...makeWorkerVersionContent().tools[0],
+        verbs: ["TRACE"],
+      },
+    ],
+  });
+  const result = validateWorkerVersion(
+    makeWorkerVersion({
+      status: "validated",
+      content,
+    }),
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.ok(result.issues.some((entry) => entry.code === "capability.unknown_verb"));
+  }
+});
+
 test("PacketADE provenance records supplied source coordinates", () => {
   const version = makeWorkerVersion({
     source: {

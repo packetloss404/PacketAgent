@@ -275,6 +275,8 @@ export function assertWorkerDeploymentUpdate(
     "workspaceId",
     "workerDefinitionId",
     "workerVersionId",
+    "capabilityGrants",
+    "compiledPolicy",
     "createdBy",
     "createdAt",
   ] as const) {
