@@ -292,6 +292,14 @@ export interface WorkerTraceContext {
   readonly traceState?: string;
 }
 
+export interface WorkerRuntimeLease {
+  readonly ownerId: string;
+  readonly fencingToken: number;
+  readonly acquiredAt: string;
+  readonly renewedAt: string;
+  readonly expiresAt: string;
+}
+
 export interface WorkerRun {
   readonly schemaVersion: WorkerContractSchemaVersion;
   readonly id: string;
@@ -303,6 +311,8 @@ export interface WorkerRun {
   readonly triggerKind: WorkerTrigger["kind"];
   readonly status: WorkerRunStatus;
   readonly attempt: number;
+  readonly revision: number;
+  readonly runtimeFence: number;
   readonly input?: JsonObject;
   readonly inputReference?: string;
   readonly output?: JsonValue;
@@ -310,6 +320,7 @@ export interface WorkerRun {
   readonly budgetUsage: WorkerBudgetUsage;
   readonly terminalReason?: WorkerRunTerminalReason;
   readonly latestCheckpointId?: string;
+  readonly runtimeLease?: WorkerRuntimeLease;
   readonly trace?: WorkerTraceContext;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -317,7 +328,13 @@ export interface WorkerRun {
   readonly completedAt?: string;
 }
 
-export type WorkerSupervisorPhase = "plan" | "act" | "evaluate" | "decide" | "attention";
+export type WorkerSupervisorPhase =
+  | "plan"
+  | "act"
+  | "evaluate"
+  | "checkpoint"
+  | "decide"
+  | "attention";
 
 export interface WorkerCheckpointCursor {
   readonly phase: WorkerSupervisorPhase;

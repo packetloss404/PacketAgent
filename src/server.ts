@@ -42,7 +42,7 @@ import { apiKeyRoutes } from "./api-key-routes.js";
 import { usageRoutes } from "./usage-routes.js";
 import { llmStreamRoutes } from "./llm-stream-routes.js";
 import { jobRoutes } from "./job-routes.js";
-import { JobDeferredError, JobScheduler } from "./jobs/scheduler.js";
+import { JobScheduler } from "./jobs/scheduler.js";
 import { selectSchedulerLeaderLock } from "./jobs/scheduler-leader-selection.js";
 import {
   ensureMetricsSnapshotCronJobAsync,
@@ -79,6 +79,7 @@ import {
 } from "./alerts/alerts-deliver-handler.js";
 import { assertManagedDatabaseRuntimeSupported } from "./deployment/managed-database-runtime-guard.js";
 import { WORKER_EXECUTION_JOB_TYPE } from "./workers/activation.js";
+import { createWorkerExecutionJobHandler } from "./workers/runtime/job-handler.js";
 import {
   WORKER_CRON_ACTIVATION_JOB_TYPE,
   WORKER_CRON_PROJECTION_JOB_TYPE,
@@ -382,6 +383,7 @@ app.route("/api/app/sandbox", sandboxRoutes);
 app.route("/api/app/workers", workerRoutes);
 
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
+const workerExecutionJobHandler = createWorkerExecutionJobHandler();
 scheduler.register({
   type: "agent.run",
   async handle(job) {
@@ -454,13 +456,8 @@ scheduler.register({
 });
 scheduler.register({
   type: WORKER_EXECUTION_JOB_TYPE,
-  async handle() {
-    // W3 owns durable admission. W4 replaces this bounded deferral with the
-    // supervisor, while preserving every already-enqueued execution job.
-    throw new JobDeferredError(
-      "Worker supervisor is not active yet.",
-      new Date(Date.now() + 60_000),
-    );
+  async handle(job, context) {
+    return workerExecutionJobHandler.handle(job, context);
   },
 });
 app.use("/data/artifacts/*", async (c, next) => {

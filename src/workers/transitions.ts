@@ -309,5 +309,16 @@ export function assertWorkerRunUpdate(previous: WorkerRun, next: WorkerRun): voi
   ] as const) {
     assertImmutableField("WorkerRun", previous, next, key);
   }
+  if (next.revision !== previous.revision + 1) {
+    throw new WorkerTransitionError("WorkerRun", previous.status, next.status, "run.revision");
+  }
+  if (next.runtimeFence < previous.runtimeFence) {
+    throw new WorkerTransitionError(
+      "WorkerRun",
+      previous.status,
+      next.status,
+      "run.runtime_fence",
+    );
+  }
   if (previous.status !== next.status) assertWorkerRunTransition(previous.status, next.status);
 }

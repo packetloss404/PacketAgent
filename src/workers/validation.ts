@@ -1035,6 +1035,11 @@ export function validateWorkerRun(value: unknown): WorkerContractValidation<Work
   enumAt(record, "triggerKind", ["manual", "cron", "webhook", "queue", "alert"], "$", issues);
   const status = enumAt(record, "status", RUN_STATUSES, "$", issues);
   numberAt(record, "attempt", "$", issues, { integer: true, exclusiveMinimum: 0 });
+  numberAt(record, "revision", "$", issues, { integer: true, exclusiveMinimum: 0 });
+  const runtimeFence = numberAt(record, "runtimeFence", "$", issues, {
+    integer: true,
+    minimum: 0,
+  });
   if (record.input !== undefined) {
     if (!isRecord(record.input)) issue(issues, "$.input", "type.object", "must be a JSON object");
     else validateJsonValue(record.input, "$.input", issues);
@@ -1072,6 +1077,41 @@ export function validateWorkerRun(value: unknown): WorkerContractValidation<Work
     record.terminalReason === undefined ? [] : issues,
   );
   stringAt(record, "latestCheckpointId", "$", issues, { optional: true });
+  if (record.runtimeLease !== undefined) {
+    const lease = recordAt(record.runtimeLease, "$.runtimeLease", issues);
+    if (lease) {
+      stringAt(lease, "ownerId", "$.runtimeLease", issues);
+      const leaseFence = numberAt(lease, "fencingToken", "$.runtimeLease", issues, {
+        integer: true,
+        exclusiveMinimum: 0,
+      });
+      if (runtimeFence !== undefined && leaseFence !== undefined && leaseFence !== runtimeFence) {
+        issue(
+          issues,
+          "$.runtimeLease.fencingToken",
+          "run.lease_fence_mismatch",
+          "must match the run runtimeFence",
+        );
+      }
+      const acquiredAt = timestampAt(lease, "acquiredAt", "$.runtimeLease", issues);
+      const renewedAt = timestampAt(lease, "renewedAt", "$.runtimeLease", issues);
+      const expiresAt = timestampAt(lease, "expiresAt", "$.runtimeLease", issues);
+      if (
+        acquiredAt &&
+        renewedAt &&
+        expiresAt &&
+        (Date.parse(renewedAt) < Date.parse(acquiredAt) ||
+          Date.parse(expiresAt) <= Date.parse(renewedAt))
+      ) {
+        issue(
+          issues,
+          "$.runtimeLease",
+          "run.invalid_lease_window",
+          "must have acquiredAt <= renewedAt < expiresAt",
+        );
+      }
+    }
+  }
   validateTrace(record.trace, "$.trace", issues);
   timestampAt(record, "createdAt", "$", issues);
   timestampAt(record, "updatedAt", "$", issues);
@@ -1133,7 +1173,13 @@ export function validateWorkerCheckpoint(
   numberAt(record, "sequence", "$", issues, { integer: true, minimum: 0 });
   const cursor = recordAt(record.cursor, "$.cursor", issues);
   if (cursor) {
-    enumAt(cursor, "phase", ["plan", "act", "evaluate", "decide", "attention"], "$.cursor", issues);
+    enumAt(
+      cursor,
+      "phase",
+      ["plan", "act", "evaluate", "checkpoint", "decide", "attention"],
+      "$.cursor",
+      issues,
+    );
     numberAt(cursor, "iteration", "$.cursor", issues, { integer: true, minimum: 0 });
     numberAt(cursor, "actionIndex", "$.cursor", issues, { integer: true, minimum: 0 });
   }

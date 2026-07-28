@@ -291,6 +291,8 @@ export function createWorkerActivationService(
           triggerKind: trigger.kind,
           status: "queued",
           attempt: 1,
+          revision: 1,
+          runtimeFence: 0,
           ...(payloadReference
             ? { inputReference: payloadReference.reference }
             : { input: validatedPayload }),

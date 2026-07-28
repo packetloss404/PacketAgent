@@ -6,13 +6,21 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Bounded autonomous supervisor (W4)
+
+- Added narrow Worker provider, tool, clock, checkpoint, event, lease, cancellation, and run ports plus adapters for the existing provider router, cost ledger, tool registry, and executor.
+- Added the pure plan-act-evaluate-checkpoint-decide reducer; only it selects completed, failed, budget-exhausted, cancelled, or quarantined terminal outcomes from declared exit predicates and explicit evidence.
+- Added monotonic elapsed-time, iteration, provider-cost, consecutive-failure, retry/backoff, and pre-execution tool-call enforcement around every awaited provider/tool boundary.
+- Replaced `worker.run` deferral with canonical execution, optimistic run revisions, monotonic lease fencing, cursor checkpoints, lifecycle events, revocation/cancellation checks, and scheduler-shutdown release.
+- Added adversarial coverage for endless tools, hung/failed providers, invalid evaluations, cost exhaustion, cancellation at every phase, ignored abort signals, lease theft, stale revisions, expired-lease takeover, and JSON/SQLite/managed-Postgres parity.
+
 ### 2026-07-27 - Trigger and activation envelope (W3)
 
 - Added a versioned Worker activation envelope, durable deduplication inbox, and `0020_worker_activations.sql` migration across JSON, SQLite, and managed Postgres.
 - Added atomic intake that validates the active deployment, enabled trigger, and Worker input schema before committing one version-pinned queued run, audit event, and execution job.
 - Added encrypted, expiry-bound payload references for large or sensitive inputs; workspace exports include reference metadata without ciphertext.
 - Routed manual requests, timezone-aware cron occurrences, opaque Worker webhooks, durable alerts, and queue deliveries through the common intake service while preserving legacy Agent triggers.
-- Added W3C trace propagation, exact-replay receipts, changed-content delivery conflicts, JSON transaction rollback isolation, scheduler deferral until W4, crash injection, and multi-backend concurrency coverage.
+- Added W3C trace propagation, exact-replay receipts, changed-content delivery conflicts, JSON transaction rollback isolation, bounded scheduler deferral before W4, crash injection, and multi-backend concurrency coverage.
 
 ### 2026-07-27 - Worker persistence, versioning, and activation (W2)
 

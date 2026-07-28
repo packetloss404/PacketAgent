@@ -5,7 +5,7 @@ import { createAgent, createWorkspaceInvitation, handleInvitationEmailJob, INVIT
 import { PACKETAGENT_INVITATION_EMAIL_MODE_ENV, PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV } from "../../invitation-email.js";
 import { resetInvitationEmailDeliveryForTests, setInvitationEmailFetchForTests } from "../../invitation-email-delivery.js";
 import { defaultJobSchedulerStorage, enqueueJob, enqueueRecurringJob, findJob, listJobs, maintainScheduledAgentJobs, updateJob } from "../store.js";
-import { JobDeferredError, JobScheduler } from "../scheduler.js";
+import { JobDeferredError, JobReleasedError, JobScheduler } from "../scheduler.js";
 import type { SchedulerLeaderLock } from "../scheduler-lock.js";
 import { __resetSchedulerMetricsForTests, getJobTypeMetrics } from "../scheduler-metrics.js";
 import { __resetSchedulerHeartbeatForTests, getSchedulerHeartbeat } from "../scheduler-heartbeat.js";
@@ -197,6 +197,37 @@ test("scheduler deferral returns a job to the queue without consuming an attempt
   assert.equal(fresh?.attempts, 0);
   assert.equal(fresh?.error, undefined);
   assert.ok(Date.parse(fresh?.scheduledAt ?? "") > Date.now() + 60_000);
+});
+
+test("scheduler shutdown releases claimed work without consuming an attempt", async () => {
+  resetStoreForTests();
+  const scheduler = new JobScheduler({ pollIntervalMs: 30 });
+  scheduler.register({
+    type: "test.release-on-shutdown",
+    async handle(_job, context) {
+      await new Promise<void>((resolve) => {
+        if (context.signal.aborted) resolve();
+        else context.signal.addEventListener("abort", () => resolve(), { once: true });
+      });
+      throw new JobReleasedError("scheduler shutdown");
+    },
+  });
+  const job = enqueueJob({
+    workspaceId: "alpha",
+    type: "test.release-on-shutdown",
+  });
+  scheduler.start();
+  for (let i = 0; i < 40; i += 1) {
+    if (findJob(job.id)?.status === "running") break;
+    await wait(30);
+  }
+
+  await scheduler.stop();
+
+  const fresh = findJob(job.id);
+  assert.equal(fresh?.status, "queued");
+  assert.equal(fresh?.attempts, 0);
+  assert.equal(fresh?.error, undefined);
 });
 
 test("listJobs returns workspace jobs newest-first with limit", () => {

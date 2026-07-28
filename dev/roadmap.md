@@ -5,10 +5,10 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W4 - Bounded autonomous supervisor**. Repository/session state
+Current active loop: **W5 - Checkpoint, recovery, and side-effect safety**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
-Resume at W4.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w41---isolate-runtime-ports).
+Resume at W5.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w51---persist-immutable-checkpoints).
 
 ## North star
 
@@ -53,11 +53,11 @@ Canonical Worker records persist in JSON, SQLite, and managed Postgres. Private 
 
 Manual, cron, webhook, alert, and queue deliveries now enter one versioned activation envelope and durable inbox. Intake validates the deployed input schema, encrypts large or sensitive payloads behind expiring references, preserves W3C trace context, deduplicates delivery identity atomically, and creates one version-pinned queued run plus execution job across JSON, SQLite, and managed Postgres.
 
-### 4. Bounded supervisor loop - active
+### 4. Bounded supervisor loop - complete
 
-Build the recoverable plan-act-evaluate loop around the existing agent runtime. Enforce maximum elapsed time, iterations, cost, tool permissions, and failure count. Require explicit success, pause, approval, budget-exhausted, cancelled, or failed terminal states.
+The canonical `worker.run` handler now executes a port-isolated plan-act-evaluate-checkpoint-decide reducer around the existing provider router and tool executor. It enforces elapsed-time, iteration, provider-cost, failure, retry, and tool-call limits; requires declared exit predicates; persists optimistic run revisions and cursor checkpoints; and stops on cancellation, revocation, lease expiry, or fencing loss. Scheduler shutdown releases claimed work for later recovery.
 
-### 5. Checkpoint and recovery
+### 5. Checkpoint and recovery - active
 
 Persist run cursor, working memory, completed actions, pending approvals, artifacts, and external-effect idempotency keys. Resume interrupted runs without replaying completed side effects.
 

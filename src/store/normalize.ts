@@ -49,7 +49,11 @@ export function normalizeStore(data: Partial<PacketAgentData>): PacketAgentData 
     workerDefinitions: data.workerDefinitions ?? [],
     workerVersions: data.workerVersions ?? [],
     workerDeployments: data.workerDeployments ?? [],
-    workerRuns: data.workerRuns ?? [],
+    workerRuns: (data.workerRuns ?? []).map((entry) => ({
+      ...entry,
+      revision: entry.revision ?? 1,
+      runtimeFence: entry.runtimeFence ?? 0,
+    })),
     workerCheckpoints: data.workerCheckpoints ?? [],
     workerDeploymentRollouts: data.workerDeploymentRollouts ?? [],
     workerCommandReceipts: data.workerCommandReceipts ?? [],

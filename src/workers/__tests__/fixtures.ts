@@ -194,6 +194,8 @@ export function makeWorkerRun(overrides: Partial<WorkerRun> = {}): WorkerRun {
     triggerKind: "manual",
     status,
     attempt: 1,
+    revision: 1,
+    runtimeFence: 0,
     input: { release_id: "release-42" },
     budgetUsage: {
       elapsedMs: 0,

@@ -2,16 +2,17 @@
 
 End-to-end test plan run before cutting a release. Covers the builder loop, agent loop, workspace setup, providers, sandbox, operations, self-host publish handoff, and the backup round-trip.
 
-This plan verifies the inherited workbench plus W2's durable Worker lifecycle
-and W3's trigger-intake boundary. Supervisor execution, checkpoint recovery,
-and PacketADE handoff cases must be added as W4-W9 ship; they are not current
-product claims.
+This plan verifies the inherited workbench plus W2's durable Worker lifecycle,
+W3's trigger-intake boundary, and W4's bounded supervisor. Full checkpoint
+recovery, effect safety, and PacketADE handoff cases must be added as W5-W9
+ship; they are not current product claims.
 
-Last automated W3 baseline (2026-07-27):
+Last automated W4 baseline (2026-07-27):
 
-- API: 1,314 passed, 1 skipped, 0 failed
+- API: 1,336 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused Worker activation, adapter, route, scheduler, and parity checks: passed
+- Focused Worker activation, supervisor, lease/revision, scheduler, and
+  JSON/SQLite/managed-Postgres parity checks: passed
 - Typecheck: passed
 - Production web build: passed
 - ESLint: 0 errors, 146 inherited warnings
@@ -73,8 +74,8 @@ mutations must also send the existing PacketAgent CSRF cookie/header pair.
 ## W3 Worker Activation Smoke
 
 W3 ends at durable admission. A successful delivery creates a queued
-`WorkerRun` and `worker.run` execution job; until W4 ships, the scheduler
-defers that job without consuming an attempt.
+`WorkerRun` and `worker.run` execution job; W4's scheduler handler now claims
+and executes that job through the bounded supervisor.
 
 1. Activate a deployment whose validated version contains enabled manual, cron, webhook, alert, and queue triggers with an input schema compatible with each test payload.
 2. Manual: `POST /api/app/workers/deployments/:deploymentId/runs` with an `Idempotency-Key`, `triggerId`, and `input`. Confirm `202`, one activation inbox record, one queued run, and one execution job.
@@ -86,6 +87,21 @@ defers that job without consuming an attempt.
 8. Send a valid `traceparent`/`tracestate` on manual or webhook intake and confirm its trace/span values are retained. Omit the headers and confirm a new valid trace is generated.
 9. Include a sensitive field such as `api_key` or a payload larger than 32 KiB. Confirm the inbox and run hold an encrypted, expiring payload reference, workspace export omits ciphertext, and no raw value appears in events or jobs.
 10. Restart PacketAgent and confirm inbox, duplicate count, queued run, execution job, and payload-reference metadata reload. Repeat the automated parity scenario for JSON, SQLite, and managed Postgres before release.
+
+## W4 Bounded Worker Supervisor Smoke
+
+W4 executes admitted runs but intentionally stops short of W5's full restart
+recovery and external-effect receipts.
+
+1. Activate a Worker with one declared objective-satisfied exit predicate, a read-only test tool, and small positive time, iteration, provider-cost, failure, retry, and tool-call limits.
+2. Confirm the `worker.run` job moves the version-pinned run from `queued` to `running`, acquires an owner/expiry/fencing lease, and emits supervisor events without exposing prompt, tool output, or exit evidence.
+3. Return one planned tool call, a successful tool result, and a valid evaluation JSON object. Confirm the run advances plan -> act -> evaluate -> checkpoint -> decide, appends a cursor checkpoint, increments its optimistic revision, and completes with an explicit predicate terminal reason.
+4. Script endless tool requests, a provider that never settles, repeated provider errors, invalid evaluation JSON, exact provider-cost exhaustion, and an iteration with no matched predicate. Confirm every case reaches a finite terminal or release outcome and provider/tool call counts stay within the pinned limits.
+5. Request cancellation during each phase and while a provider ignores its abort signal. Confirm no later tool starts and the owned run terminates as `operator_cancelled`.
+6. Revoke the deployment during execution. Confirm the supervisor observes the durable deployment state before another action and terminates the owned run as `deployment_revoked`.
+7. Let a lease expire and acquire it from a second owner. Confirm the fencing token increases monotonically, stale event/checkpoint/terminal writes conflict, and the stale supervisor performs no later tool or terminal write.
+8. Stop the scheduler while a Worker job is claimed. Confirm the signal reason releases both the runtime lease and job claim, returns the job to `queued`, and does not consume an attempt or report success.
+9. Repeat acquire, checkpoint, and terminal persistence across JSON, SQLite, and managed Postgres. Confirm identical terminal status, checkpoint count, run revisions, and no active lease on the terminal run.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

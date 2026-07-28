@@ -1,0 +1,547 @@
+import type { JsonObject, WorkerRetryPolicy, WorkerRun, WorkerToolCapability } from "../types.js";
+import type {
+  WorkerLease,
+  WorkerRuntimeContext,
+  WorkerRuntimeProviderRequest,
+  WorkerRuntimeProviderResult,
+  WorkerSupervisorPorts,
+} from "./ports.js";
+import {
+  initialWorkerSupervisorState,
+  parseWorkerEvaluation,
+  reduceWorkerSupervisor,
+  type WorkerSupervisorState,
+} from "./reducer.js";
+
+export const WORKER_SCHEDULER_SHUTDOWN_REASON = "packetagent.scheduler_shutdown";
+export const WORKER_OPERATOR_CANCEL_REASON = "packetagent.operator_cancelled";
+
+export class WorkerRuntimeReleasedError extends Error {
+  readonly reason: "scheduler_shutdown" | "lease_lost";
+
+  constructor(reason: WorkerRuntimeReleasedError["reason"]) {
+    super(`Worker runtime released: ${reason}`);
+    this.name = "WorkerRuntimeReleasedError";
+    this.reason = reason;
+  }
+}
+
+class WorkerAwaitDeadlineError extends Error {
+  constructor() {
+    super("Worker await exceeded the remaining elapsed-time budget.");
+    this.name = "WorkerAwaitDeadlineError";
+  }
+}
+
+class WorkerOperationAbortedError extends Error {
+  constructor() {
+    super("Worker operation aborted.");
+    this.name = "WorkerOperationAbortedError";
+  }
+}
+
+class WorkerProviderPhaseError extends Error {
+  readonly result: WorkerRuntimeProviderResult;
+
+  constructor(phase: "plan" | "evaluate", result: WorkerRuntimeProviderResult) {
+    super(`Worker provider ${phase} phase ended with ${result.finishReason}.`);
+    this.name = "WorkerProviderPhaseError";
+    this.result = result;
+  }
+}
+
+export interface RunWorkerSupervisorInput {
+  readonly context: WorkerRuntimeContext;
+  readonly lease: WorkerLease;
+  readonly ports: WorkerSupervisorPorts;
+  readonly signal: AbortSignal;
+  readonly startupError?: string;
+}
+
+export interface RunWorkerSupervisorResult {
+  readonly state: WorkerSupervisorState;
+  readonly run: WorkerRun;
+}
+
+export async function runWorkerSupervisor(
+  input: RunWorkerSupervisorInput,
+): Promise<RunWorkerSupervisorResult> {
+  const { context, ports, signal } = input;
+  const retry = context.version.content.policy.retry;
+  const limits = {
+    ...context.version.content.policy.budgets,
+    maxConsecutiveFailures: Math.min(
+      context.version.content.policy.budgets.maxConsecutiveFailures,
+      retry.maxAttempts,
+    ),
+  };
+  let state = initialWorkerSupervisorState(context.run.budgetUsage, limits);
+  let lease = input.lease;
+  let runRevision = context.run.revision;
+  const monotonicStartedAt = ports.clock.monotonicMs();
+  const elapsedAtStart = context.run.budgetUsage.elapsedMs;
+
+  const observeElapsed = (): void => {
+    state = reduceWorkerSupervisor(state, {
+      type: "elapsed.observed",
+      elapsedMs: elapsedAtStart + Math.max(0, ports.clock.monotonicMs() - monotonicStartedAt),
+    });
+  };
+
+  const inspectSignal = (): void => {
+    if (!signal.aborted || state.terminal) return;
+    if (signal.reason === WORKER_SCHEDULER_SHUTDOWN_REASON) {
+      throw new WorkerRuntimeReleasedError("scheduler_shutdown");
+    }
+    state = reduceWorkerSupervisor(state, {
+      type: "cancelled",
+      reason: "operator_cancelled",
+    });
+  };
+
+  const awaitBounded = async <T>(
+    operation: (operationSignal: AbortSignal) => Promise<T>,
+  ): Promise<T> => {
+    observeElapsed();
+    inspectSignal();
+    if (state.terminal) throw new WorkerAwaitDeadlineError();
+    const remainingMs = Math.max(1, limits.maxElapsedMs - state.usage.elapsedMs);
+    const leaseRemainingMs = Math.max(1, Date.parse(lease.expiresAt) - ports.clock.now().getTime());
+    const deadlineMs = Math.min(remainingMs, leaseRemainingMs);
+    const operationController = new AbortController();
+    const timeoutController = new AbortController();
+    let rejectAbort: ((error: Error) => void) | undefined;
+    const onAbort = (): void => {
+      operationController.abort(signal.reason);
+      rejectAbort?.(new WorkerOperationAbortedError());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    const aborted = new Promise<never>((_resolve, reject) => {
+      rejectAbort = reject;
+      if (signal.aborted) onAbort();
+    });
+    const timeout = ports.clock.sleep(deadlineMs, timeoutController.signal).then(() => {
+      operationController.abort("elapsed_time");
+      if (leaseRemainingMs <= remainingMs) {
+        state = reduceWorkerSupervisor(state, {
+          type: "cancelled",
+          reason: "lease_lost",
+        });
+        throw new WorkerRuntimeReleasedError("lease_lost");
+      }
+      throw new WorkerAwaitDeadlineError();
+    });
+    try {
+      return await Promise.race([operation(operationController.signal), timeout, aborted]);
+    } finally {
+      timeoutController.abort();
+      signal.removeEventListener("abort", onAbort);
+      observeElapsed();
+      inspectSignal();
+    }
+  };
+
+  const refreshControl = async (): Promise<void> => {
+    observeElapsed();
+    inspectSignal();
+    if (state.terminal) return;
+
+    const cancellation = await awaitBounded(() =>
+      ports.cancellation.inspect({
+        workspaceId: context.run.workspaceId,
+        workerRunId: context.run.id,
+        workerDeploymentId: context.run.workerDeploymentId,
+      }),
+    );
+    if (cancellation.kind !== "active") {
+      state = reduceWorkerSupervisor(state, {
+        type: "cancelled",
+        reason: cancellation.kind,
+      });
+      return;
+    }
+
+    const now = ports.clock.now();
+    if (Date.parse(lease.expiresAt) <= now.getTime()) {
+      state = reduceWorkerSupervisor(state, { type: "cancelled", reason: "lease_lost" });
+      throw new WorkerRuntimeReleasedError("lease_lost");
+    }
+    const renewed = await awaitBounded(() =>
+      ports.leases.renew({
+        workspaceId: context.run.workspaceId,
+        workerRunId: context.run.id,
+        lease,
+        now,
+      }),
+    );
+    if (!renewed) {
+      state = reduceWorkerSupervisor(state, { type: "cancelled", reason: "lease_lost" });
+      throw new WorkerRuntimeReleasedError("lease_lost");
+    }
+    lease = renewed;
+  };
+
+  const emit = async (type: string, summary: string, data?: JsonObject): Promise<void> => {
+    await refreshControl();
+    if (state.terminal) return;
+    await awaitBounded(() =>
+      ports.events.append({
+        context,
+        fencingToken: lease.fencingToken,
+        event: {
+          type,
+          phase: state.phase,
+          cursor: state.cursor,
+          summary,
+          ...(data ? { data } : {}),
+        },
+      }),
+    );
+    await refreshControl();
+  };
+
+  const failPhase = async (error: unknown): Promise<void> => {
+    const message = error instanceof Error ? error.message : String(error);
+    state = reduceWorkerSupervisor(state, { type: "phase.failed", error: message });
+    if (state.terminal) return;
+    const backoffMs = retryBackoffMs(retry, state.usage.consecutiveFailures);
+    await refreshControl();
+    if (state.terminal) return;
+    await awaitBounded((operationSignal) => ports.clock.sleep(backoffMs, operationSignal));
+    await refreshControl();
+  };
+
+  try {
+    await emit("worker.run.started", "Worker supervisor started.");
+    if (input.startupError) {
+      while (!state.terminal) {
+        state = reduceWorkerSupervisor(state, {
+          type: "phase.failed",
+          error: input.startupError,
+        });
+      }
+    }
+
+    while (!state.terminal) {
+      await refreshControl();
+      if (state.terminal) break;
+
+      if (state.phase === "plan") {
+        if (!state.iterationOpen) {
+          state = reduceWorkerSupervisor(state, { type: "iteration.begin" });
+          if (state.terminal) break;
+        }
+        try {
+          const result = await callProvider(ports, context, state, "plan", signal, awaitBounded);
+          state = reduceWorkerSupervisor(state, {
+            type: "provider.plan_succeeded",
+            result,
+          });
+          await emit("worker.phase.planned", "Worker planning phase completed.", {
+            iteration: state.cursor.iteration,
+            requestedToolCalls: result.toolCalls.length,
+            providerCostUsd: result.usage.costUsd,
+          });
+        } catch (error) {
+          if (error instanceof WorkerRuntimeReleasedError) throw error;
+          if (error instanceof WorkerAwaitDeadlineError) {
+            observeElapsed();
+          } else {
+            if (error instanceof WorkerProviderPhaseError) {
+              state = reduceWorkerSupervisor(state, {
+                type: "provider.evaluation_charged",
+                result: error.result,
+              });
+              if (state.terminal) continue;
+            }
+            await failPhase(error);
+          }
+        }
+        continue;
+      }
+
+      if (state.phase === "act") {
+        const call = state.pendingTools[state.cursor.actionIndex];
+        if (!call) {
+          state = reduceWorkerSupervisor(state, {
+            type: "quarantined",
+            error: "Worker action cursor did not resolve to a planned tool call.",
+          });
+          continue;
+        }
+        state = reduceWorkerSupervisor(state, { type: "tool.reserve" });
+        if (state.terminal) continue;
+        const capability = executableCapabilities(context).find(
+          (entry) => entry.tool === call.name,
+        );
+        if (!capability) {
+          await failPhase(
+            new Error(`Tool ${call.name} is not permitted for unattended Worker execution.`),
+          );
+          continue;
+        }
+        try {
+          const result = await awaitBounded((operationSignal) =>
+            ports.tools.execute({
+              workspaceId: context.run.workspaceId,
+              workerRunId: context.run.id,
+              call,
+              capability,
+              signal: operationSignal,
+            }),
+          );
+          await refreshControl();
+          if (state.terminal) continue;
+          if (result.status !== "ok") {
+            await failPhase(new Error(result.error ?? `Tool ${result.toolName} failed.`));
+            continue;
+          }
+          state = reduceWorkerSupervisor(state, { type: "tool.succeeded", result });
+          await emit("worker.tool.completed", `Worker tool ${result.toolName} completed.`, {
+            callId: result.callId,
+            tool: result.toolName,
+            status: result.status,
+            durationMs: result.durationMs,
+          });
+        } catch (error) {
+          if (error instanceof WorkerRuntimeReleasedError) throw error;
+          if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
+          else {
+            if (error instanceof WorkerProviderPhaseError) {
+              state = reduceWorkerSupervisor(state, {
+                type: "provider.evaluation_charged",
+                result: error.result,
+              });
+              if (state.terminal) continue;
+            }
+            await failPhase(error);
+          }
+        }
+        continue;
+      }
+
+      if (state.phase === "evaluate") {
+        try {
+          const result = await callProvider(
+            ports,
+            context,
+            state,
+            "evaluate",
+            signal,
+            awaitBounded,
+          );
+          state = reduceWorkerSupervisor(state, {
+            type: "provider.evaluation_charged",
+            result,
+          });
+          if (state.terminal) continue;
+          const evaluation = parseWorkerEvaluation(
+            result.content,
+            context.version.content.exitPredicates,
+            state.cursor.iteration,
+          );
+          if (!evaluation) {
+            await failPhase(
+              new Error("Provider returned an invalid or undeclared Worker exit evaluation."),
+            );
+            continue;
+          }
+          state = reduceWorkerSupervisor(state, {
+            type: "evaluation.accepted",
+            evaluation,
+          });
+          await emit("worker.phase.evaluated", "Worker exit predicate evaluated.", {
+            predicateId: evaluation.predicateId,
+            predicateKind: evaluation.predicateKind,
+            matched: evaluation.matched,
+          });
+        } catch (error) {
+          if (error instanceof WorkerRuntimeReleasedError) throw error;
+          if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
+          else await failPhase(error);
+        }
+        continue;
+      }
+
+      if (state.phase === "checkpoint") {
+        try {
+          const result = await awaitBounded(() =>
+            ports.checkpoints.save({
+              workspaceId: context.run.workspaceId,
+              workerRunId: context.run.id,
+              workerVersionId: context.run.workerVersionId,
+              expectedRunRevision: runRevision,
+              fencingToken: lease.fencingToken,
+              cursor: state.cursor,
+              budgetUsage: state.usage,
+              workingMemory: checkpointMemory(state),
+            }),
+          );
+          runRevision = result.runRevision;
+          state = reduceWorkerSupervisor(state, { type: "checkpoint.saved" });
+          await emit("worker.checkpoint.saved", "Worker phase cursor checkpointed.", {
+            checkpointId: result.checkpointId,
+            runRevision,
+          });
+        } catch (error) {
+          if (error instanceof WorkerRuntimeReleasedError) throw error;
+          if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
+          else await failPhase(error);
+        }
+        continue;
+      }
+
+      if (state.phase === "decide") {
+        state = reduceWorkerSupervisor(state, { type: "decide" });
+        continue;
+      }
+
+      state = reduceWorkerSupervisor(state, {
+        type: "quarantined",
+        error: `Unsupported supervisor phase ${state.phase}.`,
+      });
+    }
+  } catch (error) {
+    if (error instanceof WorkerRuntimeReleasedError) throw error;
+    if (error instanceof WorkerAwaitDeadlineError) {
+      observeElapsed();
+    } else if (!state.terminal) {
+      state = reduceWorkerSupervisor(state, {
+        type: "phase.failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      while (!state.terminal) {
+        state = reduceWorkerSupervisor(state, {
+          type: "phase.failed",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  const selected = state.terminal;
+  if (!selected) {
+    throw new Error("Worker supervisor stopped without a reducer-selected terminal outcome.");
+  }
+  const run = await ports.runs.finalize({
+    context,
+    finalization: {
+      expectedRunRevision: runRevision,
+      fencingToken: lease.fencingToken,
+      status: selected.status,
+      terminalReason: selected.reason,
+      budgetUsage: state.usage,
+      ...(selected.output !== undefined ? { output: selected.output } : {}),
+      ...(selected.error !== undefined ? { error: selected.error } : {}),
+    },
+    now: ports.clock.now(),
+  });
+  await ports.leases.release({
+    workspaceId: context.run.workspaceId,
+    workerRunId: context.run.id,
+    lease,
+    now: ports.clock.now(),
+  });
+  return { state, run };
+}
+
+async function callProvider(
+  ports: WorkerSupervisorPorts,
+  context: WorkerRuntimeContext,
+  state: WorkerSupervisorState,
+  phase: "plan" | "evaluate",
+  parentSignal: AbortSignal,
+  awaitBounded: <T>(operation: (signal: AbortSignal) => Promise<T>) => Promise<T>,
+): Promise<WorkerRuntimeProviderResult> {
+  const request = providerRequest(context, state, phase, parentSignal, ports);
+  const result = await awaitBounded((signal) => ports.provider.call({ ...request, signal }));
+  if (result.finishReason === "error" || result.finishReason === "length") {
+    throw new WorkerProviderPhaseError(phase, result);
+  }
+  return result;
+}
+
+function providerRequest(
+  context: WorkerRuntimeContext,
+  state: WorkerSupervisorState,
+  phase: "plan" | "evaluate",
+  signal: AbortSignal,
+  ports: WorkerSupervisorPorts,
+): WorkerRuntimeProviderRequest {
+  const content = context.version.content;
+  const base = {
+    workspaceId: context.run.workspaceId,
+    workerRunId: context.run.id,
+    routeKey: content.execution.routeKey,
+    ...(content.execution.providerId ? { providerId: content.execution.providerId } : {}),
+    ...(content.execution.model ? { model: content.execution.model } : {}),
+    phase,
+    signal,
+  } as const;
+  if (phase === "plan") {
+    return {
+      ...base,
+      systemPrompt:
+        "You are the planning phase of a bounded PacketAgent Worker. Use only supplied tools. Return a concise result when no tool is needed.",
+      userPrompt: [
+        `OBJECTIVE: ${content.objective}`,
+        `INSTRUCTIONS: ${content.instructions}`,
+        `INPUT: ${JSON.stringify(context.input)}`,
+        `ITERATION: ${state.cursor.iteration}`,
+        state.toolResults.length > 0
+          ? `PRIOR TOOL RESULTS: ${JSON.stringify(state.toolResults)}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      tools: ports.tools.definitions(executableCapabilities(context)),
+    };
+  }
+  return {
+    ...base,
+    systemPrompt:
+      "You are the evaluation phase of a bounded PacketAgent Worker. Return only JSON with predicateId, matched, and evidence. Test exactly one declared predicate.",
+    userPrompt: [
+      `OBJECTIVE: ${content.objective}`,
+      `CANDIDATE OUTPUT: ${JSON.stringify(state.candidateOutput ?? null)}`,
+      `TOOL RESULTS: ${JSON.stringify(state.toolResults)}`,
+      `EXIT PREDICATES: ${JSON.stringify(content.exitPredicates)}`,
+      'RESPONSE SHAPE: {"predicateId":"declared-id","matched":true,"evidence":"concise evidence"}',
+    ].join("\n"),
+    tools: [],
+  };
+}
+
+function executableCapabilities(context: WorkerRuntimeContext): readonly WorkerToolCapability[] {
+  const allowedIds = new Set(context.version.content.policy.permissions.allowedCapabilityIds);
+  return context.version.content.tools.filter(
+    (capability) => allowedIds.has(capability.id) && capability.approval === "never",
+  );
+}
+
+function checkpointMemory(state: WorkerSupervisorState): JsonObject {
+  return {
+    candidateOutputPresent: state.candidateOutput !== undefined,
+    toolResults: state.toolResults.map((result) => ({
+      callId: result.callId,
+      toolName: result.toolName,
+      status: result.status,
+    })),
+    evaluation: state.evaluation
+      ? {
+          predicateId: state.evaluation.predicateId,
+          predicateKind: state.evaluation.predicateKind,
+          testedAtIteration: state.evaluation.testedAtIteration,
+          matched: state.evaluation.matched,
+        }
+      : null,
+  };
+}
+
+function retryBackoffMs(policy: WorkerRetryPolicy, failure: number): number {
+  const exponent = Math.max(0, failure - 1);
+  return Math.min(
+    policy.maxBackoffMs,
+    Math.floor(policy.initialBackoffMs * policy.backoffMultiplier ** exponent),
+  );
+}

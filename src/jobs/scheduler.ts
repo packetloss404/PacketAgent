@@ -15,6 +15,10 @@ import { noopLeaderLock } from "./scheduler-lock.js";
 import { recordJobRun, type JobMetricStatus } from "./scheduler-metrics.js";
 import { recordSchedulerStart, recordSchedulerStop, recordTickEnd, recordTickStart } from "./scheduler-heartbeat.js";
 import { __setSchedulerLeaderProbe } from "../operations-status.js";
+import {
+  WORKER_OPERATOR_CANCEL_REASON,
+  WORKER_SCHEDULER_SHUTDOWN_REASON,
+} from "../workers/runtime/supervisor.js";
 
 export interface JobHandlerContext {
   signal: AbortSignal;
@@ -32,6 +36,13 @@ export class JobDeferredError extends Error {
     super(message);
     this.name = "JobDeferredError";
     this.retryAt = retryAt.toISOString();
+  }
+}
+
+export class JobReleasedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "JobReleasedError";
   }
 }
 
@@ -84,7 +95,7 @@ export class JobScheduler {
   async stop(): Promise<void> {
     this.polling = false;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
-    for (const ctrl of this.inFlight.values()) ctrl.abort();
+    for (const ctrl of this.inFlight.values()) ctrl.abort(WORKER_SCHEDULER_SHUTDOWN_REASON);
     if (this.leaderLock.isHeld()) {
       try { await this.leaderLock.release(); } catch { /* ignore */ }
     }
@@ -142,7 +153,7 @@ export class JobScheduler {
     const cancelWatcher = setInterval(() => {
       void findJobAsync(job.id)
         .then((fresh) => {
-          if (fresh?.cancelRequested) ctrl.abort();
+          if (fresh?.cancelRequested) ctrl.abort(WORKER_OPERATOR_CANCEL_REASON);
         })
         .catch(() => undefined);
     }, this.cancelWatchMs);
@@ -165,6 +176,10 @@ export class JobScheduler {
       }
       const result = await handler.handle(job, { signal: ctrl.signal });
       if (ctrl.signal.aborted) {
+        if (ctrl.signal.reason === WORKER_SCHEDULER_SHUTDOWN_REASON) {
+          await this.releaseJob(job);
+          return;
+        }
         recordTerminal("canceled");
         await cancelJobAsync(job.id);
         await updateJobAsync(job.id, { status: "canceled", completedAt: new Date().toISOString() });
@@ -212,6 +227,13 @@ export class JobScheduler {
           });
           return;
         }
+        if (
+          error instanceof JobReleasedError ||
+          ctrl.signal.reason === WORKER_SCHEDULER_SHUTDOWN_REASON
+        ) {
+          await this.releaseJob(job);
+          return;
+        }
         const fresh = await findJobAsync(job.id);
         if (fresh?.cancelRequested || ctrl.signal.aborted) {
           recordTerminal("canceled");
@@ -233,5 +255,15 @@ export class JobScheduler {
       clearInterval(cancelWatcher);
       this.inFlight.delete(job.id);
     }
+  }
+
+  private async releaseJob(job: JobRecord): Promise<void> {
+    await updateJobAsync(job.id, {
+      status: "queued",
+      attempts: Math.max(0, job.attempts - 1),
+      error: undefined,
+      scheduledAt: new Date().toISOString(),
+      startedAt: undefined,
+    });
   }
 }

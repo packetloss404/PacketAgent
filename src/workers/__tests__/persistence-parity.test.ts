@@ -24,6 +24,7 @@ import {
 import type { WorkerSourceProvenance } from "../types.js";
 import { makeWorkerVersionContent } from "./fixtures.js";
 import { createWorkerActivationService } from "../activation.js";
+import { createWorkerRuntimeRepository } from "../runtime/repository.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -65,6 +66,9 @@ interface BackendScenarioResult {
   readonly activationInboxCount: number;
   readonly activationDuplicateCounts: readonly number[];
   readonly workerRunJobCount: number;
+  readonly terminalRunStatuses: readonly string[];
+  readonly checkpointCount: number;
+  readonly runRevisions: readonly number[];
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -72,6 +76,7 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   await runActivationRace(service);
   await runRollback(service);
   await runActivationAdmissionRace();
+  await runRuntimePersistence();
   await runActivationQueueFailureRollback();
 
   clearStoreCacheForTests();
@@ -120,6 +125,12 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       (record) => record.duplicateCount,
     ),
     workerRunJobCount: stored.jobs.filter((job) => job.type === "worker.run").length,
+    terminalRunStatuses: stored.workerRuns
+      .filter((run) => run.status === "completed")
+      .map((run) => `${run.id}:${run.terminalReason}`)
+      .sort(),
+    checkpointCount: stored.workerCheckpoints.length,
+    runRevisions: stored.workerRuns.map((run) => run.revision).sort((a, b) => a - b),
   };
 }
 
@@ -277,6 +288,68 @@ async function runActivationQueueFailureRollback(): Promise<void> {
   assert.equal(after.workerRuns.length, before.workerRuns.length);
   assert.equal(after.jobs.length, before.jobs.length);
   assert.equal(after.workerEvents.length, before.workerEvents.length);
+}
+
+async function runRuntimePersistence(): Promise<void> {
+  const data = await loadStoreAsync();
+  const run = data.workerRuns.find((record) => record.status === "queued");
+  assert.ok(run);
+  const acquiredAt = new Date("2026-07-27T15:01:00.000Z");
+  let nextRuntimeId = 0;
+  const repository = createWorkerRuntimeRepository({
+    now: () => acquiredAt,
+    id: (kind) => `${kind}-parity-${++nextRuntimeId}`,
+  });
+  const acquisition = await repository.acquire({
+    workspaceId: run.workspaceId,
+    workerRunId: run.id,
+    ownerId: "parity-supervisor",
+    now: acquiredAt,
+  });
+  assert.equal(acquisition.disposition, "acquired");
+  if (acquisition.disposition !== "acquired") return;
+  const checkpoint = await repository.save({
+    workspaceId: run.workspaceId,
+    workerRunId: run.id,
+    workerVersionId: run.workerVersionId,
+    expectedRunRevision: acquisition.context.run.revision,
+    fencingToken: acquisition.lease.fencingToken,
+    cursor: {
+      phase: "checkpoint",
+      iteration: 1,
+      actionIndex: 0,
+    },
+    budgetUsage: {
+      elapsedMs: 10,
+      iterations: 1,
+      providerCostUsd: 0.01,
+      consecutiveFailures: 0,
+      toolCalls: 0,
+    },
+    workingMemory: {
+      candidateOutputPresent: true,
+    },
+  });
+  const terminal = await repository.finalize({
+    context: acquisition.context,
+    finalization: {
+      expectedRunRevision: checkpoint.runRevision,
+      fencingToken: acquisition.lease.fencingToken,
+      status: "completed",
+      terminalReason: "objective_satisfied",
+      budgetUsage: {
+        elapsedMs: 12,
+        iterations: 1,
+        providerCostUsd: 0.01,
+        consecutiveFailures: 0,
+        toolCalls: 0,
+      },
+      output: "ready",
+    },
+    now: new Date("2026-07-27T15:01:01.000Z"),
+  });
+  assert.equal(terminal.revision, 4);
+  assert.equal(terminal.runtimeLease, undefined);
 }
 
 async function runRollback(service: WorkerLifecycleService): Promise<void> {

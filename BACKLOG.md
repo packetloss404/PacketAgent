@@ -63,18 +63,18 @@ Dependencies: W1, W2.
 
 Dependencies: W1-W3.
 
-Status: active. Resume at
-[`W4.1 - Isolate runtime ports`](dev/worker-implementation-loops.md#w41---isolate-runtime-ports).
-
-- [ ] Wrap the current tool-using agent loop in plan, act, evaluate, checkpoint, and decide phases.
-- [ ] Enforce elapsed-time, iteration, provider-cost, failure, and tool-call budgets.
-- [ ] Require an exit predicate and explicit terminal reason.
-- [ ] Support cancellation and lease loss at every phase.
-- Gate: adversarial tests cannot produce an unbounded loop or a run that outlives cancellation, lease expiry, or budget exhaustion.
+- [x] Wrap the current tool-using agent loop in plan, act, evaluate, checkpoint, and decide phases.
+- [x] Enforce elapsed-time, iteration, provider-cost, failure, and tool-call budgets.
+- [x] Require an exit predicate and explicit terminal reason.
+- [x] Support cancellation and lease loss at every phase.
+- Gate: passed 2026-07-27. Scripted endless tools, hung providers, provider failures, invalid evaluations, exact-cost exhaustion, operator cancellation at every phase, abort during an ignored provider signal, lease theft, stale revisions, and expired-lease takeover all terminate within finite provider/tool-call bounds. Runtime transitions and cursor checkpoints retain JSON, SQLite, and managed-Postgres parity.
 
 ### W5 - Checkpoint, recovery, and side-effect safety
 
 Dependencies: W4.
+
+Status: active. Resume at
+[`W5.1 - Persist immutable checkpoints`](dev/worker-implementation-loops.md#w51---persist-immutable-checkpoints).
 
 - [ ] Persist phase cursor, working memory, completed actions, artifacts, pending approvals, and remaining budgets.
 - [ ] Resume interrupted runs after process restart.
