@@ -64,6 +64,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [CHANGELOG.md](CHANGELOG.md) records notable product and platform changes.
 - [BACKLOG.md](BACKLOG.md) is the master ledger for the autonomous-worker foundation and inherited platform work.
 - [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md) is the authoritative state and resume point for a new Codex project.
+- [dev/worker-implementation-loops.md](dev/worker-implementation-loops.md) turns W2-W10 and the inherited backlog into dependency-ordered implementation and verification loops.
 - [dev/packetade-packetagent-handoff.md](dev/packetade-packetagent-handoff.md) defines the planned PacketADE deployment contract.
 - [dev/taskloom-to-packetagent.md](dev/taskloom-to-packetagent.md) records rename compatibility and repository migration details.
 - [dev/worker-contract-plan.md](dev/worker-contract-plan.md) records W1 research, contract decisions, implementation loops, and verification.

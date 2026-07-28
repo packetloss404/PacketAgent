@@ -39,6 +39,7 @@ Runtime branding and legacy migration constants live in `src/brand.ts`. Web bran
 - `README.md` - public product truth and setup.
 - `dev/roadmap.md` - short direction.
 - `BACKLOG.md` - master implementation ledger and loop gates.
+- `dev/worker-implementation-loops.md` - executable W2-W10 and inherited loop map.
 - `dev/packetade-packetagent-handoff.md` - PacketADE deployment contract.
 - `dev/taskloom-to-packetagent.md` - rename and compatibility notes.
 - `CHANGELOG.md` - shipped history only.
@@ -51,6 +52,7 @@ For a new Codex project, read these in order:
 2. `dev/CODEX-HANDOFF.md`
 3. `dev/roadmap.md`
 4. the active loop in `BACKLOG.md`
+5. the matching loop in `dev/worker-implementation-loops.md`
 
 `docs/HANDOFF.md`, `docs/PHASE3_SCOPE.md`, `REPO_REVIEW.md`, and
 `REPO_REVIEW_NOTES.md` are historical records. They are not current task

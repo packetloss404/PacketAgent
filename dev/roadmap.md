@@ -1,9 +1,14 @@
 # PacketAgent roadmap
 
-This is the short product direction. Detailed acceptance criteria and sequencing live in [`../BACKLOG.md`](../BACKLOG.md).
+This is the short product direction. Detailed acceptance criteria and status
+live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
+continuation order live in
+[`worker-implementation-loops.md`](worker-implementation-loops.md).
 
 Current active loop: **W2 - Worker persistence, versioning, and activation**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
+Resume at W2.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w21---register-the-durable-data-shape).
 
 ## North star
 

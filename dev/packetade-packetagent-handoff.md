@@ -1,6 +1,9 @@
 # PacketADE to PacketAgent handoff
 
-Status: design contract for backlog loop W9.
+Status: design input for backlog loop W9. The exact executable slices are in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w9---packetade-deployment-handoff).
+The TypeScript envelope below is illustrative until W9.1 freezes the wire
+schema against the completed W1 domain contract.
 
 ## Goal
 
@@ -138,7 +141,8 @@ Each event includes deployment ID, Worker version, run ID when applicable, monot
 
 ## Delivery order
 
-1. Freeze the WorkerPackage schema alongside W1.
+1. Reconcile and freeze the WorkerPackage schema against the completed W1
+   Worker domain contract.
 2. Implement validation without activation.
 3. Implement deployment and inspection.
 4. Add manual activation with bounded policies.

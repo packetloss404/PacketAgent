@@ -95,11 +95,18 @@ domain files storage-neutral while adding JSON, SQLite, and managed Postgres
 repositories, migrations, lifecycle operations, activation idempotency, and
 optimistic concurrency with backend parity coverage.
 
+The exact first slice is
+[`W2.1 - Register the durable data shape`](worker-implementation-loops.md#w21---register-the-durable-data-shape).
+After each gate passes, continue through W3-W10 and then R1-R8 using that
+document's autonomous execution protocol. Historical D/phase/track documents
+have been reconciled there and must not be resumed independently.
+
 ## Canonical documents
 
 - Product truth: [`../README.md`](../README.md)
 - Short direction: [`roadmap.md`](roadmap.md)
 - Work ledger and gates: [`../BACKLOG.md`](../BACKLOG.md)
+- W2-W10 and inherited execution map: [`worker-implementation-loops.md`](worker-implementation-loops.md)
 - PacketADE contract: [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md)
 - W1 contract plan and decisions: [`worker-contract-plan.md`](worker-contract-plan.md)
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)

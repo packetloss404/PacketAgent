@@ -6,10 +6,11 @@ This plan verifies the inherited workbench. Durable Worker deployment,
 checkpoint recovery, and PacketADE handoff cases must be added as W1-W9 ship;
 they are not current product claims.
 
-Last automated foundation baseline (2026-07-27):
+Last automated W1 baseline (2026-07-27):
 
-- API: 1,240 passed, 1 skipped, 0 failed
+- API: 1,270 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
+- Focused Worker contract: 31 passed, 0 failed
 - Typecheck: passed
 - Production web build: passed
 - ESLint: 0 errors, 146 inherited warnings

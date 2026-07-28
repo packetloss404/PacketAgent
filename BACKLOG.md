@@ -4,6 +4,12 @@ This backlog keeps PacketAgent aimed at one thing first: **create a bounded work
 
 It is intentionally not a phase list. Items are grouped by product outcome so we can ship useful vertical slices.
 
+Detailed dependency order, implementation slices, repository seams, verification,
+and historical-plan reconciliation live in
+[`dev/worker-implementation-loops.md`](dev/worker-implementation-loops.md).
+After a loop gate passes, continue with the next dependency-ready loop in that
+map. "Later, not MVP" remains decision-gated.
+
 ## PacketAgent autonomous-worker flagship
 
 These loops supersede the old builder-first priority order. Existing builder, agent, scheduler, webhook, tool, approval, vault, storage, and operations code should be reused rather than replaced.
@@ -36,6 +42,9 @@ Dependencies: PA0.
 ### W2 - Worker persistence, versioning, and activation
 
 Dependencies: W1.
+
+Status: active. Resume at
+[`W2.1 - Register the durable data shape`](dev/worker-implementation-loops.md#w21---register-the-durable-data-shape).
 
 - [ ] Add repository support for JSON, SQLite, and managed Postgres modes.
 - [ ] Make deployed Worker versions immutable and addressable.
@@ -160,6 +169,11 @@ These capabilities were implemented before or during the TaskLoom foundation and
 ## Inherited lower-priority backlog
 
 These items are not yet done, but W1-W10 take precedence unless one directly blocks the autonomous-worker runtime. The old Phase 3 labels survive only in the archived [`docs/PHASE3_SCOPE.md`](docs/PHASE3_SCOPE.md).
+
+After W10, execute these items as R1-R8 in
+[`dev/worker-implementation-loops.md`](dev/worker-implementation-loops.md#r1-r8---inherited-continuation-after-w10).
+A direct Worker blocker may be pulled forward only when the map names that
+dependency.
 
 ### Provider policy
 
