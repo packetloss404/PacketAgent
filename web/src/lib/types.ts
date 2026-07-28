@@ -1756,3 +1756,271 @@ export interface SandboxExecRequest {
   timeoutMs?: number;
   stdin?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Canonical PacketAgent Worker operations read model
+// ---------------------------------------------------------------------------
+
+export type WorkerRunStatus =
+  | "queued"
+  | "running"
+  | "waiting_for_approval"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "budget_exhausted"
+  | "cancelled"
+  | "quarantined";
+
+export type WorkerEvidenceClassification = "public_metadata" | "internal" | "sensitive_reference";
+
+export interface WorkerOperationsPageInfo {
+  hasMore: boolean;
+  limit: number;
+  nextCursor?: string;
+}
+
+export interface WorkerBudgetUsage {
+  elapsedMs: number;
+  iterations: number;
+  providerCostUsd: number;
+  consecutiveFailures: number;
+  toolCalls: number;
+}
+
+export interface WorkerBudgetPolicy {
+  maxElapsedMs: number;
+  maxIterations: number;
+  maxProviderCostUsd: number;
+  maxConsecutiveFailures: number;
+  maxToolCalls: number;
+}
+
+export interface WorkerOperationsRollup {
+  computedThroughSequence: number;
+  events: number;
+  evidenceEntries: number;
+  providers: {
+    calls: number;
+    succeeded: number;
+    failed: number;
+    promptTokens: number;
+    completionTokens: number;
+    costUsd: number;
+    durationMs: number;
+  };
+  tools: {
+    attempted: number;
+    completed: number;
+    succeeded: number;
+    failed: number;
+    denied: number;
+    durationMs: number;
+  };
+  effects: {
+    total: number;
+    succeeded: number;
+    failed: number;
+    timedOut: number;
+  };
+  retries: {
+    executionAttempts: number;
+    jobRetries: number;
+    recoveryRequeues: number;
+  };
+  checkpoints: {
+    count: number;
+    latestId?: string;
+    latestSequence?: number;
+    latestCreatedAt?: string;
+  };
+  artifacts: {
+    count: number;
+    totalBytes: number;
+  };
+  sourceGaps: {
+    total: number;
+    retentionDeleted: number;
+    unexplained: number;
+  };
+}
+
+export interface WorkerCheckpointView {
+  id: string;
+  sequence: number;
+  cursor: {
+    phase: string;
+    iteration: number;
+    actionIndex: number;
+  };
+  remainingBudget: WorkerBudgetUsage;
+  stateDigest: string;
+  createdAt: string;
+}
+
+export interface WorkerAttentionView {
+  id: string;
+  workerRunId: string;
+  status: "open" | "approved" | "rejected" | "expired" | "cancelled";
+  runRevision: number;
+  capabilityId: string;
+  operationDigest: string;
+  operation?: {
+    tool: string;
+    verb: string;
+    effect: string;
+    resourceCount: number;
+    resourceSchemes: string[];
+  };
+  expirationDisposition: "pause" | "reject";
+  requestedAt: string;
+  escalatesAt?: string;
+  expiresAt: string;
+  resolvedAt?: string;
+}
+
+export interface WorkerRunSummary {
+  schemaVersion: "packetagent.worker-operations-read-model/v1";
+  id: string;
+  definition: {
+    id: string;
+    name: string;
+    description: string;
+    status: "draft" | "active" | "retired";
+  };
+  version: {
+    id: string;
+    version: number;
+    status: "draft" | "validated" | "rejected" | "retired";
+    objective: string;
+    contentDigest: string;
+  };
+  deployment: {
+    id: string;
+    status: string;
+    revision: number;
+    statusReason?: string;
+  };
+  status: WorkerRunStatus;
+  revision: number;
+  attempt: number;
+  trigger: {
+    id: string;
+    kind: "manual" | "cron" | "webhook" | "queue" | "alert";
+  };
+  terminalReason?: string;
+  budget: {
+    policy: WorkerBudgetPolicy;
+    usage: WorkerBudgetUsage;
+  };
+  latestCheckpoint?: WorkerCheckpointView;
+  attention: {
+    open: number;
+    total: number;
+  };
+  rollup: WorkerOperationsRollup;
+  controls: {
+    canPause: boolean;
+    canResume: boolean;
+    canStop: boolean;
+    canRevokeDeployment: boolean;
+    canResolveAttention: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface WorkerOperationsHealth {
+  schemaVersion: "packetagent.worker-operations-read-model/v1";
+  workspaceId: string;
+  state: "healthy" | "attention" | "degraded";
+  computedThroughSequence: number;
+  totals: {
+    definitions: number;
+    versions: number;
+    deployments: number;
+    runs: number;
+    activeRuns: number;
+    terminalRuns: number;
+    openAttention: number;
+  };
+  runStatusCounts: Partial<Record<WorkerRunStatus, number>>;
+  providerCostUsd: number;
+  billableToolCalls: number;
+  unexplainedSourceGaps: number;
+}
+
+export interface WorkerEventView {
+  id: string;
+  sequence: number;
+  type: string;
+  source?: string;
+  summary: string;
+  data?: Record<string, unknown>;
+  occurredAt: string;
+}
+
+export interface WorkerEvidenceView {
+  id: string;
+  sequence: number;
+  sourceEventId: string;
+  sourceReferences: Array<{
+    kind: string;
+    id: string;
+    digest?: string;
+  }>;
+  summary: string;
+  classification: WorkerEvidenceClassification;
+  rawPayload?: {
+    state: "retained";
+    reference: string;
+    contentDigest: string;
+    mediaType: string;
+    byteLength: number;
+    classification: WorkerEvidenceClassification;
+    expiresAt?: string;
+  };
+  artifactManifestIds?: string[];
+  evidenceDigest: string;
+  createdAt: string;
+}
+
+export interface WorkerArtifactView {
+  id: string;
+  classification: WorkerEvidenceClassification;
+  artifact: {
+    reference: string;
+    name?: string;
+    mediaType: string;
+    byteLength: number;
+    contentDigest: string;
+  };
+  provenance: {
+    producerKind: string;
+    producerId: string;
+    sourceEvidenceIds: string[];
+  };
+  manifestDigest: string;
+  createdAt: string;
+  expiresAt?: string;
+}
+
+export interface WorkerRunDetail {
+  schemaVersion: "packetagent.worker-operations-read-model/v1";
+  run: WorkerRunSummary;
+  attention: WorkerAttentionView[];
+  events: {
+    items: WorkerEventView[];
+    page: WorkerOperationsPageInfo;
+  };
+  evidence: {
+    items: WorkerEvidenceView[];
+    page: WorkerOperationsPageInfo;
+  };
+  artifacts: {
+    items: WorkerArtifactView[];
+    page: WorkerOperationsPageInfo;
+  };
+}

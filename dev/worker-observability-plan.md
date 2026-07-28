@@ -202,12 +202,27 @@ Status: complete.
 
 ### W8.4 - API and operator UI
 
+Status: complete.
+
 - Expose cursor-paginated health, attention, event, evidence, artifact, and
   rollup endpoints.
 - Add SSE cursor resume and a polling fallback.
 - Render one independently authorized Worker operations surface.
 
+Implementation notes:
+
+- The disposable read model validates the canonical store once per request and
+  joins identity, rollups, budget, checkpoint, attention, evidence, artifacts,
+  and allowed controls on the server.
+- Opaque cursors bind the workspace, collection, and normalized filter set.
+  SSE additionally accepts `Last-Event-ID`, caps connection duration and event
+  count, and closes with an explicit resume sequence.
+- `/runs` is the canonical Worker list, `/runs/worker/:id` is its detail view,
+  and `/activity` remains the inherited Agent-run surface.
+
 ### W8.5 - Answerability gate
+
+Status: active.
 
 - Prove the read model answers what is running, why, from which version and
   checkpoint, at what cost, with what evidence, and what needs attention

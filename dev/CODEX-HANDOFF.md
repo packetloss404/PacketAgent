@@ -1,6 +1,6 @@
 # Codex project handoff
 
-Last updated: 2026-07-27.
+Last updated: 2026-07-28.
 
 This is the authoritative starting point when opening `D:\projects\PacketAgent`
 as a new project in the Codex app.
@@ -18,7 +18,7 @@ new PacketAgent repository before adding an `origin`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W7 and W8.1-W8.3 are implemented as
+in foundation commit `d60cd47`. W1-W7 and W8.1-W8.4 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -204,6 +204,9 @@ Implemented substrate:
 - separate Worker retention windows, central and read-boundary redaction,
   terminal-only payload compaction, digest-only deletion events,
   retention-explained gaps, and bounded workspace cleanup jobs;
+- a consolidated Worker operations read model, cursor-paginated health,
+  attention, event, evidence, and artifact APIs, bounded resumable SSE, and
+  canonical Worker list/detail workbench;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -218,8 +221,8 @@ Not shipped:
 
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
-- external notification transports and the consolidated Worker
-  health/cost/evidence API and UI; and
+- external notification transports and the final W8 answerability/accessibility
+  gate;
 - PacketADE-to-PacketAgent deployment endpoints.
 
 Do not describe those missing Worker features as implemented.
@@ -229,7 +232,7 @@ Do not describe those missing Worker features as implemented.
 Continue **W8 - Evidence, cost, retention, and operations UI** in
 [`../BACKLOG.md`](../BACKLOG.md).
 
-W1-W7 and W8.1-W8.3 are complete under `src/workers/`, the store, migrations,
+W1-W7 and W8.1-W8.4 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -287,9 +290,17 @@ runs, preserves effect identity for duplicate-effect safety, and delegates
 artifact-byte removal to a digest-checked storage port. Persistence and read
 boundaries both redact sensitive keys and known values, while rollups separate
 retention-deleted source gaps from unexplained gaps.
+W8.4 adds the independently authorized operations read model and routes. It
+answers Worker health and run identity/state/budget/checkpoint/attention from
+one server-side projection, exposes filter-bound cursor pages for runs,
+attention, events, evidence, and artifacts, and streams bounded live event
+connections with `Last-Event-ID` resume plus polling fallback. The workbench
+uses `/runs` for canonical Workers, retains inherited Agent activity at
+`/activity`, and renders Worker detail, evidence, artifact, and control states
+without joining raw tables in the browser.
 
 The exact next slice is
-[`W8.4 - Expose API and UI`](worker-implementation-loops.md#w84---expose-api-and-ui).
+[`W8.5 - Close the answerability gate`](worker-implementation-loops.md#w85---close-the-answerability-gate).
 After each gate passes, continue through W8-W10 and then R1-R8 using that
 document's autonomous execution protocol. Historical D/phase/track documents
 have been reconciled there and must not be resumed independently.

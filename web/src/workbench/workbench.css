@@ -432,3 +432,15 @@
   background: rgba(255,255,255,0.04);
 }
 .wb-root.wb-root.wb-root .wf-subtab.active .wf-subtab-count { color: var(--green); background: rgba(184,242,92,0.08); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

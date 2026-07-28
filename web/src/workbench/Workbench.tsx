@@ -8,6 +8,8 @@ import { CommandPaletteProvider } from "./CommandPalette";
 import { AgentEditorView } from "./views/agent-editor";
 import { RunDeepView } from "./views/run-deep";
 import { RunDetailView } from "./views/run-detail";
+import { WorkerRunDetailView } from "./views/worker-run-detail";
+import { WorkerRunsView } from "./views/worker-runs";
 import { useApiData } from "./useApiData";
 import { DashboardView } from "./views/dashboard";
 import { AgentsView } from "./views/agents";
@@ -72,7 +74,8 @@ function WorkbenchInner() {
             <Route path="agents" element={<AgentsView />} />
             <Route path="agents/new" element={<AgentEditorView />} />
             <Route path="agents/:id" element={<AgentEditorView />} />
-            <Route path="runs" element={<RunsView />} />
+            <Route path="runs" element={<WorkerRunsView />} />
+            <Route path="runs/worker/:id" element={<WorkerRunDetailView />} />
             <Route path="runs/:id" element={<RunDeepView />} />
             <Route path="activity" element={<RunsView />} />
             <Route path="activity/:id" element={<RunDetailView />} />

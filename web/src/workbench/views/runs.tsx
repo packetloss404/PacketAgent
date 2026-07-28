@@ -58,6 +58,7 @@ export function RunsView() {
             <div className="kicker">RUNS · LAST 24H</div>
             <h1 className="h1" style={{ fontSize: 28, marginTop: 4 }}>Activity</h1>
           </div>
+          <button className="btn btn-sm" style={{ marginLeft: "auto" }} onClick={() => navigate("/runs")}>Canonical Workers</button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 18 }}>

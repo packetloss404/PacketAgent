@@ -14,6 +14,10 @@ import type {
   WorkerControlCommand,
 } from "./workers/control-types.js";
 import { WorkerLifecycleError } from "./workers/errors.js";
+import {
+  createWorkerOperationsReadModel,
+  type WorkerOperationsReadModel,
+} from "./workers/observability/read-model.js";
 import type { WorkerEvent } from "./workers/persistence-types.js";
 import { validateWorkerPersistence } from "./workers/repository.js";
 import type { WorkerActorReference, WorkerDeployment, WorkerRun } from "./workers/types.js";
@@ -29,6 +33,7 @@ export interface AuthorizedWorkerOperatorContext {
 
 export interface WorkerOperatorRoutesDependencies {
   readonly control?: WorkerControlService;
+  readonly readModel?: WorkerOperationsReadModel;
   readonly loadStore?: () => MaybePromise<PacketAgentData>;
   readonly authorize?: (
     context: Context,
@@ -85,6 +90,11 @@ export function createWorkerOperatorRoutes(
   const routes = new Hono();
   const control = dependencies.control ?? createWorkerControlService();
   const loadStore = dependencies.loadStore ?? defaultLoadStore;
+  const readModel =
+    dependencies.readModel ??
+    createWorkerOperationsReadModel({
+      loadStore,
+    });
   const authorize = dependencies.authorize ?? authorizeWorkerOperatorRoute;
 
   routes.get("/runs/:workerRunId", async (c) => {
@@ -104,21 +114,14 @@ export function createWorkerOperatorRoutes(
       const status = optionalAttentionStatus(c.req.query("status"));
       const workerRunId = optionalString(c.req.query("workerRunId"), "workerRunId");
       const limit = optionalLimit(c.req.query("limit"));
-      const data = await readStore(loadStore);
-      const attention = data.workerAttentionRequests
-        .filter(
-          (record) =>
-            record.workspaceId === auth.workspaceId &&
-            (status === undefined || record.status === status) &&
-            (workerRunId === undefined || record.workerRunId === workerRunId),
-        )
-        .sort((left, right) => {
-          const byRequestedAt = right.requestedAt.localeCompare(left.requestedAt);
-          return byRequestedAt === 0 ? right.id.localeCompare(left.id) : byRequestedAt;
-        })
-        .slice(0, limit)
-        .map((record) => projectAttention(data, record));
-      return c.json({ attention });
+      return c.json(
+        await readModel.listAttention(auth.workspaceId, {
+          status,
+          workerRunId,
+          cursor: optionalString(c.req.query("cursor"), "cursor"),
+          limit,
+        }),
+      );
     } catch (error) {
       return workerOperatorRouteError(c, error);
     }

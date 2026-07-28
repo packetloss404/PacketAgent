@@ -14,8 +14,10 @@ W7's durable attention, atomic controls, supervisor integration, independent
 operator API, and restart/kill race gate are also complete. W8.1's versioned,
 digest-bound event/evidence and artifact-provenance contract, W8.2's
 deterministic version/deployment/run rollups, and W8.3's bounded retention,
-redaction, and deletion-evidence jobs are complete. Resume at W8.4 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w84---expose-api-and-ui).
+redaction, and deletion-evidence jobs are complete. W8.4's consolidated
+operations read model, cursor APIs, bounded resumable event stream, and
+canonical Worker list/detail workbench are also complete. Resume at W8.5 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w85---close-the-answerability-gate).
 
 ## North star
 

@@ -85,6 +85,12 @@ import type {
   SandboxExecRecord,
   SandboxExecRequest,
   SandboxExecStatus,
+  WorkerAttentionView,
+  WorkerOperationsHealth,
+  WorkerOperationsPageInfo,
+  WorkerRunDetail,
+  WorkerRunStatus,
+  WorkerRunSummary,
 } from "@/lib/types";
 import { pushExternalToast } from "@/context/ToastContext";
 
@@ -399,6 +405,62 @@ export const api = {
     j<{ run: AgentRunRecord }>(`/api/app/agent-runs/${runId}/cancel`, { method: "POST" }).then((payload) => payload.run),
   retryAgentRun: (runId: string) =>
     j<{ run: AgentRunRecord }>(`/api/app/agent-runs/${runId}/retry`, { method: "POST" }).then((payload) => payload.run),
+  getWorkerOperationsHealth: () =>
+    j<{ health: WorkerOperationsHealth }>("/api/app/workers/health").then(
+      (payload) => payload.health,
+    ),
+  listWorkerRuns: (
+    query: {
+      status?: WorkerRunStatus;
+      workerDefinitionId?: string;
+      workerVersionId?: string;
+      workerDeploymentId?: string;
+      cursor?: string;
+      limit?: number;
+    } = {},
+  ) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) params.set(key, String(value));
+    }
+    const suffix = params.size > 0 ? `?${params.toString()}` : "";
+    return j<{ runs: WorkerRunSummary[]; page: WorkerOperationsPageInfo }>(
+      `/api/app/workers/runs${suffix}`,
+    );
+  },
+  getWorkerRunDetail: (runId: string) =>
+    j<{ detail: WorkerRunDetail }>(
+      `/api/app/workers/runs/${encodeURIComponent(runId)}/detail`,
+    ).then((payload) => payload.detail),
+  controlWorkerRun: (
+    runId: string,
+    action: "pause" | "resume" | "stop",
+    expectedRevision: number,
+  ) =>
+    j<unknown>(`/api/app/workers/runs/${encodeURIComponent(runId)}/${action}`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ expectedRevision }),
+    }),
+  revokeWorkerDeployment: (deploymentId: string, expectedRevision: number) =>
+    j<unknown>(`/api/app/workers/deployments/${encodeURIComponent(deploymentId)}/revoke`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ expectedRevision }),
+    }),
+  resolveWorkerAttention: (
+    attentionId: string,
+    action: "approve-once" | "approve-for-run" | "reject",
+    expectedRevision: number,
+  ) =>
+    j<{ attention: WorkerAttentionView }>(
+      `/api/app/workers/attention/${encodeURIComponent(attentionId)}/${action}`,
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({ expectedRevision }),
+      },
+    ),
   listEnvVars: () => j<{ envVars: WorkspaceEnvVarRecord[] }>("/api/app/env-vars").then((payload) => payload.envVars),
   createEnvVar: (body: SaveWorkspaceEnvVarInput) =>
     j<{ envVar: WorkspaceEnvVarRecord }>("/api/app/env-vars", { method: "POST", body: JSON.stringify(body) }).then((payload) => payload.envVar),

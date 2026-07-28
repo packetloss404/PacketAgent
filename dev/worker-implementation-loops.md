@@ -639,7 +639,7 @@ without relying on the authoring UI.
 Outcome: one API and one UI surface answer what is running, why, at what cost,
 from which version, at which checkpoint, and what needs attention.
 
-Status: active. W8.1-W8.3 are complete; resume at W8.4.
+Status: active. W8.1-W8.4 are complete; resume at W8.5.
 
 ### W8.1 - Formalize the event and evidence model
 
@@ -698,7 +698,15 @@ Status: complete as of 2026-07-27.
 
 ### W8.4 - Expose API and UI
 
-Status: active. This is the exact resume point after W8.3.
+Status: complete as of 2026-07-28. A workspace-scoped operations read model
+joins immutable Worker identity, deterministic run rollups, budget policy and
+usage, checkpoint metadata, attention, events, evidence, artifacts, and
+control availability on the server. Filter-bound opaque cursors cover run,
+attention, event, evidence, and artifact pages. Independently authorized Hono
+routes expose health/list/detail feeds, while a bounded SSE connection resumes
+from `Last-Event-ID` and the normal event endpoint remains the polling
+fallback. `/runs` now renders canonical Workers and `/activity` preserves the
+inherited Agent-run view.
 
 - Add list/detail/health/attention/evidence/event endpoints with cursor
   pagination and stable filters.
@@ -708,6 +716,8 @@ Status: active. This is the exact resume point after W8.3.
 - Use SSE for live events with cursor resume; polling remains a fallback.
 
 ### W8.5 - Close the answerability gate
+
+Status: active. This is the exact resume point after W8.4.
 
 - Test rollup rebuilds, missing source records, redaction, retention, cursor
   reconnect, tenant isolation, and accessible UI loading/error/empty states.

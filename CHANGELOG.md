@@ -6,6 +6,29 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - Canonical Worker operations API and UI (W8.4)
+
+- Added one workspace-scoped operations read model that joins Worker identity,
+  deployment/version, live state, budget policy and usage, latest checkpoint,
+  attention, deterministic rollups, evidence, artifacts, and control
+  availability on the server.
+- Added independently authorized health, run list/detail, attention, event,
+  evidence, and artifact reads with stable filters and opaque cursors bound to
+  their workspace and query.
+- Added bounded SSE event connections with `Last-Event-ID` resume, explicit
+  duration/event ceilings, heartbeat/close metadata, and the paginated event
+  API as a polling fallback.
+- Made `/runs` the canonical Worker operations surface with budget,
+  checkpoint, attention, evidence timeline, artifacts, and controls; preserved
+  inherited Agent activity at `/activity`.
+- Added focused cursor, workspace-isolation, redaction, one-read detail, route
+  authorization, and SSE reconnect coverage plus a signed-in browser pass for
+  the list, navigation, empty, and error states.
+- W8.5 remains the final answerability and accessibility gate; this change does
+  not claim the unified Worker lifecycle is shipped.
+- The W8.4 baseline covers 1,458 API tests (1,457 passed and 1 intentionally
+  skipped) plus 25 web tests with zero lint errors.
+
 ### 2026-07-27 - Bounded Worker retention and redaction (W8.3)
 
 - Added versioned, independently configurable retention windows for metadata,

@@ -115,7 +115,7 @@ rolling reservation, effect preparation, or external I/O.
 Dependencies: W4-W6.
 
 Status: complete. Resume at
-[`W8.3 - Add retention and redaction`](dev/worker-implementation-loops.md#w83---add-retention-and-redaction).
+[`W8.5 - Close the answerability gate`](dev/worker-implementation-loops.md#w85---close-the-answerability-gate).
 
 - [x] Define and persist version-bound attention requests, approval grants,
       control commands, and notification delivery references with durable replay
@@ -135,13 +135,13 @@ Status: complete. Resume at
 Dependencies: W2-W7.
 
 Status: active. Resume at
-[`W8.4 - Expose API and UI`](dev/worker-implementation-loops.md#w84---expose-api-and-ui).
+[`W8.5 - Close the answerability gate`](dev/worker-implementation-loops.md#w85---close-the-answerability-gate).
 
-- [ ] Add one Worker health/attention summary.
+- [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
       checkpoints, budgets, artifacts, and outcome quality up by Worker version,
       deployment, and run with deterministic replay and explained source gaps.
-- [ ] Expose a chronological evidence trail and artifact manifest.
+- [x] Expose a chronological evidence trail and artifact manifest.
 - [x] Add retention and redaction policy for prompts, tool payloads, and outputs,
       including bounded workspace jobs, read-only dry runs, deletion evidence,
       and terminal-only compaction.

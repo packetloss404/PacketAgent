@@ -12,13 +12,15 @@ attention and deadline enforcement are covered by W7.3. Independent operator
 API coverage is added by W7.4, and W7.5 closes the restart/kill gate.
 W8.1 adds the versioned event, evidence, and artifact-provenance substrate.
 W8.2 adds deterministic cumulative version/deployment/run rollups. W8.3 adds
-bounded redaction, retention, and deletion evidence. The consolidated evidence
-surface and PacketADE handoff cases must be added as W8.4-W9 ship; they are not
-current product claims.
+bounded redaction, retention, and deletion evidence. W8.4 adds the consolidated
+Worker health/list/detail read model, filter-bound cursor APIs, bounded
+resumable event stream, and canonical Worker workbench. W8.5 still owns the
+complete answerability, accessibility, and screenshot matrix; PacketADE
+handoff cases remain W9 work and are not current product claims.
 
-Last automated W8.3 baseline (2026-07-27):
+Last automated W8.4 baseline (2026-07-28):
 
-- API: 1,451 passed, 1 skipped, 0 failed
+- API: 1,457 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -55,6 +57,14 @@ Last automated W8.3 baseline (2026-07-27):
   digest-checked artifact deletion, idempotent tombstones,
   retention-explained source gaps, active-run preservation, and
   JSON/SQLite/managed-Postgres parity checks: passed
+- Focused one-read Worker identity/state/budget/checkpoint/attention/evidence
+  projection, health aggregation, stable and filter-bound run/event cursors,
+  cross-workspace cursor rejection, independently authorized routes,
+  `Last-Event-ID` SSE resume, duration/event ceilings, and explicit stream
+  closure checks: passed
+- Signed-in browser pass for the canonical `/runs` empty state, accessible
+  labels and filters, `/activity` preservation and two-way navigation, missing
+  Worker detail error state, and console warnings/errors: passed
 - Typecheck: passed
 - Production web build: passed
 - ESLint: 0 errors, 145 inherited warnings
