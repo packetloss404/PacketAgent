@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { redactedErrorMessage } from "../security/redaction.js";
-import type { ToolContext, ToolDefinition, ToolResult } from "./types.js";
+import type { ToolDefinition, ToolResult } from "./types.js";
 
 type Env = Record<string, string | undefined>;
 
@@ -158,6 +158,12 @@ export function createEmailSendTool(options: EmailSendToolOptions = {}): ToolDef
       additionalProperties: false,
     },
     side: "write",
+    effect: {
+      describe: () => ({
+        classification: "non_replayable_mutation",
+        operation: "email.send",
+      }),
+    },
     timeoutMs: EMAIL_TIMEOUT_MS,
     async handle(input) {
       const env = options.env ?? process.env;
@@ -221,6 +227,15 @@ export function createSqlQueryTool(options: SqlQueryToolOptions = {}): ToolDefin
       additionalProperties: false,
     },
     side: "write",
+    effect: {
+      describe: (input) => ({
+        classification:
+          input.write === true
+            ? ("non_replayable_mutation" as const)
+            : ("read_only" as const),
+        operation: input.write === true ? "sql.mutate" : "sql.read",
+      }),
+    },
     timeoutMs: SQLITE_TIMEOUT_MS,
     async handle(input, ctx) {
       const parsed = parseSqlInput(input);

@@ -106,12 +106,33 @@ export function createHttpFetchTool(options: CreateHttpFetchToolOptions = {}): T
       additionalProperties: false,
     },
     side: "write",
+    effect: {
+      describe(input) {
+        const method = String(input.method ?? "GET").toUpperCase();
+        return {
+          classification:
+            method === "GET"
+              ? ("read_only" as const)
+              : method === "PUT" || method === "DELETE"
+                ? ("idempotent_mutation" as const)
+                : ("non_replayable_mutation" as const),
+          operation: `http.${method.toLowerCase()}`,
+        };
+      },
+    },
     timeoutMs: 15_000,
     async handle(input, ctx) {
       const normalized = normalizeRequest(input);
       if (!normalized.ok) return { ok: false, error: normalized.error };
 
       const request = normalized.request;
+      if (
+        ctx.effectKey &&
+        request.method !== "GET" &&
+        !request.headers.has("idempotency-key")
+      ) {
+        request.headers.set("idempotency-key", ctx.effectKey);
+      }
       let response: Response;
       try {
         response = await fetchImpl(request.url, {

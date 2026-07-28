@@ -1171,6 +1171,7 @@ export function validateWorkerCheckpoint(
   stringAt(record, "workerRunId", "$", issues);
   stringAt(record, "workerVersionId", "$", issues);
   numberAt(record, "sequence", "$", issues, { integer: true, minimum: 0 });
+  stringAt(record, "previousCheckpointId", "$", issues, { optional: true });
   const cursor = recordAt(record.cursor, "$.cursor", issues);
   if (cursor) {
     enumAt(
@@ -1197,6 +1198,15 @@ export function validateWorkerCheckpoint(
   validateBudgetShape(record.remainingBudget, "$.remainingBudget", issues);
   validateTrace(record.trace, "$.trace", issues);
   timestampAt(record, "createdAt", "$", issues);
+  const stateDigest = stringAt(record, "stateDigest", "$", issues);
+  if (stateDigest && !/^sha256:[a-f0-9]{64}$/.test(stateDigest)) {
+    issue(
+      issues,
+      "$.stateDigest",
+      "checkpoint.digest_format",
+      "must be a sha256 digest",
+    );
+  }
   return finish(value, issues);
 }
 

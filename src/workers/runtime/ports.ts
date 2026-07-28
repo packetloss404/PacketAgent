@@ -3,6 +3,7 @@ import type {
   JsonValue,
   WorkerBudgetPolicy,
   WorkerBudgetUsage,
+  WorkerCheckpoint,
   WorkerCheckpointCursor,
   WorkerDefinition,
   WorkerDeployment,
@@ -20,6 +21,7 @@ export interface WorkerRuntimeContext {
   readonly deployment: WorkerDeployment;
   readonly run: WorkerRun;
   readonly input: JsonObject;
+  readonly checkpoint?: WorkerCheckpoint;
 }
 
 export interface WorkerRuntimeToolDefinition {
@@ -72,6 +74,8 @@ export interface WorkerRuntimeToolResult {
   readonly status: "ok" | "error" | "timeout";
   readonly output?: JsonValue;
   readonly error?: string;
+  readonly artifactRefs?: readonly string[];
+  readonly effectReceiptId?: string;
   readonly durationMs: number;
   readonly startedAt: string;
   readonly completedAt: string;
@@ -84,6 +88,10 @@ export interface WorkerToolPort {
   execute(input: {
     readonly workspaceId: string;
     readonly workerRunId: string;
+    readonly workerVersionId: string;
+    readonly workerDeploymentId: string;
+    readonly iteration: number;
+    readonly fencingToken: number;
     readonly call: WorkerRuntimeToolCall;
     readonly capability: WorkerToolCapability;
     readonly signal: AbortSignal;
@@ -101,14 +109,20 @@ export interface WorkerCheckpointWrite {
   readonly workerRunId: string;
   readonly workerVersionId: string;
   readonly expectedRunRevision: number;
+  readonly expectedCheckpointSequence: number;
   readonly fencingToken: number;
   readonly cursor: WorkerCheckpointCursor;
   readonly budgetUsage: WorkerBudgetUsage;
   readonly workingMemory: JsonObject;
+  readonly completedActionIds: readonly string[];
+  readonly pendingApprovalIds: readonly string[];
+  readonly artifactRefs: readonly string[];
+  readonly effectReceiptIds: readonly string[];
 }
 
 export interface WorkerCheckpointWriteResult {
   readonly checkpointId: string;
+  readonly checkpointSequence: number;
   readonly runRevision: number;
 }
 

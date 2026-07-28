@@ -16,6 +16,7 @@ import type {
   WorkerActivationInboxRecord,
   WorkerActivationPayloadRecord,
 } from "../workers/activation-types.js";
+import type { WorkerEffectReceipt } from "../workers/effect-types.js";
 import type {
   ActivationSignalKind,
   ActivationSignalOrigin,
@@ -58,6 +59,7 @@ export type DedicatedRelationalCollectionKey =
   | "workerDeployments"
   | "workerRuns"
   | "workerCheckpoints"
+  | "workerEffectReceipts"
   | "workerDeploymentRollouts"
   | "workerCommandReceipts"
   | "workerEvents"
@@ -101,6 +103,10 @@ export function loadDedicatedRelationalCollections(db: DatabaseSync): DedicatedR
     workerCheckpoints: loadWorkerPayloads<WorkerCheckpoint>(
       db,
       "select payload from worker_checkpoints order by workspace_id, worker_run_id, sequence",
+    ),
+    workerEffectReceipts: loadWorkerPayloads<WorkerEffectReceipt>(
+      db,
+      "select payload from worker_effect_receipts order by workspace_id, worker_run_id, prepared_at, id",
     ),
     workerDeploymentRollouts: loadWorkerPayloads<WorkerDeploymentRollout>(
       db,
@@ -443,6 +449,7 @@ function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData):
     delete from worker_events;
     delete from worker_command_receipts;
     delete from worker_deployment_rollouts;
+    delete from worker_effect_receipts;
     delete from worker_checkpoints;
     delete from worker_runs;
     delete from worker_deployments;
@@ -586,6 +593,35 @@ function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData):
       record.workerVersionId,
       record.sequence,
       record.createdAt,
+      JSON.stringify(record),
+    );
+  }
+
+  const effectReceiptStatement = db.prepare(`
+    insert into worker_effect_receipts (
+      workspace_id, id, worker_run_id, worker_version_id, worker_deployment_id,
+      effect_key, iteration, action_id, capability_id, tool_name, operation,
+      input_digest, classification, status, prepared_at, completed_at, payload
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const record of data.workerEffectReceipts ?? []) {
+    effectReceiptStatement.run(
+      record.workspaceId,
+      record.id,
+      record.workerRunId,
+      record.workerVersionId,
+      record.workerDeploymentId,
+      record.effectKey,
+      record.iteration,
+      record.actionId,
+      record.capabilityId,
+      record.toolName,
+      record.operation,
+      record.inputDigest,
+      record.classification,
+      record.status,
+      record.preparedAt,
+      record.completedAt ?? null,
       JSON.stringify(record),
     );
   }

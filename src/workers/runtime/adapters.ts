@@ -3,12 +3,15 @@ import { getDefaultRouter, type ProviderRouter } from "../../providers/router.js
 import type { ProviderName, ProviderToolDef } from "../../providers/types.js";
 import { executeTool } from "../../tools/executor.js";
 import { getDefaultToolRegistry, type ToolRegistry } from "../../tools/registry.js";
+import type { ToolContext, ToolDefinition, ToolResult } from "../../tools/types.js";
 import type { JsonObject, JsonValue } from "../types.js";
+import { createWorkerEffectCoordinator, type WorkerEffectCoordinator } from "../effects.js";
 import type {
   WorkerClockPort,
   WorkerProviderPort,
   WorkerRuntimeProviderRequest,
   WorkerRuntimeToolDefinition,
+  WorkerRuntimeToolResult,
   WorkerToolPort,
 } from "./ports.js";
 
@@ -76,6 +79,7 @@ export function createWorkerProviderPort(
 
 export function createWorkerToolPort(
   registry: ToolRegistry = getDefaultToolRegistry(),
+  effects: WorkerEffectCoordinator = createWorkerEffectCoordinator(),
 ): WorkerToolPort {
   return {
     definitions(capabilities) {
@@ -120,27 +124,80 @@ export function createWorkerToolPort(
           completedAt: timestamp,
         };
       }
-      const record = await executeTool({
-        tool,
-        input: { ...input.call.input },
-        context: {
-          workspaceId: input.workspaceId,
-          userId: "packetagent.worker-supervisor",
-          runId: input.workerRunId,
-          signal: input.signal,
-        },
-      });
-      const output = jsonValue(record.output);
-      return {
-        callId: input.call.id,
-        toolName: record.toolName,
-        status: record.status,
-        ...(output !== undefined ? { output } : {}),
-        ...(record.error ? { error: record.error } : {}),
-        durationMs: record.durationMs,
-        startedAt: record.startedAt,
-        completedAt: record.completedAt,
+      const descriptor = describeToolEffect(tool, input.call.input);
+      if (!capabilityAllowsEffect(input.capability.effect, tool.side, descriptor.classification)) {
+        const timestamp = new Date().toISOString();
+        return {
+          callId: input.call.id,
+          toolName: input.call.name,
+          status: "error",
+          error: `tool "${input.call.name}" requested an effect outside capability "${input.capability.id}"`,
+          durationMs: 0,
+          startedAt: timestamp,
+          completedAt: timestamp,
+        };
+      }
+      const baseContext: Omit<ToolContext, "signal"> = {
+        workspaceId: input.workspaceId,
+        userId: "packetagent.worker-supervisor",
+        runId: input.workerRunId,
       };
+      const execute = async (effectKey?: string): Promise<WorkerRuntimeToolResult> => {
+        const record = await executeTool({
+          tool,
+          input: { ...input.call.input },
+          context: {
+            ...baseContext,
+            ...(effectKey ? { effectKey } : {}),
+            signal: input.signal,
+          },
+        });
+        const output = jsonValue(record.output);
+        return {
+          callId: input.call.id,
+          toolName: record.toolName,
+          status: record.status,
+          ...(output !== undefined ? { output } : {}),
+          ...(record.error ? { error: record.error } : {}),
+          ...(record.artifacts
+            ? { artifactRefs: record.artifacts.map((artifact) => artifact.path) }
+            : {}),
+          durationMs: record.durationMs,
+          startedAt: record.startedAt,
+          completedAt: record.completedAt,
+        };
+      };
+      const reconcile = tool.effect?.reconcile
+        ? async (effectKey: string) => {
+            const reconciled = await tool.effect!.reconcile!(
+              { ...input.call.input },
+              {
+                ...baseContext,
+                effectKey,
+                signal: input.signal,
+              },
+            );
+            if (reconciled.disposition !== "completed") return reconciled;
+            return {
+              disposition: "completed" as const,
+              result: runtimeResultFromToolResult(input.call.id, tool.name, reconciled.result),
+            };
+          }
+        : undefined;
+      return await effects.execute({
+        workspaceId: input.workspaceId,
+        workerRunId: input.workerRunId,
+        workerVersionId: input.workerVersionId,
+        workerDeploymentId: input.workerDeploymentId,
+        fencingToken: input.fencingToken,
+        iteration: input.iteration,
+        capabilityId: input.capability.id,
+        call: input.call,
+        classification: descriptor.classification,
+        operation: descriptor.operation,
+        execute,
+        ...(reconcile ? { reconcile } : {}),
+      });
     },
   };
 }
@@ -214,4 +271,59 @@ function abortError(signal: AbortSignal): Error {
   return signal.reason instanceof Error
     ? signal.reason
     : new Error(typeof signal.reason === "string" ? signal.reason : "aborted");
+}
+
+function describeToolEffect(
+  tool: ToolDefinition,
+  input: JsonObject,
+): {
+  classification:
+    | "read_only"
+    | "idempotent_mutation"
+    | "reconcilable_mutation"
+    | "non_replayable_mutation";
+  operation: string;
+} {
+  const described = tool.effect?.describe({ ...input });
+  if (described) return described;
+  return {
+    classification: tool.side === "read" ? "read_only" : "non_replayable_mutation",
+    operation: tool.name,
+  };
+}
+
+function runtimeResultFromToolResult(
+  callId: string,
+  toolName: string,
+  result: ToolResult,
+): WorkerRuntimeToolResult {
+  const timestamp = new Date().toISOString();
+  const output = jsonValue(result.output);
+  return {
+    callId,
+    toolName,
+    status: result.ok ? "ok" : "error",
+    ...(output !== undefined ? { output } : {}),
+    ...(result.error ? { error: result.error } : {}),
+    ...(result.artifacts
+      ? { artifactRefs: result.artifacts.map((artifact) => artifact.path) }
+      : {}),
+    durationMs: 0,
+    startedAt: timestamp,
+    completedAt: timestamp,
+  };
+}
+
+function capabilityAllowsEffect(
+  capabilityEffect: "read" | "write" | "execute",
+  toolSide: "read" | "write" | "exec",
+  classification:
+    | "read_only"
+    | "idempotent_mutation"
+    | "reconcilable_mutation"
+    | "non_replayable_mutation",
+): boolean {
+  if (classification === "read_only") return capabilityEffect === "read";
+  if (toolSide === "exec") return capabilityEffect === "execute";
+  return capabilityEffect === "write";
 }

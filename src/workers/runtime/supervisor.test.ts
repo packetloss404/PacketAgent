@@ -111,7 +111,7 @@ test("supervisor completes plan-act-evaluate-checkpoint-decide deterministically
   assert.equal(result.run.terminalReason, "objective_satisfied");
   assert.equal(harness.providerCalls, 2);
   assert.equal(harness.toolCalls, 1);
-  assert.equal(harness.checkpoints, 1);
+  assert.equal(harness.checkpoints, 4);
   assert.equal(result.run.budgetUsage.iterations, 1);
   assert.equal(result.run.budgetUsage.toolCalls, 1);
   assert.equal(
@@ -274,9 +274,15 @@ for (const phase of [
     assert.equal(result.run.status, "cancelled");
     assert.equal(result.run.terminalReason, "operator_cancelled");
     if (phase === "plan" || phase === "act") assert.equal(harness.toolCalls, 0);
-    if (phase === "plan" || phase === "act" || phase === "evaluate") {
-      assert.equal(harness.checkpoints, 0);
-    }
+    const expectedCheckpoints = {
+      plan: 0,
+      act: 2,
+      evaluate: 3,
+      checkpoint: 4,
+      decide: 4,
+      attention: 0,
+    } satisfies Record<WorkerSupervisorPhase, number>;
+    assert.equal(harness.checkpoints, expectedCheckpoints[phase]);
     assert.ok(harness.providerCalls <= 2);
     assert.ok(harness.toolCalls <= 1);
   });
@@ -467,6 +473,7 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
         revision += 1;
         return {
           checkpointId: `checkpoint-${checkpoints}`,
+          checkpointSequence: checkpoints - 1,
           runRevision: revision,
         };
       },

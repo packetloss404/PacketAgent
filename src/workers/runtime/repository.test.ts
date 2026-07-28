@@ -41,6 +41,7 @@ test("runtime repository fences leases and run revisions atomically", async () =
       workerRunId: "run-1",
       workerVersionId: "worker-version-1",
       expectedRunRevision: 1,
+      expectedCheckpointSequence: -1,
       fencingToken: first.lease.fencingToken,
       cursor: { phase: "checkpoint", iteration: 1, actionIndex: 0 },
       budgetUsage: {
@@ -51,6 +52,10 @@ test("runtime repository fences leases and run revisions atomically", async () =
         toolCalls: 0,
       },
       workingMemory: {},
+      completedActionIds: [],
+      pendingApprovalIds: [],
+      artifactRefs: [],
+      effectReceiptIds: [],
     }),
     (error: unknown) => error instanceof WorkerLifecycleError && error.code === "conflict",
   );
@@ -60,6 +65,7 @@ test("runtime repository fences leases and run revisions atomically", async () =
     workerRunId: "run-1",
     workerVersionId: "worker-version-1",
     expectedRunRevision: 2,
+    expectedCheckpointSequence: -1,
     fencingToken: first.lease.fencingToken,
     cursor: { phase: "checkpoint", iteration: 1, actionIndex: 0 },
     budgetUsage: {
@@ -70,6 +76,10 @@ test("runtime repository fences leases and run revisions atomically", async () =
       toolCalls: 0,
     },
     workingMemory: {},
+    completedActionIds: [],
+    pendingApprovalIds: [],
+    artifactRefs: [],
+    effectReceiptIds: [],
   });
   assert.equal(checkpoint.runRevision, 3);
 
@@ -98,6 +108,91 @@ test("runtime repository fences leases and run revisions atomically", async () =
     harness.data.workerEvents.some((event) => event.type === "worker.run.terminal"),
     true,
   );
+});
+
+test("checkpoint append enforces expected sequence, digest chaining, and monotonic budgets", async () => {
+  const harness = repositoryHarness();
+  const acquisition = await harness.repository.acquire({
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    ownerId: "checkpoint-owner",
+    now: new Date(TEST_NOW),
+  });
+  assert.equal(acquisition.disposition, "acquired");
+  if (acquisition.disposition !== "acquired") return;
+  const write = {
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    workerVersionId: "worker-version-1",
+    fencingToken: acquisition.lease.fencingToken,
+    cursor: { phase: "plan", iteration: 1, actionIndex: 0 } as const,
+    workingMemory: {},
+    completedActionIds: [] as string[],
+    pendingApprovalIds: [] as string[],
+    artifactRefs: [] as string[],
+    effectReceiptIds: [] as string[],
+  };
+  const first = await harness.repository.save({
+    ...write,
+    expectedRunRevision: acquisition.context.run.revision,
+    expectedCheckpointSequence: -1,
+    budgetUsage: {
+      elapsedMs: 10,
+      iterations: 1,
+      providerCostUsd: 0.2,
+      consecutiveFailures: 0,
+      toolCalls: 0,
+    },
+  });
+  await assert.rejects(
+    harness.repository.save({
+      ...write,
+      expectedRunRevision: first.runRevision,
+      expectedCheckpointSequence: -1,
+      budgetUsage: {
+        elapsedMs: 11,
+        iterations: 1,
+        providerCostUsd: 0.3,
+        consecutiveFailures: 0,
+        toolCalls: 0,
+      },
+    }),
+    (error: unknown) => error instanceof WorkerLifecycleError && error.code === "conflict",
+  );
+  await assert.rejects(
+    harness.repository.save({
+      ...write,
+      expectedRunRevision: first.runRevision,
+      expectedCheckpointSequence: first.checkpointSequence,
+      budgetUsage: {
+        elapsedMs: 11,
+        iterations: 1,
+        providerCostUsd: 0.1,
+        consecutiveFailures: 0,
+        toolCalls: 0,
+      },
+    }),
+    (error: unknown) => error instanceof WorkerLifecycleError && error.code === "integrity",
+  );
+  const second = await harness.repository.save({
+    ...write,
+    expectedRunRevision: first.runRevision,
+    expectedCheckpointSequence: first.checkpointSequence,
+    budgetUsage: {
+      elapsedMs: 11,
+      iterations: 1,
+      providerCostUsd: 0.3,
+      consecutiveFailures: 0,
+      toolCalls: 0,
+    },
+  });
+
+  assert.equal(second.checkpointSequence, 1);
+  assert.equal(
+    harness.data.workerCheckpoints[1].previousCheckpointId,
+    harness.data.workerCheckpoints[0].id,
+  );
+  assert.match(harness.data.workerCheckpoints[1].stateDigest, /^sha256:[a-f0-9]{64}$/);
 });
 
 test("expired lease takeover increments the fence and rejects stale writers", async () => {
@@ -234,7 +329,7 @@ test("worker.run job handler executes the canonical supervisor and persists term
   assert.equal(result.status, "completed");
   assert.equal(result.terminalReason, "objective_satisfied");
   assert.equal(harness.data.workerRuns[0].status, "completed");
-  assert.equal(harness.data.workerCheckpoints.length, 1);
+  assert.equal(harness.data.workerCheckpoints.length, 3);
 });
 
 function repositoryHarness(options: { leaseDurationMs?: number; now?: () => Date } = {}) {

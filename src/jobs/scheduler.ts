@@ -13,7 +13,12 @@ import { redactedErrorMessage } from "../security/redaction.js";
 import type { SchedulerLeaderLock } from "./scheduler-lock.js";
 import { noopLeaderLock } from "./scheduler-lock.js";
 import { recordJobRun, type JobMetricStatus } from "./scheduler-metrics.js";
-import { recordSchedulerStart, recordSchedulerStop, recordTickEnd, recordTickStart } from "./scheduler-heartbeat.js";
+import {
+  recordSchedulerStart,
+  recordSchedulerStop,
+  recordTickEnd,
+  recordTickStart,
+} from "./scheduler-heartbeat.js";
 import { __setSchedulerLeaderProbe } from "../operations-status.js";
 import {
   WORKER_OPERATOR_CANCEL_REASON,
@@ -27,6 +32,12 @@ export interface JobHandlerContext {
 export interface JobHandler {
   type: string;
   handle(job: JobRecord, ctx: JobHandlerContext): Promise<unknown>;
+}
+
+export interface SchedulerReconciler {
+  readonly name: string;
+  readonly intervalMs: number;
+  run(): Promise<unknown>;
 }
 
 export class JobDeferredError extends Error {
@@ -60,11 +71,14 @@ function backoffMs(attempt: number): number {
  * never swallow it silently.
  */
 function isCoordinatorAuthError(error: unknown): boolean {
-  return error instanceof Error && error.message.startsWith("scheduler leader coordinator returned ");
+  return (
+    error instanceof Error && error.message.startsWith("scheduler leader coordinator returned ")
+  );
 }
 
 export class JobScheduler {
   private handlers = new Map<string, JobHandler>();
+  private reconcilers = new Map<string, SchedulerReconciler & { lastStartedAt: number }>();
   private polling = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private inFlight = new Map<string, AbortController>();
@@ -72,7 +86,13 @@ export class JobScheduler {
   private cancelWatchMs: number;
   private leaderLock: SchedulerLeaderLock;
 
-  constructor(opts: { pollIntervalMs?: number; cancelWatchMs?: number; leaderLock?: SchedulerLeaderLock } = {}) {
+  constructor(
+    opts: {
+      pollIntervalMs?: number;
+      cancelWatchMs?: number;
+      leaderLock?: SchedulerLeaderLock;
+    } = {},
+  ) {
     this.pollIntervalMs = opts.pollIntervalMs ?? 1000;
     this.cancelWatchMs = opts.cancelWatchMs ?? 500;
     this.leaderLock = opts.leaderLock ?? noopLeaderLock();
@@ -82,8 +102,25 @@ export class JobScheduler {
     this.handlers.set(handler.type, handler);
   }
 
+  registerReconciler(reconciler: SchedulerReconciler): void {
+    if (
+      !reconciler.name.trim() ||
+      !Number.isSafeInteger(reconciler.intervalMs) ||
+      reconciler.intervalMs < 1_000
+    ) {
+      throw new Error("Scheduler reconciler requires a name and an interval of at least 1000ms.");
+    }
+    this.reconcilers.set(reconciler.name, {
+      ...reconciler,
+      lastStartedAt: 0,
+    });
+  }
+
   start(): void {
     if (this.polling) return;
+    for (const reconciler of this.reconcilers.values()) {
+      reconciler.lastStartedAt = 0;
+    }
     this.polling = true;
     void maintainScheduledAgentJobsAsync().catch(() => undefined);
     void sweepStaleRunningJobsAsync().catch(() => undefined);
@@ -94,10 +131,17 @@ export class JobScheduler {
 
   async stop(): Promise<void> {
     this.polling = false;
-    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
     for (const ctrl of this.inFlight.values()) ctrl.abort(WORKER_SCHEDULER_SHUTDOWN_REASON);
     if (this.leaderLock.isHeld()) {
-      try { await this.leaderLock.release(); } catch { /* ignore */ }
+      try {
+        await this.leaderLock.release();
+      } catch {
+        /* ignore */
+      }
     }
     const cutoff = Date.now() + 30_000;
     while (this.inFlight.size > 0 && Date.now() < cutoff) {
@@ -109,7 +153,9 @@ export class JobScheduler {
 
   private scheduleNext(ms: number): void {
     if (!this.polling) return;
-    this.timer = setTimeout(() => { void this.tick(); }, ms);
+    this.timer = setTimeout(() => {
+      void this.tick();
+    }, ms);
   }
 
   private async tick(): Promise<void> {
@@ -122,10 +168,13 @@ export class JobScheduler {
           this.scheduleNext(this.pollIntervalMs);
           return;
         }
+        await this.runDueReconcilers();
         const job = await claimNextJobAsync(new Date());
         if (job) {
           void this.runJob(job).catch((error) => {
-            console.warn(`scheduler: unhandled error running job ${job.id} (${redactedErrorMessage(error)})`);
+            console.warn(
+              `scheduler: unhandled error running job ${job.id} (${redactedErrorMessage(error)})`,
+            );
           });
           this.scheduleNext(0);
           return;
@@ -135,7 +184,9 @@ export class JobScheduler {
         // The HTTP leader coordinator intentionally throws on 401/403 so that an
         // auth failure does NOT fail-open to "everyone is leader"; make it loud.
         if (isCoordinatorAuthError(error)) {
-          console.error(`scheduler: leader coordinator authentication failed; refusing to fail open (${redactedErrorMessage(error)})`);
+          console.error(
+            `scheduler: leader coordinator authentication failed; refusing to fail open (${redactedErrorMessage(error)})`,
+          );
         } else {
           console.warn(`scheduler: tick failed (${redactedErrorMessage(error)})`);
         }
@@ -143,6 +194,23 @@ export class JobScheduler {
       this.scheduleNext(this.pollIntervalMs);
     } finally {
       recordTickEnd();
+    }
+  }
+
+  private async runDueReconcilers(): Promise<void> {
+    const timestamp = Date.now();
+    for (const reconciler of this.reconcilers.values()) {
+      if (timestamp - reconciler.lastStartedAt < reconciler.intervalMs) {
+        continue;
+      }
+      reconciler.lastStartedAt = timestamp;
+      try {
+        await reconciler.run();
+      } catch (error) {
+        console.warn(
+          `scheduler: reconciler ${reconciler.name} failed (${redactedErrorMessage(error)})`,
+        );
+      }
     }
   }
 
@@ -171,7 +239,11 @@ export class JobScheduler {
     try {
       if (!handler) {
         recordTerminal("failed");
-        await updateJobAsync(job.id, { status: "failed", error: `no handler registered for type "${job.type}"`, completedAt: new Date().toISOString() });
+        await updateJobAsync(job.id, {
+          status: "failed",
+          error: `no handler registered for type "${job.type}"`,
+          completedAt: new Date().toISOString(),
+        });
         return;
       }
       const result = await handler.handle(job, { signal: ctrl.signal });
@@ -186,13 +258,16 @@ export class JobScheduler {
         return;
       }
       recordTerminal("success");
-      await updateJobAsync(job.id, { status: "success", result, completedAt: new Date().toISOString() });
+      await updateJobAsync(job.id, {
+        status: "success",
+        result,
+        completedAt: new Date().toISOString(),
+      });
       if (job.cron) {
         let next: Date;
         try {
           const timezone =
-            job.type === "worker.activate.cron" &&
-            typeof job.payload.timezone === "string"
+            job.type === "worker.activate.cron" && typeof job.payload.timezone === "string"
               ? job.payload.timezone
               : undefined;
           next = timezone
@@ -200,7 +275,9 @@ export class JobScheduler {
             : nextAfter(job.cron, new Date());
         } catch (cronError) {
           // Invalid cron expression: stop recurring (terminal, not transient).
-          console.warn(`scheduler: stopping recurrence for job ${job.id}; invalid cron expression (${redactedErrorMessage(cronError)})`);
+          console.warn(
+            `scheduler: stopping recurrence for job ${job.id}; invalid cron expression (${redactedErrorMessage(cronError)})`,
+          );
           return;
         }
         try {
@@ -208,7 +285,9 @@ export class JobScheduler {
         } catch (enqueueError) {
           // Transient store failure: surface it rather than silently dropping the
           // schedule, which would stop recurrence forever.
-          console.warn(`scheduler: failed to re-enqueue recurring job ${job.id} (${redactedErrorMessage(enqueueError)})`);
+          console.warn(
+            `scheduler: failed to re-enqueue recurring job ${job.id} (${redactedErrorMessage(enqueueError)})`,
+          );
         }
       }
     } catch (error) {
@@ -237,19 +316,34 @@ export class JobScheduler {
         const fresh = await findJobAsync(job.id);
         if (fresh?.cancelRequested || ctrl.signal.aborted) {
           recordTerminal("canceled");
-          await updateJobAsync(job.id, { status: "canceled", error: redactedErrorMessage(error), completedAt: new Date().toISOString() });
+          await updateJobAsync(job.id, {
+            status: "canceled",
+            error: redactedErrorMessage(error),
+            completedAt: new Date().toISOString(),
+          });
           return;
         }
         if (job.attempts < job.maxAttempts) {
           // retry path: do not record metrics; only terminal outcomes are tracked.
           const next = new Date(Date.now() + backoffMs(job.attempts));
-          await updateJobAsync(job.id, { status: "queued", error: redactedErrorMessage(error), scheduledAt: next.toISOString(), startedAt: undefined });
+          await updateJobAsync(job.id, {
+            status: "queued",
+            error: redactedErrorMessage(error),
+            scheduledAt: next.toISOString(),
+            startedAt: undefined,
+          });
         } else {
           recordTerminal("failed");
-          await updateJobAsync(job.id, { status: "failed", error: redactedErrorMessage(error), completedAt: new Date().toISOString() });
+          await updateJobAsync(job.id, {
+            status: "failed",
+            error: redactedErrorMessage(error),
+            completedAt: new Date().toISOString(),
+          });
         }
       } catch (storeError) {
-        console.warn(`scheduler: failed to persist failure outcome for job ${job.id} (${redactedErrorMessage(storeError)})`);
+        console.warn(
+          `scheduler: failed to persist failure outcome for job ${job.id} (${redactedErrorMessage(storeError)})`,
+        );
       }
     } finally {
       clearInterval(cancelWatcher);

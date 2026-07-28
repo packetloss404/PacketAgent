@@ -12,6 +12,10 @@ import {
   type WorkerEvent,
   type WorkerLifecycleCommandReceipt,
 } from "./persistence-types.js";
+import {
+  WORKER_EFFECT_RECEIPT_SCHEMA_VERSION,
+  type WorkerEffectReceipt,
+} from "./effect-types.js";
 import type {
   WorkerDefinition,
   WorkerDeployment,
@@ -348,6 +352,7 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     data.workerDeployments.forEach(assertValidWorkerDeployment);
     data.workerRuns.forEach(assertValidWorkerRun);
     data.workerCheckpoints.forEach(assertValidWorkerCheckpoint);
+    data.workerEffectReceipts.forEach(assertValidWorkerEffectReceipt);
 
     assertUnique(data.workerDefinitions, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerVersions, (record) => `${record.workspaceId}:${record.id}`);
@@ -361,6 +366,16 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     assertUnique(
       data.workerCheckpoints,
       (record) => `${record.workspaceId}:${record.workerRunId}:${record.sequence}`,
+    );
+    assertUnique(data.workerEffectReceipts, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.workerEffectReceipts,
+      (record) => `${record.workspaceId}:${record.effectKey}`,
+    );
+    assertUnique(
+      data.workerEffectReceipts,
+      (record) =>
+        `${record.workspaceId}:${record.workerRunId}:${record.iteration}:${record.actionId}`,
     );
     assertUnique(
       data.workerCommandReceipts,
@@ -484,6 +499,21 @@ function validateCoreReferences(data: PacketAgentData): void {
       );
     }
   }
+  for (const receipt of data.workerEffectReceipts) {
+    const run = data.workerRuns.find(
+      (record) =>
+        record.workspaceId === receipt.workspaceId && record.id === receipt.workerRunId,
+    );
+    if (
+      !run ||
+      run.workerVersionId !== receipt.workerVersionId ||
+      run.workerDeploymentId !== receipt.workerDeploymentId
+    ) {
+      throw new Error(
+        `WorkerEffectReceipt ${receipt.id} references an inconsistent run, version, or deployment.`,
+      );
+    }
+  }
 }
 
 function validateSupportRecords(data: PacketAgentData): void {
@@ -563,6 +593,50 @@ function validateSupportRecords(data: PacketAgentData): void {
         throw new Error(`Worker deployment rollout ${rollout.id} references a missing deployment.`);
       }
     }
+  }
+}
+
+function assertValidWorkerEffectReceipt(receipt: WorkerEffectReceipt): void {
+  if (
+    receipt.schemaVersion !== WORKER_EFFECT_RECEIPT_SCHEMA_VERSION ||
+    !receipt.id ||
+    !receipt.workspaceId ||
+    !receipt.workerRunId ||
+    !receipt.workerVersionId ||
+    !receipt.workerDeploymentId ||
+    !/^sha256:[a-f0-9]{64}$/.test(receipt.effectKey) ||
+    !/^sha256:[a-f0-9]{64}$/.test(receipt.inputDigest) ||
+    !Number.isSafeInteger(receipt.iteration) ||
+    receipt.iteration < 0 ||
+    !receipt.actionId ||
+    !receipt.capabilityId ||
+    !receipt.toolName ||
+    !receipt.operation ||
+    ![
+      "idempotent_mutation",
+      "reconcilable_mutation",
+      "non_replayable_mutation",
+    ].includes(receipt.classification) ||
+    !["prepared", "completed"].includes(receipt.status) ||
+    !Number.isFinite(Date.parse(receipt.preparedAt))
+  ) {
+    throw new Error("Worker effect receipt is invalid.");
+  }
+  if (
+    receipt.status === "completed" &&
+    (!receipt.completedAt ||
+      !receipt.result ||
+      !Number.isFinite(Date.parse(receipt.completedAt)) ||
+      receipt.result.kind !== "inline_redacted" ||
+      !/^sha256:[a-f0-9]{64}$/.test(receipt.result.digest))
+  ) {
+    throw new Error("Completed Worker effect receipt is missing its result reference.");
+  }
+  if (
+    receipt.status === "prepared" &&
+    (receipt.completedAt !== undefined || receipt.result !== undefined)
+  ) {
+    throw new Error("Prepared Worker effect receipt cannot contain a completion.");
   }
 }
 

@@ -7,11 +7,21 @@ import {
 } from "../packetagent-store.js";
 import type { ToolDefinition } from "./types.js";
 
+function readOnlyEffect(operation: string) {
+  return {
+    describe: () => ({
+      classification: "read_only" as const,
+      operation,
+    }),
+  };
+}
+
 export const readWorkflowBriefTool: ToolDefinition = {
   name: "read_workflow_brief",
   description: "Read the current workspace brief: summary, problem statement, desired outcome, customers, metrics, goals, constraints.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   side: "read",
+  effect: readOnlyEffect("workflow_brief.read"),
   async handle(_input, ctx) {
     const data = await loadStoreAsync();
     const brief = findWorkspaceBrief(data, ctx.workspaceId);
@@ -31,6 +41,7 @@ export const listRequirementsTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "read",
+  effect: readOnlyEffect("requirements.list"),
   async handle(input, ctx) {
     const { priority, status } = (input as { priority?: string; status?: string });
     const data = await loadStoreAsync();
@@ -50,6 +61,7 @@ export const listPlanItemsTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "read",
+  effect: readOnlyEffect("plan_items.list"),
   async handle(input, ctx) {
     const { status } = (input as { status?: string });
     const data = await loadStoreAsync();
@@ -68,6 +80,7 @@ export const listBlockersTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "read",
+  effect: readOnlyEffect("workflow_concerns.list"),
   async handle(input, ctx) {
     const { kind, status } = (input as { kind?: string; status?: string });
     const data = await loadStoreAsync();
@@ -83,6 +96,7 @@ export const listAgentsTool: ToolDefinition = {
   description: "List workspace agents (without instructions or playbook detail).",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   side: "read",
+  effect: readOnlyEffect("agents.list"),
   async handle(_input, ctx) {
     const data = await loadStoreAsync();
     const agents = data.agents
@@ -113,6 +127,7 @@ export const listRecentRunsTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "read",
+  effect: readOnlyEffect("agent_runs.list"),
   async handle(input, ctx) {
     const { limit = 10, status } = (input as { limit?: number; status?: string });
     const data = await loadStoreAsync();
@@ -146,6 +161,7 @@ export const httpGetTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "read",
+  effect: readOnlyEffect("http.get"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
     const { url } = input as { url: string };

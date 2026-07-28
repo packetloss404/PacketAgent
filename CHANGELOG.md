@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Checkpoint, recovery, and side-effect safety (W5)
+
+- Upgraded phase cursors to immutable digest-chained checkpoints containing redacted supervisor memory, completed actions, pending approvals, artifacts, effect receipt IDs, trace context, and exact remaining budgets.
+- Added explicit read-only, idempotent, reconcilable, and non-replayable tool-effect classifications plus deterministic action keys and prepared/completed redacted receipts.
+- Added safe completed-result replay, idempotent retries, reconciliation hooks, and fail-closed quarantine when an external mutation cannot be proven absent or completed.
+- Added scheduler startup and periodic recovery for expired Worker leases, exact action-cursor resume, corrupt-chain/version/budget detection, and idempotent execution-job requeue.
+- Added the forward-only `0021_worker_effect_receipts.sql` migration, workspace export support, managed-Postgres comparison coverage, and JSON/SQLite/managed-Postgres recovery parity.
+- Added crash, restart, replay, reconciliation, fencing, scheduler-restart, checkpoint-chain, and quarantine tests; the W5 gate passes with 1,348 API tests and 25 web tests.
+
 ### 2026-07-27 - Bounded autonomous supervisor (W4)
 
 - Added narrow Worker provider, tool, clock, checkpoint, event, lease, cancellation, and run ports plus adapters for the existing provider router, cost ledger, tool registry, and executor.

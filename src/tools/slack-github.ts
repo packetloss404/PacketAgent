@@ -161,6 +161,12 @@ export function createSlackPostWebhookTool(options: SlackPostWebhookOptions = {}
       additionalProperties: false,
     },
     side: "write",
+    effect: {
+      describe: () => ({
+        classification: "non_replayable_mutation",
+        operation: "slack.webhook.post",
+      }),
+    },
     timeoutMs: 15_000,
     async handle(input, ctx) {
       const env = resolveEnv(options.env);
@@ -228,6 +234,15 @@ export function createGithubApiTool(options: GithubApiOptions = {}): ToolDefinit
       additionalProperties: false,
     },
     side: "write",
+    effect: {
+      describe: (input) => ({
+        classification:
+          input.operation === "create_comment"
+            ? ("non_replayable_mutation" as const)
+            : ("read_only" as const),
+        operation: `github.${input.operation ?? "unknown"}`,
+      }),
+    },
     timeoutMs: 20_000,
     async handle(input, ctx) {
       const env = resolveEnv(options.env);

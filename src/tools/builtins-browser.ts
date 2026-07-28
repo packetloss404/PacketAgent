@@ -2,6 +2,18 @@ import { resolve as resolvePath } from "node:path";
 import { closeBrowserSession, ensureArtifactDir, getOrCreateBrowserSession } from "./browser-runtime.js";
 import type { ToolDefinition } from "./types.js";
 
+function browserEffect(
+  classification:
+    | "read_only"
+    | "idempotent_mutation"
+    | "non_replayable_mutation",
+  operation: string,
+) {
+  return {
+    describe: () => ({ classification, operation }),
+  };
+}
+
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
 
 function ensureRunId(runId: string | undefined): string | null {
@@ -34,6 +46,7 @@ export const browserGotoTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "exec",
+  effect: browserEffect("non_replayable_mutation", "browser.navigate"),
   timeoutMs: 30_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -63,6 +76,7 @@ export const browserClickTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "exec",
+  effect: browserEffect("non_replayable_mutation", "browser.click"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -92,6 +106,7 @@ export const browserFillTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "exec",
+  effect: browserEffect("non_replayable_mutation", "browser.fill"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -121,6 +136,7 @@ export const browserExtractTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "exec",
+  effect: browserEffect("read_only", "browser.extract"),
   timeoutMs: 15_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -151,6 +167,7 @@ export const browserScreenshotTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "exec",
+  effect: browserEffect("non_replayable_mutation", "browser.screenshot"),
   timeoutMs: 30_000,
   async handle(input, ctx) {
     const runId = ensureRunId(ctx.runId);
@@ -180,6 +197,7 @@ export const browserCloseSessionTool: ToolDefinition = {
   description: "Close the run's browser session. Sessions auto-close at run end; only call this if you need to free memory mid-run.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   side: "exec",
+  effect: browserEffect("idempotent_mutation", "browser.close"),
   async handle(_input, ctx) {
     const runId = ensureRunId(ctx.runId);
     if (!runId) return { ok: false, error: "browser tools require a runId" };

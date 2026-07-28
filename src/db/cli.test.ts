@@ -76,6 +76,7 @@ test("migrateDatabase creates runtime app tables", () => {
       "worker_deployments",
       "worker_runs",
       "worker_checkpoints",
+      "worker_effect_receipts",
       "worker_deployment_rollouts",
       "worker_command_receipts",
       "worker_events",

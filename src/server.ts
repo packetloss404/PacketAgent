@@ -80,6 +80,7 @@ import {
 import { assertManagedDatabaseRuntimeSupported } from "./deployment/managed-database-runtime-guard.js";
 import { WORKER_EXECUTION_JOB_TYPE } from "./workers/activation.js";
 import { createWorkerExecutionJobHandler } from "./workers/runtime/job-handler.js";
+import { createWorkerRecoveryCoordinator } from "./workers/runtime/recovery.js";
 import {
   WORKER_CRON_ACTIVATION_JOB_TYPE,
   WORKER_CRON_PROJECTION_JOB_TYPE,
@@ -384,6 +385,14 @@ app.route("/api/app/workers", workerRoutes);
 
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
 const workerExecutionJobHandler = createWorkerExecutionJobHandler();
+const workerRecoveryCoordinator = createWorkerRecoveryCoordinator();
+scheduler.registerReconciler({
+  name: "worker-recovery",
+  intervalMs: 30_000,
+  async run() {
+    return workerRecoveryCoordinator.recoverExpired();
+  },
+});
 scheduler.register({
   type: "agent.run",
   async handle(job) {

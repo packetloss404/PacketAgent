@@ -8,6 +8,7 @@ import {
   clearStoreCacheForTests,
   createSeedStore,
   loadStoreAsync,
+  mutateStoreAsync,
   resetStoreForTests,
   setManagedPostgresStoreClientFactoryForTests,
   type ManagedPostgresStoreClientConfig,
@@ -25,6 +26,9 @@ import type { WorkerSourceProvenance } from "../types.js";
 import { makeWorkerVersionContent } from "./fixtures.js";
 import { createWorkerActivationService } from "../activation.js";
 import { createWorkerRuntimeRepository } from "../runtime/repository.js";
+import { createWorkerEffectRepository } from "../effects.js";
+import { createWorkerRecoveryCoordinator } from "../runtime/recovery.js";
+import { WORKER_MEMORY_SCHEMA_VERSION } from "../runtime/checkpoint.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -68,6 +72,7 @@ interface BackendScenarioResult {
   readonly workerRunJobCount: number;
   readonly terminalRunStatuses: readonly string[];
   readonly checkpointCount: number;
+  readonly effectReceiptStatuses: readonly string[];
   readonly runRevisions: readonly number[];
 }
 
@@ -92,6 +97,10 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   assert.equal(rollback.rollouts[0].kind, "rollback");
   assert.equal(exported.data.workerCommandReceipts.length, stored.workerCommandReceipts.length);
   assert.equal(exported.data.workerEvents.length, stored.workerEvents.length);
+  assert.equal(
+    exported.data.workerEffectReceipts.length,
+    stored.workerEffectReceipts.length,
+  );
   assert.equal(
     exported.data.workerActivationInboxes.length,
     stored.workerActivationInboxes.length,
@@ -130,6 +139,9 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       .map((run) => `${run.id}:${run.terminalReason}`)
       .sort(),
     checkpointCount: stored.workerCheckpoints.length,
+    effectReceiptStatuses: stored.workerEffectReceipts
+      .map((receipt) => `${receipt.toolName}:${receipt.status}`)
+      .sort(),
     runRevisions: stored.workerRuns.map((run) => run.revision).sort((a, b) => a - b),
   };
 }
@@ -299,6 +311,7 @@ async function runRuntimePersistence(): Promise<void> {
   const repository = createWorkerRuntimeRepository({
     now: () => acquiredAt,
     id: (kind) => `${kind}-parity-${++nextRuntimeId}`,
+    leaseDurationMs: 1_000,
   });
   const acquisition = await repository.acquire({
     workspaceId: run.workspaceId,
@@ -308,14 +321,49 @@ async function runRuntimePersistence(): Promise<void> {
   });
   assert.equal(acquisition.disposition, "acquired");
   if (acquisition.disposition !== "acquired") return;
+  const effects = createWorkerEffectRepository({
+    now: () => acquiredAt,
+    id: (kind) => `${kind}-parity-${++nextRuntimeId}`,
+  });
+  const prepared = await effects.prepare({
+    workspaceId: run.workspaceId,
+    workerRunId: run.id,
+    workerVersionId: run.workerVersionId,
+    workerDeploymentId: run.workerDeploymentId,
+    fencingToken: acquisition.lease.fencingToken,
+    iteration: 1,
+    actionId: "parity-action-1",
+    capabilityId: "release-read",
+    toolName: "http_fetch",
+    operation: "http.put",
+    inputDigest: `sha256:${"a".repeat(64)}`,
+    effectKey: `sha256:${"b".repeat(64)}`,
+    classification: "idempotent_mutation",
+  });
+  const completedEffect = await effects.complete({
+    workspaceId: run.workspaceId,
+    workerRunId: run.id,
+    fencingToken: acquisition.lease.fencingToken,
+    effectKey: prepared.receipt.effectKey,
+    result: {
+      callId: "parity-action-1",
+      toolName: "http_fetch",
+      status: "ok",
+      output: { status: 200 },
+      durationMs: 1,
+      startedAt: acquiredAt.toISOString(),
+      completedAt: acquiredAt.toISOString(),
+    },
+  });
   const checkpoint = await repository.save({
     workspaceId: run.workspaceId,
     workerRunId: run.id,
     workerVersionId: run.workerVersionId,
     expectedRunRevision: acquisition.context.run.revision,
+    expectedCheckpointSequence: -1,
     fencingToken: acquisition.lease.fencingToken,
     cursor: {
-      phase: "checkpoint",
+      phase: "plan",
       iteration: 1,
       actionIndex: 0,
     },
@@ -327,14 +375,50 @@ async function runRuntimePersistence(): Promise<void> {
       toolCalls: 0,
     },
     workingMemory: {
-      candidateOutputPresent: true,
+      schemaVersion: WORKER_MEMORY_SCHEMA_VERSION,
+      iterationOpen: false,
+      pendingTools: [],
+      toolResults: [],
+      candidateOutputPresent: false,
     },
+    completedActionIds: ["parity-action-1"],
+    pendingApprovalIds: [],
+    artifactRefs: [],
+    effectReceiptIds: [completedEffect.id],
   });
+  await mutateStoreAsync((store) => {
+    const job = store.jobs.find(
+      (record) =>
+        record.type === "worker.run" &&
+        record.payload.workerRunId === run.id,
+    );
+    assert.ok(job);
+    job.status = "running";
+    job.attempts = 1;
+    job.startedAt = acquiredAt.toISOString();
+    job.updatedAt = acquiredAt.toISOString();
+  });
+  const recoveryAt = new Date("2026-07-27T15:01:02.000Z");
+  const recovery = createWorkerRecoveryCoordinator({
+    now: () => recoveryAt,
+    id: (kind) => `${kind}-parity-${++nextRuntimeId}`,
+  });
+  const recovered = await recovery.recoverExpired();
+  assert.deepEqual(recovered.requeuedRunIds, [run.id]);
+  const reacquired = await repository.acquire({
+    workspaceId: run.workspaceId,
+    workerRunId: run.id,
+    ownerId: "parity-supervisor-restarted",
+    now: recoveryAt,
+  });
+  assert.equal(reacquired.disposition, "acquired");
+  if (reacquired.disposition !== "acquired") return;
+  assert.equal(reacquired.context.checkpoint?.id, checkpoint.checkpointId);
   const terminal = await repository.finalize({
-    context: acquisition.context,
+    context: reacquired.context,
     finalization: {
-      expectedRunRevision: checkpoint.runRevision,
-      fencingToken: acquisition.lease.fencingToken,
+      expectedRunRevision: reacquired.context.run.revision,
+      fencingToken: reacquired.lease.fencingToken,
       status: "completed",
       terminalReason: "objective_satisfied",
       budgetUsage: {
@@ -348,7 +432,7 @@ async function runRuntimePersistence(): Promise<void> {
     },
     now: new Date("2026-07-27T15:01:01.000Z"),
   });
-  assert.equal(terminal.revision, 4);
+  assert.equal(terminal.revision, 6);
   assert.equal(terminal.runtimeLease, undefined);
 }
 

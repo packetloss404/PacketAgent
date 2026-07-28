@@ -7,6 +7,7 @@ import type {
   WorkerRun,
   WorkerVersion,
 } from "./types.js";
+import type { WorkerEffectReceipt } from "./effect-types.js";
 
 export const WORKER_COMMAND_SCHEMA_VERSION = "packetagent.worker-command/v1" as const;
 export const WORKER_EVENT_SCHEMA_VERSION = "packetagent.worker-event/v1" as const;
@@ -84,6 +85,7 @@ export interface WorkerPersistenceCollections {
   readonly workerDeployments: readonly WorkerDeployment[];
   readonly workerRuns: readonly WorkerRun[];
   readonly workerCheckpoints: readonly WorkerCheckpoint[];
+  readonly workerEffectReceipts: readonly WorkerEffectReceipt[];
   readonly workerDeploymentRollouts: readonly WorkerDeploymentRollout[];
   readonly workerCommandReceipts: readonly WorkerLifecycleCommandReceipt[];
   readonly workerEvents: readonly WorkerEvent[];

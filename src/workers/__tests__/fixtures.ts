@@ -247,6 +247,7 @@ export function makeWorkerCheckpoint(overrides: Partial<WorkerCheckpoint> = {}):
       traceId: "0123456789abcdef0123456789abcdef",
     },
     createdAt: TEST_NOW,
+    stateDigest: `sha256:${"a".repeat(64)}`,
     ...overrides,
   };
 }

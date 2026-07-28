@@ -357,6 +357,7 @@ export interface WorkerCheckpoint {
   readonly workerRunId: string;
   readonly workerVersionId: string;
   readonly sequence: number;
+  readonly previousCheckpointId?: string;
   readonly cursor: WorkerCheckpointCursor;
   readonly workingMemory: JsonObject;
   readonly completedActionIds: readonly string[];
@@ -366,6 +367,7 @@ export interface WorkerCheckpoint {
   readonly remainingBudget: WorkerRemainingBudget;
   readonly trace?: WorkerTraceContext;
   readonly createdAt: string;
+  readonly stateDigest: string;
 }
 
 export interface WorkerProjectionWarning {

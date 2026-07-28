@@ -23,6 +23,12 @@ import type {
   WorkerRunPort,
   WorkerRuntimeContext,
 } from "./ports.js";
+import {
+  assertCheckpointDigest,
+  remainingWorkerBudget,
+  workerCheckpointStateDigest,
+  WorkerCheckpointRecoveryError,
+} from "./checkpoint.js";
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -130,6 +136,7 @@ export function createWorkerRuntimeRepository(
             `WorkerRun ${run.id} has missing runtime context.`,
           );
         }
+        const checkpoint = latestValidWorkerCheckpoint(data, run);
 
         const fencingToken = Math.max(run.runtimeFence, currentLease?.fencingToken ?? 0) + 1;
         const runtimeLease: WorkerRuntimeLease = {
@@ -171,6 +178,7 @@ export function createWorkerRuntimeRepository(
             deployment: clone(deployment),
             run: clone(next),
             input: clone(next.input ?? {}),
+            ...(checkpoint ? { checkpoint: clone(checkpoint) } : {}),
           },
           lease: clone(runtimeLease),
         };
@@ -270,54 +278,49 @@ export function createWorkerRuntimeRepository(
         if (!version) {
           throw new WorkerLifecycleError("integrity", "Pinned WorkerVersion was not found.");
         }
-        const sequence =
-          data.workerCheckpoints
-            .filter(
-              (record) =>
-                record.workspaceId === write.workspaceId &&
-                record.workerRunId === write.workerRunId,
-            )
-            .reduce((maximum, record) => Math.max(maximum, record.sequence), -1) + 1;
+        const previous = latestValidWorkerCheckpoint(data, run);
+        const currentSequence = previous?.sequence ?? -1;
+        if (currentSequence !== write.expectedCheckpointSequence) {
+          throw new WorkerLifecycleError(
+            "conflict",
+            `Worker checkpoint sequence changed from expected ${write.expectedCheckpointSequence} to ${currentSequence}.`,
+          );
+        }
+        const sequence = currentSequence + 1;
         const checkpointId = id("checkpoint");
         const createdAt = now().toISOString();
-        const checkpoint: WorkerCheckpoint = {
+        const remainingBudget = remainingWorkerBudget(
+          {
+            ...version.content.policy.budgets,
+            maxConsecutiveFailures: Math.min(
+              version.content.policy.budgets.maxConsecutiveFailures,
+              version.content.policy.retry.maxAttempts,
+            ),
+          },
+          write.budgetUsage,
+        );
+        if (previous) assertRemainingBudgetDidNotIncrease(previous, remainingBudget);
+        const checkpointContent: Omit<WorkerCheckpoint, "stateDigest"> = {
           schemaVersion: WORKER_CONTRACT_SCHEMA_VERSION,
           id: checkpointId,
           workspaceId: write.workspaceId,
           workerRunId: write.workerRunId,
           workerVersionId: write.workerVersionId,
           sequence,
+          ...(previous ? { previousCheckpointId: previous.id } : {}),
           cursor: write.cursor,
           workingMemory: write.workingMemory,
-          completedActionIds: [],
-          pendingApprovalIds: [],
-          artifactRefs: [],
-          effectReceiptIds: [],
-          remainingBudget: {
-            elapsedMs: Math.max(
-              0,
-              version.content.policy.budgets.maxElapsedMs - write.budgetUsage.elapsedMs,
-            ),
-            iterations: Math.max(
-              0,
-              version.content.policy.budgets.maxIterations - write.budgetUsage.iterations,
-            ),
-            providerCostUsd: Math.max(
-              0,
-              version.content.policy.budgets.maxProviderCostUsd - write.budgetUsage.providerCostUsd,
-            ),
-            consecutiveFailures: Math.max(
-              0,
-              version.content.policy.budgets.maxConsecutiveFailures -
-                write.budgetUsage.consecutiveFailures,
-            ),
-            toolCalls: Math.max(
-              0,
-              version.content.policy.budgets.maxToolCalls - write.budgetUsage.toolCalls,
-            ),
-          },
+          completedActionIds: [...write.completedActionIds],
+          pendingApprovalIds: [...write.pendingApprovalIds],
+          artifactRefs: [...write.artifactRefs],
+          effectReceiptIds: [...write.effectReceiptIds],
+          remainingBudget,
           ...(run.trace ? { trace: run.trace } : {}),
           createdAt,
+        };
+        const checkpoint: WorkerCheckpoint = {
+          ...checkpointContent,
+          stateDigest: workerCheckpointStateDigest(checkpointContent),
         };
         const next: WorkerRun = {
           ...run,
@@ -346,6 +349,7 @@ export function createWorkerRuntimeRepository(
         validateWorkerPersistence(data);
         return {
           checkpointId,
+          checkpointSequence: sequence,
           runRevision: next.revision,
         };
       });
@@ -468,6 +472,58 @@ function replaceRun(data: PacketAgentData, run: WorkerRun): void {
     throw new WorkerLifecycleError("not_found", `WorkerRun ${run.id} was not found.`);
   }
   data.workerRuns[index] = run;
+}
+
+export function latestValidWorkerCheckpoint(
+  data: PacketAgentData,
+  run: WorkerRun,
+): WorkerCheckpoint | undefined {
+  const checkpoints = data.workerCheckpoints
+    .filter((record) => record.workspaceId === run.workspaceId && record.workerRunId === run.id)
+    .sort((left, right) => left.sequence - right.sequence);
+  let previous: WorkerCheckpoint | undefined;
+  for (const checkpoint of checkpoints) {
+    if (checkpoint.workerVersionId !== run.workerVersionId) {
+      throw new WorkerCheckpointRecoveryError(
+        `Checkpoint ${checkpoint.id} changed the run's pinned WorkerVersion.`,
+      );
+    }
+    if (checkpoint.sequence !== (previous?.sequence ?? -1) + 1) {
+      throw new WorkerCheckpointRecoveryError(
+        `Checkpoint ${checkpoint.id} breaks the run checkpoint sequence.`,
+      );
+    }
+    if (checkpoint.previousCheckpointId !== previous?.id) {
+      throw new WorkerCheckpointRecoveryError(
+        `Checkpoint ${checkpoint.id} breaks the run checkpoint chain.`,
+      );
+    }
+    assertCheckpointDigest(checkpoint);
+    if (previous) {
+      assertRemainingBudgetDidNotIncrease(previous, checkpoint.remainingBudget);
+    }
+    previous = checkpoint;
+  }
+  if (run.latestCheckpointId !== previous?.id) {
+    throw new WorkerCheckpointRecoveryError(
+      `WorkerRun ${run.id} does not point at its latest checkpoint.`,
+    );
+  }
+  return previous;
+}
+
+function assertRemainingBudgetDidNotIncrease(
+  previous: WorkerCheckpoint,
+  next: WorkerCheckpoint["remainingBudget"],
+): void {
+  for (const key of ["elapsedMs", "iterations", "providerCostUsd", "toolCalls"] as const) {
+    if (next[key] > previous.remainingBudget[key] + Number.EPSILON) {
+      throw new WorkerLifecycleError(
+        "integrity",
+        `Worker checkpoint remaining ${key} cannot increase.`,
+      );
+    }
+  }
 }
 
 function appendRuntimeEvent(

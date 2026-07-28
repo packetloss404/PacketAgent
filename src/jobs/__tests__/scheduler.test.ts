@@ -1,14 +1,43 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listInvitationEmailDeliveriesIndexed, resetStoreForTests } from "../../packetagent-store.js";
-import { createAgent, createWorkspaceInvitation, handleInvitationEmailJob, INVITATION_EMAIL_JOB_TYPE, login, resendWorkspaceInvitation, updateAgent } from "../../packetagent-services.js";
-import { PACKETAGENT_INVITATION_EMAIL_MODE_ENV, PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV } from "../../invitation-email.js";
-import { resetInvitationEmailDeliveryForTests, setInvitationEmailFetchForTests } from "../../invitation-email-delivery.js";
-import { defaultJobSchedulerStorage, enqueueJob, enqueueRecurringJob, findJob, listJobs, maintainScheduledAgentJobs, updateJob } from "../store.js";
+import {
+  listInvitationEmailDeliveriesIndexed,
+  resetStoreForTests,
+} from "../../packetagent-store.js";
+import {
+  createAgent,
+  createWorkspaceInvitation,
+  handleInvitationEmailJob,
+  INVITATION_EMAIL_JOB_TYPE,
+  login,
+  resendWorkspaceInvitation,
+  updateAgent,
+} from "../../packetagent-services.js";
+import {
+  PACKETAGENT_INVITATION_EMAIL_MODE_ENV,
+  PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV,
+} from "../../invitation-email.js";
+import {
+  resetInvitationEmailDeliveryForTests,
+  setInvitationEmailFetchForTests,
+} from "../../invitation-email-delivery.js";
+import {
+  defaultJobSchedulerStorage,
+  enqueueJob,
+  enqueueRecurringJob,
+  findJob,
+  listJobs,
+  maintainScheduledAgentJobs,
+  updateJob,
+} from "../store.js";
 import { JobDeferredError, JobReleasedError, JobScheduler } from "../scheduler.js";
 import type { SchedulerLeaderLock } from "../scheduler-lock.js";
 import { __resetSchedulerMetricsForTests, getJobTypeMetrics } from "../scheduler-metrics.js";
-import { __resetSchedulerHeartbeatForTests, getSchedulerHeartbeat } from "../scheduler-heartbeat.js";
+import {
+  __resetSchedulerHeartbeatForTests,
+  getSchedulerHeartbeat,
+} from "../scheduler-heartbeat.js";
 import { getOperationsStatus } from "../../operations-status.js";
 
 function wait(ms: number): Promise<void> {
@@ -26,7 +55,10 @@ test("scheduler runs a queued job and marks success", async () => {
   const scheduler = new JobScheduler({ pollIntervalMs: 50 });
   scheduler.register({
     type: "test.add",
-    async handle(job) { ran.push(job.id); return { ok: true }; },
+    async handle(job) {
+      ran.push(job.id);
+      return { ok: true };
+    },
   });
   const job = enqueueJob({ workspaceId: "alpha", type: "test.add", payload: {} });
   scheduler.start();
@@ -41,13 +73,76 @@ test("scheduler runs a queued job and marks success", async () => {
   assert.equal(fresh?.status, "success");
 });
 
+test("scheduler runs registered recovery reconciliation before claimed work", async () => {
+  resetStoreForTests();
+  const order: string[] = [];
+  const scheduler = new JobScheduler({ pollIntervalMs: 50 });
+  scheduler.registerReconciler({
+    name: "test-recovery",
+    intervalMs: 1_000,
+    async run() {
+      order.push("reconcile");
+    },
+  });
+  scheduler.register({
+    type: "test.after-recovery",
+    async handle() {
+      order.push("job");
+      return { ok: true };
+    },
+  });
+  const job = enqueueJob({
+    workspaceId: "alpha",
+    type: "test.after-recovery",
+  });
+
+  scheduler.start();
+  for (let i = 0; i < 40; i++) {
+    if (findJob(job.id)?.status === "success") break;
+    await wait(50);
+  }
+  await scheduler.stop();
+
+  assert.deepEqual(order.slice(0, 2), ["reconcile", "job"]);
+});
+
+test("scheduler runs reconcilers immediately after every restart", async () => {
+  resetStoreForTests();
+  let reconciliations = 0;
+  const scheduler = new JobScheduler({ pollIntervalMs: 20 });
+  scheduler.registerReconciler({
+    name: "test.restart-recovery",
+    intervalMs: 60_000,
+    async run() {
+      reconciliations += 1;
+    },
+  });
+
+  scheduler.start();
+  for (let i = 0; i < 20 && reconciliations < 1; i += 1) {
+    await wait(20);
+  }
+  await scheduler.stop();
+
+  scheduler.start();
+  for (let i = 0; i < 20 && reconciliations < 2; i += 1) {
+    await wait(20);
+  }
+  await scheduler.stop();
+
+  assert.equal(reconciliations, 2);
+});
+
 test("scheduler retries failing job up to maxAttempts then marks failed", async () => {
   resetStoreForTests();
   let calls = 0;
   const scheduler = new JobScheduler({ pollIntervalMs: 30 });
   scheduler.register({
     type: "test.fail",
-    async handle() { calls++; throw new Error("boom"); },
+    async handle() {
+      calls++;
+      throw new Error("boom");
+    },
   });
   const job = enqueueJob({ workspaceId: "alpha", type: "test.fail", maxAttempts: 2 });
   // Patch backoff by manipulating job scheduledAt back to 'now' after a failure.
@@ -81,7 +176,10 @@ test("scheduler dead-letters invitation email retry jobs after webhook failures"
       throw new Error("provider unavailable");
     });
     const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
-    const created = await createWorkspaceInvitation(auth.context, { email: "deadletter@test.example", role: "member" });
+    const created = await createWorkspaceInvitation(auth.context, {
+      email: "deadletter@test.example",
+      role: "member",
+    });
     const retryJobId = created.emailDelivery.retryJobId;
     assert.ok(retryJobId, "expected retry job id");
 
@@ -91,7 +189,8 @@ test("scheduler dead-letters invitation email retry jobs after webhook failures"
     for (let i = 0; i < 80; i++) {
       const fresh = findJob(retryJobId);
       if (fresh?.status === "failed") break;
-      if (fresh?.status === "queued") updateJob(fresh.id, { scheduledAt: new Date().toISOString() });
+      if (fresh?.status === "queued")
+        updateJob(fresh.id, { scheduledAt: new Date().toISOString() });
       await wait(40);
     }
     await scheduler.stop();
@@ -102,7 +201,10 @@ test("scheduler dead-letters invitation email retry jobs after webhook failures"
     assert.match(fresh?.error ?? "", /provider unavailable/);
     const deliveries = listInvitationEmailDeliveriesIndexed("alpha", created.invitation.id);
     assert.equal(deliveries.length, 3);
-    assert.deepEqual(deliveries.map((delivery) => delivery.status), ["failed", "failed", "failed"]);
+    assert.deepEqual(
+      deliveries.map((delivery) => delivery.status),
+      ["failed", "failed", "failed"],
+    );
   } finally {
     resetInvitationEmailDeliveryForTests();
     restoreEnv(PACKETAGENT_INVITATION_EMAIL_MODE_ENV, previousMode);
@@ -121,13 +223,19 @@ test("invitation email retry jobs resolve the current invitation token", async (
     resetInvitationEmailDeliveryForTests();
     const webhookBodies: Array<{ token?: string; action?: string }> = [];
     setInvitationEmailFetchForTests(async (_url, init) => {
-      const body = typeof init?.body === "string" ? JSON.parse(init.body) as { token?: string; action?: string } : {};
+      const body =
+        typeof init?.body === "string"
+          ? (JSON.parse(init.body) as { token?: string; action?: string })
+          : {};
       webhookBodies.push(body);
       if (webhookBodies.length === 1) throw new Error("first send failed");
       return new Response(null, { status: 204 });
     });
     const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
-    const created = await createWorkspaceInvitation(auth.context, { email: "current-token@test.example", role: "member" });
+    const created = await createWorkspaceInvitation(auth.context, {
+      email: "current-token@test.example",
+      role: "member",
+    });
     const retryJobId = created.emailDelivery.retryJobId;
     assert.ok(retryJobId, "expected retry job id");
     const originalToken = created.invitation.token;
@@ -172,10 +280,7 @@ test("scheduler deferral returns a job to the queue without consuming an attempt
   scheduler.register({
     type: "test.deferred",
     async handle() {
-      throw new JobDeferredError(
-        "waiting for a supervisor",
-        new Date(Date.now() + 10 * 60 * 1000),
-      );
+      throw new JobDeferredError("waiting for a supervisor", new Date(Date.now() + 10 * 60 * 1000));
     },
   });
   const job = enqueueJob({ workspaceId: "alpha", type: "test.deferred" });
@@ -242,7 +347,9 @@ test("cron job re-enqueues itself after success", async () => {
   const scheduler = new JobScheduler({ pollIntervalMs: 30 });
   scheduler.register({
     type: "test.cron",
-    async handle() { return "ok"; },
+    async handle() {
+      return "ok";
+    },
   });
   const job = enqueueJob({ workspaceId: "alpha", type: "test.cron", cron: "*/5 * * * *" });
   scheduler.start();
@@ -272,8 +379,9 @@ test("scheduled agents maintain one future agent.run job", () => {
   maintainScheduledAgentJobs(agent.id);
   maintainScheduledAgentJobs(agent.id);
 
-  const queued = listJobs(auth.context.workspace.id, { status: "queued" })
-    .filter((job) => job.type === "agent.run" && job.payload.agentId === agent.id);
+  const queued = listJobs(auth.context.workspace.id, { status: "queued" }).filter(
+    (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
+  );
   assert.equal(queued.length, 1);
   assert.equal(queued[0].cron, "*/15 * * * *");
   assert.equal(queued[0].payload.triggerKind, "schedule");
@@ -290,13 +398,15 @@ test("non-schedule or inactive agents do not keep queued scheduled jobs", () => 
   });
 
   updateAgent(auth.context, agent.id, { triggerKind: "manual", schedule: "*/10 * * * *" });
-  let queued = listJobs(auth.context.workspace.id, { status: "queued" })
-    .filter((job) => job.type === "agent.run" && job.payload.agentId === agent.id);
+  let queued = listJobs(auth.context.workspace.id, { status: "queued" }).filter(
+    (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
+  );
   assert.equal(queued.length, 0);
 
   updateAgent(auth.context, agent.id, { triggerKind: "schedule", status: "paused" });
-  queued = listJobs(auth.context.workspace.id, { status: "queued" })
-    .filter((job) => job.type === "agent.run" && job.payload.agentId === agent.id);
+  queued = listJobs(auth.context.workspace.id, { status: "queued" }).filter(
+    (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
+  );
   assert.equal(queued.length, 0);
 });
 
@@ -310,8 +420,9 @@ test("invalid agent cron schedules do not enqueue jobs", () => {
     schedule: "not a cron",
   });
 
-  const queued = listJobs(auth.context.workspace.id, { status: "queued" })
-    .filter((job) => job.type === "agent.run" && job.payload.agentId === agent.id);
+  const queued = listJobs(auth.context.workspace.id, { status: "queued" }).filter(
+    (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
+  );
   assert.equal(queued.length, 0);
 });
 
@@ -324,8 +435,9 @@ test("scheduler runs a seeded scheduled agent.run job", async () => {
     triggerKind: "schedule",
     schedule: "*/20 * * * *",
   });
-  const seeded = listJobs(auth.context.workspace.id, { status: "queued" })
-    .find((job) => job.type === "agent.run" && job.payload.agentId === agent.id);
+  const seeded = listJobs(auth.context.workspace.id, { status: "queued" }).find(
+    (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
+  );
   assert.ok(seeded);
   updateJob(seeded.id, { scheduledAt: new Date().toISOString() });
 
@@ -379,7 +491,10 @@ test("scheduler heartbeat reports startedAt and ticks after start", async () => 
     }
     const heartbeat = getSchedulerHeartbeat();
     assert.notEqual(heartbeat.schedulerStartedAt, null);
-    assert.ok(heartbeat.ticksSinceStart >= 1, `expected ticksSinceStart >= 1, got ${heartbeat.ticksSinceStart}`);
+    assert.ok(
+      heartbeat.ticksSinceStart >= 1,
+      `expected ticksSinceStart >= 1, got ${heartbeat.ticksSinceStart}`,
+    );
   } finally {
     await scheduler.stop();
   }
@@ -394,7 +509,9 @@ test("scheduler records job-type metrics for successful runs", async () => {
   const scheduler = new JobScheduler({ pollIntervalMs: 30 });
   scheduler.register({
     type: "metrics.success",
-    async handle() { return { ok: true }; },
+    async handle() {
+      return { ok: true };
+    },
   });
   const job = enqueueJob({ workspaceId: "alpha", type: "metrics.success", payload: {} });
   scheduler.start();
@@ -421,15 +538,19 @@ test("recurring scheduled agent jobs preserve payload inputs", () => {
     triggerKind: "schedule",
     schedule: "*/20 * * * *",
   });
-  const seeded = listJobs(auth.context.workspace.id, { status: "queued" })
-    .find((job) => job.type === "agent.run" && job.payload.agentId === agent.id);
+  const seeded = listJobs(auth.context.workspace.id, { status: "queued" }).find(
+    (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
+  );
   assert.ok(seeded);
   updateJob(seeded.id, {
     status: "success",
     payload: { ...seeded.payload, inputs: { mailbox: "support@example.com" } },
   });
 
-  const next = enqueueRecurringJob(findJob(seeded.id)!, new Date(Date.now() + 60_000).toISOString());
+  const next = enqueueRecurringJob(
+    findJob(seeded.id)!,
+    new Date(Date.now() + 60_000).toISOString(),
+  );
 
   assert.deepEqual(next?.payload.inputs, { mailbox: "support@example.com" });
   assert.equal(next?.payload.agentId, agent.id);
@@ -441,15 +562,24 @@ test("recurring scheduled agent jobs preserve payload inputs", () => {
 function captureConsole(method: "warn" | "error"): { lines: string[]; restore: () => void } {
   const lines: string[] = [];
   const original = console[method];
-  console[method] = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
-  return { lines, restore: () => { console[method] = original; } };
+  console[method] = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
+  return {
+    lines,
+    restore: () => {
+      console[method] = original;
+    },
+  };
 }
 
 test("store error while handling a job failure does not crash the scheduler (rejection handled)", async () => {
   resetStoreForTests();
   __resetSchedulerMetricsForTests();
   const unhandled: unknown[] = [];
-  const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+  const onUnhandled = (reason: unknown) => {
+    unhandled.push(reason);
+  };
   process.on("unhandledRejection", onUnhandled);
 
   const originalUpdate = defaultJobSchedulerStorage.updateJob;
@@ -459,13 +589,19 @@ test("store error while handling a job failure does not crash the scheduler (rej
     // The handler throws so we enter runJob's failure path; the store writes in
     // that path then reject. Before the fix the rejection escaped runJob (launched
     // with `void this.runJob(job)` and no .catch) and crashed the process.
-    defaultJobSchedulerStorage.findJob = async () => { throw new Error("store offline"); };
-    defaultJobSchedulerStorage.updateJob = async () => { throw new Error("store offline"); };
+    defaultJobSchedulerStorage.findJob = async () => {
+      throw new Error("store offline");
+    };
+    defaultJobSchedulerStorage.updateJob = async () => {
+      throw new Error("store offline");
+    };
 
     const scheduler = new JobScheduler({ pollIntervalMs: 20 });
     scheduler.register({
       type: "test.storefail",
-      async handle() { throw new Error("handler boom"); },
+      async handle() {
+        throw new Error("handler boom");
+      },
     });
     enqueueJob({ workspaceId: "alpha", type: "test.storefail" });
     scheduler.start();
@@ -473,7 +609,11 @@ test("store error while handling a job failure does not crash the scheduler (rej
     await wait(300);
     await scheduler.stop();
 
-    assert.deepEqual(unhandled, [], `expected no unhandled rejections, got: ${unhandled.map(String).join(", ")}`);
+    assert.deepEqual(
+      unhandled,
+      [],
+      `expected no unhandled rejections, got: ${unhandled.map(String).join(", ")}`,
+    );
     // The store error during failure-handling must be surfaced, not swallowed.
     assert.ok(
       captured.lines.some((line) => /failed to persist failure outcome/.test(line)),
@@ -496,9 +636,16 @@ test("tick surfaces a leader-coordinator auth error instead of silently swallowi
   const authError = new Error("scheduler leader coordinator returned 401");
   let acquireCalls = 0;
   const failingLock: SchedulerLeaderLock = {
-    async acquire() { acquireCalls++; throw authError; },
-    async release() { /* noop */ },
-    isHeld() { return false; },
+    async acquire() {
+      acquireCalls++;
+      throw authError;
+    },
+    async release() {
+      /* noop */
+    },
+    isHeld() {
+      return false;
+    },
   };
   const scheduler = new JobScheduler({ pollIntervalMs: 20, leaderLock: failingLock });
   try {
@@ -527,12 +674,16 @@ test("recurring re-enqueue store failure is logged, not silently dropped", async
     // Valid cron, but the store rejects when re-enqueuing the next occurrence.
     // Before the fix this transient error was swallowed by the same catch that
     // handles an invalid cron, silently stopping recurrence forever.
-    defaultJobSchedulerStorage.enqueueRecurringJob = async () => { throw new Error("store offline"); };
+    defaultJobSchedulerStorage.enqueueRecurringJob = async () => {
+      throw new Error("store offline");
+    };
 
     const scheduler = new JobScheduler({ pollIntervalMs: 20 });
     scheduler.register({
       type: "test.cronfail",
-      async handle() { return "ok"; },
+      async handle() {
+        return "ok";
+      },
     });
     const job = enqueueJob({ workspaceId: "alpha", type: "test.cronfail", cron: "*/5 * * * *" });
     scheduler.start();

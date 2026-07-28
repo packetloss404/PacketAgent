@@ -33,6 +33,10 @@ export interface WorkerSupervisorState {
   readonly limits: WorkerSupervisorLimits;
   readonly pendingTools: readonly WorkerRuntimeToolCall[];
   readonly toolResults: readonly WorkerRuntimeToolResult[];
+  readonly completedActionIds: readonly string[];
+  readonly pendingApprovalIds: readonly string[];
+  readonly artifactRefs: readonly string[];
+  readonly effectReceiptIds: readonly string[];
   readonly candidateOutput?: JsonValue;
   readonly evaluation?: WorkerEvaluationRecord;
   readonly lastError?: string;
@@ -45,7 +49,11 @@ export type WorkerSupervisorEvent =
   | { readonly type: "provider.plan_succeeded"; readonly result: WorkerRuntimeProviderResult }
   | { readonly type: "provider.evaluation_charged"; readonly result: WorkerRuntimeProviderResult }
   | { readonly type: "tool.reserve" }
-  | { readonly type: "tool.succeeded"; readonly result: WorkerRuntimeToolResult }
+  | {
+      readonly type: "tool.succeeded";
+      readonly result: WorkerRuntimeToolResult;
+      readonly effectReceiptId?: string;
+    }
   | { readonly type: "phase.failed"; readonly error: string }
   | { readonly type: "evaluation.accepted"; readonly evaluation: WorkerEvaluationRecord }
   | { readonly type: "checkpoint.saved" }
@@ -78,6 +86,10 @@ export function initialWorkerSupervisorState(
     limits,
     pendingTools: [],
     toolResults: [],
+    completedActionIds: [],
+    pendingApprovalIds: [],
+    artifactRefs: [],
+    effectReceiptIds: [],
   };
 }
 
@@ -158,6 +170,16 @@ export function reduceWorkerSupervisor(
           actionIndex,
         },
         toolResults: [...state.toolResults, event.result],
+        completedActionIds: [...state.completedActionIds, event.result.callId],
+        artifactRefs: [
+          ...state.artifactRefs,
+          ...(event.result.artifactRefs ?? []).filter(
+            (reference) => !state.artifactRefs.includes(reference),
+          ),
+        ],
+        effectReceiptIds: event.effectReceiptId
+          ? [...state.effectReceiptIds, event.effectReceiptId]
+          : state.effectReceiptIds,
       };
       return moreTools ? next : successfulPhase(next);
     }

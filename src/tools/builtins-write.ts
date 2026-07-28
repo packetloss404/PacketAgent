@@ -8,6 +8,21 @@ import {
 } from "../packetagent-store.js";
 import type { ToolDefinition } from "./types.js";
 
+function mutationEffect(
+  classification:
+    | "idempotent_mutation"
+    | "reconcilable_mutation"
+    | "non_replayable_mutation",
+  operation: string,
+) {
+  return {
+    describe: () => ({
+      classification,
+      operation,
+    }),
+  };
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -42,6 +57,7 @@ export const createPlanItemTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "write",
+  effect: mutationEffect("non_replayable_mutation", "plan_item.create"),
   async handle(input, ctx) {
     const { title, description = "", status = "todo", requirementIds = [] } = input as {
       title: string; description?: string; status?: "todo" | "in_progress" | "blocked" | "done"; requirementIds?: string[];
@@ -77,6 +93,7 @@ export const updatePlanItemStatusTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "write",
+  effect: mutationEffect("idempotent_mutation", "plan_item.status.set"),
   async handle(input, ctx) {
     const { planItemId, status } = input as { planItemId: string; status: "todo" | "in_progress" | "blocked" | "done" };
     const updated = await mutateStoreAsync((data) => {
@@ -107,6 +124,7 @@ export const createBlockerTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "write",
+  effect: mutationEffect("non_replayable_mutation", "workflow_concern.create"),
   async handle(input, ctx) {
     const { title, detail = "", kind = "blocker", severity = "medium" } = input as {
       title: string; detail?: string; kind?: "blocker" | "open_question"; severity?: "low" | "medium" | "high" | "critical";
@@ -139,6 +157,7 @@ export const logNoteTool: ToolDefinition = {
     additionalProperties: false,
   },
   side: "write",
+  effect: mutationEffect("non_replayable_mutation", "activity_note.append"),
   async handle(input, ctx) {
     const { title, body = "" } = input as { title: string; body?: string };
     await recordToolActivity(ctx.workspaceId, ctx.userId, "tool.note", { title: title.trim(), body });

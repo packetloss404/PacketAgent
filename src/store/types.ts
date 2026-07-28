@@ -16,6 +16,7 @@ import type {
   WorkerActivationInboxRecord,
   WorkerActivationPayloadRecord,
 } from "../workers/activation-types.js";
+import type { WorkerEffectReceipt } from "../workers/effect-types.js";
 
 export interface UserRecord {
   id: string;
@@ -705,6 +706,7 @@ export interface PacketAgentData {
   workerDeployments: WorkerDeployment[];
   workerRuns: WorkerRun[];
   workerCheckpoints: WorkerCheckpoint[];
+  workerEffectReceipts: WorkerEffectReceipt[];
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];

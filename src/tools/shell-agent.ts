@@ -147,6 +147,12 @@ export function createShellForAgentTool(options: ShellForAgentToolOptions = {}):
       additionalProperties: false,
     },
     side: "exec",
+    effect: {
+      describe: () => ({
+        classification: "non_replayable_mutation",
+        operation: "shell.command.execute",
+      }),
+    },
     timeoutMs: maxTimeoutMs + FORCE_KILL_GRACE_MS + 1_000,
     async handle(input, ctx) {
       const normalized = normalizeInput(input, maxTimeoutMs, defaultTimeoutMs);

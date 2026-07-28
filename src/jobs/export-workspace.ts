@@ -42,6 +42,7 @@ import type {
   WorkerActivationPayloadMetadata,
   WorkerActivationPayloadRecord,
 } from "../workers/activation-types.js";
+import type { WorkerEffectReceipt } from "../workers/effect-types.js";
 
 export interface ExportWorkspaceOptions {
   workspaceId: string;
@@ -101,6 +102,7 @@ export interface ExportedWorkspaceData {
   workerDeployments: WorkerDeployment[];
   workerRuns: WorkerRun[];
   workerCheckpoints: WorkerCheckpoint[];
+  workerEffectReceipts: WorkerEffectReceipt[];
   workerDeploymentRollouts: WorkerDeploymentRollout[];
   workerCommandReceipts: WorkerLifecycleCommandReceipt[];
   workerEvents: WorkerEvent[];
@@ -225,6 +227,10 @@ function buildWorkspaceExport(
   const workerDeployments = workspaceWorkerRecords(store.workerDeployments, workspaceId);
   const workerRuns = workspaceWorkerRecords(store.workerRuns, workspaceId);
   const workerCheckpoints = workspaceWorkerRecords(store.workerCheckpoints, workspaceId);
+  const workerEffectReceipts = workspaceWorkerRecords(
+    store.workerEffectReceipts,
+    workspaceId,
+  );
   const workerDeploymentRollouts = workspaceWorkerRecords(store.workerDeploymentRollouts, workspaceId);
   const workerCommandReceipts = workspaceWorkerRecords(store.workerCommandReceipts, workspaceId);
   const workerEvents = workspaceWorkerRecords(store.workerEvents, workspaceId);
@@ -275,6 +281,7 @@ function buildWorkspaceExport(
       workerDeployments,
       workerRuns,
       workerCheckpoints,
+      workerEffectReceipts,
       workerDeploymentRollouts,
       workerCommandReceipts,
       workerEvents,

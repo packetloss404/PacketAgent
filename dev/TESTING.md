@@ -3,19 +3,20 @@
 End-to-end test plan run before cutting a release. Covers the builder loop, agent loop, workspace setup, providers, sandbox, operations, self-host publish handoff, and the backup round-trip.
 
 This plan verifies the inherited workbench plus W2's durable Worker lifecycle,
-W3's trigger-intake boundary, and W4's bounded supervisor. Full checkpoint
-recovery, effect safety, and PacketADE handoff cases must be added as W5-W9
-ship; they are not current product claims.
+W3's trigger-intake boundary, W4's bounded supervisor, and W5's checkpoint,
+recovery, and effect-safety boundary. Permission, attention, and PacketADE
+handoff cases must be added as W6-W9 ship; they are not current product claims.
 
-Last automated W4 baseline (2026-07-27):
+Last automated W5 baseline (2026-07-27):
 
-- API: 1,336 passed, 1 skipped, 0 failed
+- API: 1,348 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
-- Focused Worker activation, supervisor, lease/revision, scheduler, and
+- Focused Worker activation, supervisor, checkpoint-chain, effect-replay,
+  recovery/quarantine, lease/revision, scheduler, and
   JSON/SQLite/managed-Postgres parity checks: passed
 - Typecheck: passed
 - Production web build: passed
-- ESLint: 0 errors, 146 inherited warnings
+- ESLint: 0 errors, 145 inherited warnings
 
 See [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md) for the full repository state.
 
@@ -90,9 +91,6 @@ and executes that job through the bounded supervisor.
 
 ## W4 Bounded Worker Supervisor Smoke
 
-W4 executes admitted runs but intentionally stops short of W5's full restart
-recovery and external-effect receipts.
-
 1. Activate a Worker with one declared objective-satisfied exit predicate, a read-only test tool, and small positive time, iteration, provider-cost, failure, retry, and tool-call limits.
 2. Confirm the `worker.run` job moves the version-pinned run from `queued` to `running`, acquires an owner/expiry/fencing lease, and emits supervisor events without exposing prompt, tool output, or exit evidence.
 3. Return one planned tool call, a successful tool result, and a valid evaluation JSON object. Confirm the run advances plan -> act -> evaluate -> checkpoint -> decide, appends a cursor checkpoint, increments its optimistic revision, and completes with an explicit predicate terminal reason.
@@ -102,6 +100,18 @@ recovery and external-effect receipts.
 7. Let a lease expire and acquire it from a second owner. Confirm the fencing token increases monotonically, stale event/checkpoint/terminal writes conflict, and the stale supervisor performs no later tool or terminal write.
 8. Stop the scheduler while a Worker job is claimed. Confirm the signal reason releases both the runtime lease and job claim, returns the job to `queued`, and does not consume an attempt or report success.
 9. Repeat acquire, checkpoint, and terminal persistence across JSON, SQLite, and managed Postgres. Confirm identical terminal status, checkpoint count, run revisions, and no active lease on the terminal run.
+
+## W5 Checkpoint, Recovery, and Effect Safety Smoke
+
+1. Run a Worker through plan and into a multi-action act phase. Confirm every appended checkpoint has a contiguous sequence, the previous checkpoint ID, a valid state digest, the pinned version, full redacted working memory, completed actions, pending approvals, artifacts, effect receipt IDs, remaining budgets, trace context, and creation time.
+2. Stop the process with a nonterminal run holding an expired lease. Restart the scheduler and confirm recovery runs before claimed work, clears the expired lease, queues exactly one `worker.run` job without consuming an attempt, and resumes at the saved phase/action cursor.
+3. Restart the same scheduler instance inside one recovery interval. Confirm startup reconciliation runs immediately again rather than waiting for the old interval.
+4. Execute a mutating tool. Confirm a deterministic effect key and `prepared` receipt persist before the external call, then the same receipt becomes `completed` with only a redacted result reference after the call.
+5. Replay an action with a completed receipt. Confirm the prior result returns and the external mutation counter remains one.
+6. Crash after a non-replayable external effect but before receipt completion. On recovery, confirm the run and job are quarantined/failed as `unsafe_replay`; do not repeat the external call.
+7. Repeat the prepared-receipt case with an idempotent mutator and a reconcilable mutator. Confirm the idempotent retry reuses one effect key, while reconciliation records proven completion without a second external call.
+8. Corrupt a checkpoint digest, chain link, version reference, remaining budget, or action cursor. Confirm recovery quarantines the run with a redacted reason and never advances it.
+9. Repeat the checkpoint/effect/recovery scenario against JSON, SQLite, and managed Postgres. Confirm equivalent receipt status, checkpoint count, run revisions, reacquisition, and terminal result.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

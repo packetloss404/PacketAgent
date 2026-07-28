@@ -11,9 +11,9 @@ ledger without rebuilding the plan after every loop.
 
 ## Scope and authority
 
-- W1-W4 are complete. W1's decisions and verification live in
+- W1-W5 are complete. W1's decisions and verification live in
   [`worker-contract-plan.md`](worker-contract-plan.md).
-- W5-W10 are the active autonomous-Worker sequence.
+- W6-W10 are the active autonomous-Worker sequence.
 - R1-R8 below are the ordered continuation of the inherited backlog after W10.
 - Work explicitly marked "Later, not MVP" is decision-gated and is not part of
   the automatic queue.
@@ -366,7 +366,9 @@ Gate: adversarial tests cannot produce an unbounded or post-cancellation run.
 Outcome: a process can crash at any phase and resume without losing progress or
 duplicating a completed external effect.
 
-Status: active. Resume at W5.1.
+Status: complete. Gate passed 2026-07-27 with digest-chained full snapshots,
+prepared/completed effect receipts, restart reconciliation, unsafe-replay
+quarantine, crash injection, and JSON/SQLite/managed-Postgres parity.
 
 ### W5.1 - Persist immutable checkpoints
 
@@ -419,6 +421,8 @@ committed nonterminal run.
 Outcome: the W1 policy becomes an enforceable, deny-by-default runtime boundary
 for every provider, tool, credential, network, filesystem, shell, and external
 write action.
+
+Status: active. Resume at W6.1.
 
 ### W6.1 - Compile typed capabilities
 

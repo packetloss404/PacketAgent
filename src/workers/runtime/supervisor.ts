@@ -12,6 +12,8 @@ import {
   reduceWorkerSupervisor,
   type WorkerSupervisorState,
 } from "./reducer.js";
+import { restoreWorkerSupervisorState, snapshotWorkerSupervisorState } from "./checkpoint.js";
+import { WorkerEffectInterruptionError, WorkerUnsafeReplayError } from "../effects.js";
 
 export const WORKER_SCHEDULER_SHUTDOWN_REASON = "packetagent.scheduler_shutdown";
 export const WORKER_OPERATOR_CANCEL_REASON = "packetagent.operator_cancelled";
@@ -50,6 +52,17 @@ class WorkerProviderPhaseError extends Error {
   }
 }
 
+class WorkerCheckpointPersistenceError extends Error {
+  constructor(readonly cause: unknown) {
+    super(
+      `Worker checkpoint persistence failed: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+    );
+    this.name = "WorkerCheckpointPersistenceError";
+  }
+}
+
 export interface RunWorkerSupervisorInput {
   readonly context: WorkerRuntimeContext;
   readonly lease: WorkerLease;
@@ -75,9 +88,12 @@ export async function runWorkerSupervisor(
       retry.maxAttempts,
     ),
   };
-  let state = initialWorkerSupervisorState(context.run.budgetUsage, limits);
+  let state = context.checkpoint
+    ? restoreWorkerSupervisorState(context.checkpoint, context.run.budgetUsage, limits)
+    : initialWorkerSupervisorState(context.run.budgetUsage, limits);
   let lease = input.lease;
   let runRevision = context.run.revision;
+  let checkpointSequence = context.checkpoint?.sequence ?? -1;
   const monotonicStartedAt = ports.clock.monotonicMs();
   const elapsedAtStart = context.run.budgetUsage.elapsedMs;
 
@@ -181,6 +197,42 @@ export async function runWorkerSupervisor(
     lease = renewed;
   };
 
+  const persistState = async (
+    cursor = state.cursor,
+  ): Promise<{ checkpointId: string; checkpointSequence: number }> => {
+    try {
+      const result = await awaitBounded(() =>
+        ports.checkpoints.save({
+          workspaceId: context.run.workspaceId,
+          workerRunId: context.run.id,
+          workerVersionId: context.run.workerVersionId,
+          expectedRunRevision: runRevision,
+          expectedCheckpointSequence: checkpointSequence,
+          fencingToken: lease.fencingToken,
+          cursor,
+          budgetUsage: state.usage,
+          workingMemory: snapshotWorkerSupervisorState(state),
+          completedActionIds: state.completedActionIds,
+          pendingApprovalIds: state.pendingApprovalIds,
+          artifactRefs: state.artifactRefs,
+          effectReceiptIds: state.effectReceiptIds,
+        }),
+      );
+      runRevision = result.runRevision;
+      checkpointSequence = result.checkpointSequence;
+      return result;
+    } catch (error) {
+      if (
+        error instanceof WorkerRuntimeReleasedError ||
+        error instanceof WorkerAwaitDeadlineError ||
+        error instanceof WorkerOperationAbortedError
+      ) {
+        throw error;
+      }
+      throw new WorkerCheckpointPersistenceError(error);
+    }
+  };
+
   const emit = async (type: string, summary: string, data?: JsonObject): Promise<void> => {
     await refreshControl();
     if (state.terminal) return;
@@ -204,6 +256,7 @@ export async function runWorkerSupervisor(
     const message = error instanceof Error ? error.message : String(error);
     state = reduceWorkerSupervisor(state, { type: "phase.failed", error: message });
     if (state.terminal) return;
+    await persistState();
     const backoffMs = retryBackoffMs(retry, state.usage.consecutiveFailures);
     await refreshControl();
     if (state.terminal) return;
@@ -230,6 +283,7 @@ export async function runWorkerSupervisor(
         if (!state.iterationOpen) {
           state = reduceWorkerSupervisor(state, { type: "iteration.begin" });
           if (state.terminal) break;
+          await persistState();
         }
         try {
           const result = await callProvider(ports, context, state, "plan", signal, awaitBounded);
@@ -237,13 +291,27 @@ export async function runWorkerSupervisor(
             type: "provider.plan_succeeded",
             result,
           });
+          await persistState();
           await emit("worker.phase.planned", "Worker planning phase completed.", {
             iteration: state.cursor.iteration,
             requestedToolCalls: result.toolCalls.length,
             providerCostUsd: result.usage.costUsd,
           });
         } catch (error) {
-          if (error instanceof WorkerRuntimeReleasedError) throw error;
+          if (
+            error instanceof WorkerRuntimeReleasedError ||
+            error instanceof WorkerCheckpointPersistenceError ||
+            error instanceof WorkerEffectInterruptionError
+          ) {
+            throw error;
+          }
+          if (error instanceof WorkerUnsafeReplayError) {
+            state = reduceWorkerSupervisor(state, {
+              type: "quarantined",
+              error: error.message,
+            });
+            continue;
+          }
           if (error instanceof WorkerAwaitDeadlineError) {
             observeElapsed();
           } else {
@@ -285,6 +353,10 @@ export async function runWorkerSupervisor(
             ports.tools.execute({
               workspaceId: context.run.workspaceId,
               workerRunId: context.run.id,
+              workerVersionId: context.run.workerVersionId,
+              workerDeploymentId: context.run.workerDeploymentId,
+              iteration: state.cursor.iteration,
+              fencingToken: lease.fencingToken,
               call,
               capability,
               signal: operationSignal,
@@ -296,7 +368,12 @@ export async function runWorkerSupervisor(
             await failPhase(new Error(result.error ?? `Tool ${result.toolName} failed.`));
             continue;
           }
-          state = reduceWorkerSupervisor(state, { type: "tool.succeeded", result });
+          state = reduceWorkerSupervisor(state, {
+            type: "tool.succeeded",
+            result,
+            ...(result.effectReceiptId ? { effectReceiptId: result.effectReceiptId } : {}),
+          });
+          await persistState();
           await emit("worker.tool.completed", `Worker tool ${result.toolName} completed.`, {
             callId: result.callId,
             tool: result.toolName,
@@ -304,7 +381,20 @@ export async function runWorkerSupervisor(
             durationMs: result.durationMs,
           });
         } catch (error) {
-          if (error instanceof WorkerRuntimeReleasedError) throw error;
+          if (
+            error instanceof WorkerRuntimeReleasedError ||
+            error instanceof WorkerCheckpointPersistenceError ||
+            error instanceof WorkerEffectInterruptionError
+          ) {
+            throw error;
+          }
+          if (error instanceof WorkerUnsafeReplayError) {
+            state = reduceWorkerSupervisor(state, {
+              type: "quarantined",
+              error: error.message,
+            });
+            continue;
+          }
           if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
           else {
             if (error instanceof WorkerProviderPhaseError) {
@@ -350,13 +440,28 @@ export async function runWorkerSupervisor(
             type: "evaluation.accepted",
             evaluation,
           });
+          const checkpoint = await persistState({
+            ...state.cursor,
+            phase: "decide",
+          });
+          await emit("worker.checkpoint.saved", "Worker phase cursor checkpointed.", {
+            checkpointId: checkpoint.checkpointId,
+            runRevision,
+          });
+          state = reduceWorkerSupervisor(state, { type: "checkpoint.saved" });
           await emit("worker.phase.evaluated", "Worker exit predicate evaluated.", {
             predicateId: evaluation.predicateId,
             predicateKind: evaluation.predicateKind,
             matched: evaluation.matched,
+            checkpointId: checkpoint.checkpointId,
           });
         } catch (error) {
-          if (error instanceof WorkerRuntimeReleasedError) throw error;
+          if (
+            error instanceof WorkerRuntimeReleasedError ||
+            error instanceof WorkerCheckpointPersistenceError
+          ) {
+            throw error;
+          }
           if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
           else await failPhase(error);
         }
@@ -365,26 +470,22 @@ export async function runWorkerSupervisor(
 
       if (state.phase === "checkpoint") {
         try {
-          const result = await awaitBounded(() =>
-            ports.checkpoints.save({
-              workspaceId: context.run.workspaceId,
-              workerRunId: context.run.id,
-              workerVersionId: context.run.workerVersionId,
-              expectedRunRevision: runRevision,
-              fencingToken: lease.fencingToken,
-              cursor: state.cursor,
-              budgetUsage: state.usage,
-              workingMemory: checkpointMemory(state),
-            }),
-          );
-          runRevision = result.runRevision;
+          const result = await persistState({
+            ...state.cursor,
+            phase: "decide",
+          });
           state = reduceWorkerSupervisor(state, { type: "checkpoint.saved" });
           await emit("worker.checkpoint.saved", "Worker phase cursor checkpointed.", {
             checkpointId: result.checkpointId,
             runRevision,
           });
         } catch (error) {
-          if (error instanceof WorkerRuntimeReleasedError) throw error;
+          if (
+            error instanceof WorkerRuntimeReleasedError ||
+            error instanceof WorkerCheckpointPersistenceError
+          ) {
+            throw error;
+          }
           if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
           else await failPhase(error);
         }
@@ -393,6 +494,7 @@ export async function runWorkerSupervisor(
 
       if (state.phase === "decide") {
         state = reduceWorkerSupervisor(state, { type: "decide" });
+        if (!state.terminal) await persistState();
         continue;
       }
 
@@ -402,7 +504,13 @@ export async function runWorkerSupervisor(
       });
     }
   } catch (error) {
-    if (error instanceof WorkerRuntimeReleasedError) throw error;
+    if (
+      error instanceof WorkerRuntimeReleasedError ||
+      error instanceof WorkerCheckpointPersistenceError ||
+      error instanceof WorkerEffectInterruptionError
+    ) {
+      throw error;
+    }
     if (error instanceof WorkerAwaitDeadlineError) {
       observeElapsed();
     } else if (!state.terminal) {
@@ -517,25 +625,6 @@ function executableCapabilities(context: WorkerRuntimeContext): readonly WorkerT
   return context.version.content.tools.filter(
     (capability) => allowedIds.has(capability.id) && capability.approval === "never",
   );
-}
-
-function checkpointMemory(state: WorkerSupervisorState): JsonObject {
-  return {
-    candidateOutputPresent: state.candidateOutput !== undefined,
-    toolResults: state.toolResults.map((result) => ({
-      callId: result.callId,
-      toolName: result.toolName,
-      status: result.status,
-    })),
-    evaluation: state.evaluation
-      ? {
-          predicateId: state.evaluation.predicateId,
-          predicateKind: state.evaluation.predicateKind,
-          testedAtIteration: state.evaluation.testedAtIteration,
-          matched: state.evaluation.matched,
-        }
-      : null,
-  };
 }
 
 function retryBackoffMs(policy: WorkerRetryPolicy, failure: number): number {

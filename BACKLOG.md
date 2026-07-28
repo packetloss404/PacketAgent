@@ -25,7 +25,7 @@ Status: foundation complete on `codex/packetagent-foundation`; inherited quality
 - [x] Refresh every Markdown document, label historical plans, and add an authoritative Codex project handoff.
 - [x] Pass typecheck, lint with zero errors, production web build, API tests, web tests, migration tests, diff check, and compatibility-only brand scan.
 - [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 367 files; files authored in this foundation pass are formatted.
-- [ ] Reduce the inherited ESLint baseline of 146 warnings while preserving the current zero-error gate.
+- [ ] Reduce the inherited ESLint baseline of 145 warnings while preserving the current zero-error gate.
 - [ ] Review and remediate dependency advisories deliberately. The full install reports 11 advisories (including 2 critical development-tree advisories); `npm audit --omit=dev` reports 5 production advisories (1 low, 1 moderate, 3 high, 0 critical). Do not apply a blind force-fix that causes unrelated dependency churn.
 - Gate: a clean PacketAgent checkout starts with new defaults and can read an existing default TaskLoom deployment without destructive migration.
 
@@ -73,18 +73,18 @@ Dependencies: W1-W3.
 
 Dependencies: W4.
 
-Status: active. Resume at
-[`W5.1 - Persist immutable checkpoints`](dev/worker-implementation-loops.md#w51---persist-immutable-checkpoints).
-
-- [ ] Persist phase cursor, working memory, completed actions, artifacts, pending approvals, and remaining budgets.
-- [ ] Resume interrupted runs after process restart.
-- [ ] Add idempotency keys and effect receipts around mutating tools.
-- [ ] Quarantine runs when safe replay cannot be proven.
-- Gate: crash-injection tests resume without duplicating completed external effects.
+- [x] Persist phase cursor, working memory, completed actions, artifacts, pending approvals, and remaining budgets.
+- [x] Resume interrupted runs after process restart.
+- [x] Add idempotency keys and effect receipts around mutating tools.
+- [x] Quarantine runs when safe replay cannot be proven.
+- Gate: passed 2026-07-27. Digest-chained full-state checkpoints, startup/periodic recovery, prepared/completed effect receipts, exact action-cursor resumption, corruption/uncertain-effect quarantine, scheduler restart coverage, and JSON/SQLite/managed-Postgres parity prove committed nonterminal work is not silently abandoned and completed mutations are not repeated.
 
 ### W6 - Permission and budget policy
 
 Dependencies: W1, W4.
+
+Status: active. Resume at
+[`W6.1 - Compile typed capabilities`](dev/worker-implementation-loops.md#w61---compile-typed-capabilities).
 
 - [ ] Replace whole-tool grants with verb/resource-scoped capabilities.
 - [ ] Resolve credentials by reference at execution time; never embed secret values in Worker packages.

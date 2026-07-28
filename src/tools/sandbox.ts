@@ -61,6 +61,12 @@ export function createSandboxedShellTool(options: SandboxOptions = {}): ToolDefi
       additionalProperties: false,
     },
     side: "exec",
+    effect: {
+      describe: () => ({
+        classification: "non_replayable_mutation",
+        operation: "sandbox.command.execute",
+      }),
+    },
     timeoutMs: timeoutMs + 1_000,
     async handle(input, ctx) {
       const { command, args = [], cwd } = input as { command: string; args?: string[]; cwd?: string };

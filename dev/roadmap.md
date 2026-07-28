@@ -5,10 +5,10 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W5 - Checkpoint, recovery, and side-effect safety**. Repository/session state
+Current active loop: **W6 - Permission and budget policy**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
-Resume at W5.1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w51---persist-immutable-checkpoints).
+Resume at W6.1 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w61---compile-typed-capabilities).
 
 ## North star
 
@@ -37,7 +37,7 @@ The TaskLoom codebase brought forward a strong implementation substrate:
 - JSON, SQLite, and managed Postgres storage paths; and
 - operations, metrics, provider-call cost data, and health surfaces.
 
-These pieces work, but they are not yet unified as one durable Worker lifecycle. The existing builder remains supported and becomes the worker creation studio. Prompt-to-app generation remains an inherited secondary capability.
+These pieces now support the durable Worker lifecycle through crash-safe recovery. The existing builder remains supported and becomes the worker creation studio. Prompt-to-app generation remains an inherited secondary capability.
 
 ## Now
 
@@ -57,29 +57,33 @@ Manual, cron, webhook, alert, and queue deliveries now enter one versioned activ
 
 The canonical `worker.run` handler now executes a port-isolated plan-act-evaluate-checkpoint-decide reducer around the existing provider router and tool executor. It enforces elapsed-time, iteration, provider-cost, failure, retry, and tool-call limits; requires declared exit predicates; persists optimistic run revisions and cursor checkpoints; and stops on cancellation, revocation, lease expiry, or fencing loss. Scheduler shutdown releases claimed work for later recovery.
 
-### 5. Checkpoint and recovery - active
+### 5. Checkpoint and recovery - complete
 
-Persist run cursor, working memory, completed actions, pending approvals, artifacts, and external-effect idempotency keys. Resume interrupted runs without replaying completed side effects.
+Digest-chained immutable snapshots persist the run cursor, full working memory, completed actions, pending approvals, artifacts, effect receipt IDs, trace, and remaining budgets. Startup and periodic reconciliation resume safe expired work from the exact action cursor. Prepared/completed receipts replay completed mutations, reconcile supported operations, and quarantine uncertain or corrupt recovery state.
 
 ## Next
 
-### 6. Permission and attention controls
+### 6. Permission and budget policy - active
 
-Move from whole-tool approval to verb/resource-scoped capabilities. Add pause, resume, stop, revoke, approve-once, approve-for-run, and escalation routing.
+Compile whole-tool requests into version-digest-bound verb/resource capabilities, enforce them immediately before every provider/tool action, resolve credentials by reference, default network/filesystem/shell/external writes to deny, and add atomic rolling budgets.
 
-### 7. Worker health, cost, and evidence
+### 7. Attention and operator controls
+
+Add pause, resume, stop, revoke, approve-once, approve-for-run, and escalation routing.
+
+### 8. Worker health, cost, and evidence
 
 Roll provider calls, queue health, checkpoints, retries, approvals, and outcomes up by worker and deployment. Make "what is running, why, at what cost, and what needs me" answerable from one screen.
 
-### 8. PacketADE handoff
+### 9. PacketADE handoff
 
 Implement the versioned deployment contract in [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md): **Deploy to PacketAgent**, **Keep running**, update, inspect, pause, and revoke. Return progress and approval events to PacketADE.
 
-### 9. PacketChat and PacketPhone routes
+### 10. PacketChat and PacketPhone routes
 
 Send worker summaries and approval requests to conversation and mobile surfaces after the core lifecycle and policy model are stable.
 
-### 10. Integrations and worker templates
+### 11. Integrations and worker templates
 
 Expand connectors and ship useful worker starters only after the runtime can execute them safely and recoverably.
 
