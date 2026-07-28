@@ -36,6 +36,13 @@ primary specifications without claiming wire-level conformance:
   deterministic canonical JSON function so Worker digests remain compatible.
   PacketAgent does not claim RFC 8785 conformance until that function passes the
   RFC's complete test corpus.
+- [OpenTelemetry's metrics data
+  model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/) separates
+  event observations from cumulative streams and requires aggregations to have
+  well-defined merge semantics. W8.2 therefore uses additive counters and sums
+  only for decomposable quantities, retains gauges such as consecutive
+  failures with explicit maximum semantics, and treats missing source ranges as
+  gaps instead of zeros.
 
 ## Contract decisions
 
@@ -88,6 +95,29 @@ An artifact reference alone is not a content digest. Existing tools that only
 return a path are not promoted into manifests until the artifact boundary can
 read and hash the bytes safely.
 
+### Deterministic rollups
+
+`packetagent.worker-observability-rollup/v1` is a disposable cumulative
+projection, not a persisted source of truth. The reducer:
+
+- produces stable version, deployment, and run identities;
+- orders every contributing collection before summing or selecting a latest
+  record, and never reads the wall clock;
+- scopes provider records through journal correlation IDs, Worker jobs through
+  their canonical run payload, and activities only through explicit Worker
+  IDs;
+- does not merge inherited Agent traces or global job-metric snapshots when
+  they lack an explicit immutable Worker identity;
+- sums calls, costs, tokens, duration, retries, queue samples, approvals,
+  checkpoints, budget reservations, artifact bytes, and outcomes while using a
+  maximum for current consecutive-failure state; and
+- deduplicates unavailable evidence-source references into typed gaps while
+  retaining journal-derived counts.
+
+Failed tool results and supervisor phase failures are journal occurrences, so
+the projection does not silently discard retries or failed calls. Exit
+evaluation counts and matches remain distinct from terminal status.
+
 ## Executable W8 loops
 
 ### W8.1A - Contract and atomic journal
@@ -119,6 +149,8 @@ read and hash the bytes safely.
   JSON/SQLite/managed-Postgres parity.
 
 ### W8.2 - Deterministic rollups
+
+Status: complete.
 
 - Build version/deployment/run rollups exclusively from journal/evidence
   records and durable source adapters.

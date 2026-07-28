@@ -352,10 +352,18 @@ export async function runWorkerSupervisor(
 
   const failPhase = async (error: unknown): Promise<void> => {
     const message = error instanceof Error ? error.message : String(error);
+    const failedPhase = state.phase;
+    const consecutiveFailures = state.usage.consecutiveFailures + 1;
+    const backoffMs = retryBackoffMs(retry, consecutiveFailures);
+    await emit("worker.phase.failed", "Worker supervisor phase failed.", {
+      phase: failedPhase,
+      consecutiveFailures,
+      backoffMs,
+    });
+    if (state.terminal) return;
     state = reduceWorkerSupervisor(state, { type: "phase.failed", error: message });
     if (state.terminal) return;
     await persistState();
-    const backoffMs = retryBackoffMs(retry, state.usage.consecutiveFailures);
     await refreshControl();
     if (state.terminal) return;
     await awaitBounded((operationSignal) => ports.clock.sleep(backoffMs, operationSignal));
@@ -576,6 +584,13 @@ export async function runWorkerSupervisor(
           await refreshControl();
           if (state.terminal) continue;
           if (result.status !== "ok") {
+            await emit("worker.tool.failed", `Worker tool ${result.toolName} failed.`, {
+              callId: result.callId,
+              tool: result.toolName,
+              status: result.status,
+              durationMs: result.durationMs,
+              ...(result.effectReceiptId ? { effectReceiptId: result.effectReceiptId } : {}),
+            });
             await failPhase(new Error(result.error ?? `Tool ${result.toolName} failed.`));
             continue;
           }
@@ -616,8 +631,9 @@ export async function runWorkerSupervisor(
             continue;
           }
           if (applyBudgetExhaustion(error)) continue;
-          if (error instanceof WorkerAwaitDeadlineError) observeElapsed();
-          else {
+          if (error instanceof WorkerAwaitDeadlineError) {
+            observeElapsed();
+          } else {
             if (error instanceof WorkerProviderPhaseError) {
               state = reduceWorkerSupervisor(state, {
                 type: "provider.evaluation_charged",
@@ -625,6 +641,11 @@ export async function runWorkerSupervisor(
               });
               if (state.terminal) continue;
             }
+            await emit("worker.tool.failed", `Worker tool ${call.name} failed.`, {
+              callId: call.id,
+              tool: call.name,
+              status: "error",
+            });
             await failPhase(error);
           }
         }

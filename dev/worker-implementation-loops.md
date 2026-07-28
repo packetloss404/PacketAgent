@@ -639,7 +639,7 @@ without relying on the authoring UI.
 Outcome: one API and one UI surface answer what is running, why, at what cost,
 from which version, at which checkpoint, and what needs attention.
 
-Status: active. W8.1 is complete; resume at W8.2.
+Status: active. W8.1-W8.2 are complete; resume at W8.3.
 
 ### W8.1 - Formalize the event and evidence model
 
@@ -666,7 +666,13 @@ Design record and executable W8 subloops:
 
 ### W8.2 - Build deterministic rollups
 
-Status: active. This is the exact resume point after W8.1.
+Status: complete. A pure cumulative projection rebuilds version, deployment,
+and run views from ordered journal/evidence plus correlated durable source
+records. It covers provider and tool calls, effect status, job and phase
+retries, queue duration, approvals, checkpoints, reported and rolling budgets,
+artifacts, terminal outcomes, and exit-predicate matches. Missing retained
+sources become deduplicated typed gaps. Replay is order-independent and the
+stable projection passes JSON, SQLite, and managed-Postgres parity.
 
 - Roll provider calls, tool calls, effects, retries, queue duration, approvals,
   checkpoints, budget usage, artifacts, and outcomes up by Worker version and
@@ -680,6 +686,8 @@ Primary seams: `src/providers/ledger.ts`, `src/provider-calls-read.ts`,
 new `src/workers/observability/` modules.
 
 ### W8.3 - Add retention and redaction
+
+Status: active. This is the exact resume point after W8.2.
 
 - Define separate retention windows for metadata, summaries, prompts, tool
   inputs/outputs, and artifacts.

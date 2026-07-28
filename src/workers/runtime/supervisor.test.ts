@@ -210,6 +210,7 @@ test("provider failures and invalid exit output have finite retry ceilings", asy
     assert.equal(result.run.terminalReason, "failure_limit");
     assert.equal(harness.providerCalls, 3);
     assert.equal(harness.toolCalls, 0);
+    assert.equal(harness.events.filter((event) => event.type === "worker.phase.failed").length, 3);
   });
 
   await t.test("invalid evaluation", async () => {
@@ -225,6 +226,37 @@ test("provider failures and invalid exit output have finite retry ceilings", asy
     assert.equal(result.run.terminalReason, "failure_limit");
     assert.equal(harness.providerCalls, 3);
   });
+});
+
+test("failed tool attempts and their retry backoff remain journaled", async () => {
+  const harness = runtimeHarness({
+    provider: async (request) =>
+      request.phase === "plan"
+        ? providerResult({
+            toolCalls: [
+              {
+                id: "failing-tool",
+                name: "http_fetch",
+                input: { url: "https://test" },
+              },
+            ],
+          })
+        : providerResult(),
+    toolError: new Error("scripted tool failure"),
+  });
+
+  const result = await runWorkerSupervisor(harness.input);
+
+  assert.equal(result.run.status, "failed");
+  assert.equal(result.run.terminalReason, "failure_limit");
+  assert.equal(harness.events.filter((event) => event.type === "worker.tool.failed").length, 3);
+  assert.equal(harness.events.filter((event) => event.type === "worker.phase.failed").length, 3);
+  assert.equal(
+    harness.events
+      .filter((event) => event.type === "worker.phase.failed")
+      .every((event) => typeof event.data?.backoffMs === "number"),
+    true,
+  );
 });
 
 test("provider cost is charged before any subsequent phase can execute", async () => {

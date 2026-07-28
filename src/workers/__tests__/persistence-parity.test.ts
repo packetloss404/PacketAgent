@@ -42,6 +42,11 @@ import {
   type WorkerArtifactManifest,
 } from "../observability/types.js";
 import { computeWorkerArtifactManifestDigest } from "../observability/validation.js";
+import type {
+  WorkerObservabilityRollup,
+  WorkerObservabilityRollupSet,
+} from "../observability/rollup-types.js";
+import { buildWorkerObservabilityRollups } from "../observability/rollups.js";
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -99,6 +104,7 @@ interface BackendScenarioResult {
   readonly exportedControlRecordCounts: readonly number[];
   readonly exportedEvidenceCount: number;
   readonly exportedArtifactManifestCount: number;
+  readonly rollupProjection: ReturnType<typeof parityRollupProjection>;
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
@@ -124,6 +130,10 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   const rollback = await reloadedService.getDefinition("alpha", "worker-rollback");
   const stored = await loadStoreAsync();
   const exported = await exportWorkspaceDataAsync({ workspaceId: "alpha" });
+  const rollupProjection = buildWorkerObservabilityRollups(stored, "alpha");
+  const reordered = structuredClone(stored);
+  reverseRollupSources(reordered);
+  assert.deepEqual(buildWorkerObservabilityRollups(reordered, "alpha"), rollupProjection);
 
   assert.equal(race.deployments.filter((deployment) => deployment.status === "active").length, 1);
   assert.equal(rollback.rollouts.length, 1);
@@ -230,7 +240,67 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
     ],
     exportedEvidenceCount: exported.data.workerEvidenceEntries.length,
     exportedArtifactManifestCount: exported.data.workerArtifactManifests.length,
+    rollupProjection: parityRollupProjection(rollupProjection),
   };
+}
+
+function parityRollupProjection(rollups: WorkerObservabilityRollupSet) {
+  return {
+    schemaVersion: rollups.schemaVersion,
+    workspaceId: rollups.workspaceId,
+    computedThroughSequence: rollups.computedThroughSequence,
+    versions: rollups.versions.map(stableRollupFields),
+    deployments: rollups.deployments.map(stableRollupFields),
+    runs: rollups.runs.map(stableRollupFields),
+  };
+}
+
+function stableRollupFields(rollup: WorkerObservabilityRollup) {
+  return {
+    identity: rollup.identity,
+    computedThroughSequence: rollup.computedThroughSequence,
+    events: rollup.events,
+    evidenceEntries: rollup.evidenceEntries,
+    legacyEvents: rollup.legacyEvents,
+    providers: rollup.providers,
+    tools: rollup.tools,
+    effects: rollup.effects,
+    retries: rollup.retries,
+    queue: {
+      jobs: rollup.queue.jobs,
+      startedSamples: rollup.queue.startedSamples,
+      pendingSamples: rollup.queue.pendingSamples,
+      totalDurationMs: rollup.queue.totalDurationMs,
+      averageDurationMs: rollup.queue.averageDurationMs,
+      maximumDurationMs: rollup.queue.maximumDurationMs,
+    },
+    approvals: rollup.approvals,
+    checkpoints: {
+      count: rollup.checkpoints.count,
+      latestSequence: rollup.checkpoints.latestSequence,
+    },
+    budget: rollup.budget,
+    artifacts: rollup.artifacts,
+    outcomes: rollup.outcomes,
+    sourceGaps: rollup.sourceGaps,
+  };
+}
+
+function reverseRollupSources(data: PacketAgentData): void {
+  data.workerVersions.reverse();
+  data.workerDeployments.reverse();
+  data.workerRuns.reverse();
+  data.workerEvents.reverse();
+  data.workerEvidenceEntries.reverse();
+  data.jobs.reverse();
+  data.providerCalls.reverse();
+  data.workerEffectReceipts.reverse();
+  data.workerBudgetReservations.reverse();
+  data.workerAttentionRequests.reverse();
+  data.workerApprovalGrants.reverse();
+  data.workerCheckpoints.reverse();
+  data.workerArtifactManifests.reverse();
+  data.activities.reverse();
 }
 
 function deploymentStatusCounts(data: PacketAgentData): string[] {

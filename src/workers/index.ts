@@ -14,6 +14,8 @@ export * from "./persistence-types.js";
 export * from "./observability/types.js";
 export * from "./observability/journal.js";
 export * from "./observability/repository.js";
+export * from "./observability/rollup-types.js";
+export * from "./observability/rollups.js";
 export * from "./observability/validation.js";
 export * from "./repository.js";
 export * from "./service.js";

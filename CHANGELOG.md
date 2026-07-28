@@ -6,6 +6,26 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-27 - Deterministic Worker observability rollups (W8.2)
+
+- Added disposable cumulative rollups keyed by immutable Worker version,
+  deployment, and run rather than persisting a second mutable source of truth.
+- Aggregated correlated provider/tool calls, mutation effects, job and
+  supervisor retries, queue duration, approvals, checkpoints, reported and
+  rolling budgets, artifact bytes, run outcomes, and exit-predicate matches.
+- Added stable source adapters for canonical Worker jobs, provider calls, and
+  explicitly correlated activities without falsely joining inherited Agent
+  traces or global scheduler snapshots.
+- Added deduplicated typed gaps for evidence references whose retained source
+  record is unavailable, while preserving journal-derived counts and safe
+  provider usage.
+- Journaled failed tool results and supervisor phase failures so failures,
+  retry backoff, and unsuccessful calls remain visible to rebuilds.
+- Proved order-independent replay, fresh-process rebuild, workspace isolation,
+  missing-source behavior, and stable JSON/SQLite/managed-Postgres parity.
+- The W8.2 baseline covers 1,448 API tests (1,447 passed and 1 intentionally
+  skipped) plus 25 web tests with zero lint errors.
+
 ### 2026-07-27 - Worker event and evidence model (W8.1)
 
 - Added digest-bound v2 Worker event envelopes with monotonic workspace,

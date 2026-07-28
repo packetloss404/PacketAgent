@@ -11,13 +11,13 @@ W7.1's durable control records plus W7.2's atomic control service. Supervisor
 attention and deadline enforcement are covered by W7.3. Independent operator
 API coverage is added by W7.4, and W7.5 closes the restart/kill gate.
 W8.1 adds the versioned event, evidence, and artifact-provenance substrate.
-Deterministic rollups, retention, the consolidated evidence surface, and
-PacketADE handoff cases must be added as W8.2-W9 ship; they are not current
-product claims.
+W8.2 adds deterministic cumulative version/deployment/run rollups. Retention,
+the consolidated evidence surface, and PacketADE handoff cases must be added
+as W8.3-W9 ship; they are not current product claims.
 
-Last automated W8.1 baseline (2026-07-27):
+Last automated W8.2 baseline (2026-07-27):
 
-- API: 1,443 passed, 1 skipped, 0 failed
+- API: 1,447 passed, 1 skipped, 0 failed
 - Web: 25 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -41,6 +41,12 @@ Last automated W8.1 baseline (2026-07-27):
   W3C trace validation, durable source correlation, event/evidence tamper
   detection, content/provenance-bound artifact manifests, legacy v1 reads,
   cursor filtering, migration, export isolation, and
+  JSON/SQLite/managed-Postgres parity checks: passed
+- Focused ordered-source replay, fresh-process rebuild,
+  version/deployment/run aggregation, provider/tool/effect calls, job and
+  supervisor retries, queue duration, approvals, checkpoints, reported and
+  rolling budgets, artifacts, outcomes, exit-predicate matches,
+  missing-source gaps, workspace isolation, and stable
   JSON/SQLite/managed-Postgres parity checks: passed
 - Typecheck: passed
 - Production web build: passed
@@ -409,6 +415,36 @@ Use authenticated requests under `/api/app/workers`. Every mutation requires
 8. Repeat the journal, artifact, workspace isolation, export, cursor, and
    migration paths against JSON, SQLite, and managed Postgres. Confirm
    dedicated event indexes and evidence/artifact tables preserve parity.
+
+## W8.2 Deterministic Rollup Smoke
+
+1. Run a Worker through provider, tool, checkpoint, approval, and terminal
+   occurrences. Rebuild rollups and confirm one immutable version, deployment,
+   and run identity receives the same scoped records.
+2. Confirm correlated provider call status, tokens, cost, and duration plus
+   successful and failed tool calls and mutation effects are counted once even
+   when their correlation appears in more than one journal event.
+3. Execute a retrying job and a supervisor phase failure. Confirm execution
+   attempts, job retries, recovery requeues, provider failures, phase failures,
+   and scheduled backoff remain separate counters.
+4. Confirm queue duration uses persisted job scheduling and start timestamps,
+   approval status uses durable attention/grant records, and the latest
+   checkpoint is selected deterministically.
+5. Compare reported per-run usage with reserved, settled, and released rolling
+   provider/action capacity. Confirm additive values sum while the
+   consecutive-failure gauge uses a maximum.
+6. Add content-bound artifact manifests and matched/unmatched exit evaluations.
+   Confirm byte totals, classifications, terminal status/reasons, and outcome
+   quality counts roll up by run, deployment, and version.
+7. Remove a correlated provider source record while retaining its
+   event/evidence. Confirm rebuild succeeds, safe journal usage remains, and
+   one deduplicated `provider_call` gap is reported instead of a zero or
+   integrity failure.
+8. Reverse every contributing source collection and reconstruct the repository
+   through a fresh process-shaped loader. Confirm the complete projection is
+   unchanged and another workspace receives no records.
+9. Repeat the stable projection fields against JSON, SQLite, and managed
+   Postgres and confirm equivalent results.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

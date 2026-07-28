@@ -115,7 +115,7 @@ rolling reservation, effect preparation, or external I/O.
 Dependencies: W4-W6.
 
 Status: complete. Resume at
-[`W8.2 - Build deterministic rollups`](dev/worker-implementation-loops.md#w82---build-deterministic-rollups).
+[`W8.3 - Add retention and redaction`](dev/worker-implementation-loops.md#w83---add-retention-and-redaction).
 
 - [x] Define and persist version-bound attention requests, approval grants,
       control commands, and notification delivery references with durable replay
@@ -135,10 +135,12 @@ Status: complete. Resume at
 Dependencies: W2-W7.
 
 Status: active. Resume at
-[`W8.2 - Build deterministic rollups`](dev/worker-implementation-loops.md#w82---build-deterministic-rollups).
+[`W8.3 - Add retention and redaction`](dev/worker-implementation-loops.md#w83---add-retention-and-redaction).
 
 - [ ] Add one Worker health/attention summary.
-- [ ] Roll provider calls, tool calls, retries, queue time, approvals, and outcome quality up by Worker version and deployment.
+- [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
+      checkpoints, budgets, artifacts, and outcome quality up by Worker version,
+      deployment, and run with deterministic replay and explained source gaps.
 - [ ] Expose a chronological evidence trail and artifact manifest.
 - [ ] Add retention and redaction policy for prompts, tool payloads, and outputs.
 - Gate: the UI and API answer what is running, why, current budget, last checkpoint, and required attention without joining raw tables manually.
