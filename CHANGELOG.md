@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R5.6 container-hardening closure
+
+- Made the generated-code validator image default to numeric non-root in
+  addition to the sandbox driver's runtime override.
+- Added explicit non-root identity, read-only root, all-capability drop,
+  no-new-privileges, PID/ulimit bounds, bounded tmpfs, and init handling to the
+  PacketAgent control-plane Compose service; made the existing generated-app
+  package controls explicit and consistent.
+- Extended generated-app Docker certification to inspect the running
+  container's applied host configuration rather than trusting the Compose
+  source.
+- Added `npm run verify:container-hardening`, which resolves both Compose
+  contracts, inspects the built validator image, and checks live sandbox UID,
+  effective capabilities, no-new-privileges state, cgroup PID maximum, and
+  read-only root behavior.
+- Typecheck, zero-warning lint, formatting, the production web build, 33 web
+  tests, 16 focused container/publish tests, all five cumulative R5 executable
+  verifiers, and 1,620 API tests pass (1,617 passed with three intentional live
+  interoperability skips).
+- R5's untrusted generated-code containment gate is complete. Resume at R6.1
+  vault-backed default SMTP transport.
+
 ### 2026-07-29 - R5.5 generated-preview origin isolation
 
 - Split workbench and generated-preview browser authority. Production now

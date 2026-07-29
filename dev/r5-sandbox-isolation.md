@@ -346,8 +346,56 @@ suite (1,614 passed with three intentional live interoperability skips). The
 preview verifier independently passed 30 deterministic assertions plus the
 real Chromium exchange/iframe proof.
 
-## Remaining R5 order
+## R5.6 decision: one inspectable hardening matrix
 
-Resume only from the unchecked R5 items in `BACKLOG.md`:
+The final audit found four container surfaces:
 
-1. R5.6: close the container-hardening matrix and the complete R5 gate.
+- the PacketAgent control-plane Compose service;
+- the codegen validator image;
+- each short-lived untrusted sandbox execution; and
+- the standalone generated-app publish package.
+
+The untrusted sandbox driver and generated-app package already applied the
+required runtime controls, but the validator image relied on the driver's
+`--user` override and the control-plane Compose service did not declare the
+matrix itself. R5.6 makes the intent explicit at every layer. The validator
+Dockerfile defaults to `65534:65534`; the control-plane service runs as
+`packetagent` with a read-only root, bounded `/tmp`, all capabilities dropped,
+no-new-privileges, a 256-process limit and matching `nproc` bound, and init
+reaping. Generated-app packages explicitly run as `node`, retain their
+read-only root and 128-process/capability/security bounds, and add matching
+ulimits and init.
+
+This does not make access to the Docker daemon socket low privilege. Docker's
+own [Engine security guidance](https://docs.docker.com/engine/security/)
+treats daemon control as host-level authority.
+Only the trusted PacketAgent control plane may receive that socket; generated
+apps and untrusted sandbox containers never do. Operators should prefer a
+[rootless daemon](https://docs.docker.com/engine/security/rootless/) or a
+[protected remote daemon](https://docs.docker.com/engine/security/protect-access/)
+and must not expose an unauthenticated Docker TCP endpoint. The selected
+Compose fields follow Docker's current
+[service specification](https://docs.docker.com/reference/compose-file/services/).
+
+## R5.6 proof and gate
+
+The uninjected command is:
+
+```bash
+npm run verify:container-hardening
+```
+
+It uses Docker Compose's resolved JSON rather than regex alone, inspects the
+built validator image, and runs a real sandbox probe. The proof requires a
+numeric non-root validator default; the complete control-plane and
+generated-app Compose matrices; live UID/GID 65534; an all-zero Linux
+`CapEff`; `NoNewPrivs=1`; cgroup `pids.max=64`; and a failed root-filesystem
+write. The generated-app certification separately inspects the running
+container and fails if any applied control diverges from the package.
+
+The R5.6 closeout passed typecheck, zero-warning lint, formatting, the
+production web build, 33/33 web tests, 16/16 focused container/publish tests,
+all five cumulative R5 executable verifiers, and the complete 1,620-test API
+suite (1,617 passed with three intentional live interoperability skips).
+
+R5 is complete. Continue only from R6.1 in `BACKLOG.md`.

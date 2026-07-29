@@ -295,10 +295,11 @@ npm run verify:generated-app-publish -- data/published-apps/<workspace>/<app>
 
 The bounded verifier validates Compose, builds and starts the package on a free
 loopback port, checks `/health/live`, `/health/ready`, static HTML, and
-generated CRUD, restarts the container to prove SQLite volume persistence,
-runs a stopped-service backup/mutate/restore round trip, and then removes its
-uniquely named test containers, network, volume, local image, and temporary
-backup.
+generated CRUD, inspects the running non-root/read-only/capability/
+no-new-privileges/process boundary, restarts the container to prove SQLite
+volume persistence, runs a stopped-service backup/mutate/restore round trip,
+and then removes its uniquely named test containers, network, volume, local
+image, and temporary backup.
 
 **To keep a published app running:**
 
@@ -562,6 +563,15 @@ only explicitly requested validated environment entries. Secret-like and
 runtime-control environment names are rejected, and accepted values are
 redacted from persisted execution records. Run
 `npm run verify:sandbox-policy` after changing Docker or these limits.
+
+Run `npm run verify:container-hardening` after changing the PacketAgent
+Dockerfile, either Compose contract, validator image, or sandbox driver. It
+resolves both Compose configurations and checks the live sandbox's UID,
+effective capabilities, no-new-privileges bit, cgroup PID maximum, and
+read-only root. The control-plane Compose service is intentionally the only
+container that may receive the Docker daemon socket. Treat that socket as
+host-level authority; never add it to generated-app or sandbox mounts. Prefer
+rootless Docker or a protected SSH/TLS daemon where practical.
 
 Sandbox egress remains deny-all unless you explicitly allow exact origins:
 

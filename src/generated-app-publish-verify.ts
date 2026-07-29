@@ -7,6 +7,10 @@ import { basename, join, resolve } from "node:path";
 import type { GeneratedAppRuntimeModel, RuntimeSchemaEntity } from "./generated-app-runtime.js";
 import { GENERATED_APP_PUBLISH_COMPOSE_FILE } from "./generated-app-publish-package.js";
 import { verifyGeneratedAppReachability } from "./generated-app-publish-reachability.js";
+import {
+  containerHardeningControlsPass,
+  dockerInspectionHardening,
+} from "./container-hardening.js";
 
 export interface GeneratedAppPublishVerificationStep {
   id: string;
@@ -83,6 +87,33 @@ export async function verifyGeneratedAppPublishPackage(
       [...composeArgs, "up", "--build", "--wait", "--wait-timeout", "180"],
       240_000,
     );
+    await probeStep(steps, "container-hardening", async () => {
+      const container = await runCommand(
+        "docker",
+        [...composeArgs, "ps", "-q", "generated-app"],
+        publishRoot,
+        env,
+        30_000,
+      );
+      const containerId = container.stdout.trim();
+      if (!/^[a-f0-9]{12,64}$/i.test(containerId)) {
+        throw new Error("Docker Compose did not return the generated-app container id");
+      }
+      const inspected = await runCommand(
+        "docker",
+        ["inspect", containerId],
+        publishRoot,
+        env,
+        30_000,
+      );
+      const parsed = JSON.parse(inspected.stdout) as unknown;
+      const inspection = Array.isArray(parsed) ? parsed[0] : undefined;
+      const controls = dockerInspectionHardening(inspection);
+      if (!containerHardeningControlsPass(controls, 128)) {
+        throw new Error("generated-app container did not apply the complete R5.6 hardening matrix");
+      }
+      return "Runtime inspection proved non-root, read-only root, all capabilities dropped, no-new-privileges, init, and a 128-process limit.";
+    });
     const portResult = await commandStep(steps, "compose-port", publishRoot, env, [
       ...composeArgs,
       "port",

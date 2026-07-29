@@ -128,6 +128,46 @@ Defense-in-depth Caddy and nginx virtual-host examples are under
 `examples/preview-origin/`. Run `npm run verify:preview-isolation` after every
 origin, cookie, CSP, or proxy change.
 
+## Container hardening
+
+PacketAgent applies one auditable container matrix:
+
+| Surface                         | User          | Read-only root | Capabilities | No new privileges | PID limit |
+| ------------------------------- | ------------- | -------------- | ------------ | ----------------- | --------- |
+| Control-plane Compose service   | `packetagent` | yes            | drop `ALL`   | yes               | `256`     |
+| Codegen validator image default | `65534:65534` | runtime        | runtime      | runtime           | runtime   |
+| Untrusted sandbox execution     | `65534:65534` | yes            | drop `ALL`   | yes               | `64`      |
+| Generated-app publish service   | `node`        | yes            | drop `ALL`   | yes               | `128`     |
+
+The validator's image default is defense in depth; the sandbox driver still
+forces the numeric identity and all runtime controls. The control-plane and
+generated-app Compose services also use bounded tmpfs/ulimits and init
+reaping. Docker Compose's resolved configuration is the configuration
+authority, and generated-app certification additionally inspects the running
+container.
+
+Run:
+
+```bash
+npm run verify:container-hardening
+```
+
+The verifier fails unless the two Compose matrices resolve correctly, the
+validator image is non-root, and a real sandbox process reports zero effective
+capabilities, `NoNewPrivs=1`, its exact cgroup PID maximum, and a denied write
+to the root filesystem.
+
+The Docker daemon socket remains host-level authority; dropping capabilities
+inside the trusted control-plane container does not reduce what an authorized
+Docker client can ask the daemon to do. Never mount the socket into generated
+apps or untrusted sandbox containers, and never expose an unauthenticated
+Docker TCP endpoint. Prefer Docker rootless mode or a protected SSH/TLS daemon
+where practical. See Docker's
+[Engine security](https://docs.docker.com/engine/security/),
+[rootless mode](https://docs.docker.com/engine/security/rootless/), and
+[daemon socket protection](https://docs.docker.com/engine/security/protect-access/)
+guidance.
+
 ## Token redaction
 
 PacketAgent treats invitation tokens, share tokens, agent webhook tokens, and bearer values as secrets. They are redacted before they appear in API responses, persisted error records, frontend display paths, access logs, exports, and structured logs. Redaction is centralized in `src/security/redaction.ts` and reused by every surface that emits string content to an operator.
@@ -204,6 +244,8 @@ Before promoting a change:
   `Host` according to the reviewed configuration.
 - `npm run verify:preview-isolation` passes and a browser inspection shows no
   `packetagent_session` or `packetagent_csrf` cookie on the preview hostname.
+- `npm run verify:container-hardening` passes against the deployment's Docker
+  engine; generated apps and sandbox containers have no Docker socket mount.
 - A sample `npm run jobs:export-workspace -- --workspace-id=<id>` produces JSON with no raw `whk_`, `Bearer `, `?token=`, `?secret=`, or `?api_key=` substrings.
 - A sample of the live proxy access log passes `node --import tsx src/security/proxy-access-log-validator.ts <log-path>` with exit code `0`.
 - `npm run jobs:cleanup-sessions` runs on a recurring schedule.

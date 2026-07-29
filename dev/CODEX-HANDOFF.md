@@ -733,11 +733,26 @@ executable verifiers, and 1,617 API tests (1,614 passed with three intentional
 live interoperability skips). The preview verifier passed 30 deterministic
 assertions plus its real Chromium proof.
 
-The exact next slice is R5.6 under
-[`R5 - sandbox, egress, and preview isolation`](../BACKLOG.md#r5---sandbox-egress-and-preview-isolation):
-close the non-root/capability/no-new-privileges/process-limit hardening matrix,
-remove any remaining inconsistent path, and pass the cumulative R5 gate.
-After each gate passes, continue through R5-R8 using that backlog's unchecked
+R5.6 is complete and the cumulative R5 gate passes. The codegen validator
+image now defaults to numeric non-root. The PacketAgent control-plane Compose
+service and standalone generated-app Compose package explicitly declare
+non-root users, read-only roots, all capabilities dropped,
+no-new-privileges, process/ulimit bounds, bounded tmpfs, and init handling.
+Generated-app certification inspects those settings on the running container.
+`npm run verify:container-hardening` resolves both Compose contracts, inspects
+the built validator image, and proves the live sandbox has UID/GID 65534,
+zero effective capabilities, `NoNewPrivs=1`, cgroup `pids.max=64`, and a
+denied root write. The R5 closure passed typecheck, zero-warning lint,
+formatting, the production web build, 33 web tests, 16 focused
+container/publish tests, all five cumulative R5 executable verifiers, and
+1,620 API tests (1,617 passed with three intentional live interoperability
+skips).
+
+The exact next slice is R6.1 under
+[`R6 - agent authoring and execution depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth):
+wire the default SMTP transport through vault-backed credentials and prove no
+plaintext secret is persisted or logged. After each gate passes, continue
+through R6-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
 must not be resumed independently.
@@ -768,8 +783,8 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,614 passed, 3 intentionally skipped live probes, 0
-  failed (1,617 total)
+- `npm run test:api` - 1,617 passed, 3 intentionally skipped live probes, 0
+  failed (1,620 total)
 - `npm run test:web` - 33 passed, 0 failed
 - focused R2 canonical catalog, provider request mappings, vLLM constrained
   decoding and one fallback, malformed tool-input correction bound,

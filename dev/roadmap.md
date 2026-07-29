@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **R5 - sandbox, egress, and preview isolation**. Repository/session state
+Current active loop: **R6 - agent authoring and execution depth**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -72,8 +72,12 @@ receipts redact query values and bind mounted content by digest. R5.5 separates
 generated code from the workbench browser authority, exchanges
 checkpoint-bound fragment capabilities for partitioned app-path cookies,
 applies nonce CSP and exact-parent framing, and moves click-to-edit onto a
-validated message bridge. Resume at R5.6 final container-hardening closure in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#r5---sandbox-egress-and-preview-isolation).
+validated message bridge. R5.6 closes the containment gate: the validator
+image, control-plane Compose service, generated-app package, and live
+untrusted sandbox now share an executable non-root/read-only-root/
+capability-drop/no-new-privileges/process-limit matrix. Resume at R6.1
+vault-backed default SMTP transport in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#r6---agent-authoring-and-execution-depth).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,
 validates SQLite migration/restore integrity and foreign keys, rejects corrupt

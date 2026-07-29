@@ -1126,7 +1126,7 @@ live interoperability skips).
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1-R5.5 completed on 2026-07-29. Resume at R5.6.
+Status: complete as of 2026-07-29. Resume at R6.
 
 1. [Complete 2026-07-29] Make real sandboxed `tsc` and Vite validation the
    default; remove synthetic success. The required validator uses a
@@ -1163,8 +1163,13 @@ Status: in progress. R5.1-R5.5 completed on 2026-07-29. Resume at R5.6.
    per-response nonce CSP, exact-parent framing, a validated cross-origin
    click-to-edit bridge, dual-host proxy examples, and
    `npm run verify:preview-isolation` close the slice.
-6. Harden container execution with a non-root user, dropped capabilities,
-   no-new-privileges, and process limits.
+6. [Complete 2026-07-29] Harden container execution with a non-root user,
+   dropped capabilities, no-new-privileges, and process limits. The validator
+   image defaults to numeric non-root, both control-plane and generated-app
+   Compose contracts declare the complete boundary, generated-app
+   certification inspects the running container, and
+   `npm run verify:container-hardening` proves the live sandbox kernel/cgroup
+   state.
 
 Gate: untrusted generated code cannot inherit host secrets/session cookies,
 reach undeclared networks, or escape declared resource limits.
@@ -1173,6 +1178,8 @@ R5 research, implementation decisions, and cumulative gate evidence live in
 [`r5-sandbox-isolation.md`](r5-sandbox-isolation.md).
 
 ### R6 - Agent authoring and execution depth
+
+Status: in progress. Resume at R6.1.
 
 1. Wire the default SMTP transport through the vault-backed credential path.
 2. Add LLM-authored Worker/agent templates beyond the heuristic draft builder.

@@ -102,6 +102,7 @@ export function generatedAppDockerComposeYaml(): string {
       - "\${PACKETAGENT_GENERATED_APP_BIND_ADDRESS:-127.0.0.1}:\${PACKETAGENT_GENERATED_APP_PORT:-8787}:8080"
     volumes:
       - generated-app-data:/app/data
+    user: node
     read_only: true
     tmpfs:
       - /tmp:size=16m,mode=1777
@@ -112,6 +113,12 @@ export function generatedAppDockerComposeYaml(): string {
     pids_limit: 128
     cpus: 1.0
     mem_limit: 512m
+    ulimits:
+      nproc: 128
+      nofile:
+        soft: 512
+        hard: 512
+    init: true
     restart: unless-stopped
     healthcheck:
       test:

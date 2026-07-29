@@ -487,12 +487,13 @@ read-only input prefetch without giving the container a network interface.
 R5.5 moves generated preview documents and runtime APIs to a distinct browser
 origin, replaces query/session inheritance with fragment-exchanged scoped
 capabilities, constrains generated code with per-response CSP, and preserves
-click-to-edit through a validated cross-origin message bridge. Active
-remaining work resumes at R5.6 final container-hardening closure in
-`BACKLOG.md`.
+click-to-edit through a validated cross-origin message bridge. R5.6 closes the
+containment gate with one verified non-root/read-only-root/capability-drop/
+no-new-privileges/process-limit matrix across the validator, control-plane
+Compose service, generated-app package, and live untrusted sandbox.
 
-The exact resume point is R5.6 in [BACKLOG.md](BACKLOG.md), the sole ledger for
-the conditional live W10 check and all remaining R5-R8 work. New Codex projects
+The exact resume point is R6.1 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+the conditional live W10 check and all remaining R6-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.
 

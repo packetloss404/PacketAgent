@@ -341,8 +341,7 @@ Status: complete as of 2026-07-29. Resume at R5.
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1-R5.5 are complete as of 2026-07-29. Resume at
-R5.6.
+Status: complete as of 2026-07-29. Resume at R6.
 
 - [x] Make real sandboxed TypeScript and Vite validation the default and remove
       synthetic success.
@@ -353,7 +352,7 @@ R5.6.
 - [x] Reuse W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections.
 - [x] Isolate generated previews by origin with scoped cookies, CSP, and proxy
       rules.
-- [ ] Harden containers with non-root users, dropped capabilities,
+- [x] Harden containers with non-root users, dropped capabilities,
       no-new-privileges, and process limits.
 - Gate: untrusted generated code cannot inherit secrets or sessions, reach
   undeclared networks, or escape resource bounds.
@@ -438,8 +437,25 @@ R5.6.
   and 1,617 API tests pass (1,614 passed with three intentional live
   interoperability skips). Resume at R5.6 final container-hardening closure
   and the cumulative R5 gate.
+- R5.6 result: the validator image now defaults to numeric non-root even when
+  launched outside the sandbox driver. The PacketAgent control-plane Compose
+  service, standalone generated-app Compose package, and untrusted sandbox
+  execution all declare non-root identity, read-only root, all capabilities
+  dropped, no-new-privileges, bounded process counts, bounded writable tmpfs,
+  and init/process reaping where applicable. Generated-app Docker
+  certification now inspects the running container instead of trusting YAML.
+  `npm run verify:container-hardening` resolves both real Compose contracts,
+  inspects the built validator image, and proves live sandbox UID/GID,
+  zero effective capabilities, `NoNewPrivs=1`, cgroup PID maximum, and denied
+  root writes. Typecheck, zero-warning lint, formatting, the production web
+  build, 33 web tests, 16 focused container/publish tests, all five cumulative
+  R5 executable verifiers, and 1,620 API tests pass (1,617 passed with three
+  intentional live interoperability skips). R5's untrusted-code containment
+  gate is complete. Resume at R6.1 vault-backed default SMTP transport.
 
 ### R6 - Agent authoring and execution depth
+
+Status: in progress. Resume at R6.1.
 
 - [ ] Wire the default SMTP transport through vault-backed credentials.
 - [ ] Add LLM-authored Worker/agent templates beyond the heuristic builder.

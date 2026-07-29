@@ -12,6 +12,8 @@ services:
       PACKETAGENT_DB_PATH: /app/data/packetagent.sqlite
       PACKETAGENT_RATE_LIMIT_KEY_SALT: "${PACKETAGENT_RATE_LIMIT_KEY_SALT:?set PACKETAGENT_RATE_LIMIT_KEY_SALT to a random secret}"
       PACKETAGENT_TRUST_PROXY: "${PACKETAGENT_TRUST_PROXY:-false}"
+      PACKETAGENT_APP_ORIGIN: "${PACKETAGENT_APP_ORIGIN:?set PACKETAGENT_APP_ORIGIN to the workbench HTTPS origin}"
+      PACKETAGENT_PREVIEW_ORIGIN: "${PACKETAGENT_PREVIEW_ORIGIN:?set PACKETAGENT_PREVIEW_ORIGIN to a different HTTPS hostname}"
       PACKETAGENT_SANDBOX_DRIVER: "${PACKETAGENT_SANDBOX_DRIVER:-docker}"
       PACKETAGENT_SANDBOX_DEFAULT_RUNTIME: "${PACKETAGENT_SANDBOX_DEFAULT_RUNTIME:-node-20}"
       PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS: "${PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS:-120000}"
@@ -24,6 +26,21 @@ services:
       # Docker sandbox execution requires Docker API access. Mount only on hosts
       # where the PacketAgent container is trusted to create and manage containers.
       - /var/run/docker.sock:/var/run/docker.sock
+    user: packetagent
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    ulimits:
+      nproc: 256
+      nofile:
+        soft: 1024
+        hard: 1024
+    init: true
     restart: unless-stopped
 
 volumes:

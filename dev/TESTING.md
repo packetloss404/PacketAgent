@@ -959,6 +959,25 @@ Required generated-preview isolation verification:
    preserve the reviewed Host/forwarded-host values, and confirm each virtual
    host rejects the other surface.
 
+Required container-hardening verification:
+
+1. Run `npm run verify:container-hardening` with Docker available.
+2. Confirm the validator image reports numeric user `65534:65534`.
+3. Confirm the resolved `controlPlaneCompose` and `generatedAppCompose`
+   matrices each report non-root, read-only root, all capabilities dropped,
+   no-new-privileges, init enabled, and their exact process limits (`256` and
+   `128`).
+4. Confirm the live sandbox reports UID/GID `65534`, all-zero `CapEff`,
+   `NoNewPrivs: "1"`, `pidsMax: "64"`, and `rootWriteDenied: true`.
+5. Certify a generated publish directory with
+   `npm run verify:generated-app-publish -- <directory>`. Confirm the
+   `container-hardening` step passes from a real `docker inspect`; changing
+   only the source YAML must not satisfy this check.
+6. Run the five R5 verifiers together after any sandbox, image, Compose,
+   preview, or egress change: `verify:codegen-sandbox`,
+   `verify:sandbox-policy`, `verify:sandbox-egress`,
+   `verify:preview-isolation`, and `verify:container-hardening`.
+
 ## Operations Sanity
 
 1. Visit `/operations`.
