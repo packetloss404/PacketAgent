@@ -1,0 +1,29 @@
+# PacketAgent generated-preview origin isolation
+#
+# Replace the two example hostnames. Both virtual hosts proxy to the same
+# PacketAgent process, but Host is preserved so PacketAgent can enforce the
+# primary/preview route split. URL fragments never reach Caddy or its access
+# log, so the preview capability is not recorded by the proxy.
+
+packetagent.example.com {
+  @generatedPreview path_regexp generatedPreview ^/api/app/generated-apps/[^/]+/(?:preview(?:/.*)?|preview-session|api(?:/.*)?)$
+  respond @generatedPreview "not found" 404
+
+  reverse_proxy 127.0.0.1:8484 {
+    header_up Host {host}
+  }
+}
+
+preview.packetagent.example.com {
+  @generatedPreview path_regexp generatedPreview ^/api/app/generated-apps/[^/]+/(?:preview(?:/.*)?|preview-session|api(?:/.*)?)$
+
+  handle @generatedPreview {
+    reverse_proxy 127.0.0.1:8484 {
+      header_up Host {host}
+    }
+  }
+
+  handle {
+    respond "not found" 404
+  }
+}

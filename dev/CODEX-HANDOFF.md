@@ -715,10 +715,28 @@ production web build, 32 web tests, 66 focused tests, the real Docker verifier,
 and 1,608 API tests pass (1,605 passed with three intentional live
 interoperability skips).
 
-The exact next slice is R5.5 under
+R5.5 is complete. Generated previews and their runtime API now require a
+different browser host from the workbench; production requires exact,
+different HTTPS origins and rejects a port-only split. Workbench sessions stay
+host-only. Versioned read/interactive capabilities bind workspace, app,
+checkpoint, scope, expiry, and interactive parent origin, travel only in URL
+fragments, and exchange for a Secure/HttpOnly/partitioned single-app cookie.
+Shared previews cannot mutate runtime state. Per-response nonce CSP,
+scope-specific `frame-ancestors`, primary/preview route denial, and a bounded
+exact-origin/source message bridge replace the prior same-origin iframe DOM
+access. Caddy/nginx examples live under
+`dev/deployment/examples/preview-origin/`; `npm run
+verify:preview-isolation` is the temporary-state executable proof. The R5.5
+closeout passed typecheck, zero-warning lint, formatting, the production web
+build, 33 web tests, 62 focused preview/security tests, all four cumulative R5
+executable verifiers, and 1,617 API tests (1,614 passed with three intentional
+live interoperability skips). The preview verifier passed 30 deterministic
+assertions plus its real Chromium proof.
+
+The exact next slice is R5.6 under
 [`R5 - sandbox, egress, and preview isolation`](../BACKLOG.md#r5---sandbox-egress-and-preview-isolation):
-isolate generated previews by origin and narrow cookies, CSP, cross-window
-messaging, and proxy rules.
+close the non-root/capability/no-new-privileges/process-limit hardening matrix,
+remove any remaining inconsistent path, and pass the cumulative R5 gate.
 After each gate passes, continue through R5-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
@@ -750,9 +768,9 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,548 passed, 4 intentionally skipped live probes, 0
-  failed
-- `npm run test:web` - 30 passed, 0 failed
+- `npm run test:api` - 1,614 passed, 3 intentionally skipped live probes, 0
+  failed (1,617 total)
+- `npm run test:web` - 33 passed, 0 failed
 - focused R2 canonical catalog, provider request mappings, vLLM constrained
   decoding and one fallback, malformed tool-input correction bound,
   local single-file authoring, Gemini/OpenRouter vault storage and request-time

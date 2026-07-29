@@ -66,6 +66,12 @@ import { invitationEmailWebhookRoutes } from "./invitation-email-webhook-routes.
 import { enforcePrivateAppMutationSecurity } from "./route-security.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 import { accessLogMiddleware } from "./security/access-log.js";
+import {
+  assertPreviewIsolationConfigured,
+  isGeneratedPreviewSurfacePath,
+  isPacketAgentPreviewOriginRequest,
+  resolvePacketAgentPreviewOrigin,
+} from "./app-preview-isolation.js";
 import { healthRoutes } from "./health-routes.js";
 import { operationsStatusRoutes } from "./operations-status-routes.js";
 import { operationsHealthRoutes } from "./operations-health-routes.js";
@@ -123,7 +129,16 @@ const standardSecurityHeaders = secureHeaders({
     fontSrc: ["'self'", "data:"],
     formAction: ["'self'"],
     frameAncestors: ["'self'"],
-    frameSrc: ["'self'"],
+    frameSrc: [
+      "'self'",
+      () => {
+        try {
+          return resolvePacketAgentPreviewOrigin();
+        } catch {
+          return "'self'";
+        }
+      },
+    ],
     imgSrc: ["'self'", "data:", "blob:"],
     objectSrc: ["'none'"],
     scriptSrc: ["'self'"],
@@ -139,6 +154,8 @@ const standardSecurityHeaders = secureHeaders({
   },
 });
 const generatedAppPreviewSecurityHeaders = secureHeaders({
+  crossOriginOpenerPolicy: false,
+  xFrameOptions: false,
   permissionsPolicy: {
     camera: false,
     geolocation: false,
@@ -148,8 +165,16 @@ const generatedAppPreviewSecurityHeaders = secureHeaders({
   },
 });
 
+app.use("*", async (c, next) => {
+  const previewOriginRequest = isPacketAgentPreviewOriginRequest(c);
+  const previewSurfacePath = isGeneratedPreviewSurfacePath(c.req.path);
+  if (previewOriginRequest !== previewSurfacePath) {
+    return c.text("not found", 404);
+  }
+  await next();
+});
 app.use("*", (c, next) =>
-  isGeneratedAppPreviewRequest(c.req.path)
+  isGeneratedPreviewSurfacePath(c.req.path)
     ? generatedAppPreviewSecurityHeaders(c, next)
     : standardSecurityHeaders(c, next),
 );
@@ -171,7 +196,11 @@ app.get("/api/activation/:workspaceId", async (c) => {
   return c.json(summary);
 });
 
-app.use("/api/app/*", enforcePrivateAppMutationSecurity);
+app.use("/api/app/*", (c, next) =>
+  isPacketAgentPreviewOriginRequest(c) && isGeneratedPreviewSurfacePath(c.req.path)
+    ? next()
+    : enforcePrivateAppMutationSecurity(c, next),
+);
 
 app.route("/api", appRoutes);
 
@@ -710,6 +739,7 @@ if (existsSync("./web/dist/index.html")) {
 }
 
 export function assertServerStartupRuntimeSupported(env: NodeJS.ProcessEnv = process.env) {
+  assertPreviewIsolationConfigured(env);
   return assertManagedDatabaseRuntimeSupported(env);
 }
 
@@ -806,10 +836,6 @@ function artifactRunIdFromPath(path: string): string | null {
     return null;
   }
   return runId;
-}
-
-function isGeneratedAppPreviewRequest(path: string): boolean {
-  return /^\/api\/app\/generated-apps\/[^/]+\/preview(?:\/|$)/.test(path);
 }
 
 function isExecutedDirectly(): boolean {

@@ -84,6 +84,50 @@ Sessions live in `packetagent_session`, an HTTP-only cookie. The CSRF token cook
 | ---------- | ------------- | ------------------------------------------------------------------------------------------- |
 | `NODE_ENV` | `development` | Set to `production` to mark session and CSRF cookies `Secure` and to disable dev shortcuts. |
 
+## Generated-preview origin isolation
+
+Generated preview HTML, source assets, and generated runtime API calls are
+accepted only on `PACKETAGENT_PREVIEW_ORIGIN`. The workbench, authentication,
+vault, Worker, artifact, health, and other private routes are accepted only on
+the primary origin. PacketAgent enforces that split from the preserved
+`Host`/trusted `X-Forwarded-Host`, independently of the reverse proxy.
+
+Production startup requires:
+
+| Env var                            | Requirement                                                                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PACKETAGENT_APP_ORIGIN`           | Exact HTTPS workbench origin.                                                                                                                    |
+| `PACKETAGENT_PREVIEW_ORIGIN`       | Exact HTTPS preview origin on a different hostname. A port-only split is rejected because cookies are not port-scoped.                           |
+| `PACKETAGENT_PREVIEW_TOKEN_SECRET` | Recommended dedicated HMAC key. `PACKETAGENT_MASTER_KEY` or `MASTER_KEY` is accepted instead; the development fallback is refused in production. |
+
+The workbench session and CSRF cookies omit `Domain`, so they remain host-only
+and are not sent to the preview hostname. Preview authorization uses a
+versioned HMAC capability bound to one workspace, app, checkpoint, scope,
+expiry, and—when interactive—one parent origin. It arrives after `#` in the
+URL, so it is absent from HTTP requests and access logs. A same-origin
+bootstrap exchanges it for a Secure, HttpOnly, `SameSite=None`, partitioned
+cookie scoped to `/api/app/generated-apps/<appId>/`, then removes the fragment.
+Partitioning permits the intended iframe without making the cookie a general
+third-party credential.
+
+Share capabilities default to one hour and permit only `GET`/`HEAD` runtime
+operations. Interactive Builder capabilities default to 15 minutes, require
+workspace management permission, and allow runtime mutations. Both are
+revalidated cryptographically and against the current app/checkpoint on every
+request.
+
+Generated documents receive a per-response nonce and an explicit CSP:
+`default-src 'none'`, bounded script/connect/image/font/style/worker sources,
+`object-src 'none'`, `form-action 'self'`, and scope-specific
+`frame-ancestors`. Shared previews cannot be framed. Interactive previews may
+be framed only by their exact workbench origin. The Builder's click-to-edit
+bridge uses exact-target `postMessage`; the parent validates the sender origin,
+iframe window, message version, shape, string lengths, and rectangle bounds.
+
+Defense-in-depth Caddy and nginx virtual-host examples are under
+`examples/preview-origin/`. Run `npm run verify:preview-isolation` after every
+origin, cookie, CSP, or proxy change.
+
 ## Token redaction
 
 PacketAgent treats invitation tokens, share tokens, agent webhook tokens, and bearer values as secrets. They are redacted before they appear in API responses, persisted error records, frontend display paths, access logs, exports, and structured logs. Redaction is centralized in `src/security/redaction.ts` and reused by every surface that emits string content to an operator.
@@ -97,6 +141,9 @@ What stays unredacted:
 What gets masked:
 
 - `path` field in app-level access log lines (token-bearing route segments and sensitive query parameters such as `?token=`, `?secret=`, `?api_key=`).
+- Generated-preview capabilities are delivered in URL fragments and therefore
+  never reach PacketAgent or proxy access logs; legacy `?token=` delivery is
+  rejected.
 - The redacted `error` field on `/api/health/ready` 503 responses.
 - All token-bearing fields in workspace exports (invitation tokens, share tokens, agent webhook tokens, environment variable values, provider credentials).
 - Webhook delivery error strings stored on alert and invitation-email delivery records.
@@ -152,6 +199,11 @@ Before promoting a change:
 - If the deployment has more than one PacketAgent process, container, or region, `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL` is configured (or equivalent edge limits exist) for `/api/auth/register`, `/api/auth/login`, `/api/app/invitations`, `/api/app/invitations/:token/accept`, and `/api/app/invitations/:invitationId/resend`.
 - Cross-origin browser mutations are rejected with `403`, and same-origin mutations include `X-CSRF-Token`.
 - `PACKETAGENT_TRUST_PROXY=true` is only set when forwarded headers are stripped and re-added by trusted infrastructure.
+- `PACKETAGENT_APP_ORIGIN` and `PACKETAGENT_PREVIEW_ORIGIN` are different
+  production HTTPS hostnames, and both proxy virtual hosts preserve/replace
+  `Host` according to the reviewed configuration.
+- `npm run verify:preview-isolation` passes and a browser inspection shows no
+  `packetagent_session` or `packetagent_csrf` cookie on the preview hostname.
 - A sample `npm run jobs:export-workspace -- --workspace-id=<id>` produces JSON with no raw `whk_`, `Bearer `, `?token=`, `?secret=`, or `?api_key=` substrings.
 - A sample of the live proxy access log passes `node --import tsx src/security/proxy-access-log-validator.ts <log-path>` with exit code `0`.
 - `npm run jobs:cleanup-sessions` runs on a recurring schedule.

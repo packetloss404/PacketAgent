@@ -58,14 +58,28 @@ test("ordinary responses receive restrictive browser security headers", async ()
   assert.match(response.headers.get("permissions-policy") ?? "", /camera=(?:none|\(\))/);
   assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'self'/);
   assert.match(response.headers.get("content-security-policy") ?? "", /object-src 'none'/);
+  assert.match(
+    response.headers.get("content-security-policy") ?? "",
+    /frame-src 'self' http:\/\/127\.0\.0\.2:8484/,
+  );
 });
 
-test("generated-app previews keep baseline headers without inheriting the workbench CSP", async () => {
-  const response = await app.request("/api/app/generated-apps/missing/preview");
+test("generated-app previews are isolated to the preview host with dedicated CSP", async () => {
+  const primaryResponse = await app.request("/api/app/generated-apps/missing/preview");
+  assert.equal(primaryResponse.status, 404);
 
+  const response = await app.request(
+    "http://127.0.0.2:8484/api/app/generated-apps/missing/preview",
+  );
+  assert.equal(response.status, 200);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.match(response.headers.get("permissions-policy") ?? "", /camera=(?:none|\(\))/);
-  assert.equal(response.headers.get("content-security-policy"), null);
+  assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'none'/);
+  assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors/);
+  assert.equal(response.headers.get("x-frame-options"), null);
+
+  const leakedPrimaryRoute = await app.request("http://127.0.0.2:8484/api/health");
+  assert.equal(leakedPrimaryRoute.status, 404);
 });
 
 test("artifact ownership matches both canonical and legacy run records exactly", () => {

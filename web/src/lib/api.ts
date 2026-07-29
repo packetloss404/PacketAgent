@@ -392,16 +392,33 @@ export const api = {
       `/api/app/generated-apps/${encodeURIComponent(input.appId)}/publish/integrity${query ? `?${query}` : ""}`,
     );
   },
-  createPreviewToken: (appId: string, options: { ttlSeconds?: number } = {}) => {
+  createPreviewToken: (
+    appId: string,
+    options: {
+      ttlSeconds?: number;
+      checkpointId?: string;
+      scope?: "read" | "interact";
+    } = {},
+  ) => {
     const params = new URLSearchParams();
     if (options.ttlSeconds && Number.isFinite(options.ttlSeconds) && options.ttlSeconds > 0) {
       params.set("ttl", String(Math.floor(options.ttlSeconds)));
     }
     const qs = params.toString();
-    return j<{ token: string; expiresAt: string; previewUrl: string }>(
-      `/api/app/generated-apps/${encodeURIComponent(appId)}/preview-token${qs ? `?${qs}` : ""}`,
-      { method: "POST" },
-    );
+    return j<{
+      token: string;
+      scope: "read" | "interact";
+      checkpointId: string;
+      expiresAt: string;
+      previewUrl: string;
+    }>(`/api/app/generated-apps/${encodeURIComponent(appId)}/preview-token${qs ? `?${qs}` : ""}`, {
+      method: "POST",
+      body: JSON.stringify({
+        ...(options.scope ? { scope: options.scope } : {}),
+        ...(options.checkpointId ? { checkpointId: options.checkpointId } : {}),
+        ...(options.ttlSeconds ? { ttlSeconds: Math.floor(options.ttlSeconds) } : {}),
+      }),
+    });
   },
   getAgent: (id: string) =>
     j<{ agent: AgentRecord; runs: AgentRunRecord[] }>(`/api/app/agents/${id}`),

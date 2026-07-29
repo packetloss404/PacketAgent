@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../icons";
 import type { AppBuilderDraft } from "@/lib/types";
-import { cssPathFor } from "../helpers";
+import { api } from "@/lib/api";
+import { parsePreviewBridgeMessage } from "../helpers";
 import type { SelectedElement } from "../types";
 import { SharePopover } from "../share";
 import { DataCard, PageCard, RouteRow } from "../cards";
@@ -9,111 +10,92 @@ import { DataCard, PageCard, RouteRow } from "../cards";
 export function PreviewTab({
   draft,
   appId,
+  checkpointId,
   previewUrl,
   onSelectElement,
   selectedSelector,
 }: {
   draft: AppBuilderDraft;
   appId: string | null;
+  checkpointId: string | null;
   previewUrl: string | null;
   onSelectElement: (sel: SelectedElement) => void;
   selectedSelector: string | null;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  // Always-on click-to-edit (2026 norm — matches Lovable/v0/Cursor/Bolt). Hover
-  // outline is gated on Cmd/Ctrl to avoid visual noise during ordinary browsing,
-  // but the click-capture stays armed so users discover the affordance by trying it.
+  const previewKey =
+    appId && previewUrl ? `${appId}:${checkpointId ?? "current"}:${previewUrl}` : null;
+  const [isolatedPreview, setIsolatedPreview] = useState<{
+    key: string;
+    url: string;
+  } | null>(null);
+  const [previewFailure, setPreviewFailure] = useState<{
+    key: string;
+    message: string;
+  } | null>(null);
+  const isolatedPreviewUrl =
+    previewKey && isolatedPreview?.key === previewKey ? isolatedPreview.url : null;
+  const previewError =
+    previewKey && previewFailure?.key === previewKey ? previewFailure.message : null;
   const [hoverRect, setHoverRect] = useState<{
     left: number;
     top: number;
     width: number;
     height: number;
   } | null>(null);
-  const [outlineArmed, setOutlineArmed] = useState(false);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey) setOutlineArmed(true);
-    };
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (!event.metaKey && !event.ctrlKey) {
-        setOutlineArmed(false);
-        setHoverRect(null);
-      }
-    };
-    const onBlur = () => {
-      setOutlineArmed(false);
-      setHoverRect(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", onBlur);
+    let cancelled = false;
+    if (!appId || !previewKey) return;
+    api
+      .createPreviewToken(appId, {
+        scope: "interact",
+        ...(checkpointId ? { checkpointId } : {}),
+      })
+      .then((result) => {
+        if (!cancelled) setIsolatedPreview({ key: previewKey, url: result.previewUrl });
+      })
+      .catch((error: Error) => {
+        if (!cancelled) {
+          setPreviewFailure({
+            key: previewKey,
+            message: error.message || "Could not open the isolated preview.",
+          });
+        }
+      });
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", onBlur);
+      cancelled = true;
     };
-  }, []);
+  }, [appId, checkpointId, previewKey]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const attach = () => {
-      let doc: Document | null = null;
-      try {
-        doc = iframe.contentDocument;
-      } catch {
-        doc = null;
-      }
-      if (!doc) return;
-
-      const onMove = (event: MouseEvent) => {
-        const target = event.target as HTMLElement | null;
-        if (!target || target === doc!.documentElement || target === doc!.body) {
-          setHoverRect(null);
-          return;
-        }
-        const rect = target.getBoundingClientRect();
-        setHoverRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
-      };
-      const onLeave = () => setHoverRect(null);
-      const onClick = (event: MouseEvent) => {
-        // Only capture the click for element-select when a modifier is held.
-        // Without this gate the preview's own buttons, links, inputs, and form
-        // submits are all inert — the user can't actually try their app.
-        if (!event.metaKey && !event.ctrlKey) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const target = event.target as HTMLElement | null;
-        if (!target) return;
-        onSelectElement({
-          selector: cssPathFor(target),
-          label: (target.textContent ?? "").trim().slice(0, 60),
-        });
+    if (!iframe || !isolatedPreviewUrl) return;
+    const expectedOrigin = new URL(isolatedPreviewUrl).origin;
+    const onMessage = (event: MessageEvent<unknown>) => {
+      if (event.origin !== expectedOrigin || event.source !== iframe.contentWindow) return;
+      const message = parsePreviewBridgeMessage(event.data);
+      if (!message) return;
+      if (message.kind === "ready" || message.kind === "clear") {
         setHoverRect(null);
-      };
-      doc.addEventListener("mousemove", onMove);
-      doc.addEventListener("mouseleave", onLeave);
-      doc.addEventListener("click", onClick, true);
-      return () => {
-        doc!.removeEventListener("mousemove", onMove);
-        doc!.removeEventListener("mouseleave", onLeave);
-        doc!.removeEventListener("click", onClick, true);
-      };
+        return;
+      }
+      if (message.kind === "hover") {
+        setHoverRect(message.rect);
+        return;
+      }
+      if (message.kind !== "select") return;
+      onSelectElement({
+        selector: message.selector,
+        label: message.label.slice(0, 60),
+      });
+      setHoverRect(null);
     };
-
-    let cleanup = attach();
-    const onLoad = () => {
-      if (cleanup) cleanup();
-      cleanup = attach();
-    };
-    iframe.addEventListener("load", onLoad);
+    window.addEventListener("message", onMessage);
     return () => {
-      iframe.removeEventListener("load", onLoad);
-      if (cleanup) cleanup();
+      window.removeEventListener("message", onMessage);
     };
-  }, [previewUrl, onSelectElement]);
+  }, [isolatedPreviewUrl, onSelectElement]);
 
   return (
     <div style={{ padding: 20, height: "100%", position: "relative" }}>
@@ -166,24 +148,32 @@ export function PreviewTab({
           )}
         </div>
       </div>
-      {previewUrl ? (
+      {previewUrl && appId ? (
         <div style={{ position: "relative", width: "100%", height: "100%" }}>
-          <iframe
-            ref={iframeRef}
-            src={
-              appId ? `/api/app/generated-apps/${encodeURIComponent(appId)}/preview/` : previewUrl
-            }
-            title={`${draft.app.name} generated app preview`}
-            sandbox="allow-forms allow-modals allow-same-origin allow-scripts"
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "1px solid var(--line)",
-              borderRadius: 8,
-              background: "var(--ink)",
-            }}
-          />
-          {outlineArmed && hoverRect && (
+          {isolatedPreviewUrl ? (
+            <iframe
+              ref={iframeRef}
+              src={isolatedPreviewUrl}
+              title={`${draft.app.name} generated app preview`}
+              sandbox="allow-forms allow-modals allow-same-origin allow-scripts"
+              referrerPolicy="no-referrer"
+              style={{
+                width: "100%",
+                height: "100%",
+                border: "1px solid var(--line)",
+                borderRadius: 8,
+                background: "var(--ink)",
+              }}
+            />
+          ) : (
+            <div
+              className="card"
+              style={{ height: "100%", display: "grid", placeItems: "center", padding: 24 }}
+            >
+              <span className="muted">{previewError ?? "Opening the isolated preview…"}</span>
+            </div>
+          )}
+          {isolatedPreviewUrl && hoverRect && (
             <div
               style={{
                 position: "absolute",

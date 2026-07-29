@@ -116,11 +116,22 @@ function ProjectsCatalog({ onOpenAgent }: { onOpenAgent: (a: AgentRecord) => voi
     void runs.refresh();
   };
 
-  const openApp = (app: GeneratedAppSummary) => {
+  const openApp = async (app: GeneratedAppSummary) => {
     const isPublished = app.publishStatus === "published" || Boolean(app.publishedUrl);
-    const target = isPublished
-      ? (app.publishedUrl ?? app.previewUrl)
-      : (app.previewUrl ?? app.publishedUrl);
+    const target = isPublished ? (app.publishedUrl ?? app.previewUrl) : app.publishedUrl;
+    if (!isPublished && app.previewUrl) {
+      const previewWindow = window.open("about:blank", "_blank");
+      if (previewWindow) previewWindow.opener = null;
+      try {
+        const preview = await api.createPreviewToken(app.id, { scope: "read" });
+        if (previewWindow) previewWindow.location.href = preview.previewUrl;
+        else window.open(preview.previewUrl, "_blank", "noopener,noreferrer");
+      } catch {
+        previewWindow?.close();
+        navigate("/builder");
+      }
+      return;
+    }
     if (!target) {
       navigate("/builder");
       return;
@@ -192,7 +203,13 @@ function ProjectsCatalog({ onOpenAgent }: { onOpenAgent: (a: AgentRecord) => voi
           <SectionHeading label="Generated apps" count={filteredApps.length} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
             {filteredApps.map((app) => (
-              <GeneratedAppCard key={app.id} app={app} onOpen={() => openApp(app)} />
+              <GeneratedAppCard
+                key={app.id}
+                app={app}
+                onOpen={() => {
+                  void openApp(app);
+                }}
+              />
             ))}
           </div>
         </>

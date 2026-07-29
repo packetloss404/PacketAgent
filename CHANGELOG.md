@@ -6,6 +6,29 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R5.5 generated-preview origin isolation
+
+- Split workbench and generated-preview browser authority. Production now
+  requires exact, different HTTPS origins and rejects port-only separation;
+  development uses a second loopback cookie host.
+- Replaced workbench-session and query-token preview access with versioned,
+  workspace/app/checkpoint/scope/expiry-bound fragment capabilities that
+  exchange for Secure, HttpOnly, partitioned cookies scoped to one app path.
+  Shared capabilities are read-only; interactive capabilities are shorter and
+  require workspace-management permission.
+- Added preview-host-only route enforcement, primary-host preview denial,
+  nonce-based generated-document CSP, exact-parent framing, query capability
+  rejection, and a bounded exact-origin/source `postMessage` bridge for
+  cross-origin click-to-edit.
+- Added Caddy/nginx dual-host examples, deployment/testing guidance,
+  deterministic route/UI coverage, and `npm run verify:preview-isolation`
+  against temporary SQLite/runtime state.
+- Typecheck, zero-warning lint, formatting, the production web build, 33 web
+  tests, 62 focused preview/security tests, all four cumulative R5 executable
+  verifiers, and 1,617 API tests pass (1,614 passed with three intentional live
+  interoperability skips).
+- Resume at R5.6 final container-hardening closure and the cumulative R5 gate.
+
 ### 2026-07-29 - R5.4 brokered sandbox egress
 
 - Added deny-by-default, operator-configured exact-origin sandbox egress as

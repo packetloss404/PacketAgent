@@ -35,6 +35,62 @@ export function getPreviewNavigationTarget(previewUrl: string | null, appId: str
   return appId ? `/builder/preview/workspace/${encodeURIComponent(appId)}` : null;
 }
 
+export type PreviewBridgeMessage =
+  | { channel: "packetagent.preview.v1"; kind: "ready" | "clear" }
+  | {
+      channel: "packetagent.preview.v1";
+      kind: "hover" | "select";
+      selector: string;
+      label: string;
+      rect: { left: number; top: number; width: number; height: number };
+    };
+
+export function parsePreviewBridgeMessage(value: unknown): PreviewBridgeMessage | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.channel !== "packetagent.preview.v1") return null;
+  if (candidate.kind === "ready" || candidate.kind === "clear") {
+    return { channel: "packetagent.preview.v1", kind: candidate.kind };
+  }
+  if (candidate.kind !== "hover" && candidate.kind !== "select") return null;
+  if (
+    typeof candidate.selector !== "string" ||
+    candidate.selector.length < 1 ||
+    candidate.selector.length > 1024 ||
+    typeof candidate.label !== "string" ||
+    candidate.label.length > 120 ||
+    !candidate.rect ||
+    typeof candidate.rect !== "object" ||
+    Array.isArray(candidate.rect)
+  ) {
+    return null;
+  }
+  const rect = candidate.rect as Record<string, unknown>;
+  const values = [rect.left, rect.top, rect.width, rect.height];
+  if (
+    values.some(
+      (entry) =>
+        typeof entry !== "number" || !Number.isFinite(entry) || Math.abs(entry) > 1_000_000,
+    ) ||
+    (rect.width as number) < 0 ||
+    (rect.height as number) < 0
+  ) {
+    return null;
+  }
+  return {
+    channel: "packetagent.preview.v1",
+    kind: candidate.kind,
+    selector: candidate.selector,
+    label: candidate.label,
+    rect: {
+      left: rect.left as number,
+      top: rect.top as number,
+      width: rect.width as number,
+      height: rect.height as number,
+    },
+  };
+}
+
 export function publishReadinessHeading(
   state: Pick<AppBuilderPublishState, "canPublish" | "publishedUrl"> | null,
 ): string {

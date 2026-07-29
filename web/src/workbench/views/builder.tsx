@@ -1370,6 +1370,7 @@ export function BuilderView() {
                   <PreviewTab
                     draft={draft}
                     appId={state.appId}
+                    checkpointId={state.checkpointId}
                     previewUrl={state.previewUrl}
                     onSelectElement={(sel) => setSelectedElement(sel)}
                     selectedSelector={selectedElement?.selector ?? null}

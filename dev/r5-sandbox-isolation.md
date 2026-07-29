@@ -246,10 +246,108 @@ production web build, 32/32 web tests, 66/66 focused sandbox/network/route
 tests, the real Docker verifier, and the complete 1,608-test API suite (1,605
 passed with three intentional live interoperability skips).
 
+## R5.5 decision: generated code gets its own browser authority
+
+The prior preview route was authenticated by the normal PacketAgent session
+cookie and served under `/api/app/generated-apps/:appId/preview` on the
+workbench origin. The iframe included `allow-same-origin`, and click-to-edit
+read `contentDocument` directly. A share token traveled in `?token=`, so the
+credential could reach application and reverse-proxy access logs.
+
+Changing only the port is not an isolation boundary. RFC 6265 explicitly notes
+that cookies for a host are shared across all of its ports and advises against
+placing mutually distrusting services on different ports of the same host:
+<https://www.rfc-editor.org/rfc/rfc6265.html>. PacketAgent now requires
+different hostnames, and production startup requires both exact origins to use
+HTTPS.
+
+R5.5 uses this boundary:
+
+- `PACKETAGENT_APP_ORIGIN` is the workbench authority and
+  `PACKETAGENT_PREVIEW_ORIGIN` is the generated-code authority. Development
+  defaults the latter to `http://127.0.0.2:8484`, a different loopback cookie
+  host from `localhost`; production requires explicit different HTTPS hosts.
+- The primary host rejects generated preview documents/assets/runtime APIs.
+  The preview host exposes only those paths and `preview-session`; it rejects
+  health, auth, workbench, vault, Worker, artifact, and all other routes.
+- Workbench session and CSRF cookies stay host-only. A preview capability is
+  HMAC-bound to version, workspace, app, checkpoint, read/interactive scope,
+  issued/expiry times, and the exact parent origin for interactive use.
+- The capability is placed after `#`, exchanged by a nonce-bearing bootstrap,
+  and removed before generated code loads. HTTP semantics exclude fragments
+  from the request target:
+  <https://www.rfc-editor.org/rfc/rfc9110.html#name-uri-references>.
+- The exchange sets a Secure, HttpOnly, host-only cookie with a single-app
+  path, `SameSite=None`, and `Partitioned`. CHIPS ties that cookie to the
+  top-level site instead of making it available across unrelated embedding
+  sites:
+  <https://privacysandbox.google.com/cookies/chips>.
+- Shared capabilities default to one hour and permit only `GET`/`HEAD`
+  runtime operations. Interactive capabilities default to 15 minutes, require
+  `manageWorkspace`, and bind the iframe to its exact authoring origin.
+- Query-string capability delivery is rejected. Every preview request
+  rechecks the HMAC, expiry, workspace/app/checkpoint binding, and current
+  stored record.
+
+Generated documents receive a cryptographically random 144-bit nonce and an
+explicit CSP. `default-src 'none'` is narrowed for the required local runtime,
+React ESM source, sql.js/WASM, images, styles, fonts, and workers;
+`object-src 'none'`, `frame-src 'none'`, `form-action 'self'`, and
+scope-specific `frame-ancestors` close the remaining document channels. CSP3
+requires unpredictable per-response nonces, defines `connect-src` as the
+script connection boundary, and notes that `frame-ancestors` does not inherit
+from `default-src`:
+<https://www.w3.org/TR/CSP3/>.
+
+Click-to-edit no longer crosses the same-origin DOM boundary. A nonce-bearing
+bridge in an interactive preview sends only bounded selector/label/rectangle
+messages to the exact parent origin. The parent checks both `event.origin` and
+`event.source`, validates the versioned schema and bounds, and treats the
+payload as untrusted selection metadata. That follows the HTML Standard's
+guidance to verify the expected origin and data format and to avoid wildcard
+targets:
+<https://html.spec.whatwg.org/multipage/web-messaging.html#security-postmsg>.
+
+The checked-in Caddy and nginx examples expose the two virtual hosts to the
+same backend, deny the opposite surface at the proxy, preserve reviewed host
+metadata, and avoid query logging in the nginx format. PacketAgent repeats the
+route split behind the proxy.
+
+## R5.5 proof
+
+The deterministic coverage proves production configuration refusal, port-only
+cookie-isolation refusal, preview/primary route separation, capability
+tamper/expiry/workspace/app/checkpoint binding, fragment-only delivery,
+app-path cookie attributes, cross-origin session-exchange rejection,
+read-scope mutation denial, interactive parent CSP, per-response script
+nonces, bridge injection, bounded parent message parsing, and primary-session
+non-inheritance.
+
+The uninjected command is:
+
+```bash
+npm run verify:preview-isolation
+```
+
+It uses temporary SQLite and generated-runtime state against the real Hono app.
+It proves the production origin configuration, both host-denial directions,
+fragment bootstrap, Secure/HttpOnly/partitioned cookie, absence of the primary
+session cookie, read-only `403`, shared `frame-ancestors 'none'`, interactive
+exact-parent CSP, bridge presence, and token absence from generated HTML. Its
+Chromium phase then uses a real loopback HTTP server and cross-site iframe to
+prove the browser exchanges and resends the partitioned cookie, loads the
+generated document, delivers the bridge-ready message, and stores no primary
+session cookie on the preview host.
+
+The R5.5 closeout passed typecheck, zero-warning lint, formatting, the
+production web build, 33/33 web tests, 62/62 focused preview/security tests,
+all four cumulative R5 executable verifiers, and the complete 1,617-test API
+suite (1,614 passed with three intentional live interoperability skips). The
+preview verifier independently passed 30 deterministic assertions plus the
+real Chromium exchange/iframe proof.
+
 ## Remaining R5 order
 
 Resume only from the unchecked R5 items in `BACKLOG.md`:
 
-1. R5.5: move generated previews to an isolated origin and narrow cookies, CSP,
-   messaging, and proxy rules.
-2. R5.6: close the container-hardening matrix and the complete R5 gate.
+1. R5.6: close the container-hardening matrix and the complete R5 gate.

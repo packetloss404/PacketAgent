@@ -7,6 +7,8 @@ import { Hono } from "hono";
 import { strFromU8, unzipSync } from "fflate";
 import { SESSION_COOKIE_NAME } from "./auth-utils";
 import { appRoutes, setHostInfoSourcesForTests } from "./app-routes";
+import { resolvePacketAgentPreviewOrigin } from "./app-preview-isolation.js";
+import { mintGeneratedPreviewCapability } from "./app-preview-capability.js";
 import { setGeneratedAppFileTreeValidatorForTests } from "./app-routes/builder-core.js";
 import { shutdownDefaultGeneratedAppRuntimeProcessPool } from "./generated-app-runtime/server.js";
 import { login } from "./packetagent-services";
@@ -78,6 +80,85 @@ function createTestApp() {
 
 function authHeaders(cookieValue: string) {
   return { Cookie: `${SESSION_COOKIE_NAME}=${cookieValue}` };
+}
+
+async function openGeneratedPreviewSession(
+  app: Hono,
+  input: {
+    appId: string;
+    sessionCookie: string;
+    checkpointId?: string;
+    scope?: "read" | "interact";
+  },
+) {
+  const tokenResponse = await app.request(
+    `/api/app/generated-apps/${encodeURIComponent(input.appId)}/preview-token`,
+    {
+      method: "POST",
+      headers: {
+        ...authHeaders(input.sessionCookie),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scope: input.scope ?? "read",
+        ...(input.checkpointId ? { checkpointId: input.checkpointId } : {}),
+      }),
+    },
+  );
+  assert.equal(tokenResponse.status, 200);
+  const tokenBody = (await tokenResponse.json()) as {
+    token: string;
+    previewUrl: string;
+    checkpointId: string;
+  };
+  const previewUrl = new URL(tokenBody.previewUrl);
+  assert.equal(previewUrl.origin, resolvePacketAgentPreviewOrigin());
+  assert.equal(previewUrl.search, "");
+  assert.match(previewUrl.hash, /^#token=pt1\./);
+  const canonicalAppId = decodeURIComponent(
+    previewUrl.pathname.split("/generated-apps/")[1]?.split("/")[0] ?? "",
+  );
+  assert.ok(canonicalAppId);
+
+  const sessionResponse = await app.request(
+    new URL(
+      `/api/app/generated-apps/${encodeURIComponent(canonicalAppId)}/preview-session`,
+      resolvePacketAgentPreviewOrigin(),
+    ),
+    {
+      method: "POST",
+      headers: {
+        Origin: resolvePacketAgentPreviewOrigin(),
+        "Sec-Fetch-Site": "same-origin",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token: tokenBody.token }),
+    },
+  );
+  assert.equal(sessionResponse.status, 200);
+  const setCookie = sessionResponse.headers.get("set-cookie");
+  assert.ok(setCookie);
+  assert.match(setCookie, /HttpOnly/i);
+  assert.match(setCookie, /SameSite=None/i);
+  assert.match(setCookie, /Secure/i);
+  assert.match(setCookie, /Partitioned/i);
+  assert.match(
+    setCookie,
+    new RegExp(
+      `Path=/api/app/generated-apps/${canonicalAppId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`,
+    ),
+  );
+  assert.doesNotMatch(setCookie, new RegExp(`${SESSION_COOKIE_NAME}=`, "i"));
+  return {
+    cookie: setCookie.split(";")[0]!,
+    previewUrl,
+    token: tokenBody.token,
+    checkpointId: tokenBody.checkpointId,
+  };
+}
+
+function generatedPreviewRequestUrl(path: string): URL {
+  return new URL(path, resolvePacketAgentPreviewOrigin());
 }
 
 async function withGeneratedAppWorkspaceRoot(run: (rootPath: string) => Promise<void> | void) {
@@ -1025,6 +1106,15 @@ test("generated app runtime API persists records through per-app SQLite", async 
       body: JSON.stringify({ draft: draftBody.draft }),
     });
     const applied = (await applyResponse.json()) as { app: { id: string } };
+    const previewSession = await openGeneratedPreviewSession(app, {
+      appId: applied.app.id,
+      sessionCookie: alpha.cookieValue,
+      scope: "interact",
+    });
+    const runtimeHeaders = {
+      Cookie: previewSession.cookie,
+      "Content-Type": "application/json",
+    };
 
     const idleHealthResponse = await app.request(
       `/api/app/generated-apps/${applied.app.id}/runtime/health`,
@@ -1040,8 +1130,8 @@ test("generated app runtime API persists records through per-app SQLite", async 
     assert.equal(idleHealth.health?.metrics?.requests, 0);
 
     const firstListResponse = await app.request(
-      `/api/app/generated-apps/${applied.app.id}/api/account`,
-      { headers },
+      generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/api/account`),
+      { headers: runtimeHeaders },
     );
     const firstList = (await firstListResponse.json()) as Array<{ id?: string; name?: string }>;
     assert.equal(firstListResponse.status, 200);
@@ -1053,10 +1143,10 @@ test("generated app runtime API persists records through per-app SQLite", async 
     assert.ok(firstList.some((record) => record.name === "Account 1"));
 
     const createResponse = await app.request(
-      `/api/app/generated-apps/${applied.app.id}/api/account`,
+      generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/api/account`),
       {
         method: "POST",
-        headers,
+        headers: runtimeHeaders,
         body: JSON.stringify({
           name: "Shared Farm Co",
           ownerId: "user_test",
@@ -1070,8 +1160,8 @@ test("generated app runtime API persists records through per-app SQLite", async 
     assert.equal(created.name, "Shared Farm Co");
 
     const secondListResponse = await app.request(
-      `/api/app/generated-apps/${applied.app.id}/api/account`,
-      { headers },
+      generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/api/account`),
+      { headers: runtimeHeaders },
     );
     const secondList = (await secondListResponse.json()) as Array<{ id?: string; name?: string }>;
     assert.equal(secondListResponse.status, 200);
@@ -1240,22 +1330,34 @@ test("generated app preview route resolves by actual app id or slug", async () =
     checkpoint?.runtimeArtifact?.files.push(asset);
     checkpoint?.sourceFiles?.push(asset);
   });
-
-  const byIdResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/preview`, {
-    headers: authHeaders(alpha.cookieValue),
+  const previewSession = await openGeneratedPreviewSession(app, {
+    appId: applied.app.id,
+    sessionCookie: alpha.cookieValue,
+    scope: "interact",
   });
+  const previewHeaders = { Cookie: previewSession.cookie };
+
+  const byIdResponse = await app.request(
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview`),
+    { headers: previewHeaders },
+  );
   const byIdHtml = await byIdResponse.text();
   assert.equal(byIdResponse.status, 200);
   assert.match(byIdResponse.headers.get("content-type") ?? "", /text\/html/);
   assert.equal(byIdResponse.headers.get("x-packetagent-generated-app-id"), applied.app.id);
   assert.equal(byIdResponse.headers.get("x-packetagent-generated-app-runtime"), "static");
   assert.equal(byIdResponse.headers.get("x-packetagent-generated-app-live"), "false");
+  assert.match(
+    byIdResponse.headers.get("content-security-policy") ?? "",
+    /frame-ancestors http:\/\/localhost/,
+  );
   assert.match(byIdHtml, new RegExp(`data-app-id="${applied.app.id}"`));
+  assert.match(byIdHtml, /packetagent\.preview\.v1/);
 
   const sourceFileResponse = await app.request(
-    `/api/app/generated-apps/${applied.app.id}/preview/src/App.tsx`,
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview/src/App.tsx`),
     {
-      headers: authHeaders(alpha.cookieValue),
+      headers: previewHeaders,
     },
   );
   const sourceFileBody = await sourceFileResponse.text();
@@ -1265,9 +1367,11 @@ test("generated app preview route resolves by actual app id or slug", async () =
   assert.match(sourceFileBody, /function GeneratedApp/);
 
   const assetResponse = await app.request(
-    `/api/app/generated-apps/${applied.app.id}/preview/assets/preview.css`,
+    generatedPreviewRequestUrl(
+      `/api/app/generated-apps/${applied.app.id}/preview/assets/preview.css`,
+    ),
     {
-      headers: authHeaders(alpha.cookieValue),
+      headers: previewHeaders,
     },
   );
   const assetBody = await assetResponse.text();
@@ -1276,9 +1380,9 @@ test("generated app preview route resolves by actual app id or slug", async () =
   assert.equal(assetBody, "body { color: rgb(12, 34, 56); }");
 
   const readinessResponse = await app.request(
-    `/api/app/generated-apps/${applied.app.id}/preview?format=json`,
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview?format=json`),
     {
-      headers: authHeaders(alpha.cookieValue),
+      headers: previewHeaders,
     },
   );
   const readinessBody = (await readinessResponse.json()) as {
@@ -1302,9 +1406,15 @@ test("generated app preview route resolves by actual app id or slug", async () =
   assert.match(readinessBody.preview?.runtime?.process?.command ?? "", /npm run dev/);
   assert.ok(readinessBody.artifact?.files?.some((file) => file.path === "src/App.tsx"));
 
-  const bySlugResponse = await app.request(`/api/app/generated-apps/${applied.app.slug}/preview`, {
-    headers: authHeaders(alpha.cookieValue),
+  const slugPreviewSession = await openGeneratedPreviewSession(app, {
+    appId: applied.app.slug,
+    sessionCookie: alpha.cookieValue,
+    scope: "read",
   });
+  const bySlugResponse = await app.request(
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview`),
+    { headers: { Cookie: slugPreviewSession.cookie } },
+  );
   const bySlugHtml = await bySlugResponse.text();
   assert.equal(bySlugResponse.status, 200);
   assert.equal(bySlugResponse.headers.get("x-packetagent-generated-app-id"), applied.app.id);
@@ -1980,10 +2090,16 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   );
   writeFileSync(publishedEntrypoint, originalEntrypoint, "utf8");
 
-  const privatePreviewUrl = `/api/app/generated-apps/${applied.app.id}/preview?checkpointId=${applied.checkpoint.id}`;
-  const privatePreviewResponse = await app.request(privatePreviewUrl, {
-    headers: authHeaders(alpha.cookieValue),
+  const privatePreviewSession = await openGeneratedPreviewSession(app, {
+    appId: applied.app.id,
+    sessionCookie: alpha.cookieValue,
+    checkpointId: applied.checkpoint.id,
+    scope: "read",
   });
+  const privatePreviewResponse = await app.request(
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview`),
+    { headers: { Cookie: privatePreviewSession.cookie } },
+  );
   assert.equal(privatePreviewResponse.status, 200);
   assert.match(
     privatePreviewResponse.headers.get("x-packetagent-generated-app-id") ?? "",
@@ -2795,19 +2911,31 @@ test("preview-token endpoint mints a token with a future expiry and a previewUrl
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(response.status, 200);
-  const body = (await response.json()) as { token: string; expiresAt: string; previewUrl: string };
-  assert.match(body.token, /^tk_/);
-  assert.ok(body.token.includes(applied.app.id));
+  const body = (await response.json()) as {
+    token: string;
+    scope: string;
+    checkpointId: string;
+    expiresAt: string;
+    previewUrl: string;
+  };
+  assert.match(body.token, /^pt1\./);
+  assert.equal(body.token.includes(applied.app.id), false);
+  assert.equal(body.scope, "read");
+  assert.match(body.checkpointId, /^gapp_ckpt_/);
   const expiresAtMs = Date.parse(body.expiresAt);
   assert.ok(Number.isFinite(expiresAtMs));
   assert.ok(expiresAtMs > before, "token expiry should be in the future");
   // Default TTL is 1 hour; allow a small drift.
   assert.ok(expiresAtMs - before <= 60 * 60 * 1000 + 5000);
   assert.ok(expiresAtMs - before >= 60 * 60 * 1000 - 5000);
+  const previewUrl = new URL(body.previewUrl);
+  assert.equal(previewUrl.origin, resolvePacketAgentPreviewOrigin());
   assert.equal(
-    body.previewUrl,
-    `/api/app/generated-apps/${encodeURIComponent(applied.app.id)}/preview/?token=${encodeURIComponent(body.token)}`,
+    previewUrl.pathname,
+    `/api/app/generated-apps/${encodeURIComponent(applied.app.id)}/preview/`,
   );
+  assert.equal(previewUrl.search, "");
+  assert.equal(previewUrl.hash, `#token=${body.token}`);
 });
 
 test("preview-token endpoint rejects appIds outside the caller's workspace", async () => {
@@ -2843,7 +2971,79 @@ test("preview-token endpoint rejects appIds outside the caller's workspace", asy
   assert.deepEqual(await response.json(), { error: "generated app not found" });
 });
 
-test("preview route accepts a freshly minted token without a session cookie", async () => {
+test("preview fragment bootstrap exchanges a capability for an app-scoped HttpOnly cookie", async () => {
+  const { app, alpha, applied } = await setupGeneratedAppForPreviewTokenTests();
+  const primaryPreview = await app.request(`/api/app/generated-apps/${applied.app.id}/preview`, {
+    headers: authHeaders(alpha.cookieValue),
+  });
+  assert.equal(primaryPreview.status, 404);
+
+  const previewSession = await openGeneratedPreviewSession(app, {
+    appId: applied.app.id,
+    sessionCookie: alpha.cookieValue,
+    scope: "read",
+  });
+  const bootstrapUrl = new URL(previewSession.previewUrl);
+  bootstrapUrl.hash = "";
+  const bootstrap = await app.request(bootstrapUrl);
+  const bootstrapHtml = await bootstrap.text();
+  assert.equal(bootstrap.status, 200);
+  assert.match(bootstrapHtml, /location\.hash/);
+  assert.match(bootstrap.headers.get("content-security-policy") ?? "", /script-src 'nonce-/);
+
+  const previewResponse = await app.request(
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview/`),
+    { headers: { Cookie: previewSession.cookie } },
+  );
+  assert.equal(previewResponse.status, 200);
+  assert.match(previewResponse.headers.get("content-type") ?? "", /text\/html/);
+  assert.equal(previewResponse.headers.get("x-packetagent-generated-app-id"), applied.app.id);
+  const html = await previewResponse.text();
+  assert.match(html, new RegExp(`data-app-id="${applied.app.id}"`));
+  assert.doesNotMatch(
+    html,
+    new RegExp(previewSession.token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+  );
+});
+
+test("read preview sessions cannot mutate runtime data and session exchange is same-origin only", async () => {
+  const { app, alpha, applied } = await setupGeneratedAppForPreviewTokenTests();
+  const previewSession = await openGeneratedPreviewSession(app, {
+    appId: applied.app.id,
+    sessionCookie: alpha.cookieValue,
+    scope: "read",
+  });
+  const writeResponse = await app.request(
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/api/account`),
+    {
+      method: "POST",
+      headers: {
+        Cookie: previewSession.cookie,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: "must not persist" }),
+    },
+  );
+  assert.equal(writeResponse.status, 403);
+  assert.deepEqual(await writeResponse.json(), {
+    error: "shared preview sessions can only read runtime data",
+  });
+
+  const crossOriginSession = await app.request(
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview-session`),
+    {
+      method: "POST",
+      headers: {
+        Origin: "https://attacker.example",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token: previewSession.token }),
+    },
+  );
+  assert.equal(crossOriginSession.status, 403);
+});
+
+test("preview origin rejects legacy query-string capability delivery", async () => {
   const { app, alpha, applied } = await setupGeneratedAppForPreviewTokenTests();
   const tokenResponse = await app.request(
     `/api/app/generated-apps/${applied.app.id}/preview-token`,
@@ -2852,39 +3052,41 @@ test("preview route accepts a freshly minted token without a session cookie", as
       headers: authHeaders(alpha.cookieValue),
     },
   );
-  const tokenBody = (await tokenResponse.json()) as { token: string };
-
-  // Note: NO cookie header here — this is what a phone on the LAN does.
-  const previewResponse = await app.request(
-    `/api/app/generated-apps/${applied.app.id}/preview/?token=${encodeURIComponent(tokenBody.token)}`,
+  const { token } = (await tokenResponse.json()) as { token: string };
+  const response = await app.request(
+    generatedPreviewRequestUrl(
+      `/api/app/generated-apps/${applied.app.id}/preview/?token=${encodeURIComponent(token)}`,
+    ),
   );
-  assert.equal(previewResponse.status, 200);
-  assert.match(previewResponse.headers.get("content-type") ?? "", /text\/html/);
-  assert.equal(previewResponse.headers.get("x-packetagent-generated-app-id"), applied.app.id);
-  const html = await previewResponse.text();
-  assert.match(html, new RegExp(`data-app-id="${applied.app.id}"`));
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "preview capabilities must be delivered in the URL fragment, not the query string",
+  });
 });
 
 test("preview route rejects an expired token with a friendly 401", async () => {
-  const { app, alpha, applied } = await setupGeneratedAppForPreviewTokenTests();
-  // Build an expired token directly via HMAC (mirrors the server's tk_<appId>.<expirySec>.<hmac> shape).
-  const crypto = await import("node:crypto");
-  const secret =
-    process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET?.trim() ||
-    process.env.PACKETAGENT_MASTER_KEY?.trim() ||
-    "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
-  const expirySec = Math.floor(Date.now() / 1000) - 60;
-  const hmac = crypto
-    .createHmac("sha256", secret)
-    .update(`${applied.app.id}.${expirySec}`)
-    .digest("base64")
-    .replace(/=+$/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
-  const token = `tk_${applied.app.id}.${expirySec}.${hmac}`;
+  const { app, applied } = await setupGeneratedAppForPreviewTokenTests();
+  const record = loadStore().generatedApps?.find((entry) => entry.id === applied.app.id);
+  assert.ok(record?.checkpointId);
+  const { token } = mintGeneratedPreviewCapability({
+    appId: applied.app.id,
+    workspaceId: record.workspaceId,
+    checkpointId: record.checkpointId,
+    scope: "read",
+    ttlSeconds: 60,
+    now: new Date(Date.now() - 2 * 60 * 60 * 1000),
+  });
 
   const previewResponse = await app.request(
-    `/api/app/generated-apps/${applied.app.id}/preview/?token=${encodeURIComponent(token)}`,
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview-session`),
+    {
+      method: "POST",
+      headers: {
+        Origin: resolvePacketAgentPreviewOrigin(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    },
   );
   assert.equal(previewResponse.status, 401);
   assert.deepEqual(await previewResponse.json(), { error: "preview link expired or invalid" });
@@ -2904,7 +3106,15 @@ test("preview route rejects a tampered or wrong-app token with a friendly 401", 
   // Tampered: flip the last character of the hmac portion.
   const flipped = tokenBody.token.slice(0, -1) + (tokenBody.token.endsWith("A") ? "B" : "A");
   const tamperedResponse = await app.request(
-    `/api/app/generated-apps/${applied.app.id}/preview/?token=${encodeURIComponent(flipped)}`,
+    generatedPreviewRequestUrl(`/api/app/generated-apps/${applied.app.id}/preview-session`),
+    {
+      method: "POST",
+      headers: {
+        Origin: resolvePacketAgentPreviewOrigin(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token: flipped }),
+    },
   );
   assert.equal(tamperedResponse.status, 401);
   assert.deepEqual(await tamperedResponse.json(), { error: "preview link expired or invalid" });
@@ -2930,7 +3140,17 @@ test("preview route rejects a tampered or wrong-app token with a friendly 401", 
     });
   });
   const wrongAppResponse = await app.request(
-    `/api/app/generated-apps/gapp_alpha_preview_token_other/preview/?token=${encodeURIComponent(tokenBody.token)}`,
+    generatedPreviewRequestUrl(
+      "/api/app/generated-apps/gapp_alpha_preview_token_other/preview-session",
+    ),
+    {
+      method: "POST",
+      headers: {
+        Origin: resolvePacketAgentPreviewOrigin(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token: tokenBody.token }),
+    },
   );
   assert.equal(wrongAppResponse.status, 401);
   assert.deepEqual(await wrongAppResponse.json(), { error: "preview link expired or invalid" });
@@ -2975,6 +3195,8 @@ test("preview-token minting refuses the baked-in fallback secret in production",
   const previousEnv = process.env.NODE_ENV;
   const previousPreview = process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
   const previousMaster = process.env.PACKETAGENT_MASTER_KEY;
+  const previousAppOrigin = process.env.PACKETAGENT_APP_ORIGIN;
+  const previousPreviewOrigin = process.env.PACKETAGENT_PREVIEW_ORIGIN;
   t.after(() => {
     if (previousEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousEnv;
@@ -2982,6 +3204,10 @@ test("preview-token minting refuses the baked-in fallback secret in production",
     else process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET = previousPreview;
     if (previousMaster === undefined) delete process.env.PACKETAGENT_MASTER_KEY;
     else process.env.PACKETAGENT_MASTER_KEY = previousMaster;
+    if (previousAppOrigin === undefined) delete process.env.PACKETAGENT_APP_ORIGIN;
+    else process.env.PACKETAGENT_APP_ORIGIN = previousAppOrigin;
+    if (previousPreviewOrigin === undefined) delete process.env.PACKETAGENT_PREVIEW_ORIGIN;
+    else process.env.PACKETAGENT_PREVIEW_ORIGIN = previousPreviewOrigin;
   });
 
   const { app, alpha, applied } = await setupGeneratedAppForPreviewTokenTests();
@@ -2990,6 +3216,8 @@ test("preview-token minting refuses the baked-in fallback secret in production",
   process.env.NODE_ENV = "production";
   delete process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
   delete process.env.PACKETAGENT_MASTER_KEY;
+  process.env.PACKETAGENT_APP_ORIGIN = "https://packetagent.example.test";
+  process.env.PACKETAGENT_PREVIEW_ORIGIN = "https://preview.packetagent.example.test";
 
   const refused = await app.request(`/api/app/generated-apps/${applied.app.id}/preview-token`, {
     method: "POST",
@@ -2997,7 +3225,7 @@ test("preview-token minting refuses the baked-in fallback secret in production",
   });
   assert.equal(refused.status, 500);
   const refusedBody = (await refused.json()) as { error: string };
-  assert.match(refusedBody.error, /preview tokens are unavailable/);
+  assert.match(refusedBody.error, /preview capabilities are unavailable/);
 
   // Once a real secret is configured, production minting works again.
   process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET = "a-real-production-preview-secret";
@@ -3007,13 +3235,15 @@ test("preview-token minting refuses the baked-in fallback secret in production",
   });
   assert.equal(ok.status, 200);
   const okBody = (await ok.json()) as { token: string };
-  assert.match(okBody.token, /^tk_/);
+  assert.match(okBody.token, /^pt1\./);
 });
 
 test("preview verification refuses fallback-forged tokens in production", async (t) => {
   const previousEnv = process.env.NODE_ENV;
   const previousPreview = process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
   const previousMaster = process.env.PACKETAGENT_MASTER_KEY;
+  const previousAppOrigin = process.env.PACKETAGENT_APP_ORIGIN;
+  const previousPreviewOrigin = process.env.PACKETAGENT_PREVIEW_ORIGIN;
   t.after(() => {
     if (previousEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousEnv;
@@ -3021,32 +3251,45 @@ test("preview verification refuses fallback-forged tokens in production", async 
     else process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET = previousPreview;
     if (previousMaster === undefined) delete process.env.PACKETAGENT_MASTER_KEY;
     else process.env.PACKETAGENT_MASTER_KEY = previousMaster;
+    if (previousAppOrigin === undefined) delete process.env.PACKETAGENT_APP_ORIGIN;
+    else process.env.PACKETAGENT_APP_ORIGIN = previousAppOrigin;
+    if (previousPreviewOrigin === undefined) delete process.env.PACKETAGENT_PREVIEW_ORIGIN;
+    else process.env.PACKETAGENT_PREVIEW_ORIGIN = previousPreviewOrigin;
   });
 
   const { app, applied } = await setupGeneratedAppForPreviewTokenTests();
 
-  // Forge a token against the baked-in dev fallback secret (what an attacker
-  // who read the source would do).
-  const crypto = await import("node:crypto");
-  const fallback = "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
-  const expirySec = Math.floor(Date.now() / 1000) + 3600;
-  const hmac = crypto
-    .createHmac("sha256", fallback)
-    .update(`${applied.app.id}.${expirySec}`)
-    .digest("base64")
-    .replace(/=+$/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
-  const forged = `tk_${applied.app.id}.${expirySec}.${hmac}`;
+  const record = loadStore().generatedApps?.find((entry) => entry.id === applied.app.id);
+  assert.ok(record?.checkpointId);
+  const { token: forged } = mintGeneratedPreviewCapability({
+    appId: applied.app.id,
+    workspaceId: record.workspaceId,
+    checkpointId: record.checkpointId,
+    scope: "read",
+    env: { NODE_ENV: "development" },
+  });
 
   // In production with no real secret, verification must refuse (401), not
   // accept the fallback-forged token.
   process.env.NODE_ENV = "production";
   delete process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET;
   delete process.env.PACKETAGENT_MASTER_KEY;
+  process.env.PACKETAGENT_APP_ORIGIN = "https://packetagent.example.test";
+  process.env.PACKETAGENT_PREVIEW_ORIGIN = "https://preview.packetagent.example.test";
 
   const previewResponse = await app.request(
-    `/api/app/generated-apps/${applied.app.id}/preview/?token=${encodeURIComponent(forged)}`,
+    new URL(
+      `/api/app/generated-apps/${applied.app.id}/preview-session`,
+      process.env.PACKETAGENT_PREVIEW_ORIGIN,
+    ),
+    {
+      method: "POST",
+      headers: {
+        Origin: process.env.PACKETAGENT_PREVIEW_ORIGIN,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token: forged }),
+    },
   );
   assert.equal(previewResponse.status, 401);
   assert.deepEqual(await previewResponse.json(), { error: "preview link expired or invalid" });

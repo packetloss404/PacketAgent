@@ -8,6 +8,7 @@ import {
 } from "./builder-start";
 import {
   getPreviewNavigationTarget,
+  parsePreviewBridgeMessage,
   publishPrimaryActionLabel,
   publishReadinessHeading,
 } from "./builder/helpers";
@@ -46,6 +47,45 @@ test("preview navigation stays local unless backend provides an absolute URL", (
   assert.equal(
     getPreviewNavigationTarget("https://example.test/app", "app_123"),
     "https://example.test/app",
+  );
+});
+
+test("isolated preview bridge accepts only bounded versioned selection messages", () => {
+  assert.deepEqual(
+    parsePreviewBridgeMessage({
+      channel: "packetagent.preview.v1",
+      kind: "select",
+      selector: "main > button:nth-of-type(2)",
+      label: "Save",
+      rect: { left: 10, top: 20, width: 80, height: 32 },
+    }),
+    {
+      channel: "packetagent.preview.v1",
+      kind: "select",
+      selector: "main > button:nth-of-type(2)",
+      label: "Save",
+      rect: { left: 10, top: 20, width: 80, height: 32 },
+    },
+  );
+  assert.equal(
+    parsePreviewBridgeMessage({
+      channel: "packetagent.preview.v1",
+      kind: "select",
+      selector: "button",
+      label: "Save",
+      rect: { left: 0, top: 0, width: -1, height: 10 },
+    }),
+    null,
+  );
+  assert.equal(
+    parsePreviewBridgeMessage({
+      channel: "attacker",
+      kind: "select",
+      selector: "button",
+      label: "Save",
+      rect: { left: 0, top: 0, width: 10, height: 10 },
+    }),
+    null,
   );
 });
 

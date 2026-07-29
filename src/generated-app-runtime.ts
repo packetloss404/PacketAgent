@@ -1142,9 +1142,7 @@ async function requestGeneratedApi<T>(path: string, options: { method?: string; 
 
 function runtimeApiUrl(path: string): string {
   const appId = document.body.dataset.appId ?? "";
-  const token = new URLSearchParams(window.location.search).get("token");
-  const query = token ? "?token=" + encodeURIComponent(token) : "";
-  return "/api/app/generated-apps/" + encodeURIComponent(appId) + "/api/" + path.replace(/^\\/+/, "") + query;
+  return "/api/app/generated-apps/" + encodeURIComponent(appId) + "/api/" + path.replace(/^\\/+/, "");
 }
 
 export const generatedApiPrimaryEntity = ${JSON.stringify(model.primaryEntity)};

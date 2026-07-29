@@ -1,6 +1,23 @@
 import { type Context, type Hono } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
+import {
+  mintGeneratedPreviewCapability,
+  normalizeHttpOrigin,
+  verifyGeneratedPreviewCapability,
+  type GeneratedPreviewCapabilityClaims,
+  type GeneratedPreviewCapabilityScope,
+} from "../app-preview-capability.js";
+import {
+  generatedPreviewBootstrapUrl,
+  generatedPreviewCookieName,
+  generatedPreviewCookiePath,
+  isPacketAgentPreviewOriginRequest,
+  requestOrigin,
+  resolvePacketAgentAppOrigin,
+  resolvePacketAgentPreviewOrigin,
+} from "../app-preview-isolation.js";
 import { requireAuthenticatedContextAsync } from "../packetagent-services.js";
 import { loadStoreAsync } from "../packetagent-store.js";
 import { resolveGeneratedAppPreviewFile } from "../generated-app-process.js";
@@ -21,33 +38,24 @@ import {
 async function previewGeneratedApp(c: Context) {
   try {
     const appIdParam = c.req.param("appId") ?? "";
-    const tokenQuery = c.req.query("token");
-    let workspaceId: string;
-    let record: GeneratedAppRecordWithRuntime;
-
-    // Token-based auth path (read-only). Lets phones / other devices on the
-    // LAN load the preview without a workspace session cookie.
-    if (tokenQuery) {
-      const verification = await verifyPreviewToken(tokenQuery, appIdParam);
-      if (!verification.ok) {
-        c.status(401);
-        return c.json({ error: "preview link expired or invalid" });
-      }
-      record = verification.record;
-      workspaceId = record.workspaceId;
-    } else {
-      const context = await requireAuthenticatedContextAsync(c);
-      await requireWorkspacePermission(context, "viewWorkspace");
-      const found = await findGeneratedAppRecord(context, appIdParam, c.req.query("checkpointId"));
-      if (!found) throw httpRouteError(404, "generated app not found");
-      record = found;
-      workspaceId = context.workspace.id;
+    requirePreviewOrigin(c);
+    if (c.req.query("token")) {
+      throw httpRouteError(
+        400,
+        "preview capabilities must be delivered in the URL fragment, not the query string",
+      );
     }
-
-    const checkpoint = checkpointForPublish(record, c.req.query("checkpointId"));
-    if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const artifact = generatedAppRuntimeArtifact(record, checkpoint);
     const requestedPath = c.req.param("*") || generatedAppPreviewPathFromRequest(c, appIdParam);
+    const authorization = await authorizeGeneratedPreviewRequest(c, appIdParam);
+    if (!authorization.ok) {
+      if (!requestedPath || requestedPath === "index.html") {
+        return generatedPreviewBootstrap(c, appIdParam);
+      }
+      throw httpRouteError(401, "preview session expired or invalid");
+    }
+    const { claims, record, checkpoint } = authorization;
+    const workspaceId = claims.workspaceId;
+    const artifact = generatedAppRuntimeArtifact(record, checkpoint);
     const resolved = resolveGeneratedAppPreviewFile({
       appId: record.id,
       workspaceId,
@@ -61,6 +69,8 @@ async function previewGeneratedApp(c: Context) {
     c.header("X-PacketAgent-Generated-App-Checkpoint", checkpoint.id);
     c.header("X-PacketAgent-Generated-App-Runtime", resolved.readiness.mode);
     c.header("X-PacketAgent-Generated-App-Live", String(resolved.readiness.live));
+    const nonce = previewResponseNonce();
+    applyGeneratedPreviewDocumentHeaders(c, claims, nonce);
 
     if (wantsGeneratedAppPreviewReadiness(c)) {
       return c.json({
@@ -99,6 +109,8 @@ async function previewGeneratedApp(c: Context) {
           fallback.file.path,
           fallback.file.content,
           fallback.file.contentType,
+          nonce,
+          claims,
         );
         c.header("Content-Type", fbType);
         return c.body(fbContent);
@@ -110,6 +122,8 @@ async function previewGeneratedApp(c: Context) {
       resolved.file.path,
       resolved.file.content,
       resolved.file.contentType,
+      nonce,
+      claims,
     );
     c.header("Content-Type", outType);
     return c.body(outContent);
@@ -121,33 +135,14 @@ async function previewGeneratedApp(c: Context) {
 async function handleGeneratedAppRuntimeApi(c: Context) {
   try {
     const appIdParam = c.req.param("appId") ?? "";
-    const tokenQuery = c.req.query("token");
-    let record: GeneratedAppRecordWithRuntime;
-    let workspaceId: string;
-
-    if (tokenQuery) {
-      const verification = await verifyPreviewToken(tokenQuery, appIdParam);
-      if (!verification.ok) {
-        c.status(401);
-        return c.json({ error: "preview link expired or invalid" });
-      }
-      if (!isGeneratedAppReadOnlyMethod(c.req.method)) {
-        c.status(403);
-        return c.json({ error: "preview links can only read generated app runtime data" });
-      }
-      record = verification.record;
-      workspaceId = record.workspaceId;
-    } else {
-      const context = await requireAuthenticatedContextAsync(c);
-      await requireWorkspacePermission(context, "viewWorkspace");
-      const found = await findGeneratedAppRecord(context, appIdParam, c.req.query("checkpointId"));
-      if (!found) throw httpRouteError(404, "generated app not found");
-      record = found;
-      workspaceId = context.workspace.id;
+    requirePreviewOrigin(c);
+    const authorization = await authorizeGeneratedPreviewRequest(c, appIdParam);
+    if (!authorization.ok) throw httpRouteError(401, "preview session expired or invalid");
+    if (authorization.claims.scope === "read" && !isGeneratedAppReadOnlyMethod(c.req.method)) {
+      throw httpRouteError(403, "shared preview sessions can only read runtime data");
     }
-
-    const checkpoint = checkpointForPublish(record, c.req.query("checkpointId"));
-    if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
+    const { claims, record, checkpoint } = authorization;
+    const workspaceId = claims.workspaceId;
     const model = buildGeneratedAppRuntimeModel(
       checkpoint.draft as unknown as AppBuilderDraftContract,
     );
@@ -165,6 +160,7 @@ async function handleGeneratedAppRuntimeApi(c: Context) {
     c.header("X-PacketAgent-Generated-App-Id", record.id);
     c.header("X-PacketAgent-Generated-App-Checkpoint", checkpoint.id);
     c.header("X-PacketAgent-Generated-App-Runtime", "server-sqlite-process");
+    applyGeneratedPreviewApiHeaders(c);
     if (result.process.pid)
       c.header("X-PacketAgent-Generated-App-Runtime-Pid", String(result.process.pid));
     return c.json(result.body);
@@ -175,6 +171,7 @@ async function handleGeneratedAppRuntimeApi(c: Context) {
 
 async function generatedAppRuntimeWorkspaceHealth(c: Context) {
   try {
+    requirePrimaryOrigin(c);
     const context = await requireAuthenticatedContextAsync(c);
     await requireWorkspacePermission(context, "viewWorkspace");
     c.header("Cache-Control", "private, no-store");
@@ -191,6 +188,7 @@ async function generatedAppRuntimeWorkspaceHealth(c: Context) {
 
 async function generatedAppRuntimeAppHealth(c: Context) {
   try {
+    requirePrimaryOrigin(c);
     const context = await requireAuthenticatedContextAsync(c);
     await requireWorkspacePermission(context, "viewWorkspace");
     const record = await findGeneratedAppRecord(context, c.req.param("appId"));
@@ -215,132 +213,170 @@ function wantsGeneratedAppPreviewReadiness(c: Context) {
   return accept.includes("application/json") && !accept.includes("text/html");
 }
 
-// --- Signed preview tokens ------------------------------------------------
-// Stateless HMAC-SHA256 tokens that grant read-only access to a single
-// generated app's preview route. Token format:
-//   tk_<appId>_<expiryUnixSec>_<base64urlHmac>
-// HMAC covers `${appId}.${expiryUnixSec}` so a token for one app can't be
-// reused for another and tampering with the expiry invalidates it. Tokens
-// are NOT stored — verification is purely cryptographic + time check.
-const PREVIEW_TOKEN_PREFIX = "tk_";
-const PREVIEW_TOKEN_DEFAULT_TTL_SECONDS = 60 * 60; // 1 hour
-const PREVIEW_TOKEN_MAX_TTL_SECONDS = 24 * 60 * 60; // 24 hours
-const PREVIEW_TOKEN_DEV_FALLBACK_SECRET =
-  "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
-let previewTokenFallbackWarned = false;
-
-function previewTokenSecret(): string {
-  const fromPreview = (process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET ?? "").trim();
-  if (fromPreview) return fromPreview;
-  const fromMaster = (process.env.PACKETAGENT_MASTER_KEY ?? "").trim();
-  if (fromMaster) return fromMaster;
-  // In production we MUST NOT sign/verify with a constant baked-in secret —
-  // anyone reading the source could forge preview tokens. Refuse outright so the
-  // operator is forced to configure a real secret.
-  if (process.env.NODE_ENV === "production") {
-    throw httpRouteError(
-      500,
-      "preview tokens are unavailable: set PACKETAGENT_PREVIEW_TOKEN_SECRET or PACKETAGENT_MASTER_KEY",
-    );
-  }
-  if (!previewTokenFallbackWarned) {
-    previewTokenFallbackWarned = true;
-    console.warn(
-      "[preview-token] No PACKETAGENT_PREVIEW_TOKEN_SECRET or PACKETAGENT_MASTER_KEY set — falling back to an in-process dev secret. Do NOT run this in production without configuring one of those env vars.",
-    );
-  }
-  return PREVIEW_TOKEN_DEV_FALLBACK_SECRET;
-}
-
-function base64UrlEncode(value: Buffer): string {
-  return value.toString("base64").replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-}
-
-function previewTokenHmac(appId: string, expirySec: number): string {
-  return base64UrlEncode(
-    createHmac("sha256", previewTokenSecret()).update(`${appId}.${expirySec}`).digest(),
-  );
-}
-
-function buildPreviewToken(appId: string, expirySec: number): string {
-  // Use "." as the separator: it's NOT in the base64url alphabet
-  // (which is A-Za-z0-9_-), so the HMAC chunk can never collide with it.
-  // Generated app ids look like `gapp_<hex>` and never contain dots either.
-  return `${PREVIEW_TOKEN_PREFIX}${appId}.${expirySec}.${previewTokenHmac(appId, expirySec)}`;
-}
-
-function parsePreviewToken(
-  token: string,
-): { appId: string; expirySec: number; hmac: string } | null {
-  if (!token.startsWith(PREVIEW_TOKEN_PREFIX)) return null;
-  const remainder = token.slice(PREVIEW_TOKEN_PREFIX.length);
-  const parts = remainder.split(".");
-  if (parts.length !== 3) return null;
-  const [appId, expiryRaw, hmac] = parts;
-  const expirySec = Number.parseInt(expiryRaw, 10);
-  if (!Number.isFinite(expirySec) || expirySec <= 0) return null;
-  if (!appId || !hmac) return null;
-  return { appId, expirySec, hmac };
-}
-
-async function verifyPreviewToken(
-  rawToken: string,
-  routeAppId: string,
-): Promise<{ ok: true; record: GeneratedAppRecordWithRuntime } | { ok: false }> {
-  const parsed = parsePreviewToken(rawToken);
-  if (!parsed) return { ok: false };
-  if (parsed.appId !== routeAppId) return { ok: false };
-  if (parsed.expirySec * 1000 < Date.now()) return { ok: false };
-  let expected: string;
-  try {
-    expected = previewTokenHmac(parsed.appId, parsed.expirySec);
-  } catch {
-    // No real secret configured in production: refuse to verify (rather than
-    // accept tokens forged against the baked-in dev fallback).
-    return { ok: false };
-  }
-  const provided = parsed.hmac;
-  if (expected.length !== provided.length) return { ok: false };
-  let equal = false;
-  try {
-    equal = timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
-  } catch {
-    return { ok: false };
-  }
-  if (!equal) return { ok: false };
-  const data = await loadStoreAsync();
-  const record = ((data.generatedApps ?? []) as GeneratedAppRecordWithRuntime[]).find(
-    (entry) => entry.id === parsed.appId,
-  );
-  if (!record) return { ok: false };
-  return { ok: true, record };
-}
-
 async function createGeneratedAppPreviewToken(c: Context) {
   try {
+    requirePrimaryOrigin(c);
     const context = await requireAuthenticatedContextAsync(c);
-    await requireWorkspacePermission(context, "viewWorkspace");
+    const body = (await c.req.json().catch(() => ({}))) as {
+      checkpointId?: string;
+      scope?: GeneratedPreviewCapabilityScope;
+      ttlSeconds?: number;
+    };
+    const scope: GeneratedPreviewCapabilityScope = body.scope === "interact" ? "interact" : "read";
+    await requireWorkspacePermission(
+      context,
+      scope === "interact" ? "manageWorkspace" : "viewWorkspace",
+    );
     const appIdParam = c.req.param("appId") ?? "";
-    const record = await findGeneratedAppRecord(context, appIdParam);
+    const record = await findGeneratedAppRecord(context, appIdParam, body.checkpointId);
     if (!record) throw httpRouteError(404, "generated app not found");
+    const checkpoint = checkpointForPublish(record, body.checkpointId);
+    if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
 
     const ttlRaw = Number.parseInt(c.req.query("ttl") ?? "", 10);
     const ttlSeconds =
-      Number.isFinite(ttlRaw) && ttlRaw > 0
-        ? Math.min(ttlRaw, PREVIEW_TOKEN_MAX_TTL_SECONDS)
-        : PREVIEW_TOKEN_DEFAULT_TTL_SECONDS;
-    const expirySec = Math.floor(Date.now() / 1000) + ttlSeconds;
-    const token = buildPreviewToken(record.id, expirySec);
-    const previewUrl = `/api/app/generated-apps/${encodeURIComponent(record.id)}/preview/?token=${encodeURIComponent(token)}`;
+      typeof body.ttlSeconds === "number" && Number.isFinite(body.ttlSeconds)
+        ? Math.floor(body.ttlSeconds)
+        : Number.isFinite(ttlRaw)
+          ? ttlRaw
+          : undefined;
+    const parentOrigin = scope === "interact" ? interactivePreviewParentOrigin(c) : undefined;
+    const { token, claims } = mintGeneratedPreviewCapability({
+      appId: record.id,
+      workspaceId: record.workspaceId,
+      checkpointId: checkpoint.id,
+      scope,
+      parentOrigin,
+      ttlSeconds,
+    });
+    const previewUrl = generatedPreviewBootstrapUrl(
+      resolvePacketAgentPreviewOrigin(),
+      record.id,
+      token,
+    );
 
+    c.header("Cache-Control", "private, no-store");
     return c.json({
       token,
-      expiresAt: new Date(expirySec * 1000).toISOString(),
+      scope: claims.scope,
+      checkpointId: claims.checkpointId,
+      expiresAt: new Date(claims.exp * 1000).toISOString(),
       previewUrl,
     });
   } catch (error) {
     return errorResponse(c, error);
   }
+}
+
+async function createGeneratedAppPreviewSession(c: Context) {
+  try {
+    requirePreviewOrigin(c);
+    requireSamePreviewOriginBootstrap(c);
+    const appId = c.req.param("appId") ?? "";
+    const contentType = c.req.header("content-type")?.toLowerCase() ?? "";
+    if (!contentType.includes("application/json")) {
+      throw httpRouteError(415, "preview session requests require application/json");
+    }
+    const body = (await c.req.json().catch(() => ({}))) as { token?: unknown };
+    if (typeof body.token !== "string" || body.token.length > 4096) {
+      throw httpRouteError(400, "preview capability is required");
+    }
+    const authorization = await authorizeGeneratedPreviewToken(body.token, appId);
+    if (!authorization.ok) throw httpRouteError(401, "preview link expired or invalid");
+    const maxAge = Math.max(1, authorization.claims.exp - Math.floor(Date.now() / 1000));
+    setCookie(c, generatedPreviewCookieName(appId), body.token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+      partitioned: true,
+      path: generatedPreviewCookiePath(appId),
+      maxAge,
+    });
+    c.header("Cache-Control", "no-store");
+    c.header("Referrer-Policy", "no-referrer");
+    return c.json({
+      ok: true,
+      redirectPath: `${generatedPreviewCookiePath(appId)}preview/`,
+      scope: authorization.claims.scope,
+      expiresAt: new Date(authorization.claims.exp * 1000).toISOString(),
+    });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+}
+
+type AuthorizedGeneratedPreview = {
+  ok: true;
+  claims: GeneratedPreviewCapabilityClaims;
+  record: GeneratedAppRecordWithRuntime;
+  checkpoint: NonNullable<ReturnType<typeof checkpointForPublish>>;
+};
+
+async function authorizeGeneratedPreviewRequest(
+  c: Context,
+  appId: string,
+): Promise<AuthorizedGeneratedPreview | { ok: false }> {
+  const token = getCookie(c, generatedPreviewCookieName(appId));
+  return token ? authorizeGeneratedPreviewToken(token, appId) : { ok: false };
+}
+
+async function authorizeGeneratedPreviewToken(
+  token: string,
+  appId: string,
+): Promise<AuthorizedGeneratedPreview | { ok: false }> {
+  const verification = verifyGeneratedPreviewCapability(token, appId);
+  if (!verification.ok) return { ok: false };
+  const data = await loadStoreAsync();
+  const record = ((data.generatedApps ?? []) as GeneratedAppRecordWithRuntime[]).find(
+    (entry) =>
+      entry.id === verification.claims.appId &&
+      entry.workspaceId === verification.claims.workspaceId,
+  );
+  if (!record) return { ok: false };
+  const checkpoint = checkpointForPublish(record, verification.claims.checkpointId);
+  if (!checkpoint || checkpoint.id !== verification.claims.checkpointId) return { ok: false };
+  return { ok: true, claims: verification.claims, record, checkpoint };
+}
+
+function requirePreviewOrigin(c: Context) {
+  if (!isPacketAgentPreviewOriginRequest(c)) {
+    throw httpRouteError(404, "generated preview is only available on the isolated preview origin");
+  }
+}
+
+function requirePrimaryOrigin(c: Context) {
+  if (isPacketAgentPreviewOriginRequest(c)) throw httpRouteError(404, "not found");
+}
+
+function requireSamePreviewOriginBootstrap(c: Context) {
+  const originHeader = c.req.header("origin");
+  if (originHeader) {
+    let normalized: string;
+    try {
+      normalized = normalizeHttpOrigin(originHeader, "preview session origin");
+    } catch {
+      throw httpRouteError(403, "cross-origin preview session requests are not allowed");
+    }
+    if (normalized !== resolvePacketAgentPreviewOrigin()) {
+      throw httpRouteError(403, "cross-origin preview session requests are not allowed");
+    }
+  }
+  const fetchSite = c.req.header("sec-fetch-site")?.toLowerCase();
+  if (fetchSite && fetchSite !== "same-origin") {
+    throw httpRouteError(403, "cross-origin preview session requests are not allowed");
+  }
+}
+
+function interactivePreviewParentOrigin(c: Context): string {
+  const configured = resolvePacketAgentAppOrigin();
+  const candidate = normalizeHttpOrigin(
+    c.req.header("origin") ?? configured ?? requestOrigin(c),
+    "interactive preview parent origin",
+  );
+  if (configured && candidate !== configured) {
+    throw httpRouteError(403, "interactive preview parent origin is not allowed");
+  }
+  return candidate;
 }
 
 // Import map injected into generated-app HTML so the browser can resolve
@@ -349,7 +385,8 @@ async function createGeneratedAppPreviewToken(c: Context) {
 // "Failed to resolve module specifier 'react/jsx-runtime'" and the preview
 // renders as broken/unstyled. A future Phase 3 will replace this with a
 // proper Vite build cached per checkpoint that ships its own bundle.
-const PREVIEW_IMPORT_MAP = `<script type="importmap">
+function previewImportMap(nonce: string) {
+  return `<script nonce="${nonce}" type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.0.0",
@@ -360,6 +397,7 @@ const PREVIEW_IMPORT_MAP = `<script type="importmap">
   }
 }
 </script>`;
+}
 
 // Transform .tsx/.ts files to executable JS at preview-serve time. The generated
 // app's index.html loads /src/main.tsx as a module script; browsers reject the
@@ -370,21 +408,30 @@ async function transformPreviewFile(
   path: string,
   content: string,
   contentType: string,
+  nonce: string,
+  claims: GeneratedPreviewCapabilityClaims,
 ): Promise<{ content: string; contentType: string }> {
   if (/\.html?$/.test(path)) {
     // Inject the importmap right after the opening <head> tag so it resolves
     // before any module script loads. If there is no <head>, prepend before <html>.
+    const importMap = previewImportMap(nonce);
     let injected = content;
     if (/<head\b[^>]*>/i.test(injected)) {
-      injected = injected.replace(/<head\b[^>]*>/i, (m) => `${m}\n${PREVIEW_IMPORT_MAP}`);
+      injected = injected.replace(/<head\b[^>]*>/i, (m) => `${m}\n${importMap}`);
     } else if (/<html\b[^>]*>/i.test(injected)) {
-      injected = injected.replace(
-        /<html\b[^>]*>/i,
-        (m) => `${m}\n<head>${PREVIEW_IMPORT_MAP}</head>`,
-      );
+      injected = injected.replace(/<html\b[^>]*>/i, (m) => `${m}\n<head>${importMap}</head>`);
     } else {
-      injected = `${PREVIEW_IMPORT_MAP}\n${injected}`;
+      injected = `${importMap}\n${injected}`;
     }
+    if (claims.scope === "interact" && claims.parentOrigin) {
+      const bridge = `<script nonce="${nonce}">${generatedPreviewBridgeScript(
+        claims.parentOrigin,
+      )}</script>`;
+      injected = /<\/body\s*>/i.test(injected)
+        ? injected.replace(/<\/body\s*>/i, `${bridge}\n</body>`)
+        : `${injected}\n${bridge}`;
+    }
+    injected = injected.replace(/<script\b(?![^>]*\bnonce\s*=)/gi, `<script nonce="${nonce}"`);
     return { content: injected, contentType };
   }
   const isTs = /\.tsx?$/.test(path);
@@ -404,6 +451,191 @@ async function transformPreviewFile(
     console.warn(`[preview-transform] failed for ${path}: ${(error as Error).message}`);
     return { content, contentType };
   }
+}
+
+function generatedPreviewBootstrap(c: Context, appId: string) {
+  const nonce = previewResponseNonce();
+  const sessionPath = `${generatedPreviewCookiePath(appId)}preview-session`;
+  const parentSources = previewBootstrapParentSources();
+  c.header("Cache-Control", "no-store");
+  c.header("Content-Type", "text/html; charset=utf-8");
+  c.header("Referrer-Policy", "no-referrer");
+  c.header(
+    "Content-Security-Policy",
+    [
+      "default-src 'none'",
+      "base-uri 'none'",
+      "connect-src 'self'",
+      `script-src 'nonce-${nonce}'`,
+      `style-src 'nonce-${nonce}'`,
+      `frame-ancestors ${parentSources.join(" ")}`,
+      "form-action 'none'",
+      "object-src 'none'",
+    ].join("; "),
+  );
+  return c.html(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opening PacketAgent preview</title>
+  <style nonce="${nonce}">
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #101418; color: #e7edf2; }
+    main { max-width: 34rem; padding: 2rem; text-align: center; }
+    p { color: #9ca9b3; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Opening isolated preview…</h1>
+    <p id="status">Establishing a short-lived preview session.</p>
+  </main>
+  <script nonce="${nonce}">
+    (() => {
+      const status = document.getElementById("status");
+      const token = new URLSearchParams(location.hash.slice(1)).get("token");
+      if (!token || token.length > 4096) {
+        status.textContent = "This preview link is missing, expired, or invalid.";
+        return;
+      }
+      fetch(${JSON.stringify(sessionPath)}, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      }).then(async (response) => {
+        if (!response.ok) throw new Error("preview session rejected");
+        history.replaceState(null, "", location.pathname + location.search);
+        location.replace(location.pathname + location.search);
+      }).catch(() => {
+        history.replaceState(null, "", location.pathname + location.search);
+        status.textContent = "This preview link is expired or invalid.";
+      });
+    })();
+  </script>
+</body>
+</html>`);
+}
+
+function applyGeneratedPreviewDocumentHeaders(
+  c: Context,
+  claims: GeneratedPreviewCapabilityClaims,
+  nonce: string,
+) {
+  const frameAncestors =
+    claims.scope === "interact" && claims.parentOrigin ? claims.parentOrigin : "'none'";
+  c.header("Referrer-Policy", "no-referrer");
+  c.header(
+    "Content-Security-Policy",
+    [
+      "default-src 'none'",
+      "base-uri 'self'",
+      "connect-src 'self' https://cdn.jsdelivr.net",
+      "font-src 'self' data:",
+      "form-action 'self'",
+      `frame-ancestors ${frameAncestors}`,
+      "frame-src 'none'",
+      "img-src 'self' data: blob:",
+      "media-src 'self' data: blob:",
+      "object-src 'none'",
+      `script-src 'self' 'nonce-${nonce}' https://esm.sh https://cdn.jsdelivr.net`,
+      "style-src 'self' 'unsafe-inline'",
+      "worker-src 'self' blob:",
+    ].join("; "),
+  );
+}
+
+function applyGeneratedPreviewApiHeaders(c: Context) {
+  c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  c.header("Referrer-Policy", "no-referrer");
+}
+
+function previewResponseNonce(): string {
+  return randomBytes(18).toString("base64");
+}
+
+function previewBootstrapParentSources(): string[] {
+  const configured = resolvePacketAgentAppOrigin();
+  return configured
+    ? [configured]
+    : [
+        "http://localhost:7341",
+        "http://127.0.0.1:7341",
+        "http://localhost:8484",
+        "http://127.0.0.1:8484",
+      ];
+}
+
+function generatedPreviewBridgeScript(parentOrigin: string): string {
+  return `(() => {
+  const channel = "packetagent.preview.v1";
+  const targetOrigin = ${JSON.stringify(parentOrigin)};
+  let hoverActive = false;
+
+  function selectorFor(element) {
+    if (!(element instanceof Element)) return "";
+    if (element.id) return "#" + CSS.escape(element.id);
+    const parts = [];
+    let current = element;
+    while (current && current !== document.body && parts.length < 8) {
+      let part = current.tagName.toLowerCase();
+      const parent = current.parentElement;
+      if (parent) {
+        const siblings = Array.from(parent.children).filter((item) => item.tagName === current.tagName);
+        if (siblings.length > 1) part += ":nth-of-type(" + (siblings.indexOf(current) + 1) + ")";
+      }
+      parts.unshift(part);
+      current = parent;
+    }
+    return parts.join(" > ").slice(0, 1024);
+  }
+
+  function boundedElementData(element) {
+    const rect = element.getBoundingClientRect();
+    return {
+      selector: selectorFor(element),
+      label: String(element.textContent || "").trim().slice(0, 120),
+      rect: {
+        left: Number(rect.left.toFixed(2)),
+        top: Number(rect.top.toFixed(2)),
+        width: Number(rect.width.toFixed(2)),
+        height: Number(rect.height.toFixed(2)),
+      },
+    };
+  }
+
+  function post(kind, detail) {
+    window.parent.postMessage({ channel, kind, ...(detail || {}) }, targetOrigin);
+  }
+
+  document.addEventListener("mousemove", (event) => {
+    const target = event.target;
+    const armed = event.metaKey || event.ctrlKey;
+    if (!armed || !(target instanceof Element) || target === document.body || target === document.documentElement) {
+      if (hoverActive) post("clear");
+      hoverActive = false;
+      return;
+    }
+    hoverActive = true;
+    post("hover", boundedElementData(target));
+  }, { passive: true });
+  document.addEventListener("mouseleave", () => {
+    hoverActive = false;
+    post("clear");
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.metaKey && !event.ctrlKey) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    post("select", boundedElementData(target));
+    hoverActive = false;
+    post("clear");
+  }, true);
+  post("ready");
+})();`;
 }
 
 function generatedAppPreviewPathFromRequest(c: Context, appId: string): string {
@@ -463,6 +695,9 @@ export function registerPreviewRoutes(app: Hono): void {
   app.get("/app/generated-apps/:appId/preview/*", async (c) => previewGeneratedApp(c));
   app.post("/app/generated-apps/:appId/preview-token", async (c) =>
     createGeneratedAppPreviewToken(c),
+  );
+  app.post("/app/generated-apps/:appId/preview-session", async (c) =>
+    createGeneratedAppPreviewSession(c),
   );
   app.get("/app/generated-apps/:appId/api", async (c) => handleGeneratedAppRuntimeApi(c));
   app.get("/app/generated-apps/:appId/api/*", async (c) => handleGeneratedAppRuntimeApi(c));

@@ -68,8 +68,11 @@ policy, enforces exact wall-clock/CPU/memory/PID/tmpfs bounds, read-only
 filesystem and explicit redacted environment rules, and proves deny-all egress
 with real Docker. R5.4 provides optional exact-origin, GET-only input prefetch
 through the W6 pinned-network client while the container remains networkless;
-receipts redact query values and bind mounted content by digest. Resume at R5.5
-generated-preview origin/cookie/CSP/proxy isolation in
+receipts redact query values and bind mounted content by digest. R5.5 separates
+generated code from the workbench browser authority, exchanges
+checkpoint-bound fragment capabilities for partitioned app-path cookies,
+applies nonce CSP and exact-parent framing, and moves click-to-edit onto a
+validated message bridge. Resume at R5.6 final container-hardening closure in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r5---sandbox-egress-and-preview-isolation).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

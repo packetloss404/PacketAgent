@@ -1,0 +1,57 @@
+# PacketAgent generated-preview origin isolation
+#
+# Replace the two example hostnames and TLS certificate paths. The log format
+# uses $uri rather than $request_uri, so query strings are omitted. Preview
+# capabilities use URL fragments and therefore never reach nginx at all.
+
+log_format packetagent_no_query '$remote_addr - $host "$request_method $uri $server_protocol" '
+                                '$status $body_bytes_sent';
+
+upstream packetagent_backend {
+  server 127.0.0.1:8484;
+  keepalive 16;
+}
+
+server {
+  listen 443 ssl http2;
+  server_name packetagent.example.com;
+
+  ssl_certificate     /etc/letsencrypt/live/packetagent.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/packetagent.example.com/privkey.pem;
+  access_log /var/log/nginx/packetagent-access.log packetagent_no_query;
+
+  location ~ ^/api/app/generated-apps/[^/]+/(preview(?:/.*)?|preview-session|api(?:/.*)?)$ {
+    return 404;
+  }
+
+  location / {
+    proxy_pass http://packetagent_backend;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+}
+
+server {
+  listen 443 ssl http2;
+  server_name preview.packetagent.example.com;
+
+  ssl_certificate     /etc/letsencrypt/live/preview.packetagent.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/preview.packetagent.example.com/privkey.pem;
+  access_log /var/log/nginx/packetagent-preview-access.log packetagent_no_query;
+
+  location ~ ^/api/app/generated-apps/[^/]+/(preview(?:/.*)?|preview-session|api(?:/.*)?)$ {
+    proxy_pass http://packetagent_backend;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+
+  location / {
+    return 404;
+  }
+}

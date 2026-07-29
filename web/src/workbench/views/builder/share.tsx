@@ -4,24 +4,11 @@ import { api } from "@/lib/api";
 
 export function SharePopover({ appId }: { appId: string | null }) {
   const [open, setOpen] = useState(false);
-  const [hostInfo, setHostInfo] = useState<{ lanIps: string[]; port: number } | null>(null);
-  const [hostInfoError, setHostInfoError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    if (!hostInfo && !hostInfoError) {
-      api
-        .getHostInfo()
-        .then((info) => {
-          if (!cancelled) setHostInfo(info);
-        })
-        .catch((err: Error) => {
-          if (!cancelled) setHostInfoError(err.message || "couldn't load network info");
-        });
-    }
     const onDown = (event: MouseEvent) => {
       if (!wrapperRef.current) return;
       if (event.target instanceof Node && wrapperRef.current.contains(event.target)) return;
@@ -33,11 +20,10 @@ export function SharePopover({ appId }: { appId: string | null }) {
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
-      cancelled = true;
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, hostInfo, hostInfoError]);
+  }, [open]);
 
   useEffect(() => {
     if (!copiedKey) return;
@@ -45,19 +31,11 @@ export function SharePopover({ appId }: { appId: string | null }) {
     return () => window.clearTimeout(handle);
   }, [copiedKey]);
 
-  const firstLanIp = hostInfo?.lanIps[0] ?? null;
-  const lanShareable = Boolean(firstLanIp && appId);
-
-  const mintTokenUrl = async (): Promise<{ localUrl: string; lanUrl: string | null } | null> => {
+  const mintTokenUrl = async (): Promise<string | null> => {
     if (!appId) return null;
     try {
-      const { token } = await api.createPreviewToken(appId);
-      const previewPath = `/api/app/generated-apps/${encodeURIComponent(appId)}/preview/?token=${encodeURIComponent(token)}`;
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const local = `${origin}${previewPath}`;
-      const lan =
-        firstLanIp && hostInfo ? `http://${firstLanIp}:${hostInfo.port}${previewPath}` : null;
-      return { localUrl: local, lanUrl: lan };
+      const { previewUrl } = await api.createPreviewToken(appId, { scope: "read" });
+      return previewUrl;
     } catch {
       return null;
     }
@@ -80,24 +58,10 @@ export function SharePopover({ appId }: { appId: string | null }) {
 
   const copyLocal = async () => {
     try {
-      const urls = await mintTokenUrl();
-      const target = urls?.localUrl ?? (typeof window !== "undefined" ? window.location.href : "");
+      const target =
+        (await mintTokenUrl()) ?? (typeof window !== "undefined" ? window.location.href : "");
       await copyText(target);
       setCopiedKey("local");
-    } catch {
-      setCopiedKey(null);
-    }
-  };
-
-  const copyLan = async () => {
-    try {
-      const urls = await mintTokenUrl();
-      if (!urls?.lanUrl) {
-        setCopiedKey(null);
-        return;
-      }
-      await copyText(urls.lanUrl);
-      setCopiedKey("lan");
     } catch {
       setCopiedKey(null);
     }
@@ -150,34 +114,13 @@ export function SharePopover({ appId }: { appId: string | null }) {
           }}
         >
           <ShareOptionButton
-            label="Copy link to this device"
-            hint="Link expires in 1 hour · works in incognito on this device"
+            label="Copy isolated preview link"
+            hint="Read-only link expires in 1 hour · works wherever the configured preview hostname resolves"
             copied={copiedKey === "local"}
             onClick={() => {
               void copyLocal();
             }}
           />
-          {hostInfo === null && hostInfoError === null && (
-            <div className="muted" style={{ fontSize: 11 }}>
-              Loading network info…
-            </div>
-          )}
-          {lanShareable ? (
-            <ShareOptionButton
-              label="Copy link for your network"
-              hint={`Link expires in 1 hour · valid on any device on your network (http://${firstLanIp})`}
-              copied={copiedKey === "lan"}
-              onClick={() => {
-                void copyLan();
-              }}
-            />
-          ) : hostInfo && (hostInfo.lanIps.length === 0 || !appId) ? (
-            <div className="muted" style={{ fontSize: 11, fontStyle: "italic" }}>
-              {appId
-                ? "(your computer isn't on a network)"
-                : "(save the draft first to share over your network)"}
-            </div>
-          ) : null}
           <div
             style={{
               borderTop: "1px solid var(--line)",

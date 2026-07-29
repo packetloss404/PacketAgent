@@ -785,7 +785,11 @@ Use this as the short confidence pass when time is tight.
 3. Open `/builder`, choose **Build an app**, and submit `Build a lightweight CRM for renewal tracking`.
 4. Confirm the draft shows generated source: page routes, API routes, data model, acceptance checks, and open questions.
 5. Approve the draft. Confirm the **Generated source** tab lists source files and a workspace path under `data/generated-apps/<workspace>/<app>/workspace`.
-6. Open the preview route and confirm it serves `/api/app/generated-apps/:appId/preview`, including nested generated files such as `src/App.tsx`.
+6. Open the preview and confirm the iframe uses the isolated origin
+   (`http://127.0.0.2:8484` by default), not the workbench origin. In browser
+   storage, confirm the preview host has only an app-path-scoped
+   `packetagent_preview_*` cookie and never `packetagent_session` or
+   `packetagent_csrf`.
 7. Open **Publish handoff**. Confirm it shows local package/runtime details, artifact paths, workspace manifest, health/smoke expectations, and next actions. It must not claim a cloud deployment unless a validated handoff URL and publish history entry exist.
 8. Open **Source** for a saved generated app. Confirm package-plan status is
    visible, download the git-ready ZIP, and inspect the archive. It must contain
@@ -804,7 +808,10 @@ Sign in -> `/builder` -> describe an app -> saved local preview -> iterate -> pu
 3. Type a prompt such as `Build a lightweight CRM for renewal tracking`, then click the primary generate action.
 4. Confirm a draft renders before any mutation. It should show app name, summary, plan steps, page map, data model, acceptance checks, and warnings/open questions when relevant.
 5. Approve the draft. Confirm a new app and checkpoint are created and that a local preview path appears.
-6. Open the preview link. You should land at `/builder/preview/<workspaceId>/<appId>/...` and see the generated routes load.
+6. Open the preview. The workbench should mint an interactive capability,
+   exchange it on the isolated preview origin, remove the URL fragment, and
+   render the generated routes. Hold Cmd/Ctrl and click an element; selection
+   should cross the validated message bridge without same-origin DOM access.
 7. Submit a refinement prompt such as `Add an inline notes field to Account`. Confirm a dry-run change set is shown before mutation, including affected artifacts, route/privacy changes, acceptance checks, and rollback target.
 8. Apply the change. Verify a new checkpoint is recorded and that the previous checkpoint is still listed in builder history.
 9. Restore a previous non-current checkpoint from the history panel. Confirm the current pointer, preview state, and build/smoke metadata update.
@@ -929,6 +936,28 @@ Required brokered-egress verification:
    `_manifest.json` but cannot mutate either.
 5. Stop Docker and repeat. Confirm Builder reports blocked failure; it must not
    return pass or use the insecure native driver.
+
+Required generated-preview isolation verification:
+
+1. Run `npm run verify:preview-isolation`. It uses temporary SQLite/runtime
+   state and must report `ok: true`, the distinct app/preview origins,
+   `fragment-to-http-only-cookie`, and read-scope write status `403`.
+2. Confirm a workbench-origin request to
+   `/api/app/generated-apps/:appId/preview` returns `404`, even with a valid
+   `packetagent_session`, and a preview-origin request to `/api/health` also
+   returns `404`.
+3. Confirm a minted preview URL has no query string and carries `#token=pt1…`.
+   The bootstrap exchange must set a Secure, HttpOnly, `SameSite=None`,
+   `Partitioned` cookie scoped to the one app path, then remove the fragment.
+4. Confirm shared/read HTML uses `frame-ancestors 'none'`, an interactive
+   document names only the exact workbench origin, inline scripts carry a
+   fresh nonce, and generated connect/form/script sources are bounded.
+5. Confirm a shared/read cookie can load preview assets and read runtime data
+   but receives `403` for `POST`, `PUT`, `PATCH`, and `DELETE`.
+6. In production, configure the dual-host Caddy or nginx example under
+   `dev/deployment/examples/preview-origin/`. Use different HTTPS hostnames,
+   preserve the reviewed Host/forwarded-host values, and confirm each virtual
+   host rejects the other surface.
 
 ## Operations Sanity
 

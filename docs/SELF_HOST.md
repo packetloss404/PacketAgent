@@ -35,9 +35,10 @@ npm run dev
 
 Open **http://localhost:7341** in your browser.
 
-The current foundation checkout is `D:\projects\PacketAgent`. PacketAgent does
-not yet have a configured `origin`; never push this work to the historical
-`taskloom-source` remote.
+The current foundation checkout is `D:\projects\PacketAgent`. Its writable
+remote is `git@github.com:packetloss404/PacketAgent.git`; the historical
+`taskloom-source` remote is read-only migration context and must never receive
+PacketAgent work.
 
 Sign in with the seeded developer account:
 
@@ -56,6 +57,29 @@ Go to `/builder` (a full-bleed route outside the workbench Shell), choose **Buil
 | `8484` | Hono (api) | REST + SSE endpoints, jobs scheduler, sandbox   |
 
 If port `7341` or `8484` is already in use, see the troubleshooting section below.
+
+Generated code is deliberately not served from the workbench origin. The
+development preview origin defaults to `http://127.0.0.2:8484`, which is a
+separate loopback cookie host from `localhost`. The Builder obtains a bounded
+interactive capability and loads that origin in its sandboxed iframe; shared
+links receive a read-only capability.
+
+For production, set:
+
+```bash
+NODE_ENV=production
+PACKETAGENT_APP_ORIGIN=https://packetagent.example.com
+PACKETAGENT_PREVIEW_ORIGIN=https://preview.packetagent.example.com
+PACKETAGENT_PREVIEW_TOKEN_SECRET=<long-random-secret>
+```
+
+The two origins must use different HTTPS hostnames; changing only the port
+does not isolate browser cookies. Route both virtual hosts to the same
+PacketAgent backend using the examples under
+[`../dev/deployment/examples/preview-origin/`](../dev/deployment/examples/preview-origin/).
+The primary host rejects preview documents/runtime APIs, and the preview host
+rejects the workbench and every non-preview route. Validate the deployed
+boundary with `npm run verify:preview-isolation`.
 
 To reset local data back to the seed state at any time, stop the dev server and run `npm run store:reset`.
 

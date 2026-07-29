@@ -341,8 +341,8 @@ Status: complete as of 2026-07-29. Resume at R5.
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1-R5.4 are complete as of 2026-07-29. Resume at
-R5.5.
+Status: in progress. R5.1-R5.5 are complete as of 2026-07-29. Resume at
+R5.6.
 
 - [x] Make real sandboxed TypeScript and Vite validation the default and remove
       synthetic success.
@@ -351,7 +351,7 @@ R5.5.
 - [x] Enforce CPU, memory, process, timeout, filesystem, environment, and
       egress limits at the sandbox boundary.
 - [x] Reuse W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections.
-- [ ] Isolate generated previews by origin with scoped cookies, CSP, and proxy
+- [x] Isolate generated previews by origin with scoped cookies, CSP, and proxy
       rules.
 - [ ] Harden containers with non-root users, dropped capabilities,
       no-new-privileges, and process limits.
@@ -419,6 +419,25 @@ R5.5.
   pass (1,605 passed with three intentional live interoperability skips).
   Resume at R5.5 generated-preview origin, cookie, CSP, messaging, and proxy
   isolation.
+- R5.5 result: the workbench and generated previews now have different browser
+  authorities. Production requires exact, different HTTPS hostnames; a
+  different port on one hostname is refused because it does not isolate
+  cookies. Primary sessions remain host-only. Versioned, checkpoint-bound
+  read/interactive capabilities travel only in URL fragments, exchange for a
+  Secure/HttpOnly/partitioned app-path cookie, and are revalidated on every
+  preview/runtime request. Shared sessions are read-only. Generated documents
+  receive per-response nonces, bounded CSP, and scope-specific framing; the
+  Builder click-to-edit path now uses exact-origin/source, schema-validated
+  messaging rather than parent DOM access. Dual-host Caddy/nginx examples and
+  `npm run verify:preview-isolation` prove both route-denial directions,
+  fragment/cookie exchange, session non-inheritance, CSP, bridge, and
+  read-scope `403`. Research and evidence live in
+  [`dev/r5-sandbox-isolation.md`](dev/r5-sandbox-isolation.md). Typecheck,
+  zero-warning lint, formatting, the production web build, 33 web tests, 62
+  focused preview/security tests, all four cumulative R5 executable verifiers,
+  and 1,617 API tests pass (1,614 passed with three intentional live
+  interoperability skips). Resume at R5.6 final container-hardening closure
+  and the cumulative R5 gate.
 
 ### R6 - Agent authoring and execution depth
 
