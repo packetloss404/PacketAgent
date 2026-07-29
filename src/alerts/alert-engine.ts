@@ -74,7 +74,10 @@ function formatPercent(rate: number): string {
   return `${Math.round(rate * 100)}%`;
 }
 
-export function evaluateAlerts(input: EvaluateAlertsInput, deps: EvaluateAlertsDeps = {}): AlertEvent[] {
+export function evaluateAlerts(
+  input: EvaluateAlertsInput,
+  deps: EvaluateAlertsDeps = {},
+): AlertEvent[] {
   const now = deps.now ?? (() => new Date());
   const generateId = deps.generateId ?? (() => randomUUID());
   const observedAt = now().toISOString();
@@ -114,7 +117,8 @@ export function evaluateAlerts(input: EvaluateAlertsInput, deps: EvaluateAlertsD
     if (metric.totalRuns <= 0) continue;
     const failureRate = failures / metric.totalRuns;
     if (failureRate <= threshold) continue;
-    const severity: AlertSeverity = failureRate > CRITICAL_JOB_FAILURE_RATE ? "critical" : "warning";
+    const severity: AlertSeverity =
+      failureRate > CRITICAL_JOB_FAILURE_RATE ? "critical" : "warning";
     const context: Record<string, unknown> = {
       type: metric.type,
       totalRuns: metric.totalRuns,

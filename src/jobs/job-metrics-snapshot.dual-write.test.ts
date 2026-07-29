@@ -5,10 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { migrateDatabase } from "../db/cli.js";
-import {
-  pruneJobMetricSnapshots,
-  snapshotJobMetrics,
-} from "./job-metrics-snapshot.js";
+import { pruneJobMetricSnapshots, snapshotJobMetrics } from "./job-metrics-snapshot.js";
 import type { JobTypeMetrics } from "./scheduler-metrics.js";
 import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
 
@@ -19,7 +16,7 @@ function makeStore(snapshots: JobMetricSnapshotRecord[] = []): PacketAgentData {
 function makeStoreDeps(data: PacketAgentData) {
   return {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
 }
 
@@ -38,7 +35,9 @@ function makeMetric(overrides: Partial<JobTypeMetrics> & { type: string }): JobT
   };
 }
 
-function makeSnapshot(overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string }): JobMetricSnapshotRecord {
+function makeSnapshot(
+  overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string },
+): JobMetricSnapshotRecord {
   return {
     id: overrides.id,
     capturedAt: overrides.capturedAt,
@@ -58,12 +57,16 @@ function makeSnapshot(overrides: Partial<JobMetricSnapshotRecord> & { id: string
 function readDedicated(dbPath: string): JobMetricSnapshotRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select id, captured_at, type, total_runs, succeeded_runs, failed_runs, canceled_runs,
         last_run_started_at, last_run_finished_at, last_duration_ms, average_duration_ms, p95_duration_ms
       from job_metric_snapshots
       order by captured_at, id
-    `).all() as Array<{
+    `,
+      )
+      .all() as Array<{
       id: string;
       captured_at: string;
       type: string;
@@ -149,7 +152,11 @@ test("pruneJobMetricSnapshots dual-deletes from JSON-side and dedicated SQLite t
   migrateDatabase({ dbPath });
   const restore = withSqliteEnv(dbPath);
   try {
-    const ancient = makeSnapshot({ id: "ancient", type: "x", capturedAt: "2026-01-01T00:00:00.000Z" });
+    const ancient = makeSnapshot({
+      id: "ancient",
+      type: "x",
+      capturedAt: "2026-01-01T00:00:00.000Z",
+    });
     const stale = makeSnapshot({ id: "stale", type: "x", capturedAt: "2026-04-10T00:00:00.000Z" });
     const fresh = makeSnapshot({ id: "fresh", type: "x", capturedAt: "2026-04-25T00:00:00.000Z" });
     const data = makeStore([ancient, stale, fresh]);
@@ -188,9 +195,15 @@ test("pruneJobMetricSnapshots dual-deletes from JSON-side and dedicated SQLite t
     );
 
     assert.equal(result.removed, 2);
-    assert.deepEqual(data.jobMetricSnapshots.map((entry) => entry.id), ["fresh"]);
+    assert.deepEqual(
+      data.jobMetricSnapshots.map((entry) => entry.id),
+      ["fresh"],
+    );
     const dedicated = readDedicated(dbPath);
-    assert.deepEqual(dedicated.map((entry) => entry.id), ["fresh"]);
+    assert.deepEqual(
+      dedicated.map((entry) => entry.id),
+      ["fresh"],
+    );
   } finally {
     restore();
     rmSync(tempDir, { recursive: true, force: true });

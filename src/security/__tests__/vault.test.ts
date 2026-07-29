@@ -56,10 +56,7 @@ test("encryption uses fresh IV per call (different ciphertext)", () => {
 
 test("loadMasterKey requires MASTER_KEY in production", () => {
   resetMasterKeyCacheForTests();
-  assert.throws(
-    () => loadMasterKey({ NODE_ENV: "production" }),
-    /MASTER_KEY must be set/,
-  );
+  assert.throws(() => loadMasterKey({ NODE_ENV: "production" }), /MASTER_KEY must be set/);
 });
 
 test("loadMasterKey allows deterministic fallback outside production", () => {

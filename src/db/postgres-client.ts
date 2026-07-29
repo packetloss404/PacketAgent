@@ -68,7 +68,9 @@ function clean(value: string | undefined): string {
   return (value ?? "").trim();
 }
 
-function firstConfiguredUrl(env: ManagedPostgresEnv): Pick<ManagedPostgresConfig, "source" | "connectionString"> {
+function firstConfiguredUrl(
+  env: ManagedPostgresEnv,
+): Pick<ManagedPostgresConfig, "source" | "connectionString"> {
   for (const key of MANAGED_POSTGRES_ENV_KEYS) {
     const value = clean(env[key]);
     if (value) return { source: key, connectionString: value };
@@ -80,7 +82,9 @@ export function redactPostgresConnectionString(value: string | null | undefined)
   return clean(value ?? undefined) ? "[redacted]" : null;
 }
 
-export function resolveManagedPostgresConfig(env: ManagedPostgresEnv = process.env): ManagedPostgresConfig {
+export function resolveManagedPostgresConfig(
+  env: ManagedPostgresEnv = process.env,
+): ManagedPostgresConfig {
   const { source, connectionString } = firstConfiguredUrl(env);
   const redactedConnectionString = redactPostgresConnectionString(connectionString);
 
@@ -103,7 +107,9 @@ export function resolveManagedPostgresConfig(env: ManagedPostgresEnv = process.e
   };
 }
 
-export function assertManagedPostgresConfigured(config: ManagedPostgresConfig): asserts config is ManagedPostgresConfig & {
+export function assertManagedPostgresConfigured(
+  config: ManagedPostgresConfig,
+): asserts config is ManagedPostgresConfig & {
   configured: true;
   source: ManagedPostgresEnvKey;
   connectionString: string;
@@ -128,7 +134,10 @@ function buildManagedPostgresPool(
   });
 }
 
-function clientFromPool(config: ManagedPostgresConfig, pool: ManagedPostgresPool): ManagedPostgresClient {
+function clientFromPool(
+  config: ManagedPostgresConfig,
+  pool: ManagedPostgresPool,
+): ManagedPostgresClient {
   assertManagedPostgresConfigured(config);
   return {
     config,
@@ -148,20 +157,26 @@ function clientFromPool(config: ManagedPostgresConfig, pool: ManagedPostgresPool
   };
 }
 
-export function createManagedPostgresPool(options: CreateManagedPostgresPoolOptions = {}): ManagedPostgresPool {
+export function createManagedPostgresPool(
+  options: CreateManagedPostgresPoolOptions = {},
+): ManagedPostgresPool {
   const config = resolveManagedPostgresConfig(options.env);
   assertManagedPostgresConfigured(config);
   return buildManagedPostgresPool(config, options);
 }
 
-export function createManagedPostgresClient(options: CreateManagedPostgresClientOptions = {}): ManagedPostgresClient {
+export function createManagedPostgresClient(
+  options: CreateManagedPostgresClientOptions = {},
+): ManagedPostgresClient {
   const config = resolveManagedPostgresConfig(options.env);
   assertManagedPostgresConfigured(config);
   const pool = options.pool ?? createManagedPostgresPool(options);
   return clientFromPool(config, pool);
 }
 
-export function getManagedPostgresPool(options: CreateManagedPostgresPoolOptions = {}): ManagedPostgresPool {
+export function getManagedPostgresPool(
+  options: CreateManagedPostgresPoolOptions = {},
+): ManagedPostgresPool {
   if (!sharedPool) {
     const config = resolveManagedPostgresConfig(options.env);
     assertManagedPostgresConfigured(config);
@@ -171,7 +186,9 @@ export function getManagedPostgresPool(options: CreateManagedPostgresPoolOptions
   return sharedPool;
 }
 
-export function getManagedPostgresClient(options: CreateManagedPostgresClientOptions = {}): ManagedPostgresClient {
+export function getManagedPostgresClient(
+  options: CreateManagedPostgresClientOptions = {},
+): ManagedPostgresClient {
   if (options.pool) return createManagedPostgresClient(options);
   const pool = options.pool ?? getManagedPostgresPool(options);
   return clientFromPool(sharedConfig ?? resolveManagedPostgresConfig(options.env), pool);

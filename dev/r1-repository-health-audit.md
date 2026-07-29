@@ -80,7 +80,7 @@ are inputs to this re-audit, not active task lists.
   Command-palette, active-view, Builder starter/tour state, and preview-copy
   helpers now live outside component-only modules; opening the palette remounts
   fresh local state instead of synchronously resetting state from effects.
-- `npm run format:check`: 247 files remain, down from 326.
+- `npm run format:check`: 123 files remain, down from 326.
 - `npm run test:api`: 1,521 passed, 4 intentionally skipped live probes, 0
   failed (1,525 total).
 - `npm audit` and `npm audit --omit=dev`: two high package entries for the

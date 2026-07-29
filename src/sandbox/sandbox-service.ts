@@ -245,8 +245,18 @@ export class SandboxService {
     const now = this.nowFn().toISOString();
     const id = randomUUID();
     const runtime = request.runtime ?? this.defaultRuntime();
-    const timeoutMs = clampPositive(request.timeoutMs, this.defaultTimeoutMs(), 1, 24 * 60 * 60 * 1000);
-    const memoryMb = clampPositive(this.numberFromEnv("PACKETAGENT_SANDBOX_MEMORY_MB"), 512, 64, 8192);
+    const timeoutMs = clampPositive(
+      request.timeoutMs,
+      this.defaultTimeoutMs(),
+      1,
+      24 * 60 * 60 * 1000,
+    );
+    const memoryMb = clampPositive(
+      this.numberFromEnv("PACKETAGENT_SANDBOX_MEMORY_MB"),
+      512,
+      64,
+      8192,
+    );
     const cpus = clampPositive(this.numberFromEnv("PACKETAGENT_SANDBOX_CPUS"), 1, 1, 32);
 
     const baseRecord: SandboxExecRecord = {
@@ -316,17 +326,19 @@ export class SandboxService {
         handle,
         (chunk) => this.onChunk(id, chunk, stdoutBuffer, stderrBuffer),
         (exit) => {
-          this.onExit(id, exit, stdoutBuffer, stderrBuffer, startedAt).then(resolve).catch((err) => {
-            // Make absolutely sure we always resolve so /stream callers don't hang
-            const record = this.active.get(id)?.record ?? startedRecord;
-            const fallback: SandboxExecRecord = {
-              ...record,
-              status: "failed",
-              errorMessage: err instanceof Error ? err.message : String(err),
-              updatedAt: this.nowFn().toISOString(),
-            };
-            resolve(fallback);
-          });
+          this.onExit(id, exit, stdoutBuffer, stderrBuffer, startedAt)
+            .then(resolve)
+            .catch((err) => {
+              // Make absolutely sure we always resolve so /stream callers don't hang
+              const record = this.active.get(id)?.record ?? startedRecord;
+              const fallback: SandboxExecRecord = {
+                ...record,
+                status: "failed",
+                errorMessage: err instanceof Error ? err.message : String(err),
+                updatedAt: this.nowFn().toISOString(),
+              };
+              resolve(fallback);
+            });
         },
       );
       this.active.set(id, {
@@ -375,7 +387,15 @@ export class SandboxService {
    */
   async runSmokeBatch(
     workspaceId: string,
-    items: ReadonlyArray<{ name: string; command: string; runtime?: string; appId?: string; checkpointId?: string; timeoutMs?: number; env?: Record<string, string> }>,
+    items: ReadonlyArray<{
+      name: string;
+      command: string;
+      runtime?: string;
+      appId?: string;
+      checkpointId?: string;
+      timeoutMs?: number;
+      env?: Record<string, string>;
+    }>,
   ): Promise<SandboxSmokeBatchResult> {
     const results: SandboxSmokeItemResult[] = [];
     for (const item of items) {
@@ -416,8 +436,8 @@ export class SandboxService {
     const status: AggregateSmokeStatus = results.every((r) => r.status === "pass")
       ? "pass"
       : results.some((r) => r.status === "fail" || r.status === "timeout")
-      ? "fail"
-      : "warn";
+        ? "fail"
+        : "warn";
     return { status, items: results };
   }
 
@@ -439,7 +459,11 @@ export class SandboxService {
     if (this.cachedDriver === this.dockerDriver && this.cachedDriverAvailable) {
       return this.dockerDriver;
     }
-    const requested = (this.forcedDriver ?? this.env.PACKETAGENT_SANDBOX_DRIVER ?? "auto").toLowerCase();
+    const requested = (
+      this.forcedDriver ??
+      this.env.PACKETAGENT_SANDBOX_DRIVER ??
+      "auto"
+    ).toLowerCase();
     if (requested === "native") {
       // Explicit native: refused unless the operator opted into the insecure flag.
       this.assertNativeAllowed();
@@ -526,7 +550,10 @@ export class SandboxService {
     return updated ?? (active?.record as SandboxExecRecord);
   }
 
-  private deriveStatus(exit: SandboxExitEvent, currentStatus?: SandboxExecStatus): SandboxExecStatus {
+  private deriveStatus(
+    exit: SandboxExitEvent,
+    currentStatus?: SandboxExecStatus,
+  ): SandboxExecStatus {
     if (currentStatus === "canceled") return "canceled";
     if (exit.errorMessage?.includes("timed out")) return "timeout";
     if (exit.errorMessage?.includes("canceled")) return "canceled";
@@ -537,7 +564,10 @@ export class SandboxService {
     return "failed";
   }
 
-  private async persistUpdate(id: string, patch: Partial<SandboxExecRecord>): Promise<SandboxExecRecord | null> {
+  private async persistUpdate(
+    id: string,
+    patch: Partial<SandboxExecRecord>,
+  ): Promise<SandboxExecRecord | null> {
     const updated = await this.store.updateExec(id, {
       ...patch,
       updatedAt: this.nowFn().toISOString(),
@@ -592,7 +622,12 @@ export class SandboxService {
   }
 
   private defaultTimeoutMs(): number {
-    return clampPositive(this.numberFromEnv("PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS"), DEFAULT_TIMEOUT_MS, 1, 24 * 60 * 60 * 1000);
+    return clampPositive(
+      this.numberFromEnv("PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS"),
+      DEFAULT_TIMEOUT_MS,
+      1,
+      24 * 60 * 60 * 1000,
+    );
   }
 
   private numberFromEnv(key: string): number | undefined {
@@ -618,7 +653,12 @@ export class SandboxService {
   }
 }
 
-function clampPositive(value: number | undefined, fallback: number, min: number, max: number): number {
+function clampPositive(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   const candidate = value ?? fallback;
   if (!Number.isFinite(candidate) || candidate < min) return Math.max(min, fallback);
   return Math.min(candidate, max);

@@ -27,14 +27,17 @@ test("slack_post_webhook posts JSON to the supplied webhook", async () => {
   };
 
   const tool = createSlackPostWebhookTool({ fetchImpl, env: {} });
-  const result = await tool.handle({
-    webhookUrl,
-    text: "Build finished",
-    username: "PacketAgent",
-    iconEmoji: ":white_check_mark:",
-    channel: "#deploys",
-    blocks: [{ type: "section", text: { type: "mrkdwn", text: "Build finished" } }],
-  }, context(ctrl.signal));
+  const result = await tool.handle(
+    {
+      webhookUrl,
+      text: "Build finished",
+      username: "PacketAgent",
+      iconEmoji: ":white_check_mark:",
+      channel: "#deploys",
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: "Build finished" } }],
+    },
+    context(ctrl.signal),
+  );
 
   assert.equal(result.ok, true);
   assert.equal(seenUrl, webhookUrl);
@@ -75,14 +78,18 @@ test("github_api routes supported operations to GitHub REST paths", async () => 
     const requestUrl = new URL(url.toString());
     const responseInit = { headers: { "content-type": "application/json" } };
 
-    if (requestUrl.pathname === "/repos/octo/packetagent/pulls" && requestUrl.searchParams.get("state") === "closed") {
+    if (
+      requestUrl.pathname === "/repos/octo/packetagent/pulls" &&
+      requestUrl.searchParams.get("state") === "closed"
+    ) {
       return Response.json([{ number: 12, title: "Fix bug" }], responseInit);
     }
     if (requestUrl.pathname === "/repos/octo/packetagent/pulls/12") {
       return Response.json({ number: 12, title: "Fix bug" }, responseInit);
     }
     if (requestUrl.pathname === "/repos/octo/packetagent/issues/12/comments") {
-      if (init?.method === "POST") return Response.json({ id: 45, body: "Looks good" }, { ...responseInit, status: 201 });
+      if (init?.method === "POST")
+        return Response.json({ id: 45, body: "Looks good" }, { ...responseInit, status: 201 });
       return Response.json([{ id: 44, body: "Prior comment" }], responseInit);
     }
     return Response.json({ message: "not found" }, { ...responseInit, status: 404 });
@@ -94,42 +101,59 @@ test("github_api routes supported operations to GitHub REST paths", async () => 
     apiBaseUrl: "https://github.test",
   });
 
-  const listed = await tool.handle({
-    owner: "octo",
-    repo: "packetagent",
-    operation: "list_prs",
-    state: "closed",
-  }, context());
-  const pr = await tool.handle({
-    owner: "octo",
-    repo: "packetagent",
-    operation: "get_pr",
-    pullNumber: 12,
-  }, context());
-  const comments = await tool.handle({
-    owner: "octo",
-    repo: "packetagent",
-    operation: "get_comments",
-    pullNumber: 12,
-  }, context());
-  const created = await tool.handle({
-    owner: "octo",
-    repo: "packetagent",
-    operation: "create_comment",
-    issueNumber: 12,
-    body: "Looks good",
-  }, context());
+  const listed = await tool.handle(
+    {
+      owner: "octo",
+      repo: "packetagent",
+      operation: "list_prs",
+      state: "closed",
+    },
+    context(),
+  );
+  const pr = await tool.handle(
+    {
+      owner: "octo",
+      repo: "packetagent",
+      operation: "get_pr",
+      pullNumber: 12,
+    },
+    context(),
+  );
+  const comments = await tool.handle(
+    {
+      owner: "octo",
+      repo: "packetagent",
+      operation: "get_comments",
+      pullNumber: 12,
+    },
+    context(),
+  );
+  const created = await tool.handle(
+    {
+      owner: "octo",
+      repo: "packetagent",
+      operation: "create_comment",
+      issueNumber: 12,
+      body: "Looks good",
+    },
+    context(),
+  );
 
   assert.equal(listed.ok, true);
   assert.equal(pr.ok, true);
   assert.equal(comments.ok, true);
   assert.equal(created.ok, true);
-  assert.deepEqual(calls.map((call) => `${call.init?.method} ${new URL(call.url).pathname}${new URL(call.url).search}`), [
-    "GET /repos/octo/packetagent/pulls?state=closed",
-    "GET /repos/octo/packetagent/pulls/12",
-    "GET /repos/octo/packetagent/issues/12/comments",
-    "POST /repos/octo/packetagent/issues/12/comments",
-  ]);
+  assert.deepEqual(
+    calls.map(
+      (call) => `${call.init?.method} ${new URL(call.url).pathname}${new URL(call.url).search}`,
+    ),
+    [
+      "GET /repos/octo/packetagent/pulls?state=closed",
+      "GET /repos/octo/packetagent/pulls/12",
+      "GET /repos/octo/packetagent/issues/12/comments",
+      "POST /repos/octo/packetagent/issues/12/comments",
+    ],
+  );
   for (const call of calls) {
     assert.equal(header(call.init, "authorization"), "Bearer ghp_envsecret");
     assert.equal(header(call.init, "accept"), "application/vnd.github+json");
@@ -150,12 +174,15 @@ test("github_api prefers explicit token and redacts it from errors", async () =>
     apiBaseUrl: "https://github.test",
   });
 
-  const result = await tool.handle({
-    token: "ghp_explicitsecret",
-    owner: "octo",
-    repo: "packetagent",
-    operation: "list_prs",
-  }, context());
+  const result = await tool.handle(
+    {
+      token: "ghp_explicitsecret",
+      owner: "octo",
+      repo: "packetagent",
+      operation: "list_prs",
+    },
+    context(),
+  );
 
   assert.equal(seenAuth, "Bearer ghp_explicitsecret");
   assert.equal(result.ok, false);
@@ -167,23 +194,37 @@ test("github_api validates required token and create_comment body", async () => 
   const fetchImpl: FetchImpl = async () => {
     throw new Error("fetch should not be called");
   };
-  const toolWithoutToken = createGithubApiTool({ fetchImpl, env: {}, apiBaseUrl: "https://github.test" });
-  const missingToken = await toolWithoutToken.handle({
-    owner: "octo",
-    repo: "packetagent",
-    operation: "list_prs",
-  }, context());
+  const toolWithoutToken = createGithubApiTool({
+    fetchImpl,
+    env: {},
+    apiBaseUrl: "https://github.test",
+  });
+  const missingToken = await toolWithoutToken.handle(
+    {
+      owner: "octo",
+      repo: "packetagent",
+      operation: "list_prs",
+    },
+    context(),
+  );
 
   assert.equal(missingToken.ok, false);
   assert.match(missingToken.error ?? "", /token is required/);
 
-  const tool = createGithubApiTool({ fetchImpl, env: { GITHUB_TOKEN: "ghp_envsecret" }, apiBaseUrl: "https://github.test" });
-  const missingBody = await tool.handle({
-    owner: "octo",
-    repo: "packetagent",
-    operation: "create_comment",
-    issueNumber: 1,
-  }, context());
+  const tool = createGithubApiTool({
+    fetchImpl,
+    env: { GITHUB_TOKEN: "ghp_envsecret" },
+    apiBaseUrl: "https://github.test",
+  });
+  const missingBody = await tool.handle(
+    {
+      owner: "octo",
+      repo: "packetagent",
+      operation: "create_comment",
+      issueNumber: 1,
+    },
+    context(),
+  );
 
   assert.equal(missingBody.ok, false);
   assert.match(missingBody.error ?? "", /body is required/);

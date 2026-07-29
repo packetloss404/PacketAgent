@@ -60,7 +60,11 @@ const RECORD_COLLECTIONS = [
   "workerNotificationDeliveries",
 ] as const satisfies readonly StoreCollectionKey[];
 
-const MAP_COLLECTIONS = ["activationFacts", "activationMilestones", "activationReadModels"] as const satisfies readonly StoreCollectionKey[];
+const MAP_COLLECTIONS = [
+  "activationFacts",
+  "activationMilestones",
+  "activationReadModels",
+] as const satisfies readonly StoreCollectionKey[];
 
 interface SqliteStoreRow {
   collection: StoreCollectionKey;
@@ -150,7 +154,10 @@ export function mutateSqliteStore<T>(dbPath: string, mutator: (data: PacketAgent
   }
 }
 
-export async function mutateSqliteStoreAsync<T>(dbPath: string, mutator: (data: PacketAgentData) => T | Promise<T>): Promise<T> {
+export async function mutateSqliteStoreAsync<T>(
+  dbPath: string,
+  mutator: (data: PacketAgentData) => T | Promise<T>,
+): Promise<T> {
   const db = openStoreDatabase(dbPath);
   const backendKey = `sqlite:${dbPath}`;
   incrementMutateSqliteDepth();
@@ -206,10 +213,14 @@ export function persistSqliteAppData(dbPath: string, data: PacketAgentData): voi
 }
 
 export function loadSqliteStore(db: DatabaseSync): PacketAgentData | null {
-  const rows = db.prepare("select collection, payload from app_records order by collection, id").all() as unknown as SqliteStoreRow[];
+  const rows = db
+    .prepare("select collection, payload from app_records order by collection, id")
+    .all() as unknown as SqliteStoreRow[];
   const rateLimits = loadSqliteRateLimitBuckets(db);
   const dedicatedCollections = loadDedicatedRelationalCollections(db);
-  const hasDedicatedRows = Object.values(dedicatedCollections).some((records) => records.length > 0);
+  const hasDedicatedRows = Object.values(dedicatedCollections).some(
+    (records) => records.length > 0,
+  );
   if (rows.length === 0 && rateLimits.length === 0 && !hasDedicatedRows) return null;
 
   const partial: Partial<PacketAgentData> = { rateLimits };
@@ -255,10 +266,23 @@ export function persistSqliteStoreRows(db: DatabaseSync, data: PacketAgentData):
   for (const collection of RECORD_COLLECTIONS) {
     for (const payload of recordsForCollection(data, collection)) {
       const id = recordId(collection, payload);
-      insert.run(collection, id, workspaceIdForRecord(payload), JSON.stringify(payload), updatedAtForRecord(payload));
+      insert.run(
+        collection,
+        id,
+        workspaceIdForRecord(payload),
+        JSON.stringify(payload),
+        updatedAtForRecord(payload),
+      );
       const searchValues = searchValuesForRecord(collection, payload);
       if (searchValues) {
-        insertSearch.run(collection, id, searchValues.workspaceId, searchValues.userId, searchValues.email, searchValues.token);
+        insertSearch.run(
+          collection,
+          id,
+          searchValues.workspaceId,
+          searchValues.userId,
+          searchValues.email,
+          searchValues.token,
+        );
       }
     }
   }
@@ -267,7 +291,13 @@ export function persistSqliteStoreRows(db: DatabaseSync, data: PacketAgentData):
   for (const collection of MAP_COLLECTIONS) {
     const map = data[collection] as Record<string, unknown>;
     for (const [workspaceId, payload] of Object.entries(map)) {
-      insert.run(collection, workspaceId, workspaceId, JSON.stringify({ [workspaceId]: payload }), null);
+      insert.run(
+        collection,
+        workspaceId,
+        workspaceId,
+        JSON.stringify({ [workspaceId]: payload }),
+        null,
+      );
     }
   }
 }
@@ -279,26 +309,32 @@ interface AppRecordSearchValues {
   token: SQLInputValue;
 }
 
-function searchValuesForRecord(collection: StoreCollectionKey, payload: unknown): AppRecordSearchValues | null {
+function searchValuesForRecord(
+  collection: StoreCollectionKey,
+  payload: unknown,
+): AppRecordSearchValues | null {
   const record = payload as Record<string, unknown>;
-  if (![
-    "users",
-    "sessions",
-    "workspaces",
-    "memberships",
-    "workspaceInvitations",
-    "shareTokens",
-    "workspaceBriefs",
-    "workspaceBriefVersions",
-    "requirements",
-    "implementationPlanItems",
-    "workflowConcerns",
-    "validationEvidence",
-    "releaseConfirmations",
-    "agents",
-    "providers",
-    "workspaceEnvVars",
-  ].includes(collection)) return null;
+  if (
+    ![
+      "users",
+      "sessions",
+      "workspaces",
+      "memberships",
+      "workspaceInvitations",
+      "shareTokens",
+      "workspaceBriefs",
+      "workspaceBriefVersions",
+      "requirements",
+      "implementationPlanItems",
+      "workflowConcerns",
+      "validationEvidence",
+      "releaseConfirmations",
+      "agents",
+      "providers",
+      "workspaceEnvVars",
+    ].includes(collection)
+  )
+    return null;
   const workspaceId = typeof record.workspaceId === "string" ? record.workspaceId : null;
   const userId = typeof record.userId === "string" ? record.userId : null;
   const email = typeof record.email === "string" ? normalizeEmail(record.email) : null;
@@ -323,10 +359,17 @@ type IndexedCollection =
   | "providers"
   | "shareTokens";
 
-export function sqliteIndexedRecord<T>(dbPath: string, collection: IndexedCollection, whereSql: string, values: SQLInputValue[]): T | null {
+export function sqliteIndexedRecord<T>(
+  dbPath: string,
+  collection: IndexedCollection,
+  whereSql: string,
+  values: SQLInputValue[],
+): T | null {
   const db = openStoreDatabase(dbPath);
   try {
-    const row = db.prepare(`
+    const row = db
+      .prepare(
+        `
       select app_records.payload as payload
       from app_record_search
       join app_records
@@ -334,17 +377,27 @@ export function sqliteIndexedRecord<T>(dbPath: string, collection: IndexedCollec
        and app_records.id = app_record_search.id
       where app_record_search.collection = ? and ${whereSql}
       limit 1
-    `).get(collection, ...values) as { payload: string } | undefined;
-    return row ? JSON.parse(row.payload) as T : null;
+    `,
+      )
+      .get(collection, ...values) as { payload: string } | undefined;
+    return row ? (JSON.parse(row.payload) as T) : null;
   } finally {
     db.close();
   }
 }
 
-export function sqliteIndexedRecords<T>(dbPath: string, collection: IndexedCollection, whereSql: string, values: SQLInputValue[], orderSql = "app_records.id"): T[] | null {
+export function sqliteIndexedRecords<T>(
+  dbPath: string,
+  collection: IndexedCollection,
+  whereSql: string,
+  values: SQLInputValue[],
+  orderSql = "app_records.id",
+): T[] | null {
   const db = openStoreDatabase(dbPath);
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select app_records.payload as payload
       from app_record_search
       join app_records
@@ -352,7 +405,9 @@ export function sqliteIndexedRecords<T>(dbPath: string, collection: IndexedColle
        and app_records.id = app_record_search.id
       where app_record_search.collection = ? and ${whereSql}
       order by ${orderSql}
-    `).all(collection, ...values) as Array<{ payload: string }>;
+    `,
+      )
+      .all(collection, ...values) as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as T);
   } finally {
     db.close();
@@ -363,12 +418,14 @@ const WORKSPACE_RECORD_ORDER_SQL = {
   id: "app_records.id",
   createdAtAsc: "json_extract(app_records.payload, '$.createdAt') asc, app_records.id asc",
   createdAtDesc: "json_extract(app_records.payload, '$.createdAt') desc, app_records.id desc",
-  updatedAtDesc: "coalesce(app_records.updated_at, json_extract(app_records.payload, '$.updatedAt'), json_extract(app_records.payload, '$.createdAt')) desc, app_records.id desc",
+  updatedAtDesc:
+    "coalesce(app_records.updated_at, json_extract(app_records.payload, '$.updatedAt'), json_extract(app_records.payload, '$.createdAt')) desc, app_records.id desc",
   occurredAtDesc: "json_extract(app_records.payload, '$.occurredAt') desc, app_records.id desc",
   scheduledAtAsc: "json_extract(app_records.payload, '$.scheduledAt') asc, app_records.id asc",
   completedAtDesc: "json_extract(app_records.payload, '$.completedAt') desc, app_records.id desc",
   orderAsc: "json_extract(app_records.payload, '$.order') asc, app_records.id asc",
-  versionNumberDesc: "json_extract(app_records.payload, '$.versionNumber') desc, app_records.id desc",
+  versionNumberDesc:
+    "json_extract(app_records.payload, '$.versionNumber') desc, app_records.id desc",
   nameAsc: "json_extract(app_records.payload, '$.name') collate nocase asc, app_records.id asc",
   keyAsc: "json_extract(app_records.payload, '$.key') collate nocase asc, app_records.id asc",
 } as const satisfies Record<WorkspaceRecordOrder, string>;
@@ -386,13 +443,17 @@ export function sqliteWorkspaceRecords<K extends WorkspaceRecordCollectionKey>(
     const hasLimit = typeof limit === "number" && limit > 0;
     const limitSql = hasLimit ? "limit ?" : "";
     if (hasLimit) values.push(limit);
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(
+        `
       select payload
       from app_records
       where collection = ? and workspace_id = ?
       order by ${WORKSPACE_RECORD_ORDER_SQL[orderBy]}
       ${limitSql}
-    `).all(...values) as Array<{ payload: string }>;
+    `,
+      )
+      .all(...values) as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as WorkspaceRecordCollectionMap[K]);
   } finally {
     db.close();
@@ -400,7 +461,9 @@ export function sqliteWorkspaceRecords<K extends WorkspaceRecordCollectionKey>(
 }
 
 function loadSqliteRateLimitBuckets(db: DatabaseSync): RateLimitRecord[] {
-  const rows = db.prepare("select id, count, reset_at, updated_at from rate_limit_buckets order by id").all() as unknown as SqliteRateLimitRow[];
+  const rows = db
+    .prepare("select id, count, reset_at, updated_at from rate_limit_buckets order by id")
+    .all() as unknown as SqliteRateLimitRow[];
   return rows.map((row) => ({
     id: row.id,
     count: row.count,
@@ -420,9 +483,13 @@ function persistSqliteRateLimitBuckets(db: DatabaseSync, rateLimits: RateLimitRe
   }
 }
 
-function recordsForCollection(data: PacketAgentData, collection: (typeof RECORD_COLLECTIONS)[number]): unknown[] {
+function recordsForCollection(
+  data: PacketAgentData,
+  collection: (typeof RECORD_COLLECTIONS)[number],
+): unknown[] {
   if (collection === "workspaceBriefs") return workspaceBriefEntries(data.workspaceBriefs);
-  if (collection === "releaseConfirmations") return releaseConfirmationEntries(data.releaseConfirmations);
+  if (collection === "releaseConfirmations")
+    return releaseConfirmationEntries(data.releaseConfirmations);
   return data[collection] as unknown[];
 }
 
@@ -430,7 +497,11 @@ function recordId(collection: StoreCollectionKey, payload: unknown): string {
   const record = payload as Record<string, unknown>;
   if (typeof record.id === "string") return record.id;
   if (collection === "memberships") return `${record.workspaceId}:${record.userId}`;
-  if (collection === "workspaceBriefs" || collection === "onboardingStates" || collection === "releaseConfirmations") {
+  if (
+    collection === "workspaceBriefs" ||
+    collection === "onboardingStates" ||
+    collection === "releaseConfirmations"
+  ) {
     return String(record.workspaceId);
   }
   return JSON.stringify(record);
@@ -443,5 +514,9 @@ function workspaceIdForRecord(payload: unknown): SQLInputValue {
 
 function updatedAtForRecord(payload: unknown): SQLInputValue {
   const record = payload as Record<string, unknown>;
-  return typeof record.updatedAt === "string" ? record.updatedAt : typeof record.createdAt === "string" ? record.createdAt : null;
+  return typeof record.updatedAt === "string"
+    ? record.updatedAt
+    : typeof record.createdAt === "string"
+      ? record.createdAt
+      : null;
 }

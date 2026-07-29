@@ -30,7 +30,9 @@ async function readJsonObject(response: Response): Promise<Record<string, unknow
     const text = await response.text();
     if (!text.trim()) return null;
     const parsed = JSON.parse(text) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
@@ -85,7 +87,10 @@ export function httpLeaderLock(options: HttpLeaderLockOptions): SchedulerLeaderL
         held = flag;
         return flag;
       } catch (error) {
-        if (error instanceof Error && error.message.startsWith("scheduler leader coordinator returned ")) {
+        if (
+          error instanceof Error &&
+          error.message.startsWith("scheduler leader coordinator returned ")
+        ) {
           throw error;
         }
         if (failOpen) return held;

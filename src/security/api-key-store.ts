@@ -45,17 +45,13 @@ function maskedView(record: ApiKeyRecord): MaskedApiKey {
 
 export function listApiKeysForWorkspace(workspaceId: string): MaskedApiKey[] {
   return mutateStore((data) => {
-    return data.apiKeys
-      .filter((k) => k.workspaceId === workspaceId)
-      .map(maskedView);
+    return data.apiKeys.filter((k) => k.workspaceId === workspaceId).map(maskedView);
   });
 }
 
 export async function listApiKeysForWorkspaceAsync(workspaceId: string): Promise<MaskedApiKey[]> {
   const data = await loadStoreAsync();
-  return data.apiKeys
-    .filter((k) => k.workspaceId === workspaceId)
-    .map(maskedView);
+  return data.apiKeys.filter((k) => k.workspaceId === workspaceId).map(maskedView);
 }
 
 export function upsertApiKey(input: UpsertApiKeyInput): MaskedApiKey {
@@ -65,7 +61,10 @@ export function upsertApiKey(input: UpsertApiKeyInput): MaskedApiKey {
   const ts = nowIso();
   return mutateStore((data) => {
     const existing = data.apiKeys.find(
-      (k) => k.workspaceId === input.workspaceId && k.provider === input.provider && k.label === input.label,
+      (k) =>
+        k.workspaceId === input.workspaceId &&
+        k.provider === input.provider &&
+        k.label === input.label,
     );
     if (existing) {
       existing.encryptedValue = encrypted.ciphertext;
@@ -97,7 +96,10 @@ export async function upsertApiKeyAsync(input: UpsertApiKeyInput): Promise<Maske
   const ts = nowIso();
   return mutateStoreAsync((data) => {
     const existing = data.apiKeys.find(
-      (k) => k.workspaceId === input.workspaceId && k.provider === input.provider && k.label === input.label,
+      (k) =>
+        k.workspaceId === input.workspaceId &&
+        k.provider === input.provider &&
+        k.label === input.label,
     );
     if (existing) {
       existing.encryptedValue = encrypted.ciphertext;
@@ -158,24 +160,40 @@ export function resolveApiKey(workspaceId: string, provider: ApiKeyProvider): st
   const masterKey = loadMasterKey();
   const ts = nowIso();
   return mutateStore((data) => {
-    const record = data.apiKeys.find((k) => k.workspaceId === workspaceId && k.provider === provider);
+    const record = data.apiKeys.find(
+      (k) => k.workspaceId === workspaceId && k.provider === provider,
+    );
     if (!record) return null;
     record.lastUsedAt = ts;
-    return decryptSecret({ ciphertext: record.encryptedValue, iv: record.iv, authTag: record.authTag }, masterKey);
+    return decryptSecret(
+      { ciphertext: record.encryptedValue, iv: record.iv, authTag: record.authTag },
+      masterKey,
+    );
   });
 }
 
-export function resolveApiKeyAsync(workspaceId: string, provider: ApiKeyProvider): Promise<string | null> {
+export function resolveApiKeyAsync(
+  workspaceId: string,
+  provider: ApiKeyProvider,
+): Promise<string | null> {
   const masterKey = loadMasterKey();
   const ts = nowIso();
   return mutateStoreAsync((data) => {
-    const record = data.apiKeys.find((k) => k.workspaceId === workspaceId && k.provider === provider);
+    const record = data.apiKeys.find(
+      (k) => k.workspaceId === workspaceId && k.provider === provider,
+    );
     if (!record) return null;
     record.lastUsedAt = ts;
-    return decryptSecret({ ciphertext: record.encryptedValue, iv: record.iv, authTag: record.authTag }, masterKey);
+    return decryptSecret(
+      { ciphertext: record.encryptedValue, iv: record.iv, authTag: record.authTag },
+      masterKey,
+    );
   });
 }
 
-export function vaultApiKeyResolver(workspaceId: string, provider: ApiKeyProvider): Promise<string | null> {
+export function vaultApiKeyResolver(
+  workspaceId: string,
+  provider: ApiKeyProvider,
+): Promise<string | null> {
   return resolveApiKeyAsync(workspaceId, provider);
 }

@@ -14,7 +14,9 @@ function makeStore(snapshots: JobMetricSnapshotRecord[] = []): PacketAgentData {
   return { jobMetricSnapshots: [...snapshots] } as unknown as PacketAgentData;
 }
 
-function makeSnapshot(overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string }): JobMetricSnapshotRecord {
+function makeSnapshot(
+  overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string },
+): JobMetricSnapshotRecord {
   return {
     id: overrides.id,
     capturedAt: overrides.capturedAt,
@@ -58,7 +60,10 @@ test("listJobMetricSnapshots delegates through repository and preserves ascendin
 
   const result = listJobMetricSnapshots({}, { loadStore: () => data });
 
-  assert.deepEqual(result.map((entry) => entry.id), ["a", "b", "c"]);
+  assert.deepEqual(
+    result.map((entry) => entry.id),
+    ["a", "b", "c"],
+  );
 });
 
 test("listJobMetricSnapshots preserves type/since/until filtering through the repository", () => {
@@ -70,19 +75,28 @@ test("listJobMetricSnapshots preserves type/since/until filtering through the re
   ]);
 
   const byType = listJobMetricSnapshots({ type: "alpha" }, { loadStore: () => data });
-  assert.deepEqual(byType.map((entry) => entry.id), ["alpha_old", "alpha_mid", "alpha_new"]);
+  assert.deepEqual(
+    byType.map((entry) => entry.id),
+    ["alpha_old", "alpha_mid", "alpha_new"],
+  );
 
   const sinceFiltered = listJobMetricSnapshots(
     { type: "alpha", since: "2026-04-21T00:00:00.000Z" },
     { loadStore: () => data },
   );
-  assert.deepEqual(sinceFiltered.map((entry) => entry.id), ["alpha_mid", "alpha_new"]);
+  assert.deepEqual(
+    sinceFiltered.map((entry) => entry.id),
+    ["alpha_mid", "alpha_new"],
+  );
 
   const untilFiltered = listJobMetricSnapshots(
     { type: "alpha", until: "2026-04-23T00:00:00.000Z" },
     { loadStore: () => data },
   );
-  assert.deepEqual(untilFiltered.map((entry) => entry.id), ["alpha_old", "alpha_mid"]);
+  assert.deepEqual(
+    untilFiltered.map((entry) => entry.id),
+    ["alpha_old", "alpha_mid"],
+  );
 
   const ranged = listJobMetricSnapshots(
     { since: "2026-04-21T00:00:00.000Z", until: "2026-04-23T00:00:00.000Z" },
@@ -101,7 +115,9 @@ test("listJobMetricSnapshots default limit is 100 and cap is 500", () => {
   const many: JobMetricSnapshotRecord[] = [];
   for (let index = 0; index < 600; index += 1) {
     const stamp = new Date(Date.UTC(2026, 0, 1, 0, 0, 0, index)).toISOString();
-    many.push(makeSnapshot({ id: `n_${index.toString().padStart(4, "0")}`, type: "x", capturedAt: stamp }));
+    many.push(
+      makeSnapshot({ id: `n_${index.toString().padStart(4, "0")}`, type: "x", capturedAt: stamp }),
+    );
   }
   const data = makeStore(many);
 
@@ -127,7 +143,10 @@ test("listJobMetricSnapshots can be backed directly by an injected repository in
   const viaInjectedRepository = repository.list({});
   const viaListFunction = listJobMetricSnapshots({}, { loadStore: () => data });
 
-  assert.deepEqual(viaInjectedRepository.map((entry) => entry.id), ["first", "second"]);
+  assert.deepEqual(
+    viaInjectedRepository.map((entry) => entry.id),
+    ["first", "second"],
+  );
   assert.deepEqual(
     viaListFunction.map((entry) => entry.id),
     viaInjectedRepository.map((entry) => entry.id),
@@ -137,9 +156,29 @@ test("listJobMetricSnapshots can be backed directly by an injected repository in
 test("listJobMetricSnapshots reads from the SQLite repository when PACKETAGENT_STORE=sqlite", () => {
   withTempSqlite((dbPath) => {
     const seedRecords: JobMetricSnapshotRecord[] = [
-      makeSnapshot({ id: "sqlite_a", type: "scheduler.tick", capturedAt: "2026-04-26T01:00:00.000Z", totalRuns: 3, succeededRuns: 2, failedRuns: 1 }),
-      makeSnapshot({ id: "sqlite_b", type: "invitation.reconcile", capturedAt: "2026-04-26T02:00:00.000Z", totalRuns: 5, succeededRuns: 5 }),
-      makeSnapshot({ id: "sqlite_c", type: "scheduler.tick", capturedAt: "2026-04-26T03:00:00.000Z", totalRuns: 4, succeededRuns: 3, failedRuns: 1 }),
+      makeSnapshot({
+        id: "sqlite_a",
+        type: "scheduler.tick",
+        capturedAt: "2026-04-26T01:00:00.000Z",
+        totalRuns: 3,
+        succeededRuns: 2,
+        failedRuns: 1,
+      }),
+      makeSnapshot({
+        id: "sqlite_b",
+        type: "invitation.reconcile",
+        capturedAt: "2026-04-26T02:00:00.000Z",
+        totalRuns: 5,
+        succeededRuns: 5,
+      }),
+      makeSnapshot({
+        id: "sqlite_c",
+        type: "scheduler.tick",
+        capturedAt: "2026-04-26T03:00:00.000Z",
+        totalRuns: 4,
+        succeededRuns: 3,
+        failedRuns: 1,
+      }),
     ];
 
     const seedingRepo = createJobMetricSnapshotsRepository({ dbPath });
@@ -147,10 +186,16 @@ test("listJobMetricSnapshots reads from the SQLite repository when PACKETAGENT_S
     assert.equal(seedingRepo.count(), 3);
 
     const ascending = listJobMetricSnapshots();
-    assert.deepEqual(ascending.map((entry) => entry.id), ["sqlite_a", "sqlite_b", "sqlite_c"]);
+    assert.deepEqual(
+      ascending.map((entry) => entry.id),
+      ["sqlite_a", "sqlite_b", "sqlite_c"],
+    );
 
     const filtered = listJobMetricSnapshots({ type: "scheduler.tick" });
-    assert.deepEqual(filtered.map((entry) => entry.id), ["sqlite_a", "sqlite_c"]);
+    assert.deepEqual(
+      filtered.map((entry) => entry.id),
+      ["sqlite_a", "sqlite_c"],
+    );
 
     const tickRecord = filtered[0];
     assert.equal(tickRecord.totalRuns, 3);

@@ -3,7 +3,10 @@ import type { ToolDefinition } from "./types.js";
 
 export type ToolCapabilityRisk = "low" | "medium" | "high";
 export type ToolApprovalDecision = "launch" | "cancel";
-export type ToolCapabilityApprovalDefinition = Pick<ToolDefinition, "name" | "description" | "inputSchema" | "side">;
+export type ToolCapabilityApprovalDefinition = Pick<
+  ToolDefinition,
+  "name" | "description" | "inputSchema" | "side"
+>;
 
 export interface ToolCapabilityApprovalTool {
   name: string;
@@ -108,7 +111,9 @@ const EXTERNAL_SIDE_EFFECT_TOOLS = new Set([
   "sql_query",
 ]);
 
-export function toolCapabilityRisk(tool: Pick<ToolCapabilityApprovalDefinition, "name" | "side">): ToolCapabilityRisk {
+export function toolCapabilityRisk(
+  tool: Pick<ToolCapabilityApprovalDefinition, "name" | "side">,
+): ToolCapabilityRisk {
   if (tool.name === "shell_for_agent" || tool.side === "exec") return "high";
   if (tool.side === "write" || EXTERNAL_SIDE_EFFECT_TOOLS.has(tool.name)) return "medium";
   return "low";
@@ -162,29 +167,40 @@ export function verifyToolCapabilityApproval(
   input: ToolCapabilityApprovalVerificationContext,
 ): ToolCapabilityApprovalVerification;
 export function verifyToolCapabilityApproval(
-  inputOrApproval: VerifyToolCapabilityApprovalInput | ToolCapabilityApprovalInput | null | undefined,
+  inputOrApproval:
+    | VerifyToolCapabilityApprovalInput
+    | ToolCapabilityApprovalInput
+    | null
+    | undefined,
   context?: ToolCapabilityApprovalVerificationContext,
 ): ToolCapabilityApprovalVerification {
   const input = resolveVerificationInput(inputOrApproval, context);
-  if (!input) return { ok: false, error: "Tool capability approval verification context is required." };
+  if (!input)
+    return { ok: false, error: "Tool capability approval verification context is required." };
 
   const approval = resolveApprovalInput(input);
   if (!approval) return { ok: false, error: "Tool capability approval payload is required." };
-  if (approval.decision === "cancel") return { ok: false, error: "Tool capability approval was canceled." };
-  if (approval.decision !== "launch") return { ok: false, error: "Tool capability approval decision is invalid." };
+  if (approval.decision === "cancel")
+    return { ok: false, error: "Tool capability approval was canceled." };
+  if (approval.decision !== "launch")
+    return { ok: false, error: "Tool capability approval decision is invalid." };
 
   const secret = resolveSecret(input.secret);
   const payload = verifyToken(approval.token, secret);
   if (!payload) return { ok: false, error: "Tool capability approval token is invalid." };
 
   const nowMs = toTimeMs(input.now);
-  if (payload.exp < nowMs) return { ok: false, error: "Tool capability approval token has expired." };
-  if (payload.workspaceId !== input.workspaceId) return { ok: false, error: "Tool capability approval workspace does not match." };
+  if (payload.exp < nowMs)
+    return { ok: false, error: "Tool capability approval token has expired." };
+  if (payload.workspaceId !== input.workspaceId)
+    return { ok: false, error: "Tool capability approval workspace does not match." };
   if (payload.userId && input.userId && payload.userId !== input.userId) {
     return { ok: false, error: "Tool capability approval user does not match." };
   }
-  if (payload.agentId !== input.agentId) return { ok: false, error: "Tool capability approval agent does not match." };
-  if (payload.triggerKind !== input.triggerKind) return { ok: false, error: "Tool capability approval trigger does not match." };
+  if (payload.agentId !== input.agentId)
+    return { ok: false, error: "Tool capability approval agent does not match." };
+  if (payload.triggerKind !== input.triggerKind)
+    return { ok: false, error: "Tool capability approval trigger does not match." };
 
   const tools = resolveTools(input);
   const toolNames = uniqueSortedToolNames(tools);
@@ -199,7 +215,10 @@ export function verifyToolCapabilityApproval(
 
   const approvedTools = normalizeApprovedTools(approval.approvedTools);
   if (!approvedTools || !sameStringArray(approvedTools, toolNames)) {
-    return { ok: false, error: "approvedTools must include every enabled tool and no unknown tools." };
+    return {
+      ok: false,
+      error: "approvedTools must include every enabled tool and no unknown tools.",
+    };
   }
 
   if (input.consume === true) {
@@ -259,18 +278,32 @@ function resolveTools(input: {
 }
 
 function resolveVerificationInput(
-  inputOrApproval: VerifyToolCapabilityApprovalInput | ToolCapabilityApprovalInput | null | undefined,
+  inputOrApproval:
+    | VerifyToolCapabilityApprovalInput
+    | ToolCapabilityApprovalInput
+    | null
+    | undefined,
   context?: ToolCapabilityApprovalVerificationContext,
 ): VerifyToolCapabilityApprovalInput | undefined {
-  if (context) return { ...context, approval: (inputOrApproval ?? undefined) as ToolCapabilityApprovalInput | undefined };
+  if (context)
+    return {
+      ...context,
+      approval: (inputOrApproval ?? undefined) as ToolCapabilityApprovalInput | undefined,
+    };
   if (!inputOrApproval || typeof inputOrApproval !== "object") return undefined;
   if (!("workspaceId" in inputOrApproval)) return undefined;
   return inputOrApproval as VerifyToolCapabilityApprovalInput;
 }
 
-function resolveApprovalInput(input: VerifyToolCapabilityApprovalInput): RuntimeApprovalInput | undefined {
+function resolveApprovalInput(
+  input: VerifyToolCapabilityApprovalInput,
+): RuntimeApprovalInput | undefined {
   if (input.approval) return input.approval;
-  if (input.decision !== undefined || input.token !== undefined || input.approvedTools !== undefined) {
+  if (
+    input.decision !== undefined ||
+    input.token !== undefined ||
+    input.approvedTools !== undefined
+  ) {
     return {
       decision: input.decision,
       token: input.token,
@@ -285,7 +318,8 @@ function uniqueSortedToolNames(tools: ToolCapabilityApprovalDefinition[]): strin
 }
 
 function normalizeApprovedTools(approvedTools: unknown): string[] | undefined {
-  if (!Array.isArray(approvedTools) || !approvedTools.every((tool) => typeof tool === "string")) return undefined;
+  if (!Array.isArray(approvedTools) || !approvedTools.every((tool) => typeof tool === "string"))
+    return undefined;
   return [...new Set(approvedTools)].sort();
 }
 
@@ -301,8 +335,13 @@ function toTimeMs(value: Date | number | string | undefined): number {
 }
 
 function resolveSecret(secret?: string): string {
-  return firstNonEmpty(secret, process.env.PACKETAGENT_TOOL_APPROVAL_SECRET, process.env.PACKETAGENT_MASTER_KEY)
-    ?? DEV_TOOL_APPROVAL_SECRET;
+  return (
+    firstNonEmpty(
+      secret,
+      process.env.PACKETAGENT_TOOL_APPROVAL_SECRET,
+      process.env.PACKETAGENT_MASTER_KEY,
+    ) ?? DEV_TOOL_APPROVAL_SECRET
+  );
 }
 
 function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
@@ -344,17 +383,19 @@ function constantTimeEqual(left: string, right: string): boolean {
 function isApprovalTokenPayload(value: unknown): value is ApprovalTokenPayload {
   if (!value || typeof value !== "object") return false;
   const payload = value as Record<string, unknown>;
-  return payload.v === TOKEN_VERSION
-    && typeof payload.exp === "number"
-    && Number.isFinite(payload.exp)
-    && typeof payload.jti === "string"
-    && typeof payload.workspaceId === "string"
-    && (payload.userId === undefined || typeof payload.userId === "string")
-    && typeof payload.agentId === "string"
-    && typeof payload.triggerKind === "string"
-    && Array.isArray(payload.toolNames)
-    && payload.toolNames.every((tool) => typeof tool === "string")
-    && typeof payload.inputsHash === "string";
+  return (
+    payload.v === TOKEN_VERSION &&
+    typeof payload.exp === "number" &&
+    Number.isFinite(payload.exp) &&
+    typeof payload.jti === "string" &&
+    typeof payload.workspaceId === "string" &&
+    (payload.userId === undefined || typeof payload.userId === "string") &&
+    typeof payload.agentId === "string" &&
+    typeof payload.triggerKind === "string" &&
+    Array.isArray(payload.toolNames) &&
+    payload.toolNames.every((tool) => typeof tool === "string") &&
+    typeof payload.inputsHash === "string"
+  );
 }
 
 function pruneConsumedApprovalJtis(nowMs: number): void {
@@ -369,7 +410,7 @@ function stableStringify(value: unknown): string {
 
 function stringifyStable(value: unknown, seen: WeakSet<object>): string {
   if (value === null) return "null";
-  if (value === undefined) return "{\"$undefined\":true}";
+  if (value === undefined) return '{"$undefined":true}';
   if (typeof value === "string" || typeof value === "boolean") return JSON.stringify(value);
   if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : "null";
   if (typeof value === "bigint") return `{"$bigint":${JSON.stringify(value.toString())}}`;

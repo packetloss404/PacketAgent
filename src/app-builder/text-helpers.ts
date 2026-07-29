@@ -3,7 +3,13 @@ export function kebabPlural(value: string): string {
 }
 
 export function appSlug(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "generated-app";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "generated-app"
+  );
 }
 
 export function humanName(value: string): string {

@@ -69,7 +69,9 @@ export function loadMasterKey(env: NodeJS.ProcessEnv = process.env): Buffer {
     throw new Error("vault: MASTER_KEY must be set when NODE_ENV=production");
   }
   if (cachedKey && cachedKeyPassphrase === DEV_MASTER_KEY) return cachedKey;
-  console.warn("[vault] MASTER_KEY not set; using deterministic dev key. DO NOT USE IN PRODUCTION.");
+  console.warn(
+    "[vault] MASTER_KEY not set; using deterministic dev key. DO NOT USE IN PRODUCTION.",
+  );
   cachedKey = deriveMasterKey(DEV_MASTER_KEY);
   cachedKeyPassphrase = DEV_MASTER_KEY;
   return cachedKey;

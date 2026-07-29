@@ -49,15 +49,18 @@ test("email_send delivers through an injected SMTP adapter", async () => {
     },
   });
 
-  const result = await tool.handle({
-    to: ["ada@example.com"],
-    cc: "team@example.com",
-    bcc: "audit@example.com",
-    replyTo: "reply@example.com",
-    subject: "Hello",
-    text: "Plain body",
-    html: "<p>Plain body</p>",
-  }, context());
+  const result = await tool.handle(
+    {
+      to: ["ada@example.com"],
+      cc: "team@example.com",
+      bcc: "audit@example.com",
+      replyTo: "reply@example.com",
+      subject: "Hello",
+      text: "Plain body",
+      html: "<p>Plain body</p>",
+    },
+    context(),
+  );
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.output, { messageId: "msg-1", acceptedCount: 1, rejectedCount: 0 });
@@ -84,11 +87,14 @@ test("email_send delivers through an injected SMTP adapter", async () => {
 test("email_send reports a setup error when no SMTP adapter is configured", async () => {
   const tool = createEmailSendTool({ env: {} });
 
-  const result = await tool.handle({
-    to: "ada@example.com",
-    subject: "Hello",
-    text: "Plain body",
-  }, context());
+  const result = await tool.handle(
+    {
+      to: "ada@example.com",
+      subject: "Hello",
+      text: "Plain body",
+    },
+    context(),
+  );
 
   assert.equal(result.ok, false);
   assert.match(result.error ?? "", /SMTP adapter is not configured/);
@@ -112,12 +118,15 @@ test("email_send redacts SMTP secrets and recipients from adapter errors", async
     },
   });
 
-  const result = await tool.handle({
-    to: "ada@example.com",
-    bcc: "audit@example.com",
-    subject: "Hello",
-    text: "Plain body",
-  }, context());
+  const result = await tool.handle(
+    {
+      to: "ada@example.com",
+      bcc: "audit@example.com",
+      subject: "Hello",
+      text: "Plain body",
+    },
+    context(),
+  );
 
   assert.equal(result.ok, false);
   assert.match(result.error ?? "", /email send failed/);
@@ -133,34 +142,49 @@ test("sql_query requires write=true for mutations and returns rows for reads", a
     const tool = createSqlQueryTool({ dbRoot });
     const ctx = context();
 
-    const rejected = await tool.handle({
-      sql: "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
-    }, ctx);
+    const rejected = await tool.handle(
+      {
+        sql: "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
+      },
+      ctx,
+    );
     assert.equal(rejected.ok, false);
     assert.match(rejected.error ?? "", /CREATE requires write=true/);
 
-    const created = await tool.handle({
-      sql: "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
-      write: true,
-    }, ctx);
+    const created = await tool.handle(
+      {
+        sql: "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
+        write: true,
+      },
+      ctx,
+    );
     assert.equal(created.ok, true);
 
-    const inserted = await tool.handle({
-      sql: "INSERT INTO items (name) VALUES (?)",
-      params: ["first"],
-      write: true,
-    }, ctx);
+    const inserted = await tool.handle(
+      {
+        sql: "INSERT INTO items (name) VALUES (?)",
+        params: ["first"],
+        write: true,
+      },
+      ctx,
+    );
     assert.equal(inserted.ok, true);
     assert.deepEqual(inserted.output, { changes: 1, lastInsertRowid: 1 });
 
-    const read = await tool.handle({
-      sql: "SELECT id, name FROM items WHERE name = ?",
-      params: ["first"],
-    }, ctx);
+    const read = await tool.handle(
+      {
+        sql: "SELECT id, name FROM items WHERE name = ?",
+        params: ["first"],
+      },
+      ctx,
+    );
     assert.equal(read.ok, true);
     const output = read.output as { rows: Array<{ id: number; name: string }>; count: number };
     assert.equal(output.count, 1);
-    assert.deepEqual(output.rows.map((row) => ({ id: row.id, name: row.name })), [{ id: 1, name: "first" }]);
+    assert.deepEqual(
+      output.rows.map((row) => ({ id: row.id, name: row.name })),
+      [{ id: 1, name: "first" }],
+    );
   } finally {
     rmSync(dbRoot, { recursive: true, force: true });
   }
@@ -174,13 +198,37 @@ test("sql_query scopes SQLite files by workspace and agent", async () => {
     const agentB = context({ workspaceId: "workspace", agentId: "agent-b" });
 
     assert.notEqual(
-      resolveAgentSqlitePath({ dbRoot, workspaceId: agentA.workspaceId, agentId: agentA.agentId ?? "" }),
-      resolveAgentSqlitePath({ dbRoot, workspaceId: agentB.workspaceId, agentId: agentB.agentId ?? "" }),
+      resolveAgentSqlitePath({
+        dbRoot,
+        workspaceId: agentA.workspaceId,
+        agentId: agentA.agentId ?? "",
+      }),
+      resolveAgentSqlitePath({
+        dbRoot,
+        workspaceId: agentB.workspaceId,
+        agentId: agentB.agentId ?? "",
+      }),
     );
 
-    assert.equal((await tool.handle({ sql: "CREATE TABLE notes (body TEXT NOT NULL)", write: true }, agentA)).ok, true);
-    assert.equal((await tool.handle({ sql: "INSERT INTO notes (body) VALUES (?)", params: ["from-a"], write: true }, agentA)).ok, true);
-    assert.equal((await tool.handle({ sql: "CREATE TABLE notes (body TEXT NOT NULL)", write: true }, agentB)).ok, true);
+    assert.equal(
+      (await tool.handle({ sql: "CREATE TABLE notes (body TEXT NOT NULL)", write: true }, agentA))
+        .ok,
+      true,
+    );
+    assert.equal(
+      (
+        await tool.handle(
+          { sql: "INSERT INTO notes (body) VALUES (?)", params: ["from-a"], write: true },
+          agentA,
+        )
+      ).ok,
+      true,
+    );
+    assert.equal(
+      (await tool.handle({ sql: "CREATE TABLE notes (body TEXT NOT NULL)", write: true }, agentB))
+        .ok,
+      true,
+    );
 
     const readB = await tool.handle({ sql: "SELECT body FROM notes" }, agentB);
     assert.equal(readB.ok, true);
@@ -206,7 +254,10 @@ test("sql_query rejects multiple statements, ATTACH, and dangerous PRAGMAs", asy
     assert.equal(quotedTrailingToken.ok, false);
     assert.match(quotedTrailingToken.error ?? "", /multiple statements/);
 
-    const attach = await tool.handle({ sql: "ATTACH DATABASE 'elsewhere.sqlite' AS other", write: true }, ctx);
+    const attach = await tool.handle(
+      { sql: "ATTACH DATABASE 'elsewhere.sqlite' AS other", write: true },
+      ctx,
+    );
     assert.equal(attach.ok, false);
     assert.match(attach.error ?? "", /ATTACH and DETACH are not allowed/);
 
@@ -214,11 +265,17 @@ test("sql_query rejects multiple statements, ATTACH, and dangerous PRAGMAs", asy
     assert.equal(dangerousPragma.ok, false);
     assert.match(dangerousPragma.error ?? "", /PRAGMA writable_schema is not allowed/);
 
-    assert.equal((await tool.handle({ sql: "CREATE TABLE items (name TEXT)", write: true }, ctx)).ok, true);
+    assert.equal(
+      (await tool.handle({ sql: "CREATE TABLE items (name TEXT)", write: true }, ctx)).ok,
+      true,
+    );
     const safePragma = await tool.handle({ sql: "PRAGMA table_info(items)" }, ctx);
     assert.equal(safePragma.ok, true);
     const output = safePragma.output as { rows: Array<{ name: string }>; count: number };
-    assert.deepEqual(output.rows.map((row) => row.name), ["name"]);
+    assert.deepEqual(
+      output.rows.map((row) => row.name),
+      ["name"],
+    );
   } finally {
     rmSync(dbRoot, { recursive: true, force: true });
   }

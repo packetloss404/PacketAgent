@@ -4,8 +4,51 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
-import { backfillActivationSignals, backfillActivities, backfillAgentRuns, backfillAlertEvents, backfillAppDatabase, backfillInvitationEmailDeliveries, backfillJobMetricSnapshots, backfillJobs, backfillManagedPostgres, backfillProviderCalls, backupDatabase, compareManagedPostgresStores, loadManagedPostgresSource, managedPostgresStoreStats, migrateDatabase, migrationStatus, readAppData, resetAppDatabase, resetDatabase, restoreDatabase, seedAppDatabase, seedDatabase, verifyActivationSignals, verifyActivities, verifyAgentRuns, verifyAlertEvents, verifyInvitationEmailDeliveries, verifyJobMetricSnapshots, verifyJobs, verifyManagedPostgres, verifyProviderCalls, type ManagedPostgresDocumentStoreDeps } from "./cli";
-import type { ActivationSignalRecord, ActivityRecord, AgentRunRecord, AlertEventRecord, InvitationEmailDeliveryRecord, JobMetricSnapshotRecord, JobRecord, ProviderCallRecord, PacketAgentData } from "../packetagent-store";
+import {
+  backfillActivationSignals,
+  backfillActivities,
+  backfillAgentRuns,
+  backfillAlertEvents,
+  backfillAppDatabase,
+  backfillInvitationEmailDeliveries,
+  backfillJobMetricSnapshots,
+  backfillJobs,
+  backfillManagedPostgres,
+  backfillProviderCalls,
+  backupDatabase,
+  compareManagedPostgresStores,
+  loadManagedPostgresSource,
+  managedPostgresStoreStats,
+  migrateDatabase,
+  migrationStatus,
+  readAppData,
+  resetAppDatabase,
+  resetDatabase,
+  restoreDatabase,
+  seedAppDatabase,
+  seedDatabase,
+  verifyActivationSignals,
+  verifyActivities,
+  verifyAgentRuns,
+  verifyAlertEvents,
+  verifyInvitationEmailDeliveries,
+  verifyJobMetricSnapshots,
+  verifyJobs,
+  verifyManagedPostgres,
+  verifyProviderCalls,
+  type ManagedPostgresDocumentStoreDeps,
+} from "./cli";
+import type {
+  ActivationSignalRecord,
+  ActivityRecord,
+  AgentRunRecord,
+  AlertEventRecord,
+  InvitationEmailDeliveryRecord,
+  JobMetricSnapshotRecord,
+  JobRecord,
+  ProviderCallRecord,
+  PacketAgentData,
+} from "../packetagent-store";
 import { createSeedStore } from "../packetagent-store";
 import { makeWorkerDefinition, makeWorkerVersion } from "../workers/__tests__/fixtures.js";
 
@@ -27,8 +70,13 @@ test("migrateDatabase applies activation migrations idempotently", () => {
 
     const db = new DatabaseSync(dbPath);
     try {
-      const rows = db.prepare("select name from schema_migrations").all() as Array<{ name: string }>;
-      assert.deepEqual(rows.map((row) => row.name), expectedMigrations);
+      const rows = db.prepare("select name from schema_migrations").all() as Array<{
+        name: string;
+      }>;
+      assert.deepEqual(
+        rows.map((row) => row.name),
+        expectedMigrations,
+      );
     } finally {
       db.close();
     }
@@ -88,14 +136,21 @@ test("migrateDatabase creates runtime app tables", () => {
 
     const db = new DatabaseSync(dbPath);
     try {
-      const rows = db.prepare(`
+      const rows = db
+        .prepare(
+          `
         select name
         from sqlite_master
         where type = 'table' and name in (${expectedTables.map(() => "?").join(", ")})
         order by name
-      `).all(...expectedTables) as Array<{ name: string }>;
+      `,
+        )
+        .all(...expectedTables) as Array<{ name: string }>;
 
-      assert.deepEqual(rows.map((row) => row.name), [...expectedTables].sort());
+      assert.deepEqual(
+        rows.map((row) => row.name),
+        [...expectedTables].sort(),
+      );
     } finally {
       db.close();
     }
@@ -112,19 +167,41 @@ test("Worker migration enforces lifecycle identity and concurrency constraints",
     const db = new DatabaseSync(dbPath);
     try {
       db.exec("pragma foreign_keys = on");
-      db.prepare(`
+      db.prepare(
+        `
         insert into worker_definitions (
           workspace_id, id, status, name, current_version_id, updated_at, payload
         ) values (?, ?, ?, ?, ?, ?, json(?))
-      `).run("alpha", "worker-db", "active", "Database Worker", null, "2026-07-27T12:00:00.000Z", "{}");
-      db.prepare(`
+      `,
+      ).run(
+        "alpha",
+        "worker-db",
+        "active",
+        "Database Worker",
+        null,
+        "2026-07-27T12:00:00.000Z",
+        "{}",
+      );
+      db.prepare(
+        `
         insert into worker_versions (
           workspace_id, id, worker_definition_id, version, status,
           content_digest, created_at, payload
         ) values (?, ?, ?, ?, ?, ?, ?, json(?))
-      `).run("alpha", "worker-db-v1", "worker-db", 1, "validated", "sha256:test", "2026-07-27T12:00:00.000Z", "{}");
-      db.prepare("update worker_definitions set current_version_id = ? where workspace_id = ? and id = ?")
-        .run("worker-db-v1", "alpha", "worker-db");
+      `,
+      ).run(
+        "alpha",
+        "worker-db-v1",
+        "worker-db",
+        1,
+        "validated",
+        "sha256:test",
+        "2026-07-27T12:00:00.000Z",
+        "{}",
+      );
+      db.prepare(
+        "update worker_definitions set current_version_id = ? where workspace_id = ? and id = ?",
+      ).run("worker-db-v1", "alpha", "worker-db");
 
       const insertDeployment = db.prepare(`
         insert into worker_deployments (
@@ -132,27 +209,71 @@ test("Worker migration enforces lifecycle identity and concurrency constraints",
           status, revision, updated_at, payload
         ) values (?, ?, ?, ?, ?, ?, ?, json(?))
       `);
-      insertDeployment.run("alpha", "worker-db-deployment-1", "worker-db", "worker-db-v1", "active", 1, "2026-07-27T12:00:00.000Z", "{}");
+      insertDeployment.run(
+        "alpha",
+        "worker-db-deployment-1",
+        "worker-db",
+        "worker-db-v1",
+        "active",
+        1,
+        "2026-07-27T12:00:00.000Z",
+        "{}",
+      );
 
       assert.throws(
-        () => insertDeployment.run("alpha", "worker-db-deployment-2", "worker-db", "worker-db-v1", "active", 1, "2026-07-27T12:01:00.000Z", "{}"),
+        () =>
+          insertDeployment.run(
+            "alpha",
+            "worker-db-deployment-2",
+            "worker-db",
+            "worker-db-v1",
+            "active",
+            1,
+            "2026-07-27T12:01:00.000Z",
+            "{}",
+          ),
         /UNIQUE constraint failed/,
       );
       assert.throws(
-        () => insertDeployment.run("alpha", "worker-db-invalid-revision", "worker-db", "worker-db-v1", "draft", 0, "2026-07-27T12:01:00.000Z", "{}"),
+        () =>
+          insertDeployment.run(
+            "alpha",
+            "worker-db-invalid-revision",
+            "worker-db",
+            "worker-db-v1",
+            "draft",
+            0,
+            "2026-07-27T12:01:00.000Z",
+            "{}",
+          ),
         /CHECK constraint failed/,
       );
       assert.throws(
-        () => db.prepare(`
+        () =>
+          db
+            .prepare(
+              `
           insert into worker_versions (
             workspace_id, id, worker_definition_id, version, status,
             content_digest, created_at, payload
           ) values (?, ?, ?, ?, ?, ?, ?, json(?))
-        `).run("alpha", "worker-db-v1-duplicate-number", "worker-db", 1, "validated", "sha256:other", "2026-07-27T12:02:00.000Z", "{}"),
+        `,
+            )
+            .run(
+              "alpha",
+              "worker-db-v1-duplicate-number",
+              "worker-db",
+              1,
+              "validated",
+              "sha256:other",
+              "2026-07-27T12:02:00.000Z",
+              "{}",
+            ),
         /UNIQUE constraint failed/,
       );
 
-      const activeIndex = db.prepare("select name from sqlite_master where type = 'index' and name = ?")
+      const activeIndex = db
+        .prepare("select name from sqlite_master where type = 'index' and name = ?")
         .get("idx_worker_deployments_one_active_definition") as { name: string } | undefined;
       assert.equal(activeIndex?.name, "idx_worker_deployments_one_active_definition");
       assert.deepEqual(db.prepare("pragma foreign_key_check").all(), []);
@@ -177,7 +298,9 @@ test("rate limit bucket migration backfills legacy app_records buckets", () => {
 
     const db = new DatabaseSync(dbPath);
     try {
-      db.exec("create table schema_migrations (name text primary key, applied_at text not null default (datetime('now'))) ");
+      db.exec(
+        "create table schema_migrations (name text primary key, applied_at text not null default (datetime('now'))) ",
+      );
       db.exec(`
         create table app_records (
           collection text not null,
@@ -189,11 +312,14 @@ test("rate limit bucket migration backfills legacy app_records buckets", () => {
         )
       `);
       const insertMigration = db.prepare("insert into schema_migrations (name) values (?)");
-      for (const name of expectedMigrations.filter((entry) => entry !== "0009_rate_limit_buckets.sql")) {
+      for (const name of expectedMigrations.filter(
+        (entry) => entry !== "0009_rate_limit_buckets.sql",
+      )) {
         insertMigration.run(name);
       }
-      db.prepare("insert into app_records (collection, id, workspace_id, payload, updated_at) values ('rateLimits', ?, null, json(?), ?)")
-        .run(legacyBucket.id, JSON.stringify(legacyBucket), legacyBucket.updatedAt);
+      db.prepare(
+        "insert into app_records (collection, id, workspace_id, payload, updated_at) values ('rateLimits', ?, null, json(?), ?)",
+      ).run(legacyBucket.id, JSON.stringify(legacyBucket), legacyBucket.updatedAt);
     } finally {
       db.close();
     }
@@ -203,8 +329,14 @@ test("rate limit bucket migration backfills legacy app_records buckets", () => {
 
     const migratedDb = new DatabaseSync(dbPath);
     try {
-      const bucket = migratedDb.prepare("select id, count, reset_at as resetAt, updated_at as updatedAt from rate_limit_buckets where id = ?").get(legacyBucket.id) as typeof legacyBucket | undefined;
-      const legacyRows = migratedDb.prepare("select count(*) as count from app_records where collection = 'rateLimits'").get() as { count: number };
+      const bucket = migratedDb
+        .prepare(
+          "select id, count, reset_at as resetAt, updated_at as updatedAt from rate_limit_buckets where id = ?",
+        )
+        .get(legacyBucket.id) as typeof legacyBucket | undefined;
+      const legacyRows = migratedDb
+        .prepare("select count(*) as count from app_records where collection = 'rateLimits'")
+        .get() as { count: number };
       assert.deepEqual(bucket ? { ...bucket } : undefined, legacyBucket);
       assert.equal(legacyRows.count, 0);
     } finally {
@@ -244,10 +376,12 @@ test("migrateDatabase rejects an existing database with foreign-key violations",
     const db = new DatabaseSync(dbPath);
     try {
       db.exec("pragma foreign_keys = off");
-      db.prepare(`
+      db.prepare(
+        `
         insert into workspace_memberships (workspace_id, user_id, role, joined_at)
         values (?, ?, 'viewer', ?)
-      `).run("missing-workspace", "missing-user", "2026-07-28T12:00:00.000Z");
+      `,
+      ).run("missing-workspace", "missing-user", "2026-07-28T12:00:00.000Z");
     } finally {
       db.close();
     }
@@ -297,9 +431,7 @@ test("restoreDatabase rejects a foreign-key-corrupt backup without replacing the
     const currentDb = new DatabaseSync(dbPath);
     try {
       currentDb.exec("create table current_restore_marker (value text not null)");
-      currentDb.prepare("insert into current_restore_marker (value) values (?)").run(
-        "preserve-me",
-      );
+      currentDb.prepare("insert into current_restore_marker (value) values (?)").run("preserve-me");
     } finally {
       currentDb.close();
     }
@@ -307,10 +439,14 @@ test("restoreDatabase rejects a foreign-key-corrupt backup without replacing the
     const corruptBackup = new DatabaseSync(backupPath);
     try {
       corruptBackup.exec("pragma foreign_keys = off");
-      corruptBackup.prepare(`
+      corruptBackup
+        .prepare(
+          `
         insert into workspace_memberships (workspace_id, user_id, role, joined_at)
         values (?, ?, 'viewer', ?)
-      `).run("missing-workspace", "missing-user", "2026-07-28T12:00:00.000Z");
+      `,
+        )
+        .run("missing-workspace", "missing-user", "2026-07-28T12:00:00.000Z");
     } finally {
       corruptBackup.close();
     }
@@ -344,14 +480,23 @@ test("seedAppDatabase writes the full seed store and activation rows", () => {
     assert.equal(result.workspaces, 3);
     assert.equal(data?.workspaces.length, 3);
     assert.equal(data?.users.length, 3);
-    assert.equal(data?.agents.some((agent) => agent.id === "agent_alpha_support"), true);
+    assert.equal(
+      data?.agents.some((agent) => agent.id === "agent_alpha_support"),
+      true,
+    );
     assert.ok((data?.activationSignals.length ?? 0) > 0);
 
     const db = new DatabaseSync(dbPath);
     try {
-      const trackCount = db.prepare("select count(*) as count from activation_tracks").get() as { count: number };
-      const signalRows = db.prepare("select count(*) as count from activation_signals").get() as { count: number };
-      const appRecordSignalRows = db.prepare("select count(*) as count from app_records where collection = 'activationSignals'").get() as { count: number };
+      const trackCount = db.prepare("select count(*) as count from activation_tracks").get() as {
+        count: number;
+      };
+      const signalRows = db.prepare("select count(*) as count from activation_signals").get() as {
+        count: number;
+      };
+      const appRecordSignalRows = db
+        .prepare("select count(*) as count from app_records where collection = 'activationSignals'")
+        .get() as { count: number };
       assert.equal(trackCount.count, 3);
       assert.equal(signalRows.count, data?.activationSignals.length ?? 0);
       assert.equal(appRecordSignalRows.count, 0);
@@ -370,12 +515,14 @@ test("backfillAppDatabase reads a JSON store path into SQLite", () => {
     const jsonPath = join(tempDir, "packetagent.json");
     const data = createSeedStore();
     data.workspaces[0] = { ...data.workspaces[0], name: "Backfilled Workspace" };
-    data.rateLimits = [{
-      id: "auth:login:sha256:backfill",
-      count: 3,
-      resetAt: "2026-05-02T00:00:00.000Z",
-      updatedAt: "2026-04-02T00:00:00.000Z",
-    }];
+    data.rateLimits = [
+      {
+        id: "auth:login:sha256:backfill",
+        count: 3,
+        resetAt: "2026-05-02T00:00:00.000Z",
+        updatedAt: "2026-04-02T00:00:00.000Z",
+      },
+    ];
     data.activationSignals = [
       makeActivationSignal({
         id: "signal_backfill_cli",
@@ -405,18 +552,41 @@ test("backfillAppDatabase reads a JSON store path into SQLite", () => {
     assert.equal(result.source, "backfill");
     assert.equal(stored?.workspaces[0]?.name, "Backfilled Workspace");
     assert.equal(stored?.rateLimits?.[0]?.id, "auth:login:sha256:backfill");
-    assert.deepEqual(stored?.activationSignals.map((entry) => entry.id), ["signal_backfill_cli"]);
-    assert.deepEqual(stored?.workerDefinitions.map((entry) => entry.id), ["worker-backfill"]);
-    assert.deepEqual(stored?.workerVersions.map((entry) => entry.id), ["worker-backfill-v1"]);
+    assert.deepEqual(
+      stored?.activationSignals.map((entry) => entry.id),
+      ["signal_backfill_cli"],
+    );
+    assert.deepEqual(
+      stored?.workerDefinitions.map((entry) => entry.id),
+      ["worker-backfill"],
+    );
+    assert.deepEqual(
+      stored?.workerVersions.map((entry) => entry.id),
+      ["worker-backfill-v1"],
+    );
 
     const db = new DatabaseSync(dbPath);
     try {
-      const bucketRows = db.prepare("select count(*) as count from rate_limit_buckets").get() as { count: number };
-      const rateLimitAppRecordRows = db.prepare("select count(*) as count from app_records where collection = 'rateLimits'").get() as { count: number };
-      const signalRows = db.prepare("select count(*) as count from activation_signals where id = 'signal_backfill_cli'").get() as { count: number };
-      const signalAppRecordRows = db.prepare("select count(*) as count from app_records where collection = 'activationSignals'").get() as { count: number };
-      const workerDefinitionRows = db.prepare("select count(*) as count from worker_definitions where id = 'worker-backfill'").get() as { count: number };
-      const workerVersionRows = db.prepare("select count(*) as count from worker_versions where id = 'worker-backfill-v1'").get() as { count: number };
+      const bucketRows = db.prepare("select count(*) as count from rate_limit_buckets").get() as {
+        count: number;
+      };
+      const rateLimitAppRecordRows = db
+        .prepare("select count(*) as count from app_records where collection = 'rateLimits'")
+        .get() as { count: number };
+      const signalRows = db
+        .prepare(
+          "select count(*) as count from activation_signals where id = 'signal_backfill_cli'",
+        )
+        .get() as { count: number };
+      const signalAppRecordRows = db
+        .prepare("select count(*) as count from app_records where collection = 'activationSignals'")
+        .get() as { count: number };
+      const workerDefinitionRows = db
+        .prepare("select count(*) as count from worker_definitions where id = 'worker-backfill'")
+        .get() as { count: number };
+      const workerVersionRows = db
+        .prepare("select count(*) as count from worker_versions where id = 'worker-backfill-v1'")
+        .get() as { count: number };
       assert.equal(bucketRows.count, 1);
       assert.equal(rateLimitAppRecordRows.count, 0);
       assert.equal(signalRows.count, 1);
@@ -448,7 +618,10 @@ test("loadManagedPostgresSource falls back to the default seed when JSON is miss
     const result = loadManagedPostgresSource({ jsonPath: join(tempDir, "missing.json") });
 
     assert.equal(result.source, "seed");
-    assert.equal(result.data.workspaces.some((workspace) => workspace.id === "alpha"), true);
+    assert.equal(
+      result.data.workspaces.some((workspace) => workspace.id === "alpha"),
+      true,
+    );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -500,19 +673,21 @@ test("backfillManagedPostgres dry-run reports differences without mutating the a
 });
 
 test("backfillManagedPostgres defaults to the managed async store boundary", async () => {
-  const envKeys = ["PACKETAGENT_STORE", "DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"] as const;
+  const envKeys = [
+    "PACKETAGENT_STORE",
+    "DATABASE_URL",
+    "PACKETAGENT_DATABASE_URL",
+    "PACKETAGENT_MANAGED_DATABASE_URL",
+  ] as const;
   const previous = new Map(envKeys.map((key) => [key, process.env[key]]));
   try {
     for (const key of envKeys) delete process.env[key];
 
-    await assert.rejects(
-      backfillManagedPostgres({ dryRun: true, source: "seed" }),
-      (error) => {
-        assert.ok(error instanceof Error);
-        assert.match(error.name, /Managed.*(?:Postgres|Database)/);
-        return true;
-      },
-    );
+    await assert.rejects(backfillManagedPostgres({ dryRun: true, source: "seed" }), (error) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.name, /Managed.*(?:Postgres|Database)/);
+      return true;
+    });
     assert.equal(process.env.PACKETAGENT_STORE, undefined);
   } finally {
     for (const key of envKeys) {
@@ -549,7 +724,10 @@ test("backfillManagedPostgres writes JSON source data through the async target b
   assert.equal(result.writtenRecords, result.sourceRecords);
   assert.equal(target.workspaces[0]?.name, "Managed Backfill Workspace");
   assert.equal(result.targetCountsAfter?.workspaces, source.workspaces.length);
-  assert.equal(target.shareTokens.some((token) => token.id === "share_target_only"), true);
+  assert.equal(
+    target.shareTokens.some((token) => token.id === "share_target_only"),
+    true,
+  );
   assert.equal(result.targetCountsAfter?.shareTokens, source.shareTokens.length + 1);
 });
 
@@ -620,16 +798,25 @@ test("resetAppDatabase recreates migrated DB state with seed app data", () => {
 
     const result = resetAppDatabase({ dbPath, jsonPath });
     const stored = readAppData({ dbPath });
-    const jsonContents = JSON.parse(readFileSync(jsonPath, "utf8")) as { workspaces: Array<{ id: string }> };
+    const jsonContents = JSON.parse(readFileSync(jsonPath, "utf8")) as {
+      workspaces: Array<{ id: string }>;
+    };
 
     assert.equal(result.command, "reset-app");
-    assert.equal(stored?.workspaces.some((workspace) => workspace.id === "alpha"), true);
+    assert.equal(
+      stored?.workspaces.some((workspace) => workspace.id === "alpha"),
+      true,
+    );
     assert.deepEqual(jsonContents.workspaces, [{ id: "json-only" }]);
 
     const db = new DatabaseSync(dbPath);
     try {
-      const signalRows = db.prepare("select count(*) as count from activation_signals").get() as { count: number };
-      const appRecordSignalRows = db.prepare("select count(*) as count from app_records where collection = 'activationSignals'").get() as { count: number };
+      const signalRows = db.prepare("select count(*) as count from activation_signals").get() as {
+        count: number;
+      };
+      const appRecordSignalRows = db
+        .prepare("select count(*) as count from app_records where collection = 'activationSignals'")
+        .get() as { count: number };
       assert.equal(signalRows.count, stored?.activationSignals.length ?? 0);
       assert.equal(appRecordSignalRows.count, 0);
     } finally {
@@ -654,8 +841,12 @@ test("seedDatabase writes activation rows derived from the local seed store", ()
 
     const db = new DatabaseSync(dbPath);
     try {
-      const track = db.prepare("select current_stage from activation_tracks where workspace_id = ?").get("gamma") as { current_stage: string };
-      const checklistCount = db.prepare("select count(*) as count from activation_checklist_items").get() as { count: number };
+      const track = db
+        .prepare("select current_stage from activation_tracks where workspace_id = ?")
+        .get("gamma") as { current_stage: string };
+      const checklistCount = db
+        .prepare("select count(*) as count from activation_checklist_items")
+        .get() as { count: number };
       assert.equal(track.current_stage, "complete");
       assert.equal(checklistCount.count, 15);
     } finally {
@@ -678,7 +869,9 @@ test("resetDatabase recreates an empty migrated database", () => {
 
     const db = new DatabaseSync(dbPath);
     try {
-      const trackCount = db.prepare("select count(*) as count from activation_tracks").get() as { count: number };
+      const trackCount = db.prepare("select count(*) as count from activation_tracks").get() as {
+        count: number;
+      };
       assert.equal(trackCount.count, 0);
     } finally {
       db.close();
@@ -688,7 +881,9 @@ test("resetDatabase recreates an empty migrated database", () => {
   }
 });
 
-function makeJobMetricSnapshot(overrides: Partial<JobMetricSnapshotRecord> & { id: string }): JobMetricSnapshotRecord {
+function makeJobMetricSnapshot(
+  overrides: Partial<JobMetricSnapshotRecord> & { id: string },
+): JobMetricSnapshotRecord {
   return {
     id: overrides.id,
     capturedAt: overrides.capturedAt ?? "2026-04-26T12:00:00.000Z",
@@ -708,11 +903,13 @@ function makeJobMetricSnapshot(overrides: Partial<JobMetricSnapshotRecord> & { i
 function insertAppRecordSnapshot(dbPath: string, record: JobMetricSnapshotRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('jobMetricSnapshots', ?, null, json(?), ?)
       on conflict(collection, id) do update set payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(record.id, JSON.stringify(record), record.capturedAt);
+    `,
+    ).run(record.id, JSON.stringify(record), record.capturedAt);
   } finally {
     db.close();
   }
@@ -721,12 +918,14 @@ function insertAppRecordSnapshot(dbPath: string, record: JobMetricSnapshotRecord
 function insertDedicatedSnapshot(dbPath: string, record: JobMetricSnapshotRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into job_metric_snapshots (
         id, captured_at, type, total_runs, succeeded_runs, failed_runs, canceled_runs,
         last_run_started_at, last_run_finished_at, last_duration_ms, average_duration_ms, p95_duration_ms
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.capturedAt,
       record.type,
@@ -748,7 +947,9 @@ function insertDedicatedSnapshot(dbPath: string, record: JobMetricSnapshotRecord
 function countDedicatedSnapshots(dbPath: string): number {
   const db = new DatabaseSync(dbPath);
   try {
-    const row = db.prepare("select count(*) as count from job_metric_snapshots").get() as { count: number };
+    const row = db.prepare("select count(*) as count from job_metric_snapshots").get() as {
+      count: number;
+    };
     return row.count;
   } finally {
     db.close();
@@ -953,11 +1154,13 @@ function makeAlertRecord(overrides: Partial<AlertEventRecord> & { id: string }):
 function insertAppRecordAlert(dbPath: string, record: AlertEventRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('alertEvents', ?, null, json(?), ?)
       on conflict(collection, id) do update set payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(record.id, JSON.stringify(record), record.observedAt);
+    `,
+    ).run(record.id, JSON.stringify(record), record.observedAt);
   } finally {
     db.close();
   }
@@ -966,12 +1169,14 @@ function insertAppRecordAlert(dbPath: string, record: AlertEventRecord): void {
 function insertDedicatedAlert(dbPath: string, record: AlertEventRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into alert_events (
         id, rule_id, severity, title, detail, observed_at, context,
         delivered, delivery_error, delivery_attempts, last_delivery_attempt_at, dead_lettered
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.ruleId,
       record.severity,
@@ -1203,11 +1408,13 @@ function makeAgentRun(overrides: Partial<AgentRunRecord> & { id: string }): Agen
 function insertAppRecordAgentRun(dbPath: string, record: AgentRunRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('agentRuns', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(record.id, record.workspaceId, JSON.stringify(record), record.updatedAt);
+    `,
+    ).run(record.id, record.workspaceId, JSON.stringify(record), record.updatedAt);
   } finally {
     db.close();
   }
@@ -1216,14 +1423,16 @@ function insertAppRecordAgentRun(dbPath: string, record: AgentRunRecord): void {
 function insertDedicatedAgentRun(dbPath: string, record: AgentRunRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into agent_runs (
         id, workspace_id, agent_id, title, status, trigger_kind,
         started_at, completed_at, inputs, output, error,
         logs, tool_calls, transcript, model_used, cost_usd,
         created_at, updated_at
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.workspaceId,
       record.agentId ?? null,
@@ -1252,11 +1461,13 @@ function insertAppRecordAgent(dbPath: string, agentId: string, workspaceId: stri
   const db = new DatabaseSync(dbPath);
   try {
     const payload = JSON.stringify({ id: agentId, workspaceId });
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('agents', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(agentId, workspaceId, payload, "2026-04-26T12:00:00.000Z");
+    `,
+    ).run(agentId, workspaceId, payload, "2026-04-26T12:00:00.000Z");
   } finally {
     db.close();
   }
@@ -1491,11 +1702,13 @@ function makeJob(overrides: Partial<JobRecord> & { id: string }): JobRecord {
 function insertAppRecordJob(dbPath: string, record: JobRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('jobs', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(record.id, record.workspaceId, JSON.stringify(record), record.updatedAt);
+    `,
+    ).run(record.id, record.workspaceId, JSON.stringify(record), record.updatedAt);
   } finally {
     db.close();
   }
@@ -1504,13 +1717,15 @@ function insertAppRecordJob(dbPath: string, record: JobRecord): void {
 function insertDedicatedJob(dbPath: string, record: JobRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into jobs (
         id, workspace_id, type, payload, status, attempts, max_attempts,
         scheduled_at, started_at, completed_at, cron, result, error,
         cancel_requested, created_at, updated_at
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.workspaceId,
       record.type,
@@ -1737,8 +1952,10 @@ function makeInvitationEmailDelivery(
   if (overrides.sentAt !== undefined) record.sentAt = overrides.sentAt;
   if (overrides.error !== undefined) record.error = overrides.error;
   if (overrides.providerStatus !== undefined) record.providerStatus = overrides.providerStatus;
-  if (overrides.providerDeliveryId !== undefined) record.providerDeliveryId = overrides.providerDeliveryId;
-  if (overrides.providerStatusAt !== undefined) record.providerStatusAt = overrides.providerStatusAt;
+  if (overrides.providerDeliveryId !== undefined)
+    record.providerDeliveryId = overrides.providerDeliveryId;
+  if (overrides.providerStatusAt !== undefined)
+    record.providerStatusAt = overrides.providerStatusAt;
   if (overrides.providerError !== undefined) record.providerError = overrides.providerError;
   return record;
 }
@@ -1749,11 +1966,13 @@ function insertAppRecordInvitationEmailDelivery(
 ): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('invitationEmailDeliveries', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(record.id, record.workspaceId, JSON.stringify(record), record.createdAt);
+    `,
+    ).run(record.id, record.workspaceId, JSON.stringify(record), record.createdAt);
   } finally {
     db.close();
   }
@@ -1765,13 +1984,15 @@ function insertDedicatedInvitationEmailDelivery(
 ): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into invitation_email_deliveries (
         id, workspace_id, invitation_id, recipient_email, subject,
         status, provider, mode, created_at, sent_at, error,
         provider_status, provider_delivery_id, provider_status_at, provider_error
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.workspaceId,
       record.invitationId,
@@ -1796,7 +2017,9 @@ function insertDedicatedInvitationEmailDelivery(
 function countDedicatedInvitationEmailDeliveries(dbPath: string): number {
   const db = new DatabaseSync(dbPath);
   try {
-    const row = db.prepare("select count(*) as count from invitation_email_deliveries").get() as { count: number };
+    const row = db.prepare("select count(*) as count from invitation_email_deliveries").get() as {
+      count: number;
+    };
     return row.count;
   } finally {
     db.close();
@@ -1995,11 +2218,13 @@ function makeActivityRecord(overrides: Partial<ActivityRecord> & { id: string })
 function insertAppRecordActivity(dbPath: string, record: ActivityRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('activities', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(record.id, record.workspaceId, JSON.stringify(record), record.occurredAt);
+    `,
+    ).run(record.id, record.workspaceId, JSON.stringify(record), record.occurredAt);
   } finally {
     db.close();
   }
@@ -2008,11 +2233,13 @@ function insertAppRecordActivity(dbPath: string, record: ActivityRecord): void {
 function insertDedicatedActivity(dbPath: string, record: ActivityRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into activities (
         id, workspace_id, occurred_at, type, payload, user_id, related_subject
       ) values (?, ?, ?, ?, json(?), ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.workspaceId,
       record.occurredAt,
@@ -2213,7 +2440,9 @@ test("verifyActivities reports contentDrift when ids match but content differs",
   }
 });
 
-function makeProviderCall(overrides: Partial<ProviderCallRecord> & { id: string }): ProviderCallRecord {
+function makeProviderCall(
+  overrides: Partial<ProviderCallRecord> & { id: string },
+): ProviderCallRecord {
   const record: ProviderCallRecord = {
     id: overrides.id,
     workspaceId: overrides.workspaceId ?? "alpha",
@@ -2239,11 +2468,13 @@ function prepareProviderCallDb(dbPath: string): void {
 function insertAppRecordProviderCall(dbPath: string, record: ProviderCallRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('providerCalls', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(record.id, record.workspaceId, JSON.stringify(record), record.completedAt);
+    `,
+    ).run(record.id, record.workspaceId, JSON.stringify(record), record.completedAt);
   } finally {
     db.close();
   }
@@ -2252,13 +2483,15 @@ function insertAppRecordProviderCall(dbPath: string, record: ProviderCallRecord)
 function insertDedicatedProviderCall(dbPath: string, record: ProviderCallRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into provider_calls (
         id, workspace_id, route_key, provider, model, prompt_tokens,
         completion_tokens, cost_usd, duration_ms, status, error_message,
         started_at, completed_at
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.workspaceId,
       record.routeKey,
@@ -2281,7 +2514,9 @@ function insertDedicatedProviderCall(dbPath: string, record: ProviderCallRecord)
 function countDedicatedProviderCalls(dbPath: string): number {
   const db = new DatabaseSync(dbPath);
   try {
-    const row = db.prepare("select count(*) as count from provider_calls").get() as { count: number };
+    const row = db.prepare("select count(*) as count from provider_calls").get() as {
+      count: number;
+    };
     return row.count;
   } finally {
     db.close();
@@ -2452,7 +2687,11 @@ test("verifyProviderCalls reports contentDrift when ids match but content differ
     prepareProviderCallDb(dbPath);
     const record = makeProviderCall({ id: "provider_call_a", status: "success" });
     insertAppRecordProviderCall(dbPath, record);
-    insertDedicatedProviderCall(dbPath, { ...record, status: "error", errorMessage: "provider failed" });
+    insertDedicatedProviderCall(dbPath, {
+      ...record,
+      status: "error",
+      errorMessage: "provider failed",
+    });
 
     const result = verifyProviderCalls({ dbPath });
 
@@ -2465,7 +2704,9 @@ test("verifyProviderCalls reports contentDrift when ids match but content differ
   }
 });
 
-function makeActivationSignal(overrides: Partial<ActivationSignalRecord> & { id: string }): ActivationSignalRecord {
+function makeActivationSignal(
+  overrides: Partial<ActivationSignalRecord> & { id: string },
+): ActivationSignalRecord {
   const record: ActivationSignalRecord = {
     id: overrides.id,
     workspaceId: overrides.workspaceId ?? "alpha",
@@ -2484,11 +2725,13 @@ function makeActivationSignal(overrides: Partial<ActivationSignalRecord> & { id:
 function insertAppRecordActivationSignal(dbPath: string, record: ActivationSignalRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('activationSignals', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(record.id, record.workspaceId, JSON.stringify(record), record.updatedAt);
+    `,
+    ).run(record.id, record.workspaceId, JSON.stringify(record), record.updatedAt);
   } finally {
     db.close();
   }
@@ -2497,11 +2740,13 @@ function insertAppRecordActivationSignal(dbPath: string, record: ActivationSigna
 function insertDedicatedActivationSignal(dbPath: string, record: ActivationSignalRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into activation_signals (
         id, workspace_id, kind, source, origin, source_id, stable_key, data, created_at, updated_at
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.workspaceId,
       record.kind,
@@ -2521,7 +2766,9 @@ function insertDedicatedActivationSignal(dbPath: string, record: ActivationSigna
 function countDedicatedActivationSignals(dbPath: string): number {
   const db = new DatabaseSync(dbPath);
   try {
-    const row = db.prepare("select count(*) as count from activation_signals").get() as { count: number };
+    const row = db.prepare("select count(*) as count from activation_signals").get() as {
+      count: number;
+    };
     return row.count;
   } finally {
     db.close();
@@ -2533,7 +2780,10 @@ test("backfillActivationSignals inserts JSON-side rows into the dedicated table"
   try {
     const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
-    insertAppRecordActivationSignal(dbPath, makeActivationSignal({ id: "signal_a", stableKey: "alpha:signal:a" }));
+    insertAppRecordActivationSignal(
+      dbPath,
+      makeActivationSignal({ id: "signal_a", stableKey: "alpha:signal:a" }),
+    );
 
     const result = backfillActivationSignals({ dbPath });
 
@@ -2552,7 +2802,10 @@ test("backfillActivationSignals is idempotent and supports dry-run", () => {
   try {
     const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
-    insertAppRecordActivationSignal(dbPath, makeActivationSignal({ id: "signal_a", stableKey: "alpha:signal:a" }));
+    insertAppRecordActivationSignal(
+      dbPath,
+      makeActivationSignal({ id: "signal_a", stableKey: "alpha:signal:a" }),
+    );
 
     backfillActivationSignals({ dbPath });
     const second = backfillActivationSignals({ dbPath, dryRun: true });
@@ -2605,7 +2858,10 @@ test("verifyActivationSignals treats dedicated-only rows as healthy after mirror
   try {
     const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
-    insertDedicatedActivationSignal(dbPath, makeActivationSignal({ id: "dedicated_only", stableKey: "alpha:dedicated-only" }));
+    insertDedicatedActivationSignal(
+      dbPath,
+      makeActivationSignal({ id: "dedicated_only", stableKey: "alpha:dedicated-only" }),
+    );
 
     const result = verifyActivationSignals({ dbPath });
 
@@ -2624,13 +2880,27 @@ test("verifyActivationSignals reports jsonOnly sqliteOnly and contentDrift", () 
     const dbPath = join(tempDir, "packetagent.sqlite");
     migrateDatabase({ dbPath });
     const matching = makeActivationSignal({ id: "matching", stableKey: "alpha:matching" });
-    const drift = makeActivationSignal({ id: "drift", source: "user_fact", stableKey: "alpha:drift" });
+    const drift = makeActivationSignal({
+      id: "drift",
+      source: "user_fact",
+      stableKey: "alpha:drift",
+    });
     insertAppRecordActivationSignal(dbPath, matching);
     insertDedicatedActivationSignal(dbPath, matching);
-    insertAppRecordActivationSignal(dbPath, makeActivationSignal({ id: "json_only", stableKey: "alpha:json_only" }));
-    insertDedicatedActivationSignal(dbPath, makeActivationSignal({ id: "sqlite_only", stableKey: "alpha:sqlite_only" }));
+    insertAppRecordActivationSignal(
+      dbPath,
+      makeActivationSignal({ id: "json_only", stableKey: "alpha:json_only" }),
+    );
+    insertDedicatedActivationSignal(
+      dbPath,
+      makeActivationSignal({ id: "sqlite_only", stableKey: "alpha:sqlite_only" }),
+    );
     insertAppRecordActivationSignal(dbPath, drift);
-    insertDedicatedActivationSignal(dbPath, { ...drift, source: "system_fact", origin: "system_observed" });
+    insertDedicatedActivationSignal(dbPath, {
+      ...drift,
+      source: "system_fact",
+      origin: "system_observed",
+    });
 
     const result = verifyActivationSignals({ dbPath });
 

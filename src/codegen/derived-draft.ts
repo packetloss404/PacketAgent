@@ -180,12 +180,13 @@ function routeForPageFile(filePath: string): string {
   const noExt = rel.replace(/\.(tsx?|jsx?)$/i, "");
   if (noExt === "" || noExt.toLowerCase() === "index") return "/";
   // Next-style brackets → route params; Index files become parent route.
-  const segments = noExt.split("/").map((segment) => {
-    if (segment.toLowerCase() === "index") return "";
-    return segment
-      .replace(/^\[\.\.\.(.+)\]$/, ":$1*")
-      .replace(/^\[(.+)\]$/, ":$1");
-  }).filter((segment) => segment.length > 0);
+  const segments = noExt
+    .split("/")
+    .map((segment) => {
+      if (segment.toLowerCase() === "index") return "";
+      return segment.replace(/^\[\.\.\.(.+)\]$/, ":$1*").replace(/^\[(.+)\]$/, ":$1");
+    })
+    .filter((segment) => segment.length > 0);
   return "/" + segments.join("/");
 }
 
@@ -234,17 +235,13 @@ function deriveDataSchema(files: GeneratedFile[]): DataSchemaDraft {
   return {
     database: "postgres",
     entities,
-    notes: entities.length === 0
-      ? ["No data schema present in the generated file tree."]
-      : [],
+    notes: entities.length === 0 ? ["No data schema present in the generated file tree."] : [],
   };
 }
 
 function deriveEntityFromFile(file: GeneratedFile): EntitySchemaDraft | null {
   const norm = normalizePath(file.path);
-  const base = norm
-    .replace(/^src\/(data|schema)\/?/, "")
-    .replace(/\.(tsx?|jsx?|json)$/i, "");
+  const base = norm.replace(/^src\/(data|schema)\/?/, "").replace(/\.(tsx?|jsx?|json)$/i, "");
   const name = base.split("/").pop() ?? "";
   if (!name) return null;
   const fields: FieldSchemaDraft[] = [{ name: "id", type: "uuid", required: true }];
@@ -263,7 +260,8 @@ function deriveComponents(files: GeneratedFile[]): ComponentDraft[] {
     .map((file) => {
       const norm = normalizePath(file.path);
       const base = norm.replace(/^src\/components\/?/, "").replace(/\.(tsx?|jsx?)$/i, "");
-      const name = (base.split("/").pop() ?? "Component").replace(/[^A-Za-z0-9_]/g, "") || "Component";
+      const name =
+        (base.split("/").pop() ?? "Component").replace(/[^A-Za-z0-9_]/g, "") || "Component";
       return {
         name,
         type: "list" as const,

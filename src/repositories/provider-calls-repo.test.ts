@@ -35,7 +35,7 @@ function makeJsonRepo(): ProviderCallsRepository {
   const data = { providerCalls: [] as ProviderCallRecord[] } as unknown as PacketAgentData;
   const deps: ProviderCallsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonProviderCallsRepository(deps);
 }
@@ -121,7 +121,10 @@ test("insertMany inserts and upserts by id", () => {
 
     assert.equal(repo.count(), 2);
     const rows = repo.list({ workspaceId: "ws_a" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["other", "dup"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["other", "dup"],
+    );
     assert.equal(rows.find((entry) => entry.id === "dup")?.model, "second");
     assert.equal(rows.find((entry) => entry.id === "dup")?.promptTokens, 10);
   });
@@ -129,12 +132,24 @@ test("insertMany inserts and upserts by id", () => {
 
 test("list filters by workspaceId", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", completedAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_b", completedAt: "2026-04-26T11:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", completedAt: "2026-04-26T12:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", completedAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_b", completedAt: "2026-04-26T11:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", completedAt: "2026-04-26T12:00:00.000Z" }),
+    );
 
-    assert.deepEqual(repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id), ["c", "a"]);
-    assert.deepEqual(repo.list({ workspaceId: "ws_b" }).map((entry) => entry.id), ["b"]);
+    assert.deepEqual(
+      repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id),
+      ["c", "a"],
+    );
+    assert.deepEqual(
+      repo.list({ workspaceId: "ws_b" }).map((entry) => entry.id),
+      ["b"],
+    );
   });
 });
 
@@ -147,7 +162,10 @@ test("list filters by since inclusively using completedAt", () => {
     ]);
 
     const rows = repo.list({ workspaceId: "ws_a", since: "2026-04-26T12:00:00.000Z" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["c", "b"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["c", "b"],
+    );
   });
 });
 
@@ -164,7 +182,9 @@ test("list applies only positive limits after filtering", () => {
     }
 
     assert.deepEqual(
-      repo.list({ workspaceId: "ws_a", since: "2026-04-26T10:00:02.000Z", limit: 2 }).map((entry) => entry.id),
+      repo
+        .list({ workspaceId: "ws_a", since: "2026-04-26T10:00:02.000Z", limit: 2 })
+        .map((entry) => entry.id),
       ["call_4", "call_3"],
     );
     assert.equal(repo.list({ workspaceId: "ws_a", limit: 0 }).length, 5);
@@ -185,7 +205,9 @@ test("list with since and limit returns correct bounded results", () => {
 
     // since is inclusive on completedAt and the LIMIT bounds the newest rows.
     assert.deepEqual(
-      repo.list({ workspaceId: "ws_a", since: "2026-04-26T10:00:00.000Z" }).map((entry) => entry.id),
+      repo
+        .list({ workspaceId: "ws_a", since: "2026-04-26T10:00:00.000Z" })
+        .map((entry) => entry.id),
       ["t14", "t12", "t10"],
     );
     assert.deepEqual(
@@ -195,10 +217,7 @@ test("list with since and limit returns correct bounded results", () => {
       ["t14", "t12"],
     );
     // since that excludes everything returns an empty result.
-    assert.deepEqual(
-      repo.list({ workspaceId: "ws_a", since: "2026-04-26T15:00:00.000Z" }),
-      [],
-    );
+    assert.deepEqual(repo.list({ workspaceId: "ws_a", since: "2026-04-26T15:00:00.000Z" }), []);
   });
 });
 
@@ -211,7 +230,10 @@ test("list sorts by completedAt descending then id descending", () => {
       makeRecord({ id: "d", workspaceId: "ws_a", completedAt: "2026-04-26T11:00:00.000Z" }),
     ]);
 
-    assert.deepEqual(repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id), ["c", "a", "d", "b"]);
+    assert.deepEqual(
+      repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id),
+      ["c", "a", "d", "b"],
+    );
   });
 });
 
@@ -273,7 +295,10 @@ test("pruneRetainLatest preserves newest rows overall and returns removed count"
     const removed = repo.pruneRetainLatest(3);
     assert.equal(removed, 2);
     assert.equal(repo.count(), 3);
-    assert.deepEqual(repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id), ["latest", "tie_z", "tie_a"]);
+    assert.deepEqual(
+      repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id),
+      ["latest", "tie_z", "tie_a"],
+    );
     assert.deepEqual(repo.list({ workspaceId: "ws_b" }), []);
   });
 });
@@ -285,7 +310,7 @@ test("createProviderCallsRepository selects JSON implementation by default", () 
     const data = { providerCalls: [] as ProviderCallRecord[] } as unknown as PacketAgentData;
     const repo = createProviderCallsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+      mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     repo.upsert(makeRecord({ id: "call_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);

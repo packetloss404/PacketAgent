@@ -11,13 +11,16 @@ export function detectMilestones(
   prior: ReadonlyArray<ActivationMilestoneRecord> = [],
 ): ActivationMilestoneRecord[] {
   const stage = deriveStage(input).stage;
-  const detections = ACTIVATION_MILESTONE_ORDER.map((key) => detectSingleMilestone(key, input, stage));
+  const detections = ACTIVATION_MILESTONE_ORDER.map((key) =>
+    detectSingleMilestone(key, input, stage),
+  );
   return mergeMilestoneState(prior, detections, input.now);
 }
 
-export function deriveStage(
-  input: ActivationSignalSnapshot,
-): { stage: ActivationStage; reasons: string[] } {
+export function deriveStage(input: ActivationSignalSnapshot): {
+  stage: ActivationStage;
+  reasons: string[];
+} {
   if (input.blockerCount > 0 || input.dependencyBlockerCount > 0) {
     return { stage: "blocked", reasons: ["Active blockers are present."] };
   }
@@ -82,11 +85,7 @@ function detectSingleMilestone(
     case "intake_ready":
       return reached(key, input.hasBrief, "A brief has been captured.");
     case "scope_defined":
-      return reached(
-        key,
-        input.hasRequirements && input.hasPlan,
-        "Requirements and plan exist.",
-      );
+      return reached(key, input.hasRequirements && input.hasPlan, "Requirements and plan exist.");
     case "build_started":
       return reached(
         key,
@@ -112,11 +111,7 @@ function detectSingleMilestone(
         "Release evidence exists.",
       );
     case "blocked":
-      return reached(
-        key,
-        stage === "blocked",
-        "Blockers are preventing progress.",
-      );
+      return reached(key, stage === "blocked", "Blockers are preventing progress.");
   }
 }
 

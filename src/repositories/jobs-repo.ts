@@ -3,7 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import type { JobRecord, JobStatus, PacketAgentData } from "../packetagent-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  mutateStore as defaultMutateStore,
+} from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
@@ -113,9 +116,9 @@ export function jsonJobsRepository(deps: JobsRepositoryDeps = {}): JobsRepositor
     find(workspaceId, id) {
       const data = load();
       const collection = Array.isArray(data.jobs) ? data.jobs : [];
-      return collection.find(
-        (entry) => entry.workspaceId === workspaceId && entry.id === id,
-      ) ?? null;
+      return (
+        collection.find((entry) => entry.workspaceId === workspaceId && entry.id === id) ?? null
+      );
     },
     upsert(record) {
       mutate((data) => {
@@ -155,7 +158,9 @@ export function jsonJobsRepository(deps: JobsRepositoryDeps = {}): JobsRepositor
           return null;
         }
         const candidate = data.jobs
-          .filter((entry) => entry.status === "queued" && Date.parse(entry.scheduledAt) <= now.getTime())
+          .filter(
+            (entry) => entry.status === "queued" && Date.parse(entry.scheduledAt) <= now.getTime(),
+          )
           .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))[0];
         if (!candidate) return null;
         const ts = now.toISOString();
@@ -208,9 +213,9 @@ export function asyncJsonJobsRepository(deps: AsyncJobsRepositoryDeps = {}): Asy
     async find(workspaceId, id) {
       const data = await load();
       const collection = Array.isArray(data.jobs) ? data.jobs : [];
-      return collection.find(
-        (entry) => entry.workspaceId === workspaceId && entry.id === id,
-      ) ?? null;
+      return (
+        collection.find((entry) => entry.workspaceId === workspaceId && entry.id === id) ?? null
+      );
     },
     async upsert(record) {
       await mutate((data) => {
@@ -250,7 +255,9 @@ export function asyncJsonJobsRepository(deps: AsyncJobsRepositoryDeps = {}): Asy
           return null;
         }
         const candidate = data.jobs
-          .filter((entry) => entry.status === "queued" && Date.parse(entry.scheduledAt) <= now.getTime())
+          .filter(
+            (entry) => entry.status === "queued" && Date.parse(entry.scheduledAt) <= now.getTime(),
+          )
           .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))[0];
         if (!candidate) return null;
         const ts = now.toISOString();
@@ -309,9 +316,9 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
     find(workspaceId, id) {
       const db = openDatabase(dbPath);
       try {
-        const row = db.prepare(
-          "select * from jobs where workspace_id = ? and id = ?",
-        ).get(workspaceId, id) as JobRow | undefined;
+        const row = db
+          .prepare("select * from jobs where workspace_id = ? and id = ?")
+          .get(workspaceId, id) as JobRow | undefined;
         return row ? rowToRecord(row) : null;
       } finally {
         db.close();
@@ -322,9 +329,9 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
       try {
         db.exec("begin immediate");
         try {
-          const existing = db.prepare("select workspace_id from jobs where id = ?").get(
-            record.id,
-          ) as { workspace_id: string } | undefined;
+          const existing = db
+            .prepare("select workspace_id from jobs where id = ?")
+            .get(record.id) as { workspace_id: string } | undefined;
           if (existing) assertSameJobWorkspace(existing.workspace_id, record.workspaceId);
           upsertRow(db, record);
           db.exec("commit");
@@ -341,14 +348,18 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
       try {
         db.exec("begin immediate");
         try {
-          const existing = db.prepare(
-            "select * from jobs where workspace_id = ? and id = ?",
-          ).get(workspaceId, id) as JobRow | undefined;
+          const existing = db
+            .prepare("select * from jobs where workspace_id = ? and id = ?")
+            .get(workspaceId, id) as JobRow | undefined;
           if (!existing) {
             db.exec("commit");
             return null;
           }
-          const merged: JobRecord = { ...rowToRecord(existing), ...patch, updatedAt: new Date().toISOString() };
+          const merged: JobRecord = {
+            ...rowToRecord(existing),
+            ...patch,
+            updatedAt: new Date().toISOString(),
+          };
           upsertRow(db, merged);
           db.exec("commit");
           return merged;
@@ -444,15 +455,18 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
         db.exec("begin immediate");
         try {
           const cutoffMs = now.getTime() - staleAfterMs;
-          const staleRows = (db
-            .prepare("select id, started_at from jobs where status = 'running' and started_at is not null")
-            .all() as Array<{ id: string; started_at: string | null }>)
-            .filter((row) => {
-              if (row.started_at === null) return false;
-              const startedMs = Date.parse(row.started_at);
-              return !Number.isNaN(startedMs) && startedMs < cutoffMs;
-            });
-        const ts = now.toISOString();
+          const staleRows = (
+            db
+              .prepare(
+                "select id, started_at from jobs where status = 'running' and started_at is not null",
+              )
+              .all() as Array<{ id: string; started_at: string | null }>
+          ).filter((row) => {
+            if (row.started_at === null) return false;
+            const startedMs = Date.parse(row.started_at);
+            return !Number.isNaN(startedMs) && startedMs < cutoffMs;
+          });
+          const ts = now.toISOString();
           const update = db.prepare(
             `update jobs
                set status = 'queued',
@@ -527,7 +541,8 @@ function claimNextNonIsoFallback(db: DatabaseSync, nowMs: number): JobRow | unde
 }
 
 function upsertRow(db: DatabaseSync, record: JobRecord): void {
-  db.prepare(`
+  db.prepare(
+    `
     insert into jobs (
       id, workspace_id, type, payload, status, attempts, max_attempts,
       scheduled_at, started_at, completed_at, cron, result, error,
@@ -549,7 +564,8 @@ function upsertRow(db: DatabaseSync, record: JobRecord): void {
       created_at = excluded.created_at,
       updated_at = excluded.updated_at
     where jobs.workspace_id = excluded.workspace_id
-  `).run(
+  `,
+  ).run(
     record.id,
     record.workspaceId,
     record.type,
@@ -569,12 +585,8 @@ function upsertRow(db: DatabaseSync, record: JobRecord): void {
   );
 }
 
-function assertSameJobWorkspace(
-  existing: JobRecord | string,
-  requestedWorkspaceId: string,
-): void {
-  const existingWorkspaceId =
-    typeof existing === "string" ? existing : existing.workspaceId;
+function assertSameJobWorkspace(existing: JobRecord | string, requestedWorkspaceId: string): void {
+  const existingWorkspaceId = typeof existing === "string" ? existing : existing.workspaceId;
   if (existingWorkspaceId !== requestedWorkspaceId) {
     throw new Error("Job identity is already owned by another workspace.");
   }
@@ -656,9 +668,13 @@ function applyMigrations(db: DatabaseSync): void {
   db.exec(
     "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
   );
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;
     const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");

@@ -4,7 +4,10 @@ import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { selectSchedulerLeaderLock, type SchedulerLeaderEnv } from "./scheduler-leader-selection.js";
+import {
+  selectSchedulerLeaderLock,
+  type SchedulerLeaderEnv,
+} from "./scheduler-leader-selection.js";
 
 function makeTempDir(): string {
   const dir = path.join(tmpdir(), `packetagent-leader-sel-${randomUUID()}`);
@@ -46,7 +49,10 @@ test("MODE=file returns a lock that writes the expected file at the configured p
   assert.equal(await lock.acquire(), true);
   assert.equal(lock.isHeld(), true);
 
-  const state = JSON.parse(readFileSync(lockPath, "utf8")) as { processId: string; expiresAt: number };
+  const state = JSON.parse(readFileSync(lockPath, "utf8")) as {
+    processId: string;
+    expiresAt: number;
+  };
   assert.equal(state.processId, "test-proc-1");
   assert.equal(typeof state.expiresAt, "number");
 

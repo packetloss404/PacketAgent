@@ -8,7 +8,10 @@ import type {
   InvitationEmailDeliveryStatus,
   PacketAgentData,
 } from "../packetagent-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  mutateStore as defaultMutateStore,
+} from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
@@ -53,7 +56,8 @@ export interface AsyncInvitationEmailDeliveriesRepositoryDeps {
 export function createInvitationEmailDeliveriesRepository(
   deps: InvitationEmailDeliveriesRepositoryDeps = {},
 ): InvitationEmailDeliveriesRepository {
-  if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteInvitationEmailDeliveriesRepository(deps);
+  if (process.env.PACKETAGENT_STORE === "sqlite")
+    return sqliteInvitationEmailDeliveriesRepository(deps);
   return jsonInvitationEmailDeliveriesRepository(deps);
 }
 
@@ -96,12 +100,16 @@ export function jsonInvitationEmailDeliveriesRepository(
   return {
     list(filter) {
       const data = load();
-      const collection = Array.isArray(data.invitationEmailDeliveries) ? data.invitationEmailDeliveries : [];
+      const collection = Array.isArray(data.invitationEmailDeliveries)
+        ? data.invitationEmailDeliveries
+        : [];
       return applyListFilter(collection, filter);
     },
     find(id) {
       const data = load();
-      const collection = Array.isArray(data.invitationEmailDeliveries) ? data.invitationEmailDeliveries : [];
+      const collection = Array.isArray(data.invitationEmailDeliveries)
+        ? data.invitationEmailDeliveries
+        : [];
       return collection.find((entry) => entry.id === id) ?? null;
     },
     upsert(record) {
@@ -118,7 +126,9 @@ export function jsonInvitationEmailDeliveriesRepository(
     },
     count() {
       const data = load();
-      return Array.isArray(data.invitationEmailDeliveries) ? data.invitationEmailDeliveries.length : 0;
+      return Array.isArray(data.invitationEmailDeliveries)
+        ? data.invitationEmailDeliveries.length
+        : 0;
     },
   };
 }
@@ -131,12 +141,16 @@ export function asyncJsonInvitationEmailDeliveriesRepository(
   return {
     async list(filter) {
       const data = await load();
-      const collection = Array.isArray(data.invitationEmailDeliveries) ? data.invitationEmailDeliveries : [];
+      const collection = Array.isArray(data.invitationEmailDeliveries)
+        ? data.invitationEmailDeliveries
+        : [];
       return applyListFilter(collection, filter);
     },
     async find(id) {
       const data = await load();
-      const collection = Array.isArray(data.invitationEmailDeliveries) ? data.invitationEmailDeliveries : [];
+      const collection = Array.isArray(data.invitationEmailDeliveries)
+        ? data.invitationEmailDeliveries
+        : [];
       return collection.find((entry) => entry.id === id) ?? null;
     },
     async upsert(record) {
@@ -153,7 +167,9 @@ export function asyncJsonInvitationEmailDeliveriesRepository(
     },
     async count() {
       const data = await load();
-      return Array.isArray(data.invitationEmailDeliveries) ? data.invitationEmailDeliveries.length : 0;
+      return Array.isArray(data.invitationEmailDeliveries)
+        ? data.invitationEmailDeliveries.length
+        : 0;
     },
   };
 }
@@ -180,7 +196,9 @@ export function sqliteInvitationEmailDeliveriesRepository(
         const limit = Math.min(Math.max(requestedLimit, 0), MAX_LIST_LIMIT);
         sql.push("limit ?");
         params.push(limit);
-        const rows = db.prepare(sql.join(" ")).all(...params) as unknown as InvitationEmailDeliveryRow[];
+        const rows = db
+          .prepare(sql.join(" "))
+          .all(...params) as unknown as InvitationEmailDeliveryRow[];
         return rows.map(rowToRecord);
       } finally {
         db.close();
@@ -189,9 +207,9 @@ export function sqliteInvitationEmailDeliveriesRepository(
     find(id) {
       const db = openDatabase(dbPath);
       try {
-        const row = db
-          .prepare("select * from invitation_email_deliveries where id = ?")
-          .get(id) as InvitationEmailDeliveryRow | undefined;
+        const row = db.prepare("select * from invitation_email_deliveries where id = ?").get(id) as
+          | InvitationEmailDeliveryRow
+          | undefined;
         return row ? rowToRecord(row) : null;
       } finally {
         db.close();
@@ -286,7 +304,8 @@ function applyListFilter(
 ): InvitationEmailDeliveryRecord[] {
   const filtered = collection.filter((entry) => {
     if (entry.workspaceId !== filter.workspaceId) return false;
-    if (filter.invitationId !== undefined && entry.invitationId !== filter.invitationId) return false;
+    if (filter.invitationId !== undefined && entry.invitationId !== filter.invitationId)
+      return false;
     return true;
   });
   filtered.sort((left, right) => {
@@ -316,10 +335,16 @@ function openDatabase(dbPath: string): DatabaseSync {
 }
 
 function applyMigrations(db: DatabaseSync): void {
-  db.exec("create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))");
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  db.exec(
+    "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
+  );
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;
     const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");

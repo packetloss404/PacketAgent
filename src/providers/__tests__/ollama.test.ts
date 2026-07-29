@@ -36,7 +36,9 @@ test("call() POSTs to /api/chat and returns content with cost = 0", async () => 
     }) as unknown as typeof fetch,
   });
   const res = await provider.call({
-    model: "llama3.2", workspaceId: "w", routeKey: "local.dev",
+    model: "llama3.2",
+    workspaceId: "w",
+    routeKey: "local.dev",
     messages: [{ role: "user", content: "hi" }],
   });
   assert.equal(res.content, "hello");
@@ -49,19 +51,22 @@ test("call() POSTs to /api/chat and returns content with cost = 0", async () => 
 
 test("call() maps tool_calls", async () => {
   const provider = new OllamaProvider({
-    fetchFn: (async () => fakeResponse({
-      model: "llama3.2",
-      message: {
-        role: "assistant",
-        content: "",
-        tool_calls: [{ function: { name: "search", arguments: { q: "x" } } }],
-      },
-      done: true,
-      done_reason: "stop",
-    })) as unknown as typeof fetch,
+    fetchFn: (async () =>
+      fakeResponse({
+        model: "llama3.2",
+        message: {
+          role: "assistant",
+          content: "",
+          tool_calls: [{ function: { name: "search", arguments: { q: "x" } } }],
+        },
+        done: true,
+        done_reason: "stop",
+      })) as unknown as typeof fetch,
   });
   const res = await provider.call({
-    model: "llama3.2", workspaceId: "w", routeKey: "local.dev",
+    model: "llama3.2",
+    workspaceId: "w",
+    routeKey: "local.dev",
     messages: [{ role: "user", content: "x" }],
     tools: [{ name: "search", description: "s", inputSchema: { type: "object" } }],
   });
@@ -71,9 +76,24 @@ test("call() maps tool_calls", async () => {
 
 test("stream() parses NDJSON, accumulates content, emits final usage", async () => {
   const lines = [
-    JSON.stringify({ model: "llama3.2", message: { role: "assistant", content: "hi " }, done: false }),
-    JSON.stringify({ model: "llama3.2", message: { role: "assistant", content: "world" }, done: false }),
-    JSON.stringify({ model: "llama3.2", message: { role: "assistant", content: "" }, done: true, prompt_eval_count: 5, eval_count: 7, done_reason: "stop" }),
+    JSON.stringify({
+      model: "llama3.2",
+      message: { role: "assistant", content: "hi " },
+      done: false,
+    }),
+    JSON.stringify({
+      model: "llama3.2",
+      message: { role: "assistant", content: "world" },
+      done: false,
+    }),
+    JSON.stringify({
+      model: "llama3.2",
+      message: { role: "assistant", content: "" },
+      done: true,
+      prompt_eval_count: 5,
+      eval_count: 7,
+      done_reason: "stop",
+    }),
   ];
   const provider = new OllamaProvider({
     fetchFn: (async () => ndjsonStream(lines)) as unknown as typeof fetch,
@@ -81,7 +101,9 @@ test("stream() parses NDJSON, accumulates content, emits final usage", async () 
   const text: string[] = [];
   let done = false;
   for await (const c of provider.stream({
-    model: "llama3.2", workspaceId: "w", routeKey: "local.dev",
+    model: "llama3.2",
+    workspaceId: "w",
+    routeKey: "local.dev",
     messages: [{ role: "user", content: "x" }],
   })) {
     if (c.delta) text.push(c.delta);
@@ -114,10 +136,18 @@ test("models() calls /api/tags and caches", async () => {
 
 test("connection refused surfaces clear error", async () => {
   const provider = new OllamaProvider({
-    fetchFn: (async () => { throw new Error("ECONNREFUSED"); }) as unknown as typeof fetch,
+    fetchFn: (async () => {
+      throw new Error("ECONNREFUSED");
+    }) as unknown as typeof fetch,
   });
   await assert.rejects(
-    () => provider.call({ model: "llama3.2", workspaceId: "w", routeKey: "local.dev", messages: [{ role: "user", content: "x" }] }),
+    () =>
+      provider.call({
+        model: "llama3.2",
+        workspaceId: "w",
+        routeKey: "local.dev",
+        messages: [{ role: "user", content: "x" }],
+      }),
     /Ollama running/,
   );
 });
@@ -130,13 +160,16 @@ test("signal abort propagates to fetch on call()", async () => {
       return fakeResponse({
         model: "llama3.2",
         message: { role: "assistant", content: "x" },
-        done: true, done_reason: "stop",
+        done: true,
+        done_reason: "stop",
       });
     }) as unknown as typeof fetch,
   });
   const ctrl = new AbortController();
   await provider.call({
-    model: "llama3.2", workspaceId: "w", routeKey: "local.dev",
+    model: "llama3.2",
+    workspaceId: "w",
+    routeKey: "local.dev",
     messages: [{ role: "user", content: "x" }],
     signal: ctrl.signal,
   });

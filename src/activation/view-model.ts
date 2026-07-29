@@ -29,7 +29,8 @@ export function buildActivationSummaryCard(
 ): ActivationSummaryCardViewModel {
   const items = status.checklist.map(toChecklistViewItem);
   const completedCount = items.filter((item) => item.completed).length;
-  const progressPercent = items.length === 0 ? 0 : Math.round((completedCount / items.length) * 100);
+  const progressPercent =
+    items.length === 0 ? 0 : Math.round((completedCount / items.length) * 100);
 
   return {
     title: "Setup checklist",
@@ -61,25 +62,26 @@ function humanizeRisk(level: ActivationRiskLevel): string {
   return level.charAt(0).toUpperCase() + level.slice(1);
 }
 
-const CHECKLIST_LABELS: Record<ActivationChecklistItemKey, { label: string; description: string }> = {
-  brief_captured: {
-    label: "Brief captured",
-    description: "Capture the initial implementation brief.",
-  },
-  requirements_defined: {
-    label: "Requirements defined",
-    description: "Document the scope and the implementation plan.",
-  },
-  implementation_started: {
-    label: "Implementation started",
-    description: "Start building against the agreed scope.",
-  },
-  validation_completed: {
-    label: "Validation completed",
-    description: "Collect test and validation evidence.",
-  },
-  release_confirmed: {
-    label: "Release confirmed",
-    description: "Confirm the work is released and live.",
-  },
-};
+const CHECKLIST_LABELS: Record<ActivationChecklistItemKey, { label: string; description: string }> =
+  {
+    brief_captured: {
+      label: "Brief captured",
+      description: "Capture the initial implementation brief.",
+    },
+    requirements_defined: {
+      label: "Requirements defined",
+      description: "Document the scope and the implementation plan.",
+    },
+    implementation_started: {
+      label: "Implementation started",
+      description: "Start building against the agreed scope.",
+    },
+    validation_completed: {
+      label: "Validation completed",
+      description: "Collect test and validation evidence.",
+    },
+    release_confirmed: {
+      label: "Release confirmed",
+      description: "Confirm the work is released and live.",
+    },
+  };

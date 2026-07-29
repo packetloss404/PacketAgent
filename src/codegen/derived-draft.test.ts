@@ -19,7 +19,10 @@ test("derives appName from package.json", () => {
   assert.equal(draft.summary, "A portal");
   // Default page when there are no src/pages files.
   assert.ok(draft.pageMap.length >= 1);
-  assert.ok(draft.pageMap.some((p) => p.path === "/"), "expected a root page");
+  assert.ok(
+    draft.pageMap.some((p) => p.path === "/"),
+    "expected a root page",
+  );
   // Auth, data schema, and integration metadata default to valid empty shapes.
   assert.equal(draft.dataSchema.database, "postgres");
   assert.deepEqual(draft.integrationMetadata.requested, []);
@@ -31,7 +34,10 @@ test("derives multiple pages when src/pages/* is present", () => {
     { path: "src/App.tsx", content: APP_TSX },
     { path: "src/pages/index.tsx", content: "export default function Home() { return null; }" },
     { path: "src/pages/about.tsx", content: "export default function About() { return null; }" },
-    { path: "src/pages/users/[id].tsx", content: "export default function User() { return null; }" },
+    {
+      path: "src/pages/users/[id].tsx",
+      content: "export default function User() { return null; }",
+    },
   ];
   const draft = deriveDraftFromFiles(files, "Build a site", "");
   const paths = draft.pageMap.map((p) => p.path).sort();

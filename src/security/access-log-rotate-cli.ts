@@ -10,7 +10,9 @@ export interface RunAccessLogRotateOptions {
   err?: (line: string) => void;
 }
 
-export async function runAccessLogRotateCli(options: RunAccessLogRotateOptions = {}): Promise<number> {
+export async function runAccessLogRotateCli(
+  options: RunAccessLogRotateOptions = {},
+): Promise<number> {
   const argv = options.argv ?? process.argv.slice(2);
   const env = options.env ?? process.env;
   const out = options.out ?? ((line: string) => console.log(line));
@@ -33,12 +35,18 @@ export async function runAccessLogRotateCli(options: RunAccessLogRotateOptions =
 
   try {
     const result = rotateAccessLogFile(targetPath, maxFiles);
-    out(JSON.stringify({
-      command: "access-log:rotate",
-      path: targetPath,
-      maxFiles,
-      ...result,
-    }, null, 2));
+    out(
+      JSON.stringify(
+        {
+          command: "access-log:rotate",
+          path: targetPath,
+          maxFiles,
+          ...result,
+        },
+        null,
+        2,
+      ),
+    );
     return 0;
   } catch (error) {
     err(redactedErrorMessage(error));
@@ -78,10 +86,12 @@ function isExecutedDirectly(): boolean {
 }
 
 if (isExecutedDirectly()) {
-  runAccessLogRotateCli().then((exitCode) => {
-    process.exitCode = exitCode;
-  }).catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
+  runAccessLogRotateCli()
+    .then((exitCode) => {
+      process.exitCode = exitCode;
+    })
+    .catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    });
 }

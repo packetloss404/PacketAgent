@@ -14,9 +14,29 @@ import type {
 test("lists failed deliveries sorted newest-first with redacted lastError", () => {
   const data = makeStore({
     deliveries: [
-      makeDelivery({ id: "del_old", invitationId: "inv_a", workspaceId: "ws_alpha", status: "failed", error: "boom token=secret123", createdAt: "2026-04-20T10:00:00.000Z" }),
-      makeDelivery({ id: "del_new", invitationId: "inv_a", workspaceId: "ws_alpha", status: "failed", error: "later boom", createdAt: "2026-04-22T10:00:00.000Z" }),
-      makeDelivery({ id: "del_sent", invitationId: "inv_a", workspaceId: "ws_alpha", status: "sent", createdAt: "2026-04-21T10:00:00.000Z" }),
+      makeDelivery({
+        id: "del_old",
+        invitationId: "inv_a",
+        workspaceId: "ws_alpha",
+        status: "failed",
+        error: "boom token=secret123",
+        createdAt: "2026-04-20T10:00:00.000Z",
+      }),
+      makeDelivery({
+        id: "del_new",
+        invitationId: "inv_a",
+        workspaceId: "ws_alpha",
+        status: "failed",
+        error: "later boom",
+        createdAt: "2026-04-22T10:00:00.000Z",
+      }),
+      makeDelivery({
+        id: "del_sent",
+        invitationId: "inv_a",
+        workspaceId: "ws_alpha",
+        status: "sent",
+        createdAt: "2026-04-21T10:00:00.000Z",
+      }),
     ],
     invitations: [makeInvitation({ id: "inv_a", workspaceId: "ws_alpha" })],
   });
@@ -25,7 +45,10 @@ test("lists failed deliveries sorted newest-first with redacted lastError", () =
 
   assert.equal(result.command, "reconcile-invitation-emails");
   assert.equal(result.scannedDeliveries, 3);
-  assert.deepEqual(result.failedDeliveries.map((entry) => entry.deliveryId), ["del_new", "del_old"]);
+  assert.deepEqual(
+    result.failedDeliveries.map((entry) => entry.deliveryId),
+    ["del_new", "del_old"],
+  );
   assert.equal(result.failedDeliveries[1].lastError, "boom token=[redacted]");
   assert.equal(result.actions.length, 0);
 });
@@ -33,43 +56,90 @@ test("lists failed deliveries sorted newest-first with redacted lastError", () =
 test("filters by workspaceId, invitationId, and deliveryId", () => {
   const data = makeStore({
     deliveries: [
-      makeDelivery({ id: "del_alpha", invitationId: "inv_a", workspaceId: "ws_alpha", status: "failed", createdAt: "2026-04-20T10:00:00.000Z" }),
-      makeDelivery({ id: "del_beta", invitationId: "inv_b", workspaceId: "ws_beta", status: "failed", createdAt: "2026-04-21T10:00:00.000Z" }),
-      makeDelivery({ id: "del_gamma", invitationId: "inv_b", workspaceId: "ws_beta", status: "failed", createdAt: "2026-04-22T10:00:00.000Z" }),
+      makeDelivery({
+        id: "del_alpha",
+        invitationId: "inv_a",
+        workspaceId: "ws_alpha",
+        status: "failed",
+        createdAt: "2026-04-20T10:00:00.000Z",
+      }),
+      makeDelivery({
+        id: "del_beta",
+        invitationId: "inv_b",
+        workspaceId: "ws_beta",
+        status: "failed",
+        createdAt: "2026-04-21T10:00:00.000Z",
+      }),
+      makeDelivery({
+        id: "del_gamma",
+        invitationId: "inv_b",
+        workspaceId: "ws_beta",
+        status: "failed",
+        createdAt: "2026-04-22T10:00:00.000Z",
+      }),
     ],
-    invitations: [makeInvitation({ id: "inv_a", workspaceId: "ws_alpha" }), makeInvitation({ id: "inv_b", workspaceId: "ws_beta" })],
+    invitations: [
+      makeInvitation({ id: "inv_a", workspaceId: "ws_alpha" }),
+      makeInvitation({ id: "inv_b", workspaceId: "ws_beta" }),
+    ],
   });
 
   const byWorkspace = reconcileInvitationEmails({ workspaceId: "ws_beta" }, makeDeps(data));
-  assert.deepEqual(byWorkspace.failedDeliveries.map((entry) => entry.deliveryId), ["del_gamma", "del_beta"]);
+  assert.deepEqual(
+    byWorkspace.failedDeliveries.map((entry) => entry.deliveryId),
+    ["del_gamma", "del_beta"],
+  );
 
   const byInvitation = reconcileInvitationEmails({ invitationId: "inv_a" }, makeDeps(data));
-  assert.deepEqual(byInvitation.failedDeliveries.map((entry) => entry.deliveryId), ["del_alpha"]);
+  assert.deepEqual(
+    byInvitation.failedDeliveries.map((entry) => entry.deliveryId),
+    ["del_alpha"],
+  );
 
   const byDelivery = reconcileInvitationEmails({ deliveryId: "del_beta" }, makeDeps(data));
-  assert.deepEqual(byDelivery.failedDeliveries.map((entry) => entry.deliveryId), ["del_beta"]);
+  assert.deepEqual(
+    byDelivery.failedDeliveries.map((entry) => entry.deliveryId),
+    ["del_beta"],
+  );
 });
 
 test("skips rows whose providerStatus is delivered", () => {
   const data = makeStore({
     deliveries: [
-      makeDelivery({ id: "del_failed_deferred", status: "failed", providerStatus: "deferred", createdAt: "2026-04-20T10:00:00.000Z" }),
-      makeDelivery({ id: "del_failed_delivered", status: "failed", providerStatus: "delivered", createdAt: "2026-04-21T10:00:00.000Z" }),
+      makeDelivery({
+        id: "del_failed_deferred",
+        status: "failed",
+        providerStatus: "deferred",
+        createdAt: "2026-04-20T10:00:00.000Z",
+      }),
+      makeDelivery({
+        id: "del_failed_delivered",
+        status: "failed",
+        providerStatus: "delivered",
+        createdAt: "2026-04-21T10:00:00.000Z",
+      }),
     ],
     invitations: [],
   });
 
   const result = reconcileInvitationEmails({}, makeDeps(data));
-  assert.deepEqual(result.failedDeliveries.map((entry) => entry.deliveryId), ["del_failed_deferred"]);
+  assert.deepEqual(
+    result.failedDeliveries.map((entry) => entry.deliveryId),
+    ["del_failed_deferred"],
+  );
 });
 
 test("markResolved with known deliveryId calls apply with providerStatus=delivered", () => {
   const data = makeStore({
-    deliveries: [makeDelivery({ id: "del_1", status: "failed", createdAt: "2026-04-20T10:00:00.000Z" })],
+    deliveries: [
+      makeDelivery({ id: "del_1", status: "failed", createdAt: "2026-04-20T10:00:00.000Z" }),
+    ],
     invitations: [],
   });
   const calls: InvitationEmailReconciliationInput[] = [];
-  const apply = (input: InvitationEmailReconciliationInput): InvitationEmailReconciliationResult => {
+  const apply = (
+    input: InvitationEmailReconciliationInput,
+  ): InvitationEmailReconciliationResult => {
     calls.push(input);
     return {
       ok: true,
@@ -116,10 +186,18 @@ test("markResolved with unknown deliveryId records a failed action", () => {
 });
 
 test("requeue with known deliveryId calls enqueueRetry and records job id", () => {
-  const delivery = makeDelivery({ id: "del_re", invitationId: "inv_re", workspaceId: "ws_alpha", status: "failed", createdAt: "2026-04-20T10:00:00.000Z" });
+  const delivery = makeDelivery({
+    id: "del_re",
+    invitationId: "inv_re",
+    workspaceId: "ws_alpha",
+    status: "failed",
+    createdAt: "2026-04-20T10:00:00.000Z",
+  });
   const data = makeStore({
     deliveries: [delivery],
-    invitations: [makeInvitation({ id: "inv_re", workspaceId: "ws_alpha", invitedByUserId: "user_1" })],
+    invitations: [
+      makeInvitation({ id: "inv_re", workspaceId: "ws_alpha", invitedByUserId: "user_1" }),
+    ],
   });
   const enqueueCalls: InvitationEmailDeliveryRecord[] = [];
   const enqueueRetry = (entry: InvitationEmailDeliveryRecord): string => {
@@ -142,7 +220,9 @@ test("requeue with known deliveryId calls enqueueRetry and records job id", () =
 
 test("markResolved + requeue together returns a validation failure and skips both", () => {
   const data = makeStore({
-    deliveries: [makeDelivery({ id: "del_x", status: "failed", createdAt: "2026-04-20T10:00:00.000Z" })],
+    deliveries: [
+      makeDelivery({ id: "del_x", status: "failed", createdAt: "2026-04-20T10:00:00.000Z" }),
+    ],
     invitations: [],
   });
   let applyCalled = false;
@@ -170,11 +250,15 @@ test("markResolved + requeue together returns a validation failure and skips bot
 
 test("default now produces an ISO timestamp", () => {
   const data = makeStore({
-    deliveries: [makeDelivery({ id: "del_iso", status: "failed", createdAt: "2026-04-20T10:00:00.000Z" })],
+    deliveries: [
+      makeDelivery({ id: "del_iso", status: "failed", createdAt: "2026-04-20T10:00:00.000Z" }),
+    ],
     invitations: [],
   });
   const observed: string[] = [];
-  const apply = (input: InvitationEmailReconciliationInput): InvitationEmailReconciliationResult => {
+  const apply = (
+    input: InvitationEmailReconciliationInput,
+  ): InvitationEmailReconciliationResult => {
     observed.push(input.occurredAt ?? "");
     return {
       ok: true,
@@ -214,7 +298,9 @@ function makeDeps(data: PacketAgentData) {
   };
 }
 
-function makeDelivery(input: Partial<InvitationEmailDeliveryRecord> & { id: string }): InvitationEmailDeliveryRecord {
+function makeDelivery(
+  input: Partial<InvitationEmailDeliveryRecord> & { id: string },
+): InvitationEmailDeliveryRecord {
   return {
     id: input.id,
     workspaceId: input.workspaceId ?? "ws_alpha",
@@ -234,7 +320,9 @@ function makeDelivery(input: Partial<InvitationEmailDeliveryRecord> & { id: stri
   };
 }
 
-function makeInvitation(input: Partial<WorkspaceInvitationRecord> & { id: string; workspaceId: string }): WorkspaceInvitationRecord {
+function makeInvitation(
+  input: Partial<WorkspaceInvitationRecord> & { id: string; workspaceId: string },
+): WorkspaceInvitationRecord {
   return {
     id: input.id,
     workspaceId: input.workspaceId,

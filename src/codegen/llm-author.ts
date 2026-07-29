@@ -29,19 +29,9 @@
 // those land, local placeholders keep this file compileable on its own.
 // =============================================================================
 
-import {
-  getDefaultRouter,
-  type ProviderRouter,
-} from "../providers/router.js";
-import {
-  resolvePresetToProviderModel,
-  type ModelPreset,
-} from "../providers/preset-resolver.js";
-import type {
-  LLMProvider,
-  ProviderStreamChunk,
-  ProviderToolDef,
-} from "../providers/types.js";
+import { getDefaultRouter, type ProviderRouter } from "../providers/router.js";
+import { resolvePresetToProviderModel, type ModelPreset } from "../providers/preset-resolver.js";
+import type { LLMProvider, ProviderStreamChunk, ProviderToolDef } from "../providers/types.js";
 import { validateWorkspacePath } from "./path-validator.js";
 import {
   validateFileTree,
@@ -143,7 +133,7 @@ function defaultPrompts(): ResolvedPrompts {
     "",
     "You work in two phases:",
     "  1. PLAN — outline the files you will write. Respond with prose, then a",
-    "     single JSON block formatted as `[{\"path\": string, \"purpose\":",
+    '     single JSON block formatted as `[{"path": string, "purpose":',
     "     string}, ...]`. The JSON MUST be parseable.",
     "  2. WRITE — emit one `write_file` tool call per planned file. Each call",
     "     carries a workspace-relative path and complete file contents.",
@@ -279,14 +269,11 @@ interface ResolvedProvider {
   model: string;
 }
 
-function resolveProvider(
-  options: AuthorAppOptions,
-): ResolvedProvider | null {
+function resolveProvider(options: AuthorAppOptions): ResolvedProvider | null {
   const router = options.router ?? getDefaultRouter();
-  const resolved = resolvePresetToProviderModel(
-    options.preset as ModelPreset | undefined,
-    { router },
-  );
+  const resolved = resolvePresetToProviderModel(options.preset as ModelPreset | undefined, {
+    router,
+  });
   if (!resolved) return null;
   const provider = router.get(resolved.provider);
   if (!provider) return null;
@@ -338,9 +325,7 @@ async function runPlanPhase(
         ],
       });
     } catch (error) {
-      console.warn(
-        `[llm-author] plan stream init failed: ${(error as Error).message}`,
-      );
+      console.warn(`[llm-author] plan stream init failed: ${(error as Error).message}`);
       return null;
     }
 
@@ -361,9 +346,7 @@ async function runPlanPhase(
         }
       }
     } catch (error) {
-      console.warn(
-        `[llm-author] plan stream consume failed: ${(error as Error).message}`,
-      );
+      console.warn(`[llm-author] plan stream consume failed: ${(error as Error).message}`);
       return null;
     }
 
@@ -415,9 +398,7 @@ async function runSingleWriteRound(
       tools: [WRITE_FILE_TOOL],
     });
   } catch (error) {
-    console.warn(
-      `[llm-author] write stream init failed: ${(error as Error).message}`,
-    );
+    console.warn(`[llm-author] write stream init failed: ${(error as Error).message}`);
     return null;
   }
 
@@ -440,9 +421,7 @@ async function runSingleWriteRound(
         const path = (input as Record<string, unknown>).path;
         const content = (input as Record<string, unknown>).content;
         if (typeof path !== "string" || typeof content !== "string") {
-          console.warn(
-            `[llm-author] write_file call missing path/content; skipping`,
-          );
+          console.warn(`[llm-author] write_file call missing path/content; skipping`);
           continue;
         }
         const pathCheck = validateWorkspacePath(path);
@@ -456,9 +435,7 @@ async function runSingleWriteRound(
       }
     }
   } catch (error) {
-    console.warn(
-      `[llm-author] write stream consume failed: ${(error as Error).message}`,
-    );
+    console.warn(`[llm-author] write stream consume failed: ${(error as Error).message}`);
     return null;
   }
 
@@ -471,9 +448,7 @@ function buildPlanSummary(plan: PlannedFile[]): string {
 
 function buildChunkUserPrompt(chunk: PlannedFile[]): string {
   const pathList = chunk.map((entry) => entry.path).join(", ");
-  const chunkBullets = chunk
-    .map((entry) => `- ${entry.path} — ${entry.purpose}`)
-    .join("\n");
+  const chunkBullets = chunk.map((entry) => `- ${entry.path} — ${entry.purpose}`).join("\n");
   return [
     `Write these files: ${pathList}. Don't write any other files in this turn.`,
     "",
@@ -527,13 +502,7 @@ async function runWritePhaseChunked(
     const chunk = chunks[i];
     if (!chunk) continue;
     const userContent = buildChunkUserPrompt(chunk);
-    const roundResult = await runSingleWriteRound(
-      prompts,
-      resolved,
-      options,
-      userContent,
-      emit,
-    );
+    const roundResult = await runSingleWriteRound(prompts, resolved, options, userContent, emit);
     if (!roundResult) {
       // Hard error from the provider stream. Surface as null only if we
       // haven't accumulated anything yet; otherwise return the partial
@@ -545,9 +514,7 @@ async function runWritePhaseChunked(
       return { files: accumulated };
     }
     if (roundResult.files.length === 0) {
-      console.warn(
-        `[llm-author] write chunk ${i + 1}/${chunks.length} emitted 0 files; stopping`,
-      );
+      console.warn(`[llm-author] write chunk ${i + 1}/${chunks.length} emitted 0 files; stopping`);
       return { files: accumulated };
     }
     accumulated.push(...roundResult.files);
@@ -595,20 +562,8 @@ export async function authorAppViaLLM(
   // chunked across multiple rounds so we don't blow past maxTokens.
   const writeResult =
     planResult.plan.length > CHUNK_WRITE_THRESHOLD
-      ? await runWritePhaseChunked(
-          planResult.plan,
-          prompts,
-          resolved,
-          options,
-          emit,
-        )
-      : await runWritePhase(
-          planResult.plan,
-          prompts,
-          resolved,
-          options,
-          emit,
-        );
+      ? await runWritePhaseChunked(planResult.plan, prompts, resolved, options, emit)
+      : await runWritePhase(planResult.plan, prompts, resolved, options, emit);
   if (!writeResult) return null;
   if (writeResult.files.length === 0) {
     console.warn(`[llm-author] model emitted zero write_file calls`);
@@ -631,7 +586,10 @@ export async function authorAndValidateAppViaLLM(
 ): Promise<AuthorAndValidateAppResult | null> {
   const author = options.authorFn ?? authorAppViaLLM;
   const validate = options.validateFn ?? validateFileTree;
-  const maxRepairAttempts = Math.max(0, options.maxValidationFixAttempts ?? DEFAULT_VALIDATION_FIX_ATTEMPTS);
+  const maxRepairAttempts = Math.max(
+    0,
+    options.maxValidationFixAttempts ?? DEFAULT_VALIDATION_FIX_ATTEMPTS,
+  );
   const authorOptions = authorOptionsOnly(options);
   const validateOptions = validationOptionsOnly(options);
   const seenSignatures = new Set<string>();
@@ -658,13 +616,18 @@ export async function authorAndValidateAppViaLLM(
     try {
       await emit(
         `\n\nBuild validation found ${validation.errors.length} issue${validation.errors.length === 1 ? "" : "s"}. ` +
-        `Trying repair pass ${repairAttempts + 1} of ${maxRepairAttempts}.\n\n`,
+          `Trying repair pass ${repairAttempts + 1} of ${maxRepairAttempts}.\n\n`,
       );
     } catch {
       // emit must not break generation
     }
 
-    const repairGoal = buildValidationRepairGoal(userGoal, result.files, validation, repairAttempts + 1);
+    const repairGoal = buildValidationRepairGoal(
+      userGoal,
+      result.files,
+      validation,
+      repairAttempts + 1,
+    );
     const repaired = await author(repairGoal, authorOptions, emit);
     if (!repaired) {
       return { ...result, validation, repairAttempts, stoppedReason: "repair-author-failed" };
@@ -673,17 +636,11 @@ export async function authorAndValidateAppViaLLM(
   }
 }
 
-function buildSummary(
-  userGoal: string,
-  plan: PlannedFile[],
-  files: GeneratedFile[],
-): string {
+function buildSummary(userGoal: string, plan: PlannedFile[], files: GeneratedFile[]): string {
   const fileCount = files.length;
   const goalSnippet = userGoal.length > 80 ? `${userGoal.slice(0, 77)}...` : userGoal;
   const plannedNote =
-    plan.length === files.length
-      ? `${fileCount} files`
-      : `${fileCount}/${plan.length} files`;
+    plan.length === files.length ? `${fileCount} files` : `${fileCount}/${plan.length} files`;
   return `LLM-authored app for: ${goalSnippet} (${plannedNote})`;
 }
 
@@ -713,12 +670,14 @@ async function runValidation(
     return {
       ok: false,
       source: "real",
-      errors: [{
-        file: "<validator>",
-        message: error instanceof Error ? error.message : String(error),
-        severity: "error",
-        phase: "typecheck",
-      }],
+      errors: [
+        {
+          file: "<validator>",
+          message: error instanceof Error ? error.message : String(error),
+          severity: "error",
+          phase: "typecheck",
+        },
+      ],
       warnings: [],
       durationMs: 0,
       phases: { typecheck: "failed", build: "skipped" },
@@ -729,13 +688,15 @@ async function runValidation(
 function validationErrorSignature(validation: ValidationResult): string {
   return validation.errors
     .slice(0, 12)
-    .map((error) => [
-      error.phase,
-      error.file,
-      error.line ?? "",
-      error.column ?? "",
-      normalizeValidationMessage(error.message),
-    ].join(":"))
+    .map((error) =>
+      [
+        error.phase,
+        error.file,
+        error.line ?? "",
+        error.column ?? "",
+        normalizeValidationMessage(error.message),
+      ].join(":"),
+    )
     .join("|");
 }
 
@@ -785,13 +746,16 @@ function renderFilesForRepairPrompt(files: GeneratedFile[], budgetBytes: number)
     const footer = "\n```\n";
     const remaining = budgetBytes - used - Buffer.byteLength(header) - Buffer.byteLength(footer);
     if (remaining <= 0) {
-      chunks.push(`\n... ${files.length - chunks.length} more file(s) omitted due to prompt budget.\n`);
+      chunks.push(
+        `\n... ${files.length - chunks.length} more file(s) omitted due to prompt budget.\n`,
+      );
       break;
     }
     const contentBytes = Buffer.byteLength(file.content);
-    const content = contentBytes > remaining
-      ? `${file.content.slice(0, Math.max(0, remaining))}\n... truncated ...`
-      : file.content;
+    const content =
+      contentBytes > remaining
+        ? `${file.content.slice(0, Math.max(0, remaining))}\n... truncated ...`
+        : file.content;
     chunks.push(`${header}${content}${footer}`);
     used += Buffer.byteLength(chunks[chunks.length - 1] ?? "");
   }

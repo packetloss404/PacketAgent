@@ -7,9 +7,7 @@ import {
   type ValidationRunner,
 } from "./validate.js";
 
-const SAMPLE_FILES = [
-  { path: "src/index.ts", content: "export const answer: number = 42;\n" },
-];
+const SAMPLE_FILES = [{ path: "src/index.ts", content: "export const answer: number = 42;\n" }];
 
 function smokeEnv(): NodeJS.ProcessEnv {
   return { PACKETAGENT_SANDBOX_SMOKE_ENABLED: "1" };
@@ -321,8 +319,7 @@ test("tsc passes + vite build fails: build error is reported with phase=build", 
     return {
       exitCode: 1,
       stdout: "",
-      stderr:
-        '[vite]: Could not resolve "./missing.tsx" from "src/App.tsx"\nerror during build:\n',
+      stderr: '[vite]: Could not resolve "./missing.tsx" from "src/App.tsx"\nerror during build:\n',
     };
   };
   const result = await validateFileTree(SAMPLE_FILES, {

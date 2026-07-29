@@ -109,7 +109,12 @@ export function validateWorkspacePath(rawPath: string): PathValidationResult {
   // `path.posix.normalize` collapses `a/./b` and `a//b` but preserves a
   // leading `..` if the path tries to escape. Re-check after normalization to
   // defeat constructed bypasses like `foo/../../bar`.
-  if (normalized === ".." || normalized.startsWith("../") || normalized === "." || normalized === "") {
+  if (
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    normalized === "." ||
+    normalized === ""
+  ) {
     if (normalized === "." || normalized === "") {
       return fail("path resolves to the workspace root");
     }
@@ -138,9 +143,7 @@ export function validateWorkspacePath(rawPath: string): PathValidationResult {
     }
 
     // Windows reserved device name check. Strip extension and uppercase.
-    const stem = segment.includes(".")
-      ? segment.slice(0, segment.indexOf("."))
-      : segment;
+    const stem = segment.includes(".") ? segment.slice(0, segment.indexOf(".")) : segment;
     if (WINDOWS_RESERVED_NAMES.has(stem.toUpperCase())) {
       return fail(`segment '${segment}' is a reserved Windows device name`);
     }

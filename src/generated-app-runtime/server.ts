@@ -88,7 +88,9 @@ export class GeneratedAppRuntimeProcessPool {
     this.now = options.now ?? (() => new Date());
   }
 
-  async request(input: GeneratedAppRuntimeProcessRequest): Promise<GeneratedAppRuntimeProcessResponse> {
+  async request(
+    input: GeneratedAppRuntimeProcessRequest,
+  ): Promise<GeneratedAppRuntimeProcessResponse> {
     return this.requestWithRetry(input, false);
   }
 
@@ -98,7 +100,13 @@ export class GeneratedAppRuntimeProcessPool {
     await Promise.all(entries.map((entry) => this.stopEntry(entry, "shutdown")));
   }
 
-  snapshot(): Array<{ appId: string; workspaceId: string; schemaSignature: string; pid?: number; activeRequests: number }> {
+  snapshot(): Array<{
+    appId: string;
+    workspaceId: string;
+    schemaSignature: string;
+    pid?: number;
+    activeRequests: number;
+  }> {
     return [...this.entries.values()].map((entry) => ({
       appId: entry.appId,
       workspaceId: entry.workspaceId,
@@ -175,7 +183,10 @@ export class GeneratedAppRuntimeProcessPool {
     return readyEntry;
   }
 
-  private async startEntry(entry: RuntimeEntry, input: GeneratedAppRuntimeProcessRequest): Promise<RuntimeEntry> {
+  private async startEntry(
+    entry: RuntimeEntry,
+    input: GeneratedAppRuntimeProcessRequest,
+  ): Promise<RuntimeEntry> {
     try {
       const worker = await this.workerFactory({
         appId: input.appId,
@@ -220,7 +231,8 @@ export class GeneratedAppRuntimeProcessPool {
   private async stopEntry(entry: RuntimeEntry, reason: string): Promise<void> {
     entry.stopped = true;
     try {
-      const worker = entry.worker ?? (await entry.ready.then((ready) => ready.worker).catch(() => undefined));
+      const worker =
+        entry.worker ?? (await entry.ready.then((ready) => ready.worker).catch(() => undefined));
       await worker?.stop(reason);
     } catch {
       // A dead worker is already past the useful cleanup boundary.
@@ -233,7 +245,9 @@ export function getDefaultGeneratedAppRuntimeProcessPool(): GeneratedAppRuntimeP
   return defaultPool;
 }
 
-export function setDefaultGeneratedAppRuntimeProcessPoolForTests(pool: GeneratedAppRuntimeProcessPool | null): void {
+export function setDefaultGeneratedAppRuntimeProcessPoolForTests(
+  pool: GeneratedAppRuntimeProcessPool | null,
+): void {
   defaultPool = pool;
 }
 
@@ -246,15 +260,21 @@ export async function spawnGeneratedAppRuntimeWorker(
   config: GeneratedAppRuntimeWorkerStartConfig,
 ): Promise<GeneratedAppRuntimeWorkerHandle> {
   const workerPath = fileURLToPath(new URL("./server-worker.ts", import.meta.url));
-  const configDir = path.join(tmpdir(), `packetagent-generated-runtime-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  const configDir = path.join(
+    tmpdir(),
+    `packetagent-generated-runtime-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
   mkdirSync(configDir, { recursive: true });
   const configPath = path.join(configDir, "config.json");
-  writeFileSync(configPath, JSON.stringify({
-    appId: config.appId,
-    workspaceId: config.workspaceId,
-    model: config.model,
-    runtimeRoot: config.runtimeRoot,
-  }));
+  writeFileSync(
+    configPath,
+    JSON.stringify({
+      appId: config.appId,
+      workspaceId: config.workspaceId,
+      model: config.model,
+      runtimeRoot: config.runtimeRoot,
+    }),
+  );
 
   const child = fork(workerPath, [configPath], {
     cwd: process.cwd(),
@@ -303,7 +323,10 @@ function runtimePoolKey(workspaceId: string, appId: string): string {
 }
 
 function defaultMaxProcesses(): number {
-  const parsed = Number.parseInt(process.env.PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES ?? "", 10);
+  const parsed = Number.parseInt(
+    process.env.PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES ?? "",
+    10,
+  );
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_PROCESSES;
 }
 
@@ -314,7 +337,9 @@ function waitForWorkerReady(
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       cleanup();
-      reject(new Error(`generated app runtime worker startup timed out${formatWorkerOutput(output())}`));
+      reject(
+        new Error(`generated app runtime worker startup timed out${formatWorkerOutput(output())}`),
+      );
     }, STARTUP_TIMEOUT_MS);
 
     const onMessage = (message: unknown) => {
@@ -322,17 +347,28 @@ function waitForWorkerReady(
       const payload = message as { type?: unknown; port?: unknown; pid?: unknown; error?: unknown };
       if (payload.type === "ready" && typeof payload.port === "number") {
         cleanup();
-        resolve({ port: payload.port, pid: typeof payload.pid === "number" ? payload.pid : undefined });
+        resolve({
+          port: payload.port,
+          pid: typeof payload.pid === "number" ? payload.pid : undefined,
+        });
         return;
       }
       if (payload.type === "error") {
         cleanup();
-        reject(new Error(`generated app runtime worker failed: ${String(payload.error ?? "unknown error")}${formatWorkerOutput(output())}`));
+        reject(
+          new Error(
+            `generated app runtime worker failed: ${String(payload.error ?? "unknown error")}${formatWorkerOutput(output())}`,
+          ),
+        );
       }
     };
     const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
       cleanup();
-      reject(new Error(`generated app runtime worker exited before ready (${code ?? signal ?? "unknown"})${formatWorkerOutput(output())}`));
+      reject(
+        new Error(
+          `generated app runtime worker exited before ready (${code ?? signal ?? "unknown"})${formatWorkerOutput(output())}`,
+        ),
+      );
     };
     const onError = (error: Error) => {
       cleanup();
@@ -363,7 +399,7 @@ async function requestWorker(
     body: hasBody ? JSON.stringify(request.body) : undefined,
   });
   const text = await response.text();
-  const body = text ? JSON.parse(text) as unknown : null;
+  const body = text ? (JSON.parse(text) as unknown) : null;
   return { status: response.status, body };
 }
 
@@ -403,15 +439,7 @@ async function stopChild(child: ChildProcess): Promise<void> {
 }
 
 function scrubRuntimeEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const allowed = [
-    "PATH",
-    "HOME",
-    "TMPDIR",
-    "TEMP",
-    "TMP",
-    "SystemRoot",
-    "WINDIR",
-  ];
+  const allowed = ["PATH", "HOME", "TMPDIR", "TEMP", "TMP", "SystemRoot", "WINDIR"];
   const scrubbed: NodeJS.ProcessEnv = {};
   for (const key of allowed) {
     const value = env[key];

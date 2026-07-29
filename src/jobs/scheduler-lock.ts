@@ -1,4 +1,13 @@
-import { existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, closeSync } from "node:fs";
+import {
+  existsSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+  closeSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 
@@ -10,9 +19,15 @@ export interface SchedulerLeaderLock {
 
 export function noopLeaderLock(): SchedulerLeaderLock {
   return {
-    async acquire() { return true; },
-    async release() { /* noop */ },
-    isHeld() { return true; },
+    async acquire() {
+      return true;
+    },
+    async release() {
+      /* noop */
+    },
+    isHeld() {
+      return true;
+    },
   };
 }
 
@@ -39,9 +54,10 @@ function readLockState(path: string): FileLockState | null {
     const raw = readFileSync(fd, "utf8");
     const parsed = JSON.parse(raw) as unknown;
     if (
-      typeof parsed === "object" && parsed !== null
-      && typeof (parsed as FileLockState).processId === "string"
-      && typeof (parsed as FileLockState).expiresAt === "number"
+      typeof parsed === "object" &&
+      parsed !== null &&
+      typeof (parsed as FileLockState).processId === "string" &&
+      typeof (parsed as FileLockState).expiresAt === "number"
     ) {
       return parsed as FileLockState;
     }
@@ -50,7 +66,11 @@ function readLockState(path: string): FileLockState | null {
     return null;
   } finally {
     if (fd !== null) {
-      try { closeSync(fd); } catch { /* ignore */ }
+      try {
+        closeSync(fd);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
@@ -78,7 +98,8 @@ export function fileLeaderLock(options: FileLeaderLockOptions): SchedulerLeaderL
           throw new Error(`scheduler leader lock parent is not a directory: ${parent}`);
         }
       } catch (error) {
-        if (error instanceof Error && error.message.startsWith("scheduler leader lock parent")) throw error;
+        if (error instanceof Error && error.message.startsWith("scheduler leader lock parent"))
+          throw error;
         throw new Error(`scheduler leader lock parent directory does not exist: ${parent}`);
       }
 
@@ -100,9 +121,15 @@ export function fileLeaderLock(options: FileLeaderLockOptions): SchedulerLeaderL
       try {
         const current = readLockState(path);
         if (current && current.processId === processId) {
-          try { unlinkSync(path); } catch { /* ignore */ }
+          try {
+            unlinkSync(path);
+          } catch {
+            /* ignore */
+          }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       held = false;
     },
     isHeld() {

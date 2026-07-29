@@ -61,7 +61,7 @@ function makeStore(records: AlertEventRecord[] = []): PacketAgentData {
 function makeStoreDeps(data: PacketAgentData) {
   return {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
 }
 
@@ -77,7 +77,9 @@ function makeEvent(overrides: Partial<AlertEvent> & { id: string }): AlertEvent 
   };
 }
 
-function makeRecord(overrides: Partial<AlertEventRecord> & { id: string; observedAt: string }): AlertEventRecord {
+function makeRecord(
+  overrides: Partial<AlertEventRecord> & { id: string; observedAt: string },
+): AlertEventRecord {
   const record: AlertEventRecord = {
     id: overrides.id,
     ruleId: overrides.ruleId ?? "subsystem-degraded",
@@ -98,12 +100,16 @@ function makeRecord(overrides: Partial<AlertEventRecord> & { id: string; observe
 function readDedicated(dbPath: string): AlertEventRow[] {
   const db = new DatabaseSync(dbPath);
   try {
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       select id, rule_id, severity, title, detail, observed_at, context,
         delivered, delivery_error, delivery_attempts, last_delivery_attempt_at, dead_lettered
       from alert_events
       order by observed_at, id
-    `).all() as unknown as AlertEventRow[];
+    `,
+      )
+      .all() as unknown as AlertEventRow[];
   } finally {
     db.close();
   }
@@ -112,12 +118,14 @@ function readDedicated(dbPath: string): AlertEventRow[] {
 function seedDedicated(dbPath: string, record: AlertEventRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into alert_events (
         id, rule_id, severity, title, detail, observed_at, context,
         delivered, delivery_error, delivery_attempts, last_delivery_attempt_at, dead_lettered
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       record.id,
       record.ruleId,
       record.severity,
@@ -398,7 +406,11 @@ test("updateAlertDeliveryStatus: a failing dedicated-table write does NOT throw 
   const restore = withSqliteEnv(dbPath);
   const warn = captureConsoleWarn();
   try {
-    const seeded = makeRecord({ id: "evt_a", observedAt: "2026-04-26T12:00:00.000Z", delivered: false });
+    const seeded = makeRecord({
+      id: "evt_a",
+      observedAt: "2026-04-26T12:00:00.000Z",
+      delivered: false,
+    });
     const data = makeStore([seeded]);
 
     const result = updateAlertDeliveryStatus(

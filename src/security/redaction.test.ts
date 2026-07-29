@@ -4,7 +4,9 @@ import { maskSecret, redactSensitiveString, redactSensitiveValue } from "./redac
 
 test("redaction masks known secrets and bearer tokens", () => {
   const secret = "invitation-token-1234";
-  const redacted = redactSensitiveString(`failed for ${secret} with Bearer provider-secret-1234`, [secret]);
+  const redacted = redactSensitiveString(`failed for ${secret} with Bearer provider-secret-1234`, [
+    secret,
+  ]);
 
   assert.equal(redacted.includes(secret), false);
   assert.equal(redacted.includes("provider-secret-1234"), false);
@@ -25,7 +27,9 @@ test("redaction removes token-bearing URLs and assignments", () => {
 });
 
 test("redaction does not append match offset for routes without a trailing capture group", () => {
-  const redacted = redactSensitiveString("/share/raw-token-1234 then /api/public/webhooks/agents/whk_secret_value tail");
+  const redacted = redactSensitiveString(
+    "/share/raw-token-1234 then /api/public/webhooks/agents/whk_secret_value tail",
+  );
 
   assert.equal(redacted.includes("raw-token-1234"), false);
   assert.equal(redacted.includes("whk_secret_value"), false);
@@ -34,7 +38,9 @@ test("redaction does not append match offset for routes without a trailing captu
 });
 
 test("redaction stops at & boundaries when redacting assignments", () => {
-  const redacted = redactSensitiveString("?token=raw-token-1234&access_token=other-secret-9876&keep=visible");
+  const redacted = redactSensitiveString(
+    "?token=raw-token-1234&access_token=other-secret-9876&keep=visible",
+  );
 
   assert.equal(redacted.includes("raw-token-1234"), false);
   assert.equal(redacted.includes("other-secret-9876"), false);

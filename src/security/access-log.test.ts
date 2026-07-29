@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { Hono } from "hono";
-import { __resetAccessLogForTests, accessLogMiddleware, formatAccessLogLine, rotateAccessLogFile } from "./access-log.js";
+import {
+  __resetAccessLogForTests,
+  accessLogMiddleware,
+  formatAccessLogLine,
+  rotateAccessLogFile,
+} from "./access-log.js";
 
 const FIXED_NOW = new Date("2026-04-26T12:00:00.000Z");
 
@@ -24,27 +29,33 @@ function baseInput(overrides: Partial<Parameters<typeof formatAccessLogLine>[0]>
 }
 
 test("formatAccessLogLine redacts whk_ webhook tokens in path", () => {
-  const line = formatAccessLogLine(baseInput({
-    path: "/api/public/webhooks/agents/whk_some_secret_token",
-  }));
+  const line = formatAccessLogLine(
+    baseInput({
+      path: "/api/public/webhooks/agents/whk_some_secret_token",
+    }),
+  );
   const parsed = JSON.parse(line);
   assert.equal(parsed.path.includes("whk_some_secret_token"), false);
   assert.equal(parsed.path.startsWith("/api/public/webhooks/agents/[redacted]"), true);
 });
 
 test("formatAccessLogLine redacts /share/<token> path", () => {
-  const line = formatAccessLogLine(baseInput({
-    path: "/share/share-token-1234",
-  }));
+  const line = formatAccessLogLine(
+    baseInput({
+      path: "/share/share-token-1234",
+    }),
+  );
   const parsed = JSON.parse(line);
   assert.equal(parsed.path.includes("share-token-1234"), false);
   assert.equal(parsed.path.startsWith("/share/[redacted]"), true);
 });
 
 test("formatAccessLogLine redacts /api/app/invitations/<token>/accept", () => {
-  const line = formatAccessLogLine(baseInput({
-    path: "/api/app/invitations/invite-secret-1234/accept",
-  }));
+  const line = formatAccessLogLine(
+    baseInput({
+      path: "/api/app/invitations/invite-secret-1234/accept",
+    }),
+  );
   const parsed = JSON.parse(line);
   assert.equal(parsed.path.includes("invite-secret-1234"), false);
   assert.equal(parsed.path.includes("[redacted]"), true);
@@ -52,10 +63,12 @@ test("formatAccessLogLine redacts /api/app/invitations/<token>/accept", () => {
 });
 
 test("formatAccessLogLine redacts token and access_token query params", () => {
-  const line = formatAccessLogLine(baseInput({
-    path: "/api/things",
-    query: "token=secret&access_token=other",
-  }));
+  const line = formatAccessLogLine(
+    baseInput({
+      path: "/api/things",
+      query: "token=secret&access_token=other",
+    }),
+  );
   const parsed = JSON.parse(line);
   assert.equal(parsed.path.includes("secret"), false);
   assert.equal(parsed.path.includes("other"), false);
@@ -63,15 +76,17 @@ test("formatAccessLogLine redacts token and access_token query params", () => {
 });
 
 test("formatAccessLogLine keeps method, status, durationMs, userId, workspaceId verbatim", () => {
-  const line = formatAccessLogLine(baseInput({
-    method: "POST",
-    status: 201,
-    path: "/api/app/agents",
-    durationMs: 42,
-    userId: "user-abc",
-    workspaceId: "ws-xyz",
-    requestId: "req-1",
-  }));
+  const line = formatAccessLogLine(
+    baseInput({
+      method: "POST",
+      status: 201,
+      path: "/api/app/agents",
+      durationMs: 42,
+      userId: "user-abc",
+      workspaceId: "ws-xyz",
+      requestId: "req-1",
+    }),
+  );
   const parsed = JSON.parse(line);
   assert.equal(parsed.method, "POST");
   assert.equal(parsed.status, 201);
@@ -89,7 +104,9 @@ test("middleware in 'off' mode does not write to stdout", async () => {
   __resetAccessLogForTests();
   const captured: string[] = [];
   const originalWrite = process.stdout.write.bind(process.stdout);
-  (process.stdout as unknown as { write: (chunk: unknown) => boolean }).write = ((chunk: unknown) => {
+  (process.stdout as unknown as { write: (chunk: unknown) => boolean }).write = ((
+    chunk: unknown,
+  ) => {
     captured.push(String(chunk));
     return true;
   }) as never;
@@ -109,12 +126,19 @@ test("middleware in 'off' mode does not write to stdout", async () => {
 });
 
 function makeTmpDir(label: string): string {
-  const dir = join(tmpdir(), `packetagent-access-log-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const dir = join(
+    tmpdir(),
+    `packetagent-access-log-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-function withFileEnv(filePath: string, maxBytes: string | null, maxFiles: string | null): () => void {
+function withFileEnv(
+  filePath: string,
+  maxBytes: string | null,
+  maxFiles: string | null,
+): () => void {
   const previous = {
     mode: process.env.PACKETAGENT_ACCESS_LOG_MODE,
     path: process.env.PACKETAGENT_ACCESS_LOG_PATH,
@@ -236,7 +260,10 @@ test("middleware in file mode rotates when MAX_BYTES is exceeded", async () => {
     await waitForFile(`${filePath}.1`);
     assert.equal(existsSync(`${filePath}.1`), true);
     if (existsSync(filePath)) {
-      assert.ok(statSync(filePath).size <= 300, `current file size ${statSync(filePath).size} should be <= 300`);
+      assert.ok(
+        statSync(filePath).size <= 300,
+        `current file size ${statSync(filePath).size} should be <= 300`,
+      );
     }
   } finally {
     restore();
@@ -296,7 +323,9 @@ test("middleware in 'stdout' mode writes one redacted line per request", async (
   __resetAccessLogForTests();
   const captured: string[] = [];
   const originalWrite = process.stdout.write.bind(process.stdout);
-  (process.stdout as unknown as { write: (chunk: unknown) => boolean }).write = ((chunk: unknown) => {
+  (process.stdout as unknown as { write: (chunk: unknown) => boolean }).write = ((
+    chunk: unknown,
+  ) => {
     captured.push(String(chunk));
     return true;
   }) as never;

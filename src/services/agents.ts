@@ -49,13 +49,27 @@ import { DEFAULT_PROVIDER_NAMES } from "../providers/bootstrap.js";
 import { getDefaultRouter } from "../providers/router.js";
 import type { ProviderName } from "../providers/types.js";
 import { listDefaultToolSummaries } from "../tools/bootstrap.js";
-import { buildWebhookTriggerReadiness, type WebhookTriggerReadiness } from "../webhook-readiness.js";
+import {
+  buildWebhookTriggerReadiness,
+  type WebhookTriggerReadiness,
+} from "../webhook-readiness.js";
 import { getDefaultToolRegistry } from "../tools/registry.js";
-import type { ToolCapabilityApprovalInput, ToolCapabilityApprovalRequest } from "../tools/approval.js";
+import type {
+  ToolCapabilityApprovalInput,
+  ToolCapabilityApprovalRequest,
+} from "../tools/approval.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { maintainScheduledAgentJobs } from "../jobs/store.js";
-import { detectPhase71Integrations, type Phase71IntegrationMetadata } from "../app-builder-service.js";
-import { isSensitiveKey, maskSecret as maskBearerSecret, redactSensitiveString, redactSensitiveValue } from "../security/redaction.js";
+import {
+  detectPhase71Integrations,
+  type Phase71IntegrationMetadata,
+} from "../app-builder-service.js";
+import {
+  isSensitiveKey,
+  maskSecret as maskBearerSecret,
+  redactSensitiveString,
+  redactSensitiveValue,
+} from "../security/redaction.js";
 import { generateId, now } from "../auth-utils";
 import {
   activationActivityId,
@@ -206,7 +220,15 @@ export interface AgentBuilderApproveResult {
   sampleInputs?: Record<string, string | number | boolean>;
 }
 
-export type AgentRunTraceSpanKind = "run" | "input" | "step" | "tool" | "log" | "output" | "error" | string;
+export type AgentRunTraceSpanKind =
+  | "run"
+  | "input"
+  | "step"
+  | "tool"
+  | "log"
+  | "output"
+  | "error"
+  | string;
 export type AgentRunTraceSpanStatus = StoredAgentRunTraceSpan["status"] | "unknown" | string;
 
 export interface AgentRunTraceSpan {
@@ -262,10 +284,20 @@ export type AgentRunDetail = {
 };
 
 export function listAgents(context: AuthenticatedContext) {
-  const providersById = new Map(listProvidersForWorkspaceIndexed(context.workspace.id).map((provider) => [provider.id, provider]));
+  const providersById = new Map(
+    listProvidersForWorkspaceIndexed(context.workspace.id).map((provider) => [
+      provider.id,
+      provider,
+    ]),
+  );
   return {
-    agents: listAgentsForWorkspaceIndexed(context.workspace.id)
-      .map((agent) => decorateAgentWithProvider(agent, agent.providerId ? providersById.get(agent.providerId) ?? null : null, { includeWebhookToken: false })),
+    agents: listAgentsForWorkspaceIndexed(context.workspace.id).map((agent) =>
+      decorateAgentWithProvider(
+        agent,
+        agent.providerId ? (providersById.get(agent.providerId) ?? null) : null,
+        { includeWebhookToken: false },
+      ),
+    ),
   };
 }
 
@@ -280,7 +312,13 @@ export async function listAgentsAsync(context: AuthenticatedContext) {
     agents: data.agents
       .filter((agent) => agent.workspaceId === context.workspace.id && agent.status !== "archived")
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .map((agent) => decorateAgentWithProvider(agent, agent.providerId ? providersById.get(agent.providerId) ?? null : null, { includeWebhookToken: false })),
+      .map((agent) =>
+        decorateAgentWithProvider(
+          agent,
+          agent.providerId ? (providersById.get(agent.providerId) ?? null) : null,
+          { includeWebhookToken: false },
+        ),
+      ),
   };
 }
 
@@ -290,7 +328,9 @@ export function getAgent(context: AuthenticatedContext, agentId: string) {
     throw httpError(404, "agent not found");
   }
   const provider = agent.providerId
-    ? listProvidersForWorkspaceIndexed(context.workspace.id).find((entry) => entry.id === agent.providerId) ?? null
+    ? (listProvidersForWorkspaceIndexed(context.workspace.id).find(
+        (entry) => entry.id === agent.providerId,
+      ) ?? null)
     : null;
 
   return {
@@ -299,7 +339,10 @@ export function getAgent(context: AuthenticatedContext, agentId: string) {
   };
 }
 
-export function generateAgentDraftFromPrompt(prompt: string, options: AgentDraftOptions = {}): AgentDraft {
+export function generateAgentDraftFromPrompt(
+  prompt: string,
+  options: AgentDraftOptions = {},
+): AgentDraft {
   const trimmed = String(prompt ?? "").trim();
   if (trimmed.length < 8) throw httpError(400, "prompt must be at least 8 characters");
 
@@ -312,7 +355,10 @@ export function generateAgentDraftFromPrompt(prompt: string, options: AgentDraft
   const inputSchema = buildAgentInputSchema(trimmed);
   const enabledTools = inferAgentTools(trimmed);
   const integrationMetadata = buildAgentPhase71IntegrationMetadata(trimmed);
-  const playbook = applyAgentIntegrationPlaybookSteps(buildAgentPlaybook(sentences, actionPhrases, enabledTools), integrationMetadata);
+  const playbook = applyAgentIntegrationPlaybookSteps(
+    buildAgentPlaybook(sentences, actionPhrases, enabledTools),
+    integrationMetadata,
+  );
   const webhookReadiness = buildWebhookTriggerReadiness(triggerKind);
 
   return {
@@ -321,7 +367,10 @@ export function generateAgentDraftFromPrompt(prompt: string, options: AgentDraft
     agent: {
       name,
       description: summarizePromptAgentDraft(sentences, name),
-      instructions: applyAgentIntegrationInstructions(buildAgentInstructions(trimmed, actionPhrases, enabledTools), integrationMetadata),
+      instructions: applyAgentIntegrationInstructions(
+        buildAgentInstructions(trimmed, actionPhrases, enabledTools),
+        integrationMetadata,
+      ),
       providerId: stringOrUndefined(options.providerId),
       model: stringOrUndefined(options.model),
       tools: enabledTools,
@@ -330,18 +379,30 @@ export function generateAgentDraftFromPrompt(prompt: string, options: AgentDraft
       schedule,
       triggerKind,
       playbook,
-      status: options.status && ["active", "paused", "archived"].includes(options.status) ? options.status : "paused",
+      status:
+        options.status && ["active", "paused", "archived"].includes(options.status)
+          ? options.status
+          : "paused",
       inputSchema,
     },
-    plan: applyAgentIntegrationDraftPlan(buildAgentDraftPlan(triggerKind, enabledTools, inputSchema), integrationMetadata),
-    assumptions: applyAgentIntegrationAssumptions(buildAgentDraftAssumptions(triggerKind, enabledTools, inputSchema), integrationMetadata),
+    plan: applyAgentIntegrationDraftPlan(
+      buildAgentDraftPlan(triggerKind, enabledTools, inputSchema),
+      integrationMetadata,
+    ),
+    assumptions: applyAgentIntegrationAssumptions(
+      buildAgentDraftAssumptions(triggerKind, enabledTools, inputSchema),
+      integrationMetadata,
+    ),
     readiness: {
       webhook: webhookReadiness,
     },
   };
 }
 
-export async function generateAgentFromPromptAsync(context: AuthenticatedContext, input: AgentDraftInput): Promise<AgentDraftResult> {
+export async function generateAgentFromPromptAsync(
+  context: AuthenticatedContext,
+  input: AgentDraftInput,
+): Promise<AgentDraftResult> {
   const draft = generateAgentDraftFromPrompt(input.prompt ?? "", {
     providerId: input.providerId,
     model: input.model,
@@ -368,14 +429,16 @@ export async function generateAgentFromPromptAsync(context: AuthenticatedContext
 
 export async function getAgentAsync(context: AuthenticatedContext, agentId: string) {
   const data = await loadStoreAsync();
-  const agent = data.agents.find((entry) =>
-    entry.workspaceId === context.workspace.id && entry.id === agentId
+  const agent = data.agents.find(
+    (entry) => entry.workspaceId === context.workspace.id && entry.id === agentId,
   );
   if (!agent || agent.status === "archived") {
     throw httpError(404, "agent not found");
   }
   const provider = agent.providerId
-    ? data.providers.find((entry) => entry.workspaceId === context.workspace.id && entry.id === agent.providerId) ?? null
+    ? (data.providers.find(
+        (entry) => entry.workspaceId === context.workspace.id && entry.id === agent.providerId,
+      ) ?? null)
     : null;
 
   return {
@@ -395,30 +458,44 @@ export function createAgent(context: AuthenticatedContext, input: AgentInput) {
   const result = mutateStore((data) => {
     validateProvider(data, context.workspace.id, normalized.providerId);
 
-    const agent = upsertAgent(data, {
-      workspaceId: context.workspace.id,
-      name: normalized.name,
-      description: normalized.description,
-      instructions: normalized.instructions,
-      providerId: normalized.providerId,
-      model: normalized.model,
-      tools: normalized.tools,
-      enabledTools: normalized.enabledTools,
-      routeKey: normalized.routeKey,
-      schedule: normalized.schedule,
-      triggerKind: normalized.triggerKind,
-      playbook: normalized.playbook,
-      status: normalized.status,
-      templateId: normalized.templateId,
-      inputSchema: normalized.inputSchema,
-      createdByUserId: context.user.id,
-    }, timestamp);
+    const agent = upsertAgent(
+      data,
+      {
+        workspaceId: context.workspace.id,
+        name: normalized.name,
+        description: normalized.description,
+        instructions: normalized.instructions,
+        providerId: normalized.providerId,
+        model: normalized.model,
+        tools: normalized.tools,
+        enabledTools: normalized.enabledTools,
+        routeKey: normalized.routeKey,
+        schedule: normalized.schedule,
+        triggerKind: normalized.triggerKind,
+        playbook: normalized.playbook,
+        status: normalized.status,
+        templateId: normalized.templateId,
+        inputSchema: normalized.inputSchema,
+        createdByUserId: context.user.id,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "agent.created", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Agent created: ${agent.name}`, agentId: agent.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.created",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Agent created: ${agent.name}`, agentId: agent.id },
+        timestamp,
+      ),
+    );
 
     return { agent: decorateAgent(data, agent) };
   });
@@ -433,30 +510,44 @@ export async function createAgentAsync(context: AuthenticatedContext, input: Age
   const result = await mutateStoreAsync((data) => {
     validateProvider(data, context.workspace.id, normalized.providerId);
 
-    const agent = upsertAgent(data, {
-      workspaceId: context.workspace.id,
-      name: normalized.name,
-      description: normalized.description,
-      instructions: normalized.instructions,
-      providerId: normalized.providerId,
-      model: normalized.model,
-      tools: normalized.tools,
-      enabledTools: normalized.enabledTools,
-      routeKey: normalized.routeKey,
-      schedule: normalized.schedule,
-      triggerKind: normalized.triggerKind,
-      playbook: normalized.playbook,
-      status: normalized.status,
-      templateId: normalized.templateId,
-      inputSchema: normalized.inputSchema,
-      createdByUserId: context.user.id,
-    }, timestamp);
+    const agent = upsertAgent(
+      data,
+      {
+        workspaceId: context.workspace.id,
+        name: normalized.name,
+        description: normalized.description,
+        instructions: normalized.instructions,
+        providerId: normalized.providerId,
+        model: normalized.model,
+        tools: normalized.tools,
+        enabledTools: normalized.enabledTools,
+        routeKey: normalized.routeKey,
+        schedule: normalized.schedule,
+        triggerKind: normalized.triggerKind,
+        playbook: normalized.playbook,
+        status: normalized.status,
+        templateId: normalized.templateId,
+        inputSchema: normalized.inputSchema,
+        createdByUserId: context.user.id,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "agent.created", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Agent created: ${agent.name}`, agentId: agent.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.created",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Agent created: ${agent.name}`, agentId: agent.id },
+        timestamp,
+      ),
+    );
 
     return { agent: decorateAgent(data, agent) };
   });
@@ -464,41 +555,63 @@ export async function createAgentAsync(context: AuthenticatedContext, input: Age
   return result;
 }
 
-export function updateAgent(context: AuthenticatedContext, agentId: string, input: Partial<AgentInput>) {
+export function updateAgent(
+  context: AuthenticatedContext,
+  agentId: string,
+  input: Partial<AgentInput>,
+) {
   const timestamp = now();
 
   const result = mutateStore((data) => {
     const existing = findAgent(data, agentId);
-    if (!existing || existing.workspaceId !== context.workspace.id || existing.status === "archived") {
+    if (
+      !existing ||
+      existing.workspaceId !== context.workspace.id ||
+      existing.status === "archived"
+    ) {
       throw httpError(404, "agent not found");
     }
 
     const normalized = normalizeAgentInput({ ...existing, ...input });
     validateProvider(data, context.workspace.id, normalized.providerId);
 
-    const agent = upsertAgent(data, {
-      ...existing,
-      name: normalized.name,
-      description: normalized.description,
-      instructions: normalized.instructions,
-      providerId: normalized.providerId,
-      model: normalized.model,
-      tools: normalized.tools,
-      enabledTools: normalized.enabledTools,
-      routeKey: normalized.routeKey,
-      schedule: normalized.schedule,
-      triggerKind: normalized.triggerKind,
-      playbook: normalized.playbook,
-      status: normalized.status,
-      templateId: normalized.templateId ?? existing.templateId,
-      inputSchema: normalized.inputSchema,
-    }, timestamp);
+    const agent = upsertAgent(
+      data,
+      {
+        ...existing,
+        name: normalized.name,
+        description: normalized.description,
+        instructions: normalized.instructions,
+        providerId: normalized.providerId,
+        model: normalized.model,
+        tools: normalized.tools,
+        enabledTools: normalized.enabledTools,
+        routeKey: normalized.routeKey,
+        schedule: normalized.schedule,
+        triggerKind: normalized.triggerKind,
+        playbook: normalized.playbook,
+        status: normalized.status,
+        templateId: normalized.templateId ?? existing.templateId,
+        inputSchema: normalized.inputSchema,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "agent.updated", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Agent updated: ${agent.name}`, agentId: agent.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.updated",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Agent updated: ${agent.name}`, agentId: agent.id },
+        timestamp,
+      ),
+    );
 
     return { agent: decorateAgent(data, agent) };
   });
@@ -506,41 +619,63 @@ export function updateAgent(context: AuthenticatedContext, agentId: string, inpu
   return result;
 }
 
-export async function updateAgentAsync(context: AuthenticatedContext, agentId: string, input: Partial<AgentInput>) {
+export async function updateAgentAsync(
+  context: AuthenticatedContext,
+  agentId: string,
+  input: Partial<AgentInput>,
+) {
   const timestamp = now();
 
   const result = await mutateStoreAsync((data) => {
     const existing = findAgent(data, agentId);
-    if (!existing || existing.workspaceId !== context.workspace.id || existing.status === "archived") {
+    if (
+      !existing ||
+      existing.workspaceId !== context.workspace.id ||
+      existing.status === "archived"
+    ) {
       throw httpError(404, "agent not found");
     }
 
     const normalized = normalizeAgentInput({ ...existing, ...input });
     validateProvider(data, context.workspace.id, normalized.providerId);
 
-    const agent = upsertAgent(data, {
-      ...existing,
-      name: normalized.name,
-      description: normalized.description,
-      instructions: normalized.instructions,
-      providerId: normalized.providerId,
-      model: normalized.model,
-      tools: normalized.tools,
-      enabledTools: normalized.enabledTools,
-      routeKey: normalized.routeKey,
-      schedule: normalized.schedule,
-      triggerKind: normalized.triggerKind,
-      playbook: normalized.playbook,
-      status: normalized.status,
-      templateId: normalized.templateId ?? existing.templateId,
-      inputSchema: normalized.inputSchema,
-    }, timestamp);
+    const agent = upsertAgent(
+      data,
+      {
+        ...existing,
+        name: normalized.name,
+        description: normalized.description,
+        instructions: normalized.instructions,
+        providerId: normalized.providerId,
+        model: normalized.model,
+        tools: normalized.tools,
+        enabledTools: normalized.enabledTools,
+        routeKey: normalized.routeKey,
+        schedule: normalized.schedule,
+        triggerKind: normalized.triggerKind,
+        playbook: normalized.playbook,
+        status: normalized.status,
+        templateId: normalized.templateId ?? existing.templateId,
+        inputSchema: normalized.inputSchema,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "agent.updated", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Agent updated: ${agent.name}`, agentId: agent.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.updated",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Agent updated: ${agent.name}`, agentId: agent.id },
+        timestamp,
+      ),
+    );
 
     return { agent: decorateAgent(data, agent) };
   });
@@ -553,21 +688,39 @@ export function archiveAgent(context: AuthenticatedContext, agentId: string) {
 
   const result = mutateStore((data) => {
     const existing = findAgent(data, agentId);
-    if (!existing || existing.workspaceId !== context.workspace.id || existing.status === "archived") {
+    if (
+      !existing ||
+      existing.workspaceId !== context.workspace.id ||
+      existing.status === "archived"
+    ) {
       throw httpError(404, "agent not found");
     }
 
-    const agent = upsertAgent(data, {
-      ...existing,
-      status: "archived",
-      archivedAt: timestamp,
-    }, timestamp);
+    const agent = upsertAgent(
+      data,
+      {
+        ...existing,
+        status: "archived",
+        archivedAt: timestamp,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "agent.archived", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Agent archived: ${agent.name}`, agentId: agent.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.archived",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Agent archived: ${agent.name}`, agentId: agent.id },
+        timestamp,
+      ),
+    );
 
     return { agent: decorateAgent(data, agent) };
   });
@@ -580,21 +733,39 @@ export async function archiveAgentAsync(context: AuthenticatedContext, agentId: 
 
   const result = await mutateStoreAsync((data) => {
     const existing = findAgent(data, agentId);
-    if (!existing || existing.workspaceId !== context.workspace.id || existing.status === "archived") {
+    if (
+      !existing ||
+      existing.workspaceId !== context.workspace.id ||
+      existing.status === "archived"
+    ) {
       throw httpError(404, "agent not found");
     }
 
-    const agent = upsertAgent(data, {
-      ...existing,
-      status: "archived",
-      archivedAt: timestamp,
-    }, timestamp);
+    const agent = upsertAgent(
+      data,
+      {
+        ...existing,
+        status: "archived",
+        archivedAt: timestamp,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "agent.archived", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Agent archived: ${agent.name}`, agentId: agent.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.archived",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Agent archived: ${agent.name}`, agentId: agent.id },
+        timestamp,
+      ),
+    );
 
     return { agent: decorateAgent(data, agent) };
   });
@@ -613,7 +784,9 @@ export type RunAgentToolApprovalPayload = Partial<ToolCapabilityApprovalInput> &
   tools?: unknown;
 };
 
-export type RunAgentResult = { run: ReturnType<typeof decorateRun> } | { approval: ToolCapabilityApprovalRequest };
+export type RunAgentResult =
+  | { run: ReturnType<typeof decorateRun> }
+  | { approval: ToolCapabilityApprovalRequest };
 
 export async function runAgent(
   context: AuthenticatedContext,
@@ -632,9 +805,10 @@ export async function runAgent(
 ): Promise<RunAgentResult> {
   const timestamp = now();
   const requestedTriggerRaw = stringOrUndefined(input?.triggerKind);
-  const triggerKind: AgentTriggerKind = requestedTriggerRaw && (TRIGGER_KINDS as string[]).includes(requestedTriggerRaw)
-    ? (requestedTriggerRaw as AgentTriggerKind)
-    : "manual";
+  const triggerKind: AgentTriggerKind =
+    requestedTriggerRaw && (TRIGGER_KINDS as string[]).includes(requestedTriggerRaw)
+      ? (requestedTriggerRaw as AgentTriggerKind)
+      : "manual";
   const rawInputs: Record<string, unknown> = input?.inputs ?? {};
 
   const data = await loadStoreAsync();
@@ -687,12 +861,19 @@ export async function runAgent(
     const liveAgent = findAgent(store, agentId);
     if (!liveAgent) throw httpError(404, "agent not found");
     const provider = liveAgent.providerId ? findProvider(store, liveAgent.providerId) : null;
-    const providerReady = provider ? isProviderReadyForAgentRuns(store, context.workspace.id, provider) : false;
+    const providerReady = provider
+      ? isProviderReadyForAgentRuns(store, context.workspace.id, provider)
+      : false;
     const transcript = buildDryRunTranscript(liveAgent.playbook ?? [], timestamp);
 
     const logs: AgentRunLogEntry[] = [
       { at: timestamp, level: "info", message: `Dry run started for ${liveAgent.name}.` },
-      { at: timestamp, level: "warn", message: "No model or runtime tools were invoked; this run only records the planned local transcript." },
+      {
+        at: timestamp,
+        level: "warn",
+        message:
+          "No model or runtime tools were invoked; this run only records the planned local transcript.",
+      },
     ];
     if (provider) {
       logs.push({
@@ -706,35 +887,59 @@ export async function runAgent(
       logs.push({
         at: timestamp,
         level: "warn",
-        message: "No provider is selected for this agent; configure a provider and enabled tools for real execution.",
+        message:
+          "No provider is selected for this agent; configure a provider and enabled tools for real execution.",
       });
     }
     for (const field of liveAgent.inputSchema ?? []) {
       if (field.key in inputs) {
-        logs.push({ at: timestamp, level: "info", message: `Input ${field.key} = ${formatInputValue(inputs[field.key])}` });
+        logs.push({
+          at: timestamp,
+          level: "info",
+          message: `Input ${field.key} = ${formatInputValue(inputs[field.key])}`,
+        });
       }
     }
-    logs.push({ at: timestamp, level: "info", message: "Dry run recorded locally. Enable registered tools to execute through the agent loop." });
+    logs.push({
+      at: timestamp,
+      level: "info",
+      message:
+        "Dry run recorded locally. Enable registered tools to execute through the agent loop.",
+    });
 
-    const run = upsertAgentRun(store, {
-      workspaceId: context.workspace.id,
-      agentId: liveAgent.id,
-      title: `${liveAgent.name} dry run recorded`,
-      status: "success",
-      triggerKind,
-      transcript,
-      startedAt: timestamp,
-      completedAt: timestamp,
-      inputs: Object.keys(inputs).length ? inputs : undefined,
-      output: buildDryRunOutput(liveAgent.name, inputs),
-      logs,
-    }, timestamp);
+    const run = upsertAgentRun(
+      store,
+      {
+        workspaceId: context.workspace.id,
+        agentId: liveAgent.id,
+        title: `${liveAgent.name} dry run recorded`,
+        status: "success",
+        triggerKind,
+        transcript,
+        startedAt: timestamp,
+        completedAt: timestamp,
+        inputs: Object.keys(inputs).length ? inputs : undefined,
+        output: buildDryRunOutput(liveAgent.name, inputs),
+        logs,
+      },
+      timestamp,
+    );
 
-    recordActivity(store, makeActivity(context.workspace.id, "workspace", "agent.run", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: run.title, agentId: liveAgent.id, runId: run.id, status: run.status, triggerKind }, timestamp));
+    recordActivity(
+      store,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.run",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: run.title, agentId: liveAgent.id, runId: run.id, status: run.status, triggerKind },
+        timestamp,
+      ),
+    );
 
     return { run: decorateRun(run) };
   });
@@ -792,14 +997,16 @@ async function buildAgentToolCapabilityApprovalRequest(
   input: AgentToolCapabilityApprovalContext,
 ): Promise<ToolCapabilityApprovalRequest> {
   const { buildToolCapabilityApprovalRequest } = await import("../tools/approval.js");
-  return Promise.resolve(buildToolCapabilityApprovalRequest({
-    workspaceId: input.workspaceId,
-    userId: input.userId,
-    agentId: input.agentId,
-    triggerKind: input.triggerKind,
-    tools: input.tools,
-    inputs: input.inputs,
-  }));
+  return Promise.resolve(
+    buildToolCapabilityApprovalRequest({
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      agentId: input.agentId,
+      triggerKind: input.triggerKind,
+      tools: input.tools,
+      inputs: input.inputs,
+    }),
+  );
 }
 
 async function hasValidToolLaunchApproval(
@@ -809,33 +1016,42 @@ async function hasValidToolLaunchApproval(
   if (!toolApproval || getToolApprovalDecision(toolApproval) !== "launch") return false;
   try {
     const { verifyToolCapabilityApproval } = await import("../tools/approval.js");
-    const result = await Promise.resolve(verifyToolCapabilityApproval(normalizeToolApprovalPayload(toolApproval), {
-      workspaceId: approvalInput.workspaceId,
-      userId: approvalInput.userId,
-      agentId: approvalInput.agentId,
-      triggerKind: approvalInput.triggerKind,
-      tools: approvalInput.tools,
-      inputs: approvalInput.inputs,
-      consume: true,
-    }));
+    const result = await Promise.resolve(
+      verifyToolCapabilityApproval(normalizeToolApprovalPayload(toolApproval), {
+        workspaceId: approvalInput.workspaceId,
+        userId: approvalInput.userId,
+        agentId: approvalInput.agentId,
+        triggerKind: approvalInput.triggerKind,
+        tools: approvalInput.tools,
+        inputs: approvalInput.inputs,
+        consume: true,
+      }),
+    );
     return approvalVerificationPassed(result);
   } catch {
     return false;
   }
 }
 
-function normalizeToolApprovalPayload(toolApproval: RunAgentToolApprovalPayload): ToolCapabilityApprovalInput {
+function normalizeToolApprovalPayload(
+  toolApproval: RunAgentToolApprovalPayload,
+): ToolCapabilityApprovalInput {
   const approval = toolApproval as RunAgentToolApprovalPayload & { approvalToken?: unknown };
-  const token = typeof approval.token === "string"
-    ? approval.token
-    : typeof approval.approvalToken === "string"
-      ? approval.approvalToken
-      : "";
+  const token =
+    typeof approval.token === "string"
+      ? approval.token
+      : typeof approval.approvalToken === "string"
+        ? approval.approvalToken
+        : "";
   const approvedTools = Array.isArray(approval.approvedTools)
     ? approval.approvedTools
     : Array.isArray(approval.tools)
       ? approval.tools
-          .map((tool) => typeof tool === "object" && tool !== null && "name" in tool ? String((tool as { name: unknown }).name) : "")
+          .map((tool) =>
+            typeof tool === "object" && tool !== null && "name" in tool
+              ? String((tool as { name: unknown }).name)
+              : "",
+          )
           .filter(Boolean)
       : [];
   return {
@@ -845,7 +1061,9 @@ function normalizeToolApprovalPayload(toolApproval: RunAgentToolApprovalPayload)
   };
 }
 
-function getToolApprovalDecision(toolApproval: RunAgentToolApprovalPayload | null | undefined): string | undefined {
+function getToolApprovalDecision(
+  toolApproval: RunAgentToolApprovalPayload | null | undefined,
+): string | undefined {
   if (!toolApproval || typeof toolApproval !== "object") return undefined;
   const decision = (toolApproval as { decision?: unknown }).decision;
   return typeof decision === "string" ? decision : undefined;
@@ -854,7 +1072,12 @@ function getToolApprovalDecision(toolApproval: RunAgentToolApprovalPayload | nul
 function approvalVerificationPassed(result: unknown): boolean {
   if (typeof result === "boolean") return result;
   if (!result || typeof result !== "object") return false;
-  const verification = result as { ok?: unknown; valid?: unknown; approved?: unknown; verified?: unknown };
+  const verification = result as {
+    ok?: unknown;
+    valid?: unknown;
+    approved?: unknown;
+    verified?: unknown;
+  };
   if (typeof verification.ok === "boolean") return verification.ok;
   if (typeof verification.valid === "boolean") return verification.valid;
   if (typeof verification.approved === "boolean") return verification.approved;
@@ -876,22 +1099,35 @@ async function runAgentWithToolLoop(args: {
   const routeKey = agent.routeKey || "agent.reasoning";
   const runId = generateId();
   const storeSnapshot = await loadStoreAsync();
-  const executionTarget = resolveAgentExecutionTarget(storeSnapshot, context.workspace.id, agent, routeKey);
-  const registeredToolNames = new Set(getDefaultToolRegistry().list().map((tool) => tool.name));
+  const executionTarget = resolveAgentExecutionTarget(
+    storeSnapshot,
+    context.workspace.id,
+    agent,
+    routeKey,
+  );
+  const registeredToolNames = new Set(
+    getDefaultToolRegistry()
+      .list()
+      .map((tool) => tool.name),
+  );
   const missingTools = enabledTools.filter((tool) => !registeredToolNames.has(tool));
   const blockers = [
     ...executionTarget.blockers,
-    ...(missingTools.length > 0 ? [`Enabled tools are not registered in the runtime: ${missingTools.join(", ")}.`] : []),
+    ...(missingTools.length > 0
+      ? [`Enabled tools are not registered in the runtime: ${missingTools.join(", ")}.`]
+      : []),
   ];
 
   const userPromptParts = [agent.instructions];
   if (Object.keys(inputs).length > 0) {
     userPromptParts.push("INPUTS:");
-    for (const [k, v] of Object.entries(inputs)) userPromptParts.push(`- ${k}: ${formatInputValue(v)}`);
+    for (const [k, v] of Object.entries(inputs))
+      userPromptParts.push(`- ${k}: ${formatInputValue(v)}`);
   }
   if ((agent.playbook ?? []).length > 0) {
     userPromptParts.push("PLAYBOOK:");
-    for (const step of agent.playbook ?? []) userPromptParts.push(`- ${step.title}: ${step.instruction}`);
+    for (const step of agent.playbook ?? [])
+      userPromptParts.push(`- ${step.title}: ${step.instruction}`);
   }
 
   const logs: AgentRunLogEntry[] = [
@@ -925,16 +1161,25 @@ async function runAgentWithToolLoop(args: {
       routeKey,
       providerName: executionTarget.providerName,
       model: executionTarget.model,
-      systemPrompt: "You are a workspace agent. Use the supplied tools to complete the user's task. When finished, return a concise final answer.",
+      systemPrompt:
+        "You are a workspace agent. Use the supplied tools to complete the user's task. When finished, return a concise final answer.",
       userPrompt: userPromptParts.join("\n"),
       toolNames: enabledTools,
       maxTurns: 8,
     });
   } catch (error) {
     loopError = (error as Error).message;
-    logs.push({ at: new Date().toISOString(), level: "error", message: `Loop crashed: ${loopError}` });
+    logs.push({
+      at: new Date().toISOString(),
+      level: "error",
+      message: `Loop crashed: ${loopError}`,
+    });
   } finally {
-    try { await closeBrowserSession(runId); } catch { /* ignore */ }
+    try {
+      await closeBrowserSession(runId);
+    } catch {
+      /* ignore */
+    }
   }
 
   const completedAt = new Date().toISOString();
@@ -947,43 +1192,63 @@ async function runAgentWithToolLoop(args: {
     });
   }
   if (loopResult) {
-    logs.push({ at: completedAt, level: "info", message: `Finished in ${loopResult.turnsUsed} turn(s) using ${loopResult.modelUsed} ($${loopResult.costUsd.toFixed(4)}).` });
+    logs.push({
+      at: completedAt,
+      level: "info",
+      message: `Finished in ${loopResult.turnsUsed} turn(s) using ${loopResult.modelUsed} ($${loopResult.costUsd.toFixed(4)}).`,
+    });
   }
 
   return mutateStoreAsync((store) => {
-    const run = upsertAgentRun(store, {
-      workspaceId: context.workspace.id,
-      agentId: agent.id,
-      title: ok ? `${agent.name} run completed` : `${agent.name} run failed`,
-      status: ok ? "success" : "failed",
-      triggerKind,
-      startedAt: timestamp,
-      completedAt,
-      inputs: Object.keys(inputs).length ? inputs : undefined,
-      output: loopResult?.finalContent,
-      error: loopError ?? (loopResult?.finishReason === "max_turns" ? "Loop exceeded max_turns." : undefined),
-      logs,
-      toolCalls: loopResult?.toolCalls.map((tc) => ({
-        id: tc.id,
-        toolName: tc.toolName,
-        input: tc.input,
-        output: tc.output,
-        ...(tc.error ? { error: tc.error } : {}),
-        ...(tc.artifacts ? { artifacts: tc.artifacts } : {}),
-        durationMs: tc.durationMs,
-        startedAt: tc.startedAt,
-        completedAt: tc.completedAt,
-        status: tc.status,
-      })),
-      modelUsed: loopResult?.modelUsed,
-      costUsd: loopResult?.costUsd,
-    }, timestamp);
+    const run = upsertAgentRun(
+      store,
+      {
+        workspaceId: context.workspace.id,
+        agentId: agent.id,
+        title: ok ? `${agent.name} run completed` : `${agent.name} run failed`,
+        status: ok ? "success" : "failed",
+        triggerKind,
+        startedAt: timestamp,
+        completedAt,
+        inputs: Object.keys(inputs).length ? inputs : undefined,
+        output: loopResult?.finalContent,
+        error:
+          loopError ??
+          (loopResult?.finishReason === "max_turns" ? "Loop exceeded max_turns." : undefined),
+        logs,
+        toolCalls: loopResult?.toolCalls.map((tc) => ({
+          id: tc.id,
+          toolName: tc.toolName,
+          input: tc.input,
+          output: tc.output,
+          ...(tc.error ? { error: tc.error } : {}),
+          ...(tc.artifacts ? { artifacts: tc.artifacts } : {}),
+          durationMs: tc.durationMs,
+          startedAt: tc.startedAt,
+          completedAt: tc.completedAt,
+          status: tc.status,
+        })),
+        modelUsed: loopResult?.modelUsed,
+        costUsd: loopResult?.costUsd,
+      },
+      timestamp,
+    );
 
-    recordActivity(store, makeActivity(context.workspace.id, "workspace", "agent.run", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: run.title, agentId: agent.id, runId: run.id, status: run.status, triggerKind }, timestamp));
+    recordActivity(
+      store,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.run",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: run.title, agentId: agent.id, runId: run.id, status: run.status, triggerKind },
+        timestamp,
+      ),
+    );
 
     return { run };
   });
@@ -1013,12 +1278,18 @@ function resolveAgentExecutionTarget(
     notes.push(`Using agent provider ${provider.name} with model ${model}.`);
 
     if (!providerName) {
-      blockers.push(`Provider ${provider.name} uses kind "${provider.kind}", which is not wired to the agent runtime yet.`);
+      blockers.push(
+        `Provider ${provider.name} uses kind "${provider.kind}", which is not wired to the agent runtime yet.`,
+      );
     } else if (!router.has(providerName)) {
-      blockers.push(`Provider ${provider.name} (${providerName}) is configured on the agent but not registered in this runtime.`);
+      blockers.push(
+        `Provider ${provider.name} (${providerName}) is configured on the agent but not registered in this runtime.`,
+      );
     }
     if (!isProviderReadyForAgentRuns(data, workspaceId, provider)) {
-      blockers.push(`Provider ${provider.name} is not ready for real execution; connect its API key or enable the provider before running.`);
+      blockers.push(
+        `Provider ${provider.name} is not ready for real execution; connect its API key or enable the provider before running.`,
+      );
     }
 
     return { providerName: providerName ?? undefined, model, blockers, notes };
@@ -1026,19 +1297,32 @@ function resolveAgentExecutionTarget(
 
   const route = router.resolve(routeKey);
   const model = agent.model || route.model;
-  notes.push(agent.model
-    ? `Using route ${routeKey} provider ${route.provider} with agent model override ${agent.model}.`
-    : `Using route ${routeKey} provider ${route.provider} with model ${route.model}.`);
+  notes.push(
+    agent.model
+      ? `Using route ${routeKey} provider ${route.provider} with agent model override ${agent.model}.`
+      : `Using route ${routeKey} provider ${route.provider} with model ${route.model}.`,
+  );
   if (route.provider === "stub") {
-    blockers.push(`Route ${routeKey} resolves to the stub provider; choose a real provider before executing tools.`);
+    blockers.push(
+      `Route ${routeKey} resolves to the stub provider; choose a real provider before executing tools.`,
+    );
   } else if (!router.has(route.provider)) {
-    blockers.push(`Route ${routeKey} targets provider ${route.provider}, but that provider is not registered in this runtime.`);
+    blockers.push(
+      `Route ${routeKey} targets provider ${route.provider}, but that provider is not registered in this runtime.`,
+    );
   }
   return { providerName: undefined, model, blockers, notes };
 }
 
 function providerNameForKind(kind: ProviderKind): ProviderName | null {
-  if (kind === "openai" || kind === "anthropic" || kind === "minimax" || kind === "ollama" || kind === "gemini") return kind;
+  if (
+    kind === "openai" ||
+    kind === "anthropic" ||
+    kind === "minimax" ||
+    kind === "ollama" ||
+    kind === "gemini"
+  )
+    return kind;
   return null;
 }
 
@@ -1052,43 +1336,63 @@ async function recordCanceledAgentExecutionRun(input: {
   const completedAt = new Date().toISOString();
   const message = "Tool run was canceled before execution.";
   return mutateStoreAsync((store) => {
-    const run = upsertAgentRun(store, {
-      workspaceId: input.context.workspace.id,
-      agentId: input.agent.id,
-      title: `${input.agent.name} run canceled`,
-      status: "canceled",
-      triggerKind: input.triggerKind,
-      startedAt: input.timestamp,
-      completedAt,
-      inputs: Object.keys(input.inputs).length ? input.inputs : undefined,
-      transcript: [
-        {
-          id: generateId(),
-          title: "Approve tool execution",
-          status: "skipped",
-          output: message,
-          durationMs: 0,
-          startedAt: input.timestamp,
-        },
-        ...(input.agent.playbook ?? []).map((step) => ({
-          id: generateId(),
-          title: step.title,
-          status: "skipped" as const,
-          output: message,
-          durationMs: 0,
-          startedAt: input.timestamp,
-        })),
-      ],
-      error: message,
-      logs: [{ at: input.timestamp, level: "warn", message }],
-      toolCalls: [],
-    }, input.timestamp);
+    const run = upsertAgentRun(
+      store,
+      {
+        workspaceId: input.context.workspace.id,
+        agentId: input.agent.id,
+        title: `${input.agent.name} run canceled`,
+        status: "canceled",
+        triggerKind: input.triggerKind,
+        startedAt: input.timestamp,
+        completedAt,
+        inputs: Object.keys(input.inputs).length ? input.inputs : undefined,
+        transcript: [
+          {
+            id: generateId(),
+            title: "Approve tool execution",
+            status: "skipped",
+            output: message,
+            durationMs: 0,
+            startedAt: input.timestamp,
+          },
+          ...(input.agent.playbook ?? []).map((step) => ({
+            id: generateId(),
+            title: step.title,
+            status: "skipped" as const,
+            output: message,
+            durationMs: 0,
+            startedAt: input.timestamp,
+          })),
+        ],
+        error: message,
+        logs: [{ at: input.timestamp, level: "warn", message }],
+        toolCalls: [],
+      },
+      input.timestamp,
+    );
 
-    recordActivity(store, makeActivity(input.context.workspace.id, "workspace", "agent.run", {
-      type: "user",
-      id: input.context.user.id,
-      displayName: input.context.user.displayName,
-    }, { title: run.title, agentId: input.agent.id, runId: run.id, status: run.status, triggerKind: input.triggerKind }, input.timestamp));
+    recordActivity(
+      store,
+      makeActivity(
+        input.context.workspace.id,
+        "workspace",
+        "agent.run",
+        {
+          type: "user",
+          id: input.context.user.id,
+          displayName: input.context.user.displayName,
+        },
+        {
+          title: run.title,
+          agentId: input.agent.id,
+          runId: run.id,
+          status: run.status,
+          triggerKind: input.triggerKind,
+        },
+        input.timestamp,
+      ),
+    );
 
     return { run };
   });
@@ -1106,50 +1410,74 @@ async function recordFailedAgentExecutionRun(input: {
 }): Promise<{ run: AgentRunRecord }> {
   const completedAt = new Date().toISOString();
   return mutateStoreAsync((store) => {
-    const run = upsertAgentRun(store, {
-      id: input.runId,
-      workspaceId: input.context.workspace.id,
-      agentId: input.agent.id,
-      title: `${input.agent.name} setup required`,
-      status: "failed",
-      triggerKind: input.triggerKind,
-      startedAt: input.timestamp,
-      completedAt,
-      inputs: Object.keys(input.inputs).length ? input.inputs : undefined,
-      transcript: [
-        {
-          id: generateId(),
-          title: "Resolve execution setup",
-          status: "failed",
-          output: input.error,
-          durationMs: 0,
-          startedAt: input.timestamp,
-        },
-        ...(input.agent.playbook ?? []).map((step) => ({
-          id: generateId(),
-          title: step.title,
-          status: "skipped" as const,
-          output: "Skipped because agent execution setup is incomplete.",
-          durationMs: 0,
-          startedAt: input.timestamp,
-        })),
-      ],
-      error: input.error,
-      logs: input.logs,
-      toolCalls: [],
-    }, input.timestamp);
+    const run = upsertAgentRun(
+      store,
+      {
+        id: input.runId,
+        workspaceId: input.context.workspace.id,
+        agentId: input.agent.id,
+        title: `${input.agent.name} setup required`,
+        status: "failed",
+        triggerKind: input.triggerKind,
+        startedAt: input.timestamp,
+        completedAt,
+        inputs: Object.keys(input.inputs).length ? input.inputs : undefined,
+        transcript: [
+          {
+            id: generateId(),
+            title: "Resolve execution setup",
+            status: "failed",
+            output: input.error,
+            durationMs: 0,
+            startedAt: input.timestamp,
+          },
+          ...(input.agent.playbook ?? []).map((step) => ({
+            id: generateId(),
+            title: step.title,
+            status: "skipped" as const,
+            output: "Skipped because agent execution setup is incomplete.",
+            durationMs: 0,
+            startedAt: input.timestamp,
+          })),
+        ],
+        error: input.error,
+        logs: input.logs,
+        toolCalls: [],
+      },
+      input.timestamp,
+    );
 
-    recordActivity(store, makeActivity(input.context.workspace.id, "workspace", "agent.run", {
-      type: "user",
-      id: input.context.user.id,
-      displayName: input.context.user.displayName,
-    }, { title: run.title, agentId: input.agent.id, runId: run.id, status: run.status, triggerKind: input.triggerKind }, input.timestamp));
+    recordActivity(
+      store,
+      makeActivity(
+        input.context.workspace.id,
+        "workspace",
+        "agent.run",
+        {
+          type: "user",
+          id: input.context.user.id,
+          displayName: input.context.user.displayName,
+        },
+        {
+          title: run.title,
+          agentId: input.agent.id,
+          runId: run.id,
+          status: run.status,
+          triggerKind: input.triggerKind,
+        },
+        input.timestamp,
+      ),
+    );
 
     return { run: decorateRun(run) };
   });
 }
 
-function buildDryRunTranscript(playbook: AgentPlaybookStep[], timestamp: string, label = "Dry run"): AgentRunStep[] {
+function buildDryRunTranscript(
+  playbook: AgentPlaybookStep[],
+  timestamp: string,
+  label = "Dry run",
+): AgentRunStep[] {
   if (playbook.length === 0) {
     return [
       {
@@ -1175,18 +1503,36 @@ function buildDryRunTranscript(playbook: AgentPlaybookStep[], timestamp: string,
   }));
 }
 
-export async function generateAgentBuilderDraftAsync(context: AuthenticatedContext, input: AgentBuilderPromptInput): Promise<AgentBuilderDraft> {
+export async function generateAgentBuilderDraftAsync(
+  context: AuthenticatedContext,
+  input: AgentBuilderPromptInput,
+): Promise<AgentBuilderDraft> {
   const prompt = String(input.prompt ?? "").trim();
   if (prompt.length < 12) throw httpError(400, "prompt must be at least 12 characters");
   if (prompt.length > 2_000) throw httpError(400, "prompt must be 2000 characters or fewer");
 
   const data = await loadStoreAsync();
   const providers = data.providers
-    .filter((provider) => provider.workspaceId === context.workspace.id && provider.status !== "disabled")
-    .sort((left, right) => Number(right.status === "connected") - Number(left.status === "connected") || left.name.localeCompare(right.name));
-  const selectedProvider = providers.find((provider) => provider.status === "connected" && provider.apiKeyConfigured) ?? providers[0] ?? null;
-  const registeredTools = getDefaultToolRegistry().list().map((tool) => tool.name);
-  const availableTools = (registeredTools.length > 0 ? registeredTools : listDefaultToolSummaries().map((tool) => tool.name)).sort();
+    .filter(
+      (provider) => provider.workspaceId === context.workspace.id && provider.status !== "disabled",
+    )
+    .sort(
+      (left, right) =>
+        Number(right.status === "connected") - Number(left.status === "connected") ||
+        left.name.localeCompare(right.name),
+    );
+  const selectedProvider =
+    providers.find((provider) => provider.status === "connected" && provider.apiKeyConfigured) ??
+    providers[0] ??
+    null;
+  const registeredTools = getDefaultToolRegistry()
+    .list()
+    .map((tool) => tool.name);
+  const availableTools = (
+    registeredTools.length > 0
+      ? registeredTools
+      : listDefaultToolSummaries().map((tool) => tool.name)
+  ).sort();
   const intent = inferAgentBuilderIntent(prompt);
   const recommendedTools = recommendAgentTools(intent, prompt, availableTools);
   const inputSchema = buildAgentBuilderInputSchema(intent, prompt);
@@ -1197,12 +1543,19 @@ export async function generateAgentBuilderDraftAsync(context: AuthenticatedConte
   const webhookReadiness = buildAgentBuilderWebhookReadiness(triggerKind);
   const scheduleReadiness = buildAgentBuilderScheduleReadiness(triggerKind, schedule);
   const name = buildAgentBuilderName(prompt, intent);
-  const playbook = applyAgentIntegrationPlaybookSteps(buildAgentBuilderPlaybook(intent, prompt), integrationMetadata);
+  const playbook = applyAgentIntegrationPlaybookSteps(
+    buildAgentBuilderPlaybook(intent, prompt),
+    integrationMetadata,
+  );
   const missingTools = recommendedTools.filter((tool) => !availableTools.includes(tool));
-  const providerConfigured = selectedProvider ? isProviderReadyForAgentRuns(data, context.workspace.id, selectedProvider) : false;
+  const providerConfigured = selectedProvider
+    ? isProviderReadyForAgentRuns(data, context.workspace.id, selectedProvider)
+    : false;
   const blockers = [
     ...(!providerConfigured ? ["Connect a provider API key before running with LLM tools."] : []),
-    ...(missingTools.length > 0 ? [`Remove or implement missing tools: ${missingTools.join(", ")}.`] : []),
+    ...(missingTools.length > 0
+      ? [`Remove or implement missing tools: ${missingTools.join(", ")}.`]
+      : []),
   ];
 
   return {
@@ -1213,7 +1566,10 @@ export async function generateAgentBuilderDraftAsync(context: AuthenticatedConte
     agent: {
       name,
       description: summarizeAgentPrompt(prompt),
-      instructions: applyAgentIntegrationInstructions(buildAgentBuilderInstructions(prompt, intent), integrationMetadata),
+      instructions: applyAgentIntegrationInstructions(
+        buildAgentBuilderInstructions(prompt, intent),
+        integrationMetadata,
+      ),
       providerId: selectedProvider?.id,
       model: selectedProvider?.defaultModel,
       tools: recommendedTools,
@@ -1229,17 +1585,44 @@ export async function generateAgentBuilderDraftAsync(context: AuthenticatedConte
     plan: {
       title: `Build ${name}`,
       steps: [
-        { title: "Capture the job", detail: "Turn the prompt into clear agent instructions, typed inputs, and a first-run sample." },
-        { title: "Wire useful tools", detail: recommendedTools.length > 0 ? `Enable ${recommendedTools.join(", ")} for the first run.` : "Keep the first draft tool-light until an integration is selected." },
+        {
+          title: "Capture the job",
+          detail:
+            "Turn the prompt into clear agent instructions, typed inputs, and a first-run sample.",
+        },
+        {
+          title: "Wire useful tools",
+          detail:
+            recommendedTools.length > 0
+              ? `Enable ${recommendedTools.join(", ")} for the first run.`
+              : "Keep the first draft tool-light until an integration is selected.",
+        },
         ...buildAgentBuilderIntegrationPlanSteps(integrationMetadata),
-        { title: "Choose the trigger", detail: triggerKind === "schedule" ? scheduleReadiness.planDetail : triggerKind === "webhook" ? webhookReadiness.planDetail : "Start with manual runs while the draft is validated." },
-        ...(triggerKind === "webhook" ? [{ title: "Prepare webhook publish readiness", detail: webhookReadiness.message }] : []),
-        { title: "Run once", detail: "Save the draft, run it with sample inputs, then inspect transcript, tool calls, and output." },
+        {
+          title: "Choose the trigger",
+          detail:
+            triggerKind === "schedule"
+              ? scheduleReadiness.planDetail
+              : triggerKind === "webhook"
+                ? webhookReadiness.planDetail
+                : "Start with manual runs while the draft is validated.",
+        },
+        ...(triggerKind === "webhook"
+          ? [{ title: "Prepare webhook publish readiness", detail: webhookReadiness.message }]
+          : []),
+        {
+          title: "Run once",
+          detail:
+            "Save the draft, run it with sample inputs, then inspect transcript, tool calls, and output.",
+        },
       ],
       acceptanceChecks: [
         "Agent draft is saved with generated instructions, input schema, tools, and trigger.",
         "Missing provider or tool setup is visible before first run.",
-        ...integrationMetadata.requested.map((integration) => `${integration.label} flow references ${integration.envVars.join(", ")} and remains draft-safe until setup is complete.`),
+        ...integrationMetadata.requested.map(
+          (integration) =>
+            `${integration.label} flow references ${integration.envVars.join(", ")} and remains draft-safe until setup is complete.`,
+        ),
         "First test run records output, logs, transcript, and any tool calls.",
       ],
       openQuestions: buildAgentBuilderOpenQuestions(intent, prompt),
@@ -1247,40 +1630,48 @@ export async function generateAgentBuilderDraftAsync(context: AuthenticatedConte
     readiness: {
       provider: {
         configured: providerConfigured,
-        ...(selectedProvider ? {
-          selectedProviderId: selectedProvider.id,
-          selectedProviderName: selectedProvider.name,
-          selectedModel: selectedProvider.defaultModel,
-        } : {}),
+        ...(selectedProvider
+          ? {
+              selectedProviderId: selectedProvider.id,
+              selectedProviderName: selectedProvider.name,
+              selectedModel: selectedProvider.defaultModel,
+            }
+          : {}),
         message: providerConfigured
           ? `${selectedProvider?.name} is ready for first run.`
           : selectedProvider
-          ? `${selectedProvider.name} exists but still needs an API key or connected status.`
-          : "Add an OpenAI, Anthropic, Ollama, or custom provider before real LLM execution.",
+            ? `${selectedProvider.name} exists but still needs an API key or connected status.`
+            : "Add an OpenAI, Anthropic, Ollama, or custom provider before real LLM execution.",
       },
       tools: {
         recommended: recommendedTools,
         available: recommendedTools.filter((tool) => availableTools.includes(tool)),
         missing: missingTools,
-        message: missingTools.length === 0
-          ? "Recommended tools are available in this workspace runtime."
-          : `Some requested tools are not registered yet: ${missingTools.join(", ")}.`,
+        message:
+          missingTools.length === 0
+            ? "Recommended tools are available in this workspace runtime."
+            : `Some requested tools are not registered yet: ${missingTools.join(", ")}.`,
       },
       webhook: webhookReadiness,
       schedule: scheduleReadiness,
       firstRun: {
         canRun: blockers.length === 0,
         blockers,
-        message: blockers.length === 0
-          ? "Ready to save and run with the generated sample inputs."
-          : "The draft can be saved now, but resolve setup blockers before expecting real execution.",
+        message:
+          blockers.length === 0
+            ? "Ready to save and run with the generated sample inputs."
+            : "The draft can be saved now, but resolve setup blockers before expecting real execution.",
       },
     },
   };
 }
 
-export async function approveAgentBuilderDraftAsync(context: AuthenticatedContext, input: AgentBuilderApproveInput): Promise<AgentBuilderApproveResult> {
-  const draft = input.draft ?? await generateAgentBuilderDraftAsync(context, { prompt: input.prompt });
+export async function approveAgentBuilderDraftAsync(
+  context: AuthenticatedContext,
+  input: AgentBuilderApproveInput,
+): Promise<AgentBuilderApproveResult> {
+  const draft =
+    input.draft ?? (await generateAgentBuilderDraftAsync(context, { prompt: input.prompt }));
   const created = await createAgentAsync(context, {
     ...draft.agent,
     status: input.status ?? draft.agent.status ?? "active",
@@ -1305,33 +1696,69 @@ async function recordAgentPreviewRun(
   const timestamp = now();
   return mutateStoreAsync((store) => {
     const liveAgent = findAgent(store, agent.id);
-    if (!liveAgent || liveAgent.workspaceId !== context.workspace.id || liveAgent.status === "archived") {
+    if (
+      !liveAgent ||
+      liveAgent.workspaceId !== context.workspace.id ||
+      liveAgent.status === "archived"
+    ) {
       throw httpError(404, "agent not found");
     }
 
-    const run = upsertAgentRun(store, {
-      workspaceId: context.workspace.id,
-      agentId: liveAgent.id,
-      title: `${liveAgent.name} preview dry run recorded`,
-      status: "success",
-      triggerKind: "manual",
-      transcript: buildDryRunTranscript(liveAgent.playbook ?? [], timestamp, "Preview dry run"),
-      startedAt: timestamp,
-      completedAt: timestamp,
-      inputs: Object.keys(inputs).length ? inputs : undefined,
-      output: buildDryRunOutput(liveAgent.name, inputs, "Preview dry run"),
-      logs: [
-        { at: timestamp, level: "info", message: `Preview dry run started for ${liveAgent.name}.` },
-        { at: timestamp, level: "info", message: "Sample inputs generated for first-run visibility." },
-        { at: timestamp, level: "info", message: "Preview run recorded locally without invoking tools or a model." },
-      ],
-    }, timestamp);
+    const run = upsertAgentRun(
+      store,
+      {
+        workspaceId: context.workspace.id,
+        agentId: liveAgent.id,
+        title: `${liveAgent.name} preview dry run recorded`,
+        status: "success",
+        triggerKind: "manual",
+        transcript: buildDryRunTranscript(liveAgent.playbook ?? [], timestamp, "Preview dry run"),
+        startedAt: timestamp,
+        completedAt: timestamp,
+        inputs: Object.keys(inputs).length ? inputs : undefined,
+        output: buildDryRunOutput(liveAgent.name, inputs, "Preview dry run"),
+        logs: [
+          {
+            at: timestamp,
+            level: "info",
+            message: `Preview dry run started for ${liveAgent.name}.`,
+          },
+          {
+            at: timestamp,
+            level: "info",
+            message: "Sample inputs generated for first-run visibility.",
+          },
+          {
+            at: timestamp,
+            level: "info",
+            message: "Preview run recorded locally without invoking tools or a model.",
+          },
+        ],
+      },
+      timestamp,
+    );
 
-    recordActivity(store, makeActivity(context.workspace.id, "workspace", "agent.run.preview", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: run.title, agentId: liveAgent.id, runId: run.id, status: run.status, triggerKind: run.triggerKind }, timestamp));
+    recordActivity(
+      store,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.run.preview",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        {
+          title: run.title,
+          agentId: liveAgent.id,
+          runId: run.id,
+          status: run.status,
+          triggerKind: run.triggerKind,
+        },
+        timestamp,
+      ),
+    );
 
     return decorateRun(run);
   });
@@ -1345,13 +1772,19 @@ function buildAgentPhase71IntegrationMetadata(prompt: string): Phase71Integratio
   };
 }
 
-function applyAgentIntegrationInstructions(instructions: string, metadata: Phase71IntegrationMetadata): string {
+function applyAgentIntegrationInstructions(
+  instructions: string,
+  metadata: Phase71IntegrationMetadata,
+): string {
   if (metadata.requested.length === 0) return instructions;
   return [
     instructions,
     "",
     "Phase 71 integration setup:",
-    ...metadata.requested.map((integration) => `- ${integration.label}: reference ${integration.envVars.join(", ")} and keep unrelated features draft-safe if setup is missing.`),
+    ...metadata.requested.map(
+      (integration) =>
+        `- ${integration.label}: reference ${integration.envVars.join(", ")} and keep unrelated features draft-safe if setup is missing.`,
+    ),
   ].join("\n");
 }
 
@@ -1360,16 +1793,14 @@ function applyAgentIntegrationPlaybookSteps(
   metadata: Phase71IntegrationMetadata,
 ): AgentPlaybookStep[] {
   if (metadata.requested.length === 0) return playbook;
-  const integrationSteps = metadata.requested.map((integration): AgentPlaybookStep => ({
-    id: `integration-${integration.id}`,
-    title: `Prepare ${integration.label}`,
-    instruction: `${integration.flows.join(" ")} Required setup references: ${integration.envVars.join(", ")}.`,
-  }));
-  return [
-    playbook[0],
-    ...integrationSteps,
-    ...playbook.slice(1),
-  ].filter(Boolean);
+  const integrationSteps = metadata.requested.map(
+    (integration): AgentPlaybookStep => ({
+      id: `integration-${integration.id}`,
+      title: `Prepare ${integration.label}`,
+      instruction: `${integration.flows.join(" ")} Required setup references: ${integration.envVars.join(", ")}.`,
+    }),
+  );
+  return [playbook[0], ...integrationSteps, ...playbook.slice(1)].filter(Boolean);
 }
 
 function applyAgentIntegrationDraftPlan(
@@ -1379,11 +1810,13 @@ function applyAgentIntegrationDraftPlan(
   if (metadata.requested.length === 0) return plan;
   return [
     ...plan,
-    ...metadata.requested.map((integration): AgentDraftPlanItem => ({
-      title: `Configure ${integration.label}`,
-      detail: `${integration.setupGuidance.join(" ")} Generated flow: ${integration.flows[0]}`,
-      status: "todo",
-    })),
+    ...metadata.requested.map(
+      (integration): AgentDraftPlanItem => ({
+        title: `Configure ${integration.label}`,
+        detail: `${integration.setupGuidance.join(" ")} Generated flow: ${integration.flows[0]}`,
+        status: "todo",
+      }),
+    ),
   ];
 }
 
@@ -1394,7 +1827,10 @@ function applyAgentIntegrationAssumptions(
   if (metadata.requested.length === 0) return assumptions;
   return [
     ...assumptions,
-    ...metadata.requested.map((integration) => `${integration.label} can be drafted before setup; live calls require ${integration.envVars.join(", ")}.`),
+    ...metadata.requested.map(
+      (integration) =>
+        `${integration.label} can be drafted before setup; live calls require ${integration.envVars.join(", ")}.`,
+    ),
   ];
 }
 
@@ -1420,8 +1856,10 @@ function inferAgentBuilderIntent(prompt: string): string {
 
 function inferAgentTriggerKind(intent: string, prompt: string): AgentTriggerKind {
   const lower = prompt.toLowerCase();
-  if (/\b(webhook|incoming|when.*received|on event|external trigger)\b/.test(lower)) return "webhook";
-  if (/\b(daily|weekly|hourly|every|schedule|morning|nightly|cron)\b/.test(lower)) return "schedule";
+  if (/\b(webhook|incoming|when.*received|on event|external trigger)\b/.test(lower))
+    return "webhook";
+  if (/\b(daily|weekly|hourly|every|schedule|morning|nightly|cron)\b/.test(lower))
+    return "schedule";
   if (/\b(email|inbox|mailbox)\b/.test(lower) && intent === "support") return "email";
   return "manual";
 }
@@ -1438,13 +1876,22 @@ function inferAgentSchedule(prompt: string): string {
 function recommendAgentTools(intent: string, prompt: string, availableTools: string[]): string[] {
   const lower = prompt.toLowerCase();
   const desired = new Set<string>();
-  if (["research", "lead_enrichment"].includes(intent) || /\b(url|website|web|scrape|research|fetch)\b/.test(lower)) desired.add("http_fetch");
-  if (/\b(slack|notify|notification|message|webhook)\b/.test(lower)) desired.add("slack_post_webhook");
-  if (/\b(github|pull request|pull requests|\bpr\b|\bprs\b|issue|issues|comment)\b/.test(lower)) desired.add("github_api");
+  if (
+    ["research", "lead_enrichment"].includes(intent) ||
+    /\b(url|website|web|scrape|research|fetch)\b/.test(lower)
+  )
+    desired.add("http_fetch");
+  if (/\b(slack|notify|notification|message|webhook)\b/.test(lower))
+    desired.add("slack_post_webhook");
+  if (/\b(github|pull request|pull requests|\bpr\b|\bprs\b|issue|issues|comment)\b/.test(lower))
+    desired.add("github_api");
   if (/\b(email|mail|inbox|reply|send)\b/.test(lower)) desired.add("email_send");
   if (/\b(sql|sqlite|database|table|query)\b/.test(lower)) desired.add("sql_query");
   if (/\b(shell|command|script|terminal|npm|git)\b/.test(lower)) desired.add("shell_for_agent");
-  if (["reporting", "release"].includes(intent) || /\b(workflow|requirement|plan|blocker|release)\b/.test(lower)) {
+  if (
+    ["reporting", "release"].includes(intent) ||
+    /\b(workflow|requirement|plan|blocker|release)\b/.test(lower)
+  ) {
     desired.add("read_workflow_brief");
     desired.add("list_requirements");
     desired.add("list_plan_items");
@@ -1457,7 +1904,8 @@ function recommendAgentTools(intent: string, prompt: string, availableTools: str
   }
   if (/\b(create task|open blocker|log note|write|update)\b/.test(lower)) desired.add("log_note");
   if (/\b(browser|click|page|form)\b/.test(lower)) {
-    for (const tool of availableTools.filter((name) => name.startsWith("browser_"))) desired.add(tool);
+    for (const tool of availableTools.filter((name) => name.startsWith("browser_")))
+      desired.add(tool);
   }
   return [...desired].slice(0, 8);
 }
@@ -1466,45 +1914,106 @@ function buildAgentBuilderInputSchema(intent: string, prompt: string): AgentInpu
   const lower = prompt.toLowerCase();
   if (intent === "support") {
     return [
-      { key: "mailbox", label: "Mailbox", type: "string", required: true, description: "Inbox, label, or queue to review.", defaultValue: "support" },
-      { key: "urgency_threshold", label: "Urgency threshold", type: "enum", required: true, options: ["low", "medium", "high"], defaultValue: "medium" },
+      {
+        key: "mailbox",
+        label: "Mailbox",
+        type: "string",
+        required: true,
+        description: "Inbox, label, or queue to review.",
+        defaultValue: "support",
+      },
+      {
+        key: "urgency_threshold",
+        label: "Urgency threshold",
+        type: "enum",
+        required: true,
+        options: ["low", "medium", "high"],
+        defaultValue: "medium",
+      },
     ];
   }
   if (intent === "lead_enrichment") {
     return [
-      { key: "lead_source", label: "Lead source", type: "string", required: true, description: "CRM view, CSV name, or inbound source.", defaultValue: "new leads" },
+      {
+        key: "lead_source",
+        label: "Lead source",
+        type: "string",
+        required: true,
+        description: "CRM view, CSV name, or inbound source.",
+        defaultValue: "new leads",
+      },
       { key: "company_website", label: "Company website", type: "url", required: false },
     ];
   }
   if (intent === "release") {
     return [
-      { key: "release_label", label: "Release label", type: "string", required: true, defaultValue: "next release" },
+      {
+        key: "release_label",
+        label: "Release label",
+        type: "string",
+        required: true,
+        defaultValue: "next release",
+      },
       { key: "evidence_url", label: "Evidence URL", type: "url", required: false },
     ];
   }
   if (intent === "research" || /\burl|website\b/.test(lower)) {
     return [
       { key: "source_url", label: "Source URL", type: "url", required: true },
-      { key: "depth", label: "Depth", type: "enum", required: false, options: ["quick", "deep"], defaultValue: "quick" },
+      {
+        key: "depth",
+        label: "Depth",
+        type: "enum",
+        required: false,
+        options: ["quick", "deep"],
+        defaultValue: "quick",
+      },
     ];
   }
   if (intent === "reporting") {
     return [
-      { key: "lookback_hours", label: "Lookback hours", type: "number", required: true, defaultValue: "24" },
-      { key: "audience", label: "Audience", type: "enum", required: false, options: ["internal", "customer"], defaultValue: "internal" },
+      {
+        key: "lookback_hours",
+        label: "Lookback hours",
+        type: "number",
+        required: true,
+        defaultValue: "24",
+      },
+      {
+        key: "audience",
+        label: "Audience",
+        type: "enum",
+        required: false,
+        options: ["internal", "customer"],
+        defaultValue: "internal",
+      },
     ];
   }
   return [
-    { key: "task", label: "Task", type: "string", required: true, description: "The work item this agent should complete.", defaultValue: truncateSentence(prompt, 80) },
+    {
+      key: "task",
+      label: "Task",
+      type: "string",
+      required: true,
+      description: "The work item this agent should complete.",
+      defaultValue: truncateSentence(prompt, 80),
+    },
   ];
 }
 
-function buildAgentBuilderWebhookReadiness(triggerKind: AgentTriggerKind): AgentBuilderWebhookTriggerReadiness {
+function buildAgentBuilderWebhookReadiness(
+  triggerKind: AgentTriggerKind,
+): AgentBuilderWebhookTriggerReadiness {
   const readiness = buildWebhookTriggerReadiness(triggerKind);
   return {
     ...readiness,
     publishSteps: readiness.recommended
-      ? ["Save the agent", "Create or rotate the webhook token", "Send a test payload", "Rotate the token before sharing broadly"]
+      ? [
+          "Save the agent",
+          "Create or rotate the webhook token",
+          "Send a test payload",
+          "Rotate the token before sharing broadly",
+        ]
       : [],
   };
 }
@@ -1553,10 +2062,29 @@ function buildAgentBuilderInstructions(prompt: string, intent: string): string {
 
 function buildAgentBuilderPlaybook(intent: string, prompt: string): AgentPlaybookStep[] {
   return [
-    { id: "understand", title: "Understand request", instruction: `Restate the goal from this prompt: ${truncateSentence(prompt, 180)}` },
-    { id: "collect", title: "Collect context", instruction: "Use inputs and enabled tools to gather the minimum context needed." },
-    { id: "produce", title: "Produce output", instruction: intent === "notification" ? "Draft and prepare the message or notification." : "Create the requested summary, action, or recommendation." },
-    { id: "report", title: "Report result", instruction: "Return what changed, what was found, and what still needs setup or approval." },
+    {
+      id: "understand",
+      title: "Understand request",
+      instruction: `Restate the goal from this prompt: ${truncateSentence(prompt, 180)}`,
+    },
+    {
+      id: "collect",
+      title: "Collect context",
+      instruction: "Use inputs and enabled tools to gather the minimum context needed.",
+    },
+    {
+      id: "produce",
+      title: "Produce output",
+      instruction:
+        intent === "notification"
+          ? "Draft and prepare the message or notification."
+          : "Create the requested summary, action, or recommendation.",
+    },
+    {
+      id: "report",
+      title: "Report result",
+      instruction: "Return what changed, what was found, and what still needs setup or approval.",
+    },
   ];
 }
 
@@ -1598,9 +2126,29 @@ function summarizePromptAgentDraft(sentences: string[], fallbackName: string): s
 
 function extractAgentActions(sentences: string[]): string[] {
   const verbs = [
-    "monitor", "summarize", "draft", "review", "route", "triage", "notify", "send",
-    "track", "collect", "capture", "validate", "research", "report", "analyze",
-    "sync", "escalate", "respond", "create", "open", "update", "publish", "schedule",
+    "monitor",
+    "summarize",
+    "draft",
+    "review",
+    "route",
+    "triage",
+    "notify",
+    "send",
+    "track",
+    "collect",
+    "capture",
+    "validate",
+    "research",
+    "report",
+    "analyze",
+    "sync",
+    "escalate",
+    "respond",
+    "create",
+    "open",
+    "update",
+    "publish",
+    "schedule",
   ];
   const actions: string[] = [];
   const seen = new Set<string>();
@@ -1616,13 +2164,17 @@ function extractAgentActions(sentences: string[]): string[] {
       }
     }
   }
-  if (actions.length === 0) actions.push(sentences[0]?.slice(0, 80) ?? "automate workspace follow-up");
+  if (actions.length === 0)
+    actions.push(sentences[0]?.slice(0, 80) ?? "automate workspace follow-up");
   return actions.slice(0, 5);
 }
 
 function buildAgentName(primaryAction: string, prompt: string): string {
   const topic = primaryAction
-    .replace(/^(monitor|summarize|draft|review|route|triage|notify|send|track|collect|capture|validate|research|report|analyze|sync|escalate|respond|create|open|update|publish|schedule)\s+/i, "")
+    .replace(
+      /^(monitor|summarize|draft|review|route|triage|notify|send|track|collect|capture|validate|research|report|analyze|sync|escalate|respond|create|open|update|publish|schedule)\s+/i,
+      "",
+    )
     .replace(/\b(every|daily|weekly|hourly|when|with|for|to|and|then)\b.*$/i, "")
     .replace(/[^a-z0-9\s-]/gi, " ")
     .replace(/\s+/g, " ")
@@ -1636,7 +2188,10 @@ function buildAgentName(primaryAction: string, prompt: string): string {
 function inferPromptAgentTriggerKind(prompt: string): AgentTriggerKind {
   if (/\b(webhook|incoming request|payload|event)\b/i.test(prompt)) return "webhook";
   if (/\b(email|inbox|mailbox)\b/i.test(prompt)) return "email";
-  if (/\b(schedule|scheduled|daily|weekly|hourly|every\s+\d+|each morning|each day)\b/i.test(prompt)) return "schedule";
+  if (
+    /\b(schedule|scheduled|daily|weekly|hourly|every\s+\d+|each morning|each day)\b/i.test(prompt)
+  )
+    return "schedule";
   return "manual";
 }
 
@@ -1650,19 +2205,49 @@ function inferPromptAgentSchedule(prompt: string): string {
 function buildAgentInputSchema(prompt: string): AgentInputField[] {
   const fields: AgentInputField[] = [];
   if (/\b(url|website|page|site|http)\b/i.test(prompt)) {
-    fields.push({ key: "target_url", label: "Target URL", type: "url", required: true, description: "Page or endpoint the agent should inspect." });
+    fields.push({
+      key: "target_url",
+      label: "Target URL",
+      type: "url",
+      required: true,
+      description: "Page or endpoint the agent should inspect.",
+    });
   }
   if (/\b(email|inbox|mailbox)\b/i.test(prompt)) {
-    fields.push({ key: "mailbox", label: "Mailbox", type: "string", required: false, description: "Mailbox, queue, or label to inspect." });
+    fields.push({
+      key: "mailbox",
+      label: "Mailbox",
+      type: "string",
+      required: false,
+      description: "Mailbox, queue, or label to inspect.",
+    });
   }
   if (/\b(ticket|issue|case|incident)\b/i.test(prompt)) {
-    fields.push({ key: "ticket_id", label: "Ticket ID", type: "string", required: false, description: "Optional ticket, issue, or case identifier." });
+    fields.push({
+      key: "ticket_id",
+      label: "Ticket ID",
+      type: "string",
+      required: false,
+      description: "Optional ticket, issue, or case identifier.",
+    });
   }
   if (/\b(customer|account|client)\b/i.test(prompt)) {
-    fields.push({ key: "account_name", label: "Account", type: "string", required: false, description: "Customer, client, or account name." });
+    fields.push({
+      key: "account_name",
+      label: "Account",
+      type: "string",
+      required: false,
+      description: "Customer, client, or account name.",
+    });
   }
   if (/\brelease|evidence\b/i.test(prompt)) {
-    fields.push({ key: "release_label", label: "Release label", type: "string", required: true, defaultValue: "next release" });
+    fields.push({
+      key: "release_label",
+      label: "Release label",
+      type: "string",
+      required: true,
+      defaultValue: "next release",
+    });
   }
   if (/\bevidence url|evidence urls|url\b/i.test(prompt)) {
     fields.push({ key: "evidence_url", label: "Evidence URL", type: "url", required: false });
@@ -1672,13 +2257,22 @@ function buildAgentInputSchema(prompt: string): AgentInputField[] {
 
 function inferAgentTools(prompt: string): string[] {
   const tools = new Set<string>(["read_workflow_brief", "list_requirements", "list_plan_items"]);
-  if (/\b(run|runs|failure|failed|status|monitor|recent)\b/i.test(prompt)) tools.add("list_recent_runs");
-  if (/\b(blocker|question|risk|escalat|urgent|incident)\b/i.test(prompt)) tools.add("list_blockers");
-  if (/\b(create|open|update|write|log|blocker|question|plan item|follow-up|follow up)\b/i.test(prompt)) tools.add("create_blocker");
+  if (/\b(run|runs|failure|failed|status|monitor|recent)\b/i.test(prompt))
+    tools.add("list_recent_runs");
+  if (/\b(blocker|question|risk|escalat|urgent|incident)\b/i.test(prompt))
+    tools.add("list_blockers");
+  if (
+    /\b(create|open|update|write|log|blocker|question|plan item|follow-up|follow up)\b/i.test(
+      prompt,
+    )
+  )
+    tools.add("create_blocker");
   if (/\b(note|log|summary|summarize|report)\b/i.test(prompt)) tools.add("log_note");
   if (/\b(url|website|page|site|http|research|fetch)\b/i.test(prompt)) tools.add("http_fetch");
-  if (/\b(slack|notify|notification|message|webhook)\b/i.test(prompt)) tools.add("slack_post_webhook");
-  if (/\b(github|pull request|pull requests|\bpr\b|\bprs\b|issue|issues|comment)\b/i.test(prompt)) tools.add("github_api");
+  if (/\b(slack|notify|notification|message|webhook)\b/i.test(prompt))
+    tools.add("slack_post_webhook");
+  if (/\b(github|pull request|pull requests|\bpr\b|\bprs\b|issue|issues|comment)\b/i.test(prompt))
+    tools.add("github_api");
   if (/\b(email|mail|inbox|reply|send)\b/i.test(prompt)) tools.add("email_send");
   if (/\b(sql|sqlite|database|table|query)\b/i.test(prompt)) tools.add("sql_query");
   if (/\b(shell|command|script|terminal|npm|git)\b/i.test(prompt)) tools.add("shell_for_agent");
@@ -1690,15 +2284,21 @@ function inferAgentTools(prompt: string): string[] {
   return Array.from(tools).slice(0, 12);
 }
 
-function buildAgentPlaybook(sentences: string[], actions: string[], enabledTools: string[]): AgentPlaybookStep[] {
+function buildAgentPlaybook(
+  sentences: string[],
+  actions: string[],
+  enabledTools: string[],
+): AgentPlaybookStep[] {
   const steps = [
     {
       title: "Read workspace context",
-      instruction: "Review the workspace brief, accepted requirements, current plan items, and recent activity before taking action.",
+      instruction:
+        "Review the workspace brief, accepted requirements, current plan items, and recent activity before taking action.",
     },
     ...actions.slice(0, 3).map((action) => ({
       title: titleCase(action).slice(0, 120),
-      instruction: matchingSentence(sentences, action) || `Complete this requested action: ${action}.`,
+      instruction:
+        matchingSentence(sentences, action) || `Complete this requested action: ${action}.`,
     })),
     {
       title: "Record outcome",
@@ -1711,7 +2311,9 @@ function buildAgentPlaybook(sentences: string[], actions: string[], enabledTools
 }
 
 function buildAgentInstructions(prompt: string, actions: string[], enabledTools: string[]): string {
-  const actionList = actions.map((action, index) => `${index + 1}. ${titleCase(action)}`).join("\n");
+  const actionList = actions
+    .map((action, index) => `${index + 1}. ${titleCase(action)}`)
+    .join("\n");
   const toolList = enabledTools.length ? enabledTools.join(", ") : "no tools";
   return [
     "You are a PacketAgent workspace agent generated from an operator prompt.",
@@ -1727,35 +2329,83 @@ function buildAgentInstructions(prompt: string, actions: string[], enabledTools:
   ].join("\n");
 }
 
-function buildAgentDraftPlan(triggerKind: AgentTriggerKind, enabledTools: string[], inputSchema: AgentInputField[]): AgentDraftPlanItem[] {
+function buildAgentDraftPlan(
+  triggerKind: AgentTriggerKind,
+  enabledTools: string[],
+  inputSchema: AgentInputField[],
+): AgentDraftPlanItem[] {
   const webhookReadiness = buildWebhookTriggerReadiness(triggerKind);
   return [
-    { title: "Review generated agent instructions", detail: "Confirm the generated name, instructions, and playbook match the operational intent.", status: "todo" },
+    {
+      title: "Review generated agent instructions",
+      detail:
+        "Confirm the generated name, instructions, and playbook match the operational intent.",
+      status: "todo",
+    },
     ...(inputSchema.length > 0
-      ? [{ title: "Confirm run inputs", detail: `Check generated inputs: ${inputSchema.map((field) => field.key).join(", ")}.`, status: "todo" as const }]
+      ? [
+          {
+            title: "Confirm run inputs",
+            detail: `Check generated inputs: ${inputSchema.map((field) => field.key).join(", ")}.`,
+            status: "todo" as const,
+          },
+        ]
       : []),
-    { title: "Configure runtime access", detail: enabledTools.length > 0 ? `Verify enabled tools are appropriate: ${enabledTools.join(", ")}.` : "No tools were inferred.", status: "todo" },
+    {
+      title: "Configure runtime access",
+      detail:
+        enabledTools.length > 0
+          ? `Verify enabled tools are appropriate: ${enabledTools.join(", ")}.`
+          : "No tools were inferred.",
+      status: "todo",
+    },
     ...(triggerKind === "webhook"
-      ? [{ title: "Prepare webhook trigger readiness", detail: webhookReadiness.planDetail, status: "todo" as const }]
+      ? [
+          {
+            title: "Prepare webhook trigger readiness",
+            detail: webhookReadiness.planDetail,
+            status: "todo" as const,
+          },
+        ]
       : []),
-    { title: triggerKind === "schedule" ? "Verify schedule" : "Run a manual smoke test", detail: triggerKind === "schedule" ? "Confirm the cron schedule before activating the agent." : "Run once manually and inspect the transcript.", status: "todo" },
+    {
+      title: triggerKind === "schedule" ? "Verify schedule" : "Run a manual smoke test",
+      detail:
+        triggerKind === "schedule"
+          ? "Confirm the cron schedule before activating the agent."
+          : "Run once manually and inspect the transcript.",
+      status: "todo",
+    },
   ];
 }
 
-function buildAgentDraftAssumptions(triggerKind: AgentTriggerKind, enabledTools: string[], inputSchema: AgentInputField[]): string[] {
+function buildAgentDraftAssumptions(
+  triggerKind: AgentTriggerKind,
+  enabledTools: string[],
+  inputSchema: AgentInputField[],
+): string[] {
   const assumptions = [
     `Trigger inferred as ${triggerKind}.`,
     "Generated agents start paused unless they are explicitly created from the approval flow.",
   ];
-  if (enabledTools.length > 0) assumptions.push("Tool selection is heuristic and should be reviewed before enabling production runs.");
-  if (inputSchema.length === 0) assumptions.push("No required runtime inputs were inferred from the prompt.");
-  if (triggerKind === "webhook") assumptions.push("Webhook-triggered drafts need a saved agent and generated token before external events can reach the public trigger route.");
+  if (enabledTools.length > 0)
+    assumptions.push(
+      "Tool selection is heuristic and should be reviewed before enabling production runs.",
+    );
+  if (inputSchema.length === 0)
+    assumptions.push("No required runtime inputs were inferred from the prompt.");
+  if (triggerKind === "webhook")
+    assumptions.push(
+      "Webhook-triggered drafts need a saved agent and generated token before external events can reach the public trigger route.",
+    );
   return assumptions;
 }
 
 function matchingSentence(sentences: string[], action: string): string {
   const verb = action.split(/\s+/)[0] ?? "";
-  return sentences.find((sentence) => new RegExp(`\\b${escapeRegex(verb)}\\b`, "i").test(sentence)) ?? "";
+  return (
+    sentences.find((sentence) => new RegExp(`\\b${escapeRegex(verb)}\\b`, "i").test(sentence)) ?? ""
+  );
 }
 
 function titleCase(value: string): string {
@@ -1779,7 +2429,9 @@ function sampleInputValue(field: AgentInputField): string | number | boolean {
   return field.defaultValue || field.label.toLowerCase();
 }
 
-export function buildAgentSampleInputs(schema: AgentInputField[]): Record<string, string | number | boolean> {
+export function buildAgentSampleInputs(
+  schema: AgentInputField[],
+): Record<string, string | number | boolean> {
   return Object.fromEntries(schema.map((field) => [field.key, sampleInputValue(field)]));
 }
 
@@ -1808,15 +2460,23 @@ export type IntegrationReadinessSummary = {
 
 const DEFAULT_WORKSPACE_PROVIDER_KINDS = [...DEFAULT_PROVIDER_NAMES] as ApiKeyProvider[];
 
-export function getIntegrationReadiness(context: AuthenticatedContext): IntegrationReadinessSummary {
+export function getIntegrationReadiness(
+  context: AuthenticatedContext,
+): IntegrationReadinessSummary {
   return buildIntegrationReadinessSummary(loadStore(), context.workspace.id);
 }
 
-export async function getIntegrationReadinessAsync(context: AuthenticatedContext): Promise<IntegrationReadinessSummary> {
+export async function getIntegrationReadinessAsync(
+  context: AuthenticatedContext,
+): Promise<IntegrationReadinessSummary> {
   return buildIntegrationReadinessSummary(await loadStoreAsync(), context.workspace.id);
 }
 
-export function createAgentFromTemplate(context: AuthenticatedContext, templateId: string, overrides: { name?: string; providerId?: string; model?: string } = {}) {
+export function createAgentFromTemplate(
+  context: AuthenticatedContext,
+  templateId: string,
+  overrides: { name?: string; providerId?: string; model?: string } = {},
+) {
   const template = findAgentTemplate(templateId);
   if (!template) throw httpError(404, "agent template not found");
 
@@ -1834,7 +2494,11 @@ export function createAgentFromTemplate(context: AuthenticatedContext, templateI
   });
 }
 
-export async function createAgentFromTemplateAsync(context: AuthenticatedContext, templateId: string, overrides: { name?: string; providerId?: string; model?: string } = {}) {
+export async function createAgentFromTemplateAsync(
+  context: AuthenticatedContext,
+  templateId: string,
+  overrides: { name?: string; providerId?: string; model?: string } = {},
+) {
   const template = findAgentTemplate(templateId);
   if (!template) throw httpError(404, "agent template not found");
 
@@ -1870,16 +2534,30 @@ export function createProvider(context: AuthenticatedContext, input: ProviderInp
   const timestamp = now();
 
   return mutateStore((data) => {
-    const provider = upsertProvider(data, {
-      workspaceId: context.workspace.id,
-      ...normalized,
-    }, timestamp);
+    const provider = upsertProvider(
+      data,
+      {
+        workspaceId: context.workspace.id,
+        ...normalized,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "provider.created", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Provider connected: ${provider.name}`, providerId: provider.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "provider.created",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Provider connected: ${provider.name}`, providerId: provider.id },
+        timestamp,
+      ),
+    );
 
     return { provider };
   });
@@ -1890,22 +2568,40 @@ export async function createProviderAsync(context: AuthenticatedContext, input: 
   const timestamp = now();
 
   return mutateStoreAsync((data) => {
-    const provider = upsertProvider(data, {
-      workspaceId: context.workspace.id,
-      ...normalized,
-    }, timestamp);
+    const provider = upsertProvider(
+      data,
+      {
+        workspaceId: context.workspace.id,
+        ...normalized,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "provider.created", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Provider connected: ${provider.name}`, providerId: provider.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "provider.created",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Provider connected: ${provider.name}`, providerId: provider.id },
+        timestamp,
+      ),
+    );
 
     return { provider };
   });
 }
 
-export function updateProvider(context: AuthenticatedContext, providerId: string, input: Partial<ProviderInput>) {
+export function updateProvider(
+  context: AuthenticatedContext,
+  providerId: string,
+  input: Partial<ProviderInput>,
+) {
   const timestamp = now();
 
   return mutateStore((data) => {
@@ -1915,22 +2611,40 @@ export function updateProvider(context: AuthenticatedContext, providerId: string
     }
 
     const normalized = normalizeProviderInput({ ...existing, ...input });
-    const provider = upsertProvider(data, {
-      ...existing,
-      ...normalized,
-    }, timestamp);
+    const provider = upsertProvider(
+      data,
+      {
+        ...existing,
+        ...normalized,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "provider.updated", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Provider updated: ${provider.name}`, providerId: provider.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "provider.updated",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Provider updated: ${provider.name}`, providerId: provider.id },
+        timestamp,
+      ),
+    );
 
     return { provider };
   });
 }
 
-export async function updateProviderAsync(context: AuthenticatedContext, providerId: string, input: Partial<ProviderInput>) {
+export async function updateProviderAsync(
+  context: AuthenticatedContext,
+  providerId: string,
+  input: Partial<ProviderInput>,
+) {
   const timestamp = now();
 
   return mutateStoreAsync((data) => {
@@ -1940,16 +2654,30 @@ export async function updateProviderAsync(context: AuthenticatedContext, provide
     }
 
     const normalized = normalizeProviderInput({ ...existing, ...input });
-    const provider = upsertProvider(data, {
-      ...existing,
-      ...normalized,
-    }, timestamp);
+    const provider = upsertProvider(
+      data,
+      {
+        ...existing,
+        ...normalized,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "provider.updated", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Provider updated: ${provider.name}`, providerId: provider.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "provider.updated",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Provider updated: ${provider.name}`, providerId: provider.id },
+        timestamp,
+      ),
+    );
 
     return { provider };
   });
@@ -1979,7 +2707,10 @@ export function getAgentRunDetail(context: AuthenticatedContext, runId: string):
   return buildAgentRunDetail(run, findRunAgentName(data, context.workspace.id, run));
 }
 
-export async function getAgentRunDetailAsync(context: AuthenticatedContext, runId: string): Promise<AgentRunDetail> {
+export async function getAgentRunDetailAsync(
+  context: AuthenticatedContext,
+  runId: string,
+): Promise<AgentRunDetail> {
   const run = await findAgentRunForWorkspaceIndexedAsync(context.workspace.id, runId);
   if (!run) {
     throw httpError(404, "agent run not found");
@@ -1997,7 +2728,11 @@ function buildAgentRunDetail(run: AgentRunRecord, agentName?: string): AgentRunD
   };
 }
 
-function findRunAgentName(data: PacketAgentData, workspaceId: string, run: AgentRunRecord): string | undefined {
+function findRunAgentName(
+  data: PacketAgentData,
+  workspaceId: string,
+  run: AgentRunRecord,
+): string | undefined {
   if (!run.agentId) return undefined;
   const agent = findAgent(data, run.agentId);
   return agent && agent.workspaceId === workspaceId ? agent.name : undefined;
@@ -2013,18 +2748,32 @@ export function cancelAgentRun(context: AuthenticatedContext, runId: string) {
     throw httpError(409, "only queued or running runs can be canceled");
   }
   return mutateStore((data) => {
-    const updated = upsertAgentRun(data, {
-      ...run,
-      status: "canceled",
-      completedAt: timestamp,
-      error: run.error ?? "Canceled by operator.",
-    }, timestamp);
+    const updated = upsertAgentRun(
+      data,
+      {
+        ...run,
+        status: "canceled",
+        completedAt: timestamp,
+        error: run.error ?? "Canceled by operator.",
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "agent.run_canceled", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Run canceled: ${updated.title}`, agentId: updated.agentId, runId: updated.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.run_canceled",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Run canceled: ${updated.title}`, agentId: updated.agentId, runId: updated.id },
+        timestamp,
+      ),
+    );
 
     return { run: decorateRun(updated) };
   });
@@ -2033,25 +2782,41 @@ export function cancelAgentRun(context: AuthenticatedContext, runId: string) {
 export async function cancelAgentRunAsync(context: AuthenticatedContext, runId: string) {
   const timestamp = now();
   return mutateStoreAsync((data) => {
-    const run = data.agentRuns.find((entry) => entry.workspaceId === context.workspace.id && entry.id === runId);
+    const run = data.agentRuns.find(
+      (entry) => entry.workspaceId === context.workspace.id && entry.id === runId,
+    );
     if (!run) {
       throw httpError(404, "agent run not found");
     }
     if (run.status !== "queued" && run.status !== "running") {
       throw httpError(409, "only queued or running runs can be canceled");
     }
-    const updated = upsertAgentRun(data, {
-      ...run,
-      status: "canceled",
-      completedAt: timestamp,
-      error: run.error ?? "Canceled by operator.",
-    }, timestamp);
+    const updated = upsertAgentRun(
+      data,
+      {
+        ...run,
+        status: "canceled",
+        completedAt: timestamp,
+        error: run.error ?? "Canceled by operator.",
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "agent.run_canceled", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Run canceled: ${updated.title}`, agentId: updated.agentId, runId: updated.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.run_canceled",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Run canceled: ${updated.title}`, agentId: updated.agentId, runId: updated.id },
+        timestamp,
+      ),
+    );
 
     return { run: decorateRun(updated) };
   });
@@ -2059,12 +2824,16 @@ export async function cancelAgentRunAsync(context: AuthenticatedContext, runId: 
 
 export function recordRunAsPlaybook(context: AuthenticatedContext, runId: string) {
   return mutateStore((data) => {
-    const run = data.agentRuns.find((r) => r.id === runId && r.workspaceId === context.workspace.id);
+    const run = data.agentRuns.find(
+      (r) => r.id === runId && r.workspaceId === context.workspace.id,
+    );
     if (!run) throw httpError(404, "agent run not found");
     if (!run.agentId) throw httpError(400, "this run is not linked to an agent");
     const agent = findAgent(data, run.agentId);
-    if (!agent || agent.workspaceId !== context.workspace.id) throw httpError(404, "agent not found");
-    if (!run.toolCalls || run.toolCalls.length === 0) throw httpError(400, "run has no tool calls to record");
+    if (!agent || agent.workspaceId !== context.workspace.id)
+      throw httpError(404, "agent not found");
+    if (!run.toolCalls || run.toolCalls.length === 0)
+      throw httpError(400, "run has no tool calls to record");
     const playbook: AgentPlaybookStep[] = run.toolCalls.map((call, index) => ({
       id: generateId(),
       title: `${index + 1}. ${call.toolName}`,
@@ -2078,12 +2847,16 @@ export function recordRunAsPlaybook(context: AuthenticatedContext, runId: string
 
 export async function recordRunAsPlaybookAsync(context: AuthenticatedContext, runId: string) {
   return mutateStoreAsync((data) => {
-    const run = data.agentRuns.find((r) => r.id === runId && r.workspaceId === context.workspace.id);
+    const run = data.agentRuns.find(
+      (r) => r.id === runId && r.workspaceId === context.workspace.id,
+    );
     if (!run) throw httpError(404, "agent run not found");
     if (!run.agentId) throw httpError(400, "this run is not linked to an agent");
     const agent = findAgent(data, run.agentId);
-    if (!agent || agent.workspaceId !== context.workspace.id) throw httpError(404, "agent not found");
-    if (!run.toolCalls || run.toolCalls.length === 0) throw httpError(400, "run has no tool calls to record");
+    if (!agent || agent.workspaceId !== context.workspace.id)
+      throw httpError(404, "agent not found");
+    if (!run.toolCalls || run.toolCalls.length === 0)
+      throw httpError(400, "run has no tool calls to record");
     const playbook: AgentPlaybookStep[] = run.toolCalls.map((call, index) => ({
       id: generateId(),
       title: `${index + 1}. ${call.toolName}`,
@@ -2097,52 +2870,79 @@ export async function recordRunAsPlaybookAsync(context: AuthenticatedContext, ru
 
 export async function retryAgentRun(context: AuthenticatedContext, runId: string) {
   const data = await loadStoreAsync();
-  const previous = data.agentRuns.find((entry) => entry.workspaceId === context.workspace.id && entry.id === runId);
+  const previous = data.agentRuns.find(
+    (entry) => entry.workspaceId === context.workspace.id && entry.id === runId,
+  );
   if (!previous) {
     throw httpError(404, "agent run not found");
   }
   if (!previous.agentId) {
     throw httpError(400, "this run is not linked to an agent and cannot be retried");
   }
-  const agent = data.agents.find((entry) => entry.id === previous.agentId && entry.workspaceId === context.workspace.id);
+  const agent = data.agents.find(
+    (entry) => entry.id === previous.agentId && entry.workspaceId === context.workspace.id,
+  );
   if (agent?.enabledTools && agent.enabledTools.length > 0) {
-    throw httpError(409, "tool-enabled runs require a fresh launch approval from the agent editor before retrying");
+    throw httpError(
+      409,
+      "tool-enabled runs require a fresh launch approval from the agent editor before retrying",
+    );
   }
   const timestamp = now();
   await mutateStoreAsync((store) => {
-    const existingSignal = store.activationSignals.find((entry) =>
-      entry.workspaceId === context.workspace.id && entry.kind === "retry" && entry.sourceId === previous.id
+    const existingSignal = store.activationSignals.find(
+      (entry) =>
+        entry.workspaceId === context.workspace.id &&
+        entry.kind === "retry" &&
+        entry.sourceId === previous.id,
     );
-    const stableKey = existingSignal?.stableKey ?? activationSignalStableKey(context.workspace.id, "retry", "agent_run", previous.id);
-    const signal = upsertActivationSignal(store, {
-      id: existingSignal?.id,
-      workspaceId: context.workspace.id,
-      kind: "retry",
-      source: "agent_run",
-      origin: "user_entered",
-      sourceId: previous.id,
-      stableKey,
-      data: {
-        origin: "user_action",
-        observedBy: "service",
-        previousRunId: previous.id,
-        agentId: previous.agentId,
+    const stableKey =
+      existingSignal?.stableKey ??
+      activationSignalStableKey(context.workspace.id, "retry", "agent_run", previous.id);
+    const signal = upsertActivationSignal(
+      store,
+      {
+        id: existingSignal?.id,
+        workspaceId: context.workspace.id,
+        kind: "retry",
+        source: "agent_run",
+        origin: "user_entered",
+        sourceId: previous.id,
+        stableKey,
+        data: {
+          origin: "user_action",
+          observedBy: "service",
+          previousRunId: previous.id,
+          agentId: previous.agentId,
+        },
       },
-    }, timestamp);
-    upsertActivationActivity(store, makeActivity(context.workspace.id, "activation", "agent.run.retry", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, {
-      title: `Run retried: ${previous.title}`,
-      activationSignalKind: "retry",
-      activationSignalId: signal.id,
-      sourceId: previous.id,
-      previousRunId: previous.id,
-      agentId: previous.agentId,
-      origin: "user_action",
-      observedBy: "service",
-    }, timestamp, activationActivityId(context.workspace.id, "agent.run.retry", signal.id)));
+      timestamp,
+    );
+    upsertActivationActivity(
+      store,
+      makeActivity(
+        context.workspace.id,
+        "activation",
+        "agent.run.retry",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        {
+          title: `Run retried: ${previous.title}`,
+          activationSignalKind: "retry",
+          activationSignalId: signal.id,
+          sourceId: previous.id,
+          previousRunId: previous.id,
+          agentId: previous.agentId,
+          origin: "user_action",
+          observedBy: "service",
+        },
+        timestamp,
+        activationActivityId(context.workspace.id, "agent.run.retry", signal.id),
+      ),
+    );
   });
   return runAgent(context, previous.agentId);
 }
@@ -2167,54 +2967,97 @@ export function createWorkspaceEnvVar(context: AuthenticatedContext, input: Work
   const timestamp = now();
 
   return mutateStore((data) => {
-    const conflict = listWorkspaceEnvVars(data, context.workspace.id)
-      .find((entry) => entry.key === normalized.key);
+    const conflict = listWorkspaceEnvVars(data, context.workspace.id).find(
+      (entry) => entry.key === normalized.key,
+    );
     if (conflict) throw httpError(409, `env var ${normalized.key} already exists`);
 
-    const created = upsertWorkspaceEnvVar(data, {
-      workspaceId: context.workspace.id,
-      key: normalized.key,
-      value: normalized.value,
-      scope: normalized.scope,
-      secret: normalized.secret,
-      description: normalized.description,
-      createdByUserId: context.user.id,
-    }, timestamp);
+    const created = upsertWorkspaceEnvVar(
+      data,
+      {
+        workspaceId: context.workspace.id,
+        key: normalized.key,
+        value: normalized.value,
+        scope: normalized.scope,
+        secret: normalized.secret,
+        description: normalized.description,
+        createdByUserId: context.user.id,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "env_var.created", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Env var added: ${created.key}`, envVarId: created.id, scope: created.scope, secret: created.secret }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "env_var.created",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        {
+          title: `Env var added: ${created.key}`,
+          envVarId: created.id,
+          scope: created.scope,
+          secret: created.secret,
+        },
+        timestamp,
+      ),
+    );
 
     return { envVar: maskEnvVar(created) };
   });
 }
 
-export async function createWorkspaceEnvVarAsync(context: AuthenticatedContext, input: WorkspaceEnvVarInput) {
+export async function createWorkspaceEnvVarAsync(
+  context: AuthenticatedContext,
+  input: WorkspaceEnvVarInput,
+) {
   const normalized = normalizeEnvVarInput(input);
   const timestamp = now();
 
   return mutateStoreAsync((data) => {
-    const conflict = listWorkspaceEnvVars(data, context.workspace.id)
-      .find((entry) => entry.key === normalized.key);
+    const conflict = listWorkspaceEnvVars(data, context.workspace.id).find(
+      (entry) => entry.key === normalized.key,
+    );
     if (conflict) throw httpError(409, `env var ${normalized.key} already exists`);
 
-    const created = upsertWorkspaceEnvVar(data, {
-      workspaceId: context.workspace.id,
-      key: normalized.key,
-      value: normalized.value,
-      scope: normalized.scope,
-      secret: normalized.secret,
-      description: normalized.description,
-      createdByUserId: context.user.id,
-    }, timestamp);
+    const created = upsertWorkspaceEnvVar(
+      data,
+      {
+        workspaceId: context.workspace.id,
+        key: normalized.key,
+        value: normalized.value,
+        scope: normalized.scope,
+        secret: normalized.secret,
+        description: normalized.description,
+        createdByUserId: context.user.id,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "env_var.created", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Env var added: ${created.key}`, envVarId: created.id, scope: created.scope, secret: created.secret }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "env_var.created",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        {
+          title: `Env var added: ${created.key}`,
+          envVarId: created.id,
+          scope: created.scope,
+          secret: created.secret,
+        },
+        timestamp,
+      ),
+    );
 
     return { envVar: maskEnvVar(created) };
   });
@@ -2242,25 +3085,40 @@ export function updateWorkspaceEnvVar(
     });
 
     if (merged.key !== existing.key) {
-      const conflict = listWorkspaceEnvVars(data, context.workspace.id)
-        .find((entry) => entry.key === merged.key && entry.id !== existing.id);
+      const conflict = listWorkspaceEnvVars(data, context.workspace.id).find(
+        (entry) => entry.key === merged.key && entry.id !== existing.id,
+      );
       if (conflict) throw httpError(409, `env var ${merged.key} already exists`);
     }
 
-    const updated = upsertWorkspaceEnvVar(data, {
-      ...existing,
-      key: merged.key,
-      value: merged.value,
-      scope: merged.scope,
-      secret: merged.secret,
-      description: merged.description,
-    }, timestamp);
+    const updated = upsertWorkspaceEnvVar(
+      data,
+      {
+        ...existing,
+        key: merged.key,
+        value: merged.value,
+        scope: merged.scope,
+        secret: merged.secret,
+        description: merged.description,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "env_var.updated", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Env var updated: ${updated.key}`, envVarId: updated.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "env_var.updated",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Env var updated: ${updated.key}`, envVarId: updated.id },
+        timestamp,
+      ),
+    );
 
     return { envVar: maskEnvVar(updated) };
   });
@@ -2288,25 +3146,40 @@ export async function updateWorkspaceEnvVarAsync(
     });
 
     if (merged.key !== existing.key) {
-      const conflict = listWorkspaceEnvVars(data, context.workspace.id)
-        .find((entry) => entry.key === merged.key && entry.id !== existing.id);
+      const conflict = listWorkspaceEnvVars(data, context.workspace.id).find(
+        (entry) => entry.key === merged.key && entry.id !== existing.id,
+      );
       if (conflict) throw httpError(409, `env var ${merged.key} already exists`);
     }
 
-    const updated = upsertWorkspaceEnvVar(data, {
-      ...existing,
-      key: merged.key,
-      value: merged.value,
-      scope: merged.scope,
-      secret: merged.secret,
-      description: merged.description,
-    }, timestamp);
+    const updated = upsertWorkspaceEnvVar(
+      data,
+      {
+        ...existing,
+        key: merged.key,
+        value: merged.value,
+        scope: merged.scope,
+        secret: merged.secret,
+        description: merged.description,
+      },
+      timestamp,
+    );
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "env_var.updated", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Env var updated: ${updated.key}`, envVarId: updated.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "env_var.updated",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Env var updated: ${updated.key}`, envVarId: updated.id },
+        timestamp,
+      ),
+    );
 
     return { envVar: maskEnvVar(updated) };
   });
@@ -2320,16 +3193,29 @@ export function deleteWorkspaceEnvVarById(context: AuthenticatedContext, envVarI
       throw httpError(404, "env var not found");
     }
     deleteWorkspaceEnvVar(data, envVarId);
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "env_var.deleted", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Env var removed: ${existing.key}`, envVarId: existing.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "env_var.deleted",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Env var removed: ${existing.key}`, envVarId: existing.id },
+        timestamp,
+      ),
+    );
     return { ok: true };
   });
 }
 
-export async function deleteWorkspaceEnvVarByIdAsync(context: AuthenticatedContext, envVarId: string) {
+export async function deleteWorkspaceEnvVarByIdAsync(
+  context: AuthenticatedContext,
+  envVarId: string,
+) {
   const timestamp = now();
   return mutateStoreAsync((data) => {
     const existing = findWorkspaceEnvVar(data, envVarId);
@@ -2337,11 +3223,21 @@ export async function deleteWorkspaceEnvVarByIdAsync(context: AuthenticatedConte
       throw httpError(404, "env var not found");
     }
     deleteWorkspaceEnvVar(data, envVarId);
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "env_var.deleted", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Env var removed: ${existing.key}`, envVarId: existing.id }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "env_var.deleted",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Env var removed: ${existing.key}`, envVarId: existing.id },
+        timestamp,
+      ),
+    );
     return { ok: true };
   });
 }
@@ -2357,17 +3253,24 @@ export async function listReleaseHistoryAsync(context: AuthenticatedContext) {
 }
 
 function listReleaseHistoryFromData(data: PacketAgentData, workspaceId: string) {
-  const releases = listReleaseConfirmationsForWorkspace(data, workspaceId)
-    .sort((left, right) => (right.confirmedAt ?? right.updatedAt).localeCompare(left.confirmedAt ?? left.updatedAt));
+  const releases = listReleaseConfirmationsForWorkspace(data, workspaceId).sort((left, right) =>
+    (right.confirmedAt ?? right.updatedAt).localeCompare(left.confirmedAt ?? left.updatedAt),
+  );
 
   const evidence = data.validationEvidence.filter((entry) => entry.workspaceId === workspaceId);
   const concerns = data.workflowConcerns.filter((entry) => entry.workspaceId === workspaceId);
 
   const passedEvidence = evidence.filter((entry) => entry.status === "passed").length;
   const failedEvidence = evidence.filter((entry) => entry.status === "failed").length;
-  const pendingEvidence = evidence.filter((entry) => !entry.status || entry.status === "pending").length;
-  const openBlockers = concerns.filter((entry) => entry.kind === "blocker" && entry.status === "open").length;
-  const openQuestions = concerns.filter((entry) => entry.kind === "open_question" && entry.status === "open").length;
+  const pendingEvidence = evidence.filter(
+    (entry) => !entry.status || entry.status === "pending",
+  ).length;
+  const openBlockers = concerns.filter(
+    (entry) => entry.kind === "blocker" && entry.status === "open",
+  ).length;
+  const openQuestions = concerns.filter(
+    (entry) => entry.kind === "open_question" && entry.status === "open",
+  ).length;
 
   return {
     releases: releases.map((entry) => ({
@@ -2404,13 +3307,16 @@ type WorkspaceEnvVarInput = {
 const ENV_VAR_KEY_PATTERN = /^[A-Z][A-Z0-9_]{0,254}$/;
 
 function normalizeEnvVarInput(input: WorkspaceEnvVarInput) {
-  const key = String(input.key ?? "").trim().toUpperCase();
+  const key = String(input.key ?? "")
+    .trim()
+    .toUpperCase();
   if (!ENV_VAR_KEY_PATTERN.test(key)) {
     throw httpError(400, "key must start with a letter and contain only A-Z, 0-9, and underscores");
   }
   const value = String(input.value ?? "");
   if (value.length > 5000) throw httpError(400, "value must be 5000 characters or fewer");
-  const scope: WorkspaceEnvVarScope = input.scope === "build" || input.scope === "runtime" ? input.scope : "all";
+  const scope: WorkspaceEnvVarScope =
+    input.scope === "build" || input.scope === "runtime" ? input.scope : "all";
   const secret = Boolean(input.secret);
   const description = stringOrUndefined(input.description);
   return { key, value, scope, secret, description };
@@ -2437,9 +3343,10 @@ type DecoratedAgentRun = AgentRunDetail["run"];
 function deriveAgentRunTrace(run: DecoratedAgentRun): AgentRunTraceDetail {
   const storedSpans = deriveStoredAgentRunTraceSpans(run);
   const spans = storedSpans.map(toAgentRunTraceSpan);
-  const costUsd = typeof run.costUsd === "number"
-    ? run.costUsd
-    : sumNullableNumbers(storedSpans.map((span) => span.costUsd));
+  const costUsd =
+    typeof run.costUsd === "number"
+      ? run.costUsd
+      : sumNullableNumbers(storedSpans.map((span) => span.costUsd));
   return {
     id: `${run.id}:trace`,
     runId: run.id,
@@ -2490,7 +3397,12 @@ function traceKindFromStoredType(type: StoredAgentRunTraceSpanType): AgentRunTra
 }
 
 function isStoredErrorTraceSpan(span: StoredAgentRunTraceSpan): boolean {
-  return span.type === "error" || span.status === "failed" || span.status === "error" || span.status === "timeout";
+  return (
+    span.type === "error" ||
+    span.status === "failed" ||
+    span.status === "error" ||
+    span.status === "timeout"
+  );
 }
 
 function sumNullableNumbers(values: Array<number | null | undefined>): number | null {
@@ -2511,11 +3423,15 @@ function omitUndefined<T extends Record<string, unknown>>(record: T): T {
 function decorateRun(run: AgentRunRecord) {
   const start = run.startedAt ? Date.parse(run.startedAt) : NaN;
   const end = run.completedAt ? Date.parse(run.completedAt) : NaN;
-  const durationMs = Number.isFinite(start) && Number.isFinite(end) && end >= start ? end - start : null;
+  const durationMs =
+    Number.isFinite(start) && Number.isFinite(end) && end >= start ? end - start : null;
   return {
     ...run,
-    transcript: run.transcript?.map((step) => ({ ...step, output: redactSensitiveString(step.output) })),
-    inputs: run.inputs ? redactSensitiveValue(run.inputs) as AgentRunRecord["inputs"] : undefined,
+    transcript: run.transcript?.map((step) => ({
+      ...step,
+      output: redactSensitiveString(step.output),
+    })),
+    inputs: run.inputs ? (redactSensitiveValue(run.inputs) as AgentRunRecord["inputs"]) : undefined,
     output: run.output ? redactSensitiveString(run.output) : undefined,
     error: run.error ? redactSensitiveString(run.error) : undefined,
     logs: run.logs.map((entry) => ({ ...entry, message: redactSensitiveString(entry.message) })),
@@ -2527,7 +3443,9 @@ function decorateRun(run: AgentRunRecord) {
     })),
     durationMs,
     canCancel: run.status === "queued" || run.status === "running",
-    canRetry: Boolean(run.agentId) && (run.status === "failed" || run.status === "canceled" || run.status === "success"),
+    canRetry:
+      Boolean(run.agentId) &&
+      (run.status === "failed" || run.status === "canceled" || run.status === "success"),
   };
 }
 
@@ -2559,15 +3477,32 @@ type ProviderInput = {
   status?: "connected" | "missing_key" | "disabled";
 };
 
-function decorateAgent(data: ReturnType<typeof loadStore>, agent: AgentRecord, opts: { includeWebhookToken?: boolean } = {}) {
+function decorateAgent(
+  data: ReturnType<typeof loadStore>,
+  agent: AgentRecord,
+  opts: { includeWebhookToken?: boolean } = {},
+) {
   const provider = agent.providerId ? findProvider(data, agent.providerId) : null;
   return decorateAgentWithProvider(agent, provider, opts);
 }
 
-function decorateAgentWithProvider(agent: AgentRecord, provider: ProviderRecord | null, opts: { includeWebhookToken?: boolean } = {}) {
+function decorateAgentWithProvider(
+  agent: AgentRecord,
+  provider: ProviderRecord | null,
+  opts: { includeWebhookToken?: boolean } = {},
+) {
   const responseAgent = opts.includeWebhookToken
-    ? { ...agent, webhookTokenPreview: agent.webhookToken ? maskBearerSecret(agent.webhookToken) : undefined, hasWebhookToken: Boolean(agent.webhookToken) }
-    : { ...agent, webhookToken: undefined, webhookTokenPreview: agent.webhookToken ? maskBearerSecret(agent.webhookToken) : undefined, hasWebhookToken: Boolean(agent.webhookToken) };
+    ? {
+        ...agent,
+        webhookTokenPreview: agent.webhookToken ? maskBearerSecret(agent.webhookToken) : undefined,
+        hasWebhookToken: Boolean(agent.webhookToken),
+      }
+    : {
+        ...agent,
+        webhookToken: undefined,
+        webhookTokenPreview: agent.webhookToken ? maskBearerSecret(agent.webhookToken) : undefined,
+        hasWebhookToken: Boolean(agent.webhookToken),
+      };
   return {
     ...responseAgent,
     provider: provider
@@ -2583,8 +3518,22 @@ function decorateAgentWithProvider(agent: AgentRecord, provider: ProviderRecord 
   };
 }
 
-function normalizeAgentInput(input: AgentInput): Required<Pick<AgentRecord, "name" | "description" | "instructions" | "tools" | "status" | "inputSchema">> &
-  Pick<AgentRecord, "providerId" | "model" | "schedule" | "triggerKind" | "playbook" | "templateId" | "enabledTools" | "routeKey"> {
+function normalizeAgentInput(
+  input: AgentInput,
+): Required<
+  Pick<AgentRecord, "name" | "description" | "instructions" | "tools" | "status" | "inputSchema">
+> &
+  Pick<
+    AgentRecord,
+    | "providerId"
+    | "model"
+    | "schedule"
+    | "triggerKind"
+    | "playbook"
+    | "templateId"
+    | "enabledTools"
+    | "routeKey"
+  > {
   const name = String(input.name ?? "").trim();
   if (name.length < 2) throw httpError(400, "agent name must be at least 2 characters");
   if (name.length > 80) throw httpError(400, "agent name must be 80 characters or fewer");
@@ -2599,18 +3548,25 @@ function normalizeAgentInput(input: AgentInput): Required<Pick<AgentRecord, "nam
         .split(",")
         .map((entry) => entry.trim())
         .filter(Boolean);
-  const status = input.status && ["active", "paused", "archived"].includes(input.status) ? input.status : "active";
+  const status =
+    input.status && ["active", "paused", "archived"].includes(input.status)
+      ? input.status
+      : "active";
   const inputSchema = normalizeInputSchema(input.inputSchema);
 
   const triggerKindRaw = stringOrUndefined(input.triggerKind);
-  const triggerKind: AgentTriggerKind | undefined = triggerKindRaw && (TRIGGER_KINDS as string[]).includes(triggerKindRaw)
-    ? (triggerKindRaw as AgentTriggerKind)
-    : undefined;
+  const triggerKind: AgentTriggerKind | undefined =
+    triggerKindRaw && (TRIGGER_KINDS as string[]).includes(triggerKindRaw)
+      ? (triggerKindRaw as AgentTriggerKind)
+      : undefined;
 
   const playbook = normalizePlaybook(input.playbook ?? undefined);
 
   const enabledTools = Array.isArray(input.enabledTools)
-    ? input.enabledTools.map((t) => String(t).trim()).filter(Boolean).slice(0, 24)
+    ? input.enabledTools
+        .map((t) => String(t).trim())
+        .filter(Boolean)
+        .slice(0, 24)
     : undefined;
 
   return {
@@ -2631,7 +3587,9 @@ function normalizeAgentInput(input: AgentInput): Required<Pick<AgentRecord, "nam
   };
 }
 
-function normalizePlaybook(input: Array<Partial<AgentPlaybookStep>> | undefined): AgentPlaybookStep[] | undefined {
+function normalizePlaybook(
+  input: Array<Partial<AgentPlaybookStep>> | undefined,
+): AgentPlaybookStep[] | undefined {
   if (!input) return undefined;
   if (!Array.isArray(input)) return [];
   const cleaned: AgentPlaybookStep[] = [];
@@ -2660,12 +3618,17 @@ function normalizeInputSchema(raw: unknown): AgentInputField[] {
     const item = candidate as Record<string, unknown>;
     const key = String(item.key ?? "").trim();
     if (!/^[a-z0-9_]{1,40}$/i.test(key)) {
-      throw httpError(400, "input field keys must be 1-40 chars of letters, numbers, or underscores");
+      throw httpError(
+        400,
+        "input field keys must be 1-40 chars of letters, numbers, or underscores",
+      );
     }
     if (seenKeys.has(key)) throw httpError(400, `duplicate input field key: ${key}`);
     seenKeys.add(key);
 
-    const type = FIELD_TYPES.includes(item.type as AgentInputFieldType) ? (item.type as AgentInputFieldType) : "string";
+    const type = FIELD_TYPES.includes(item.type as AgentInputFieldType)
+      ? (item.type as AgentInputFieldType)
+      : "string";
     const label = String(item.label ?? "").trim() || key;
     const description = stringOrUndefined(item.description);
     const required = Boolean(item.required);
@@ -2673,7 +3636,10 @@ function normalizeInputSchema(raw: unknown): AgentInputField[] {
     let options: string[] | undefined;
     if (type === "enum") {
       options = Array.isArray(item.options)
-        ? item.options.map((entry) => String(entry).trim()).filter(Boolean).slice(0, 16)
+        ? item.options
+            .map((entry) => String(entry).trim())
+            .filter(Boolean)
+            .slice(0, 16)
         : [];
       if (!options.length) throw httpError(400, `enum field "${key}" requires at least one option`);
     }
@@ -2684,7 +3650,10 @@ function normalizeInputSchema(raw: unknown): AgentInputField[] {
   return fields;
 }
 
-function validateAgentInputs(schema: AgentInputField[], raw: Record<string, unknown>): Record<string, string | number | boolean> {
+function validateAgentInputs(
+  schema: AgentInputField[],
+  raw: Record<string, unknown>,
+): Record<string, string | number | boolean> {
   const inputs: Record<string, string | number | boolean> = {};
 
   for (const field of schema) {
@@ -2733,7 +3702,10 @@ function coerceInputValue(field: AgentInputField, value: unknown): string | numb
     case "enum": {
       const text = String(value).trim();
       if (!field.options?.includes(text)) {
-        throw httpError(400, `input ${field.key} must be one of: ${(field.options ?? []).join(", ")}`);
+        throw httpError(
+          400,
+          `input ${field.key} must be one of: ${(field.options ?? []).join(", ")}`,
+        );
       }
       return text;
     }
@@ -2747,14 +3719,25 @@ function formatInputValue(value: string | number | boolean): string {
   return String(value);
 }
 
-function buildDryRunOutput(agentName: string, inputs: Record<string, string | number | boolean>, label = "Dry run"): string {
-  const inputSummary = Object.keys(inputs).length === 0
-    ? "no inputs"
-    : Object.entries(inputs).map(([key, value]) => `${key}=${formatInputValue(value)}`).join(", ");
+function buildDryRunOutput(
+  agentName: string,
+  inputs: Record<string, string | number | boolean>,
+  label = "Dry run",
+): string {
+  const inputSummary =
+    Object.keys(inputs).length === 0
+      ? "no inputs"
+      : Object.entries(inputs)
+          .map(([key, value]) => `${key}=${formatInputValue(value)}`)
+          .join(", ");
   return `${label} only: ${agentName} did not call a model, external provider, or runtime tools. Planned inputs: ${inputSummary}.`;
 }
 
-function validateProvider(data: ReturnType<typeof loadStore>, workspaceId: string, providerId?: string) {
+function validateProvider(
+  data: ReturnType<typeof loadStore>,
+  workspaceId: string,
+  providerId?: string,
+) {
   if (!providerId) return;
   const provider = findProvider(data, providerId);
   if (!provider || provider.workspaceId !== workspaceId) {
@@ -2762,24 +3745,34 @@ function validateProvider(data: ReturnType<typeof loadStore>, workspaceId: strin
   }
 }
 
-function isProviderReadyForAgentRuns(data: PacketAgentData, workspaceId: string, provider: ProviderRecord): boolean {
+function isProviderReadyForAgentRuns(
+  data: PacketAgentData,
+  workspaceId: string,
+  provider: ProviderRecord,
+): boolean {
   if (provider.status === "disabled") return false;
   const apiKeyProvider = apiKeyProviderForKind(provider.kind);
   if (!apiKeyProvider || provider.kind === "ollama") return true;
-  return provider.apiKeyConfigured || data.apiKeys.some((key) => key.workspaceId === workspaceId && key.provider === apiKeyProvider);
+  return (
+    provider.apiKeyConfigured ||
+    data.apiKeys.some((key) => key.workspaceId === workspaceId && key.provider === apiKeyProvider)
+  );
 }
 
-function buildIntegrationReadinessSummary(data: PacketAgentData, workspaceId: string): IntegrationReadinessSummary {
+function buildIntegrationReadinessSummary(
+  data: PacketAgentData,
+  workspaceId: string,
+): IntegrationReadinessSummary {
   const tools = listDefaultToolSummaries();
   const toolNames = [...new Set(tools.map((tool) => tool.name))].sort();
-  const generatedPlanTools = [...new Set(AGENT_TEMPLATES.flatMap((template) => template.tools))].sort();
+  const generatedPlanTools = [
+    ...new Set(AGENT_TEMPLATES.flatMap((template) => template.tools)),
+  ].sort();
   const missingForGeneratedPlans = generatedPlanTools.filter((tool) => !toolNames.includes(tool));
 
   const providers = data.providers.filter((provider) => provider.workspaceId === workspaceId);
   const apiKeys = new Set(
-    data.apiKeys
-      .filter((key) => key.workspaceId === workspaceId)
-      .map((key) => key.provider),
+    data.apiKeys.filter((key) => key.workspaceId === workspaceId).map((key) => key.provider),
   );
   const providerKinds = new Set(providers.map((provider) => provider.kind));
 
@@ -2797,9 +3790,17 @@ function buildIntegrationReadinessSummary(data: PacketAgentData, workspaceId: st
     };
   });
 
-  const missingProviderKinds = DEFAULT_WORKSPACE_PROVIDER_KINDS.filter((kind) => !providerKinds.has(kind as ProviderKind));
+  const missingProviderKinds = DEFAULT_WORKSPACE_PROVIDER_KINDS.filter(
+    (kind) => !providerKinds.has(kind as ProviderKind),
+  );
   const missingApiKeys = providerReadiness
-    .filter((entry) => entry.apiKeyProvider && entry.requiresApiKey && !entry.apiKeyReady && entry.provider.status !== "disabled")
+    .filter(
+      (entry) =>
+        entry.apiKeyProvider &&
+        entry.requiresApiKey &&
+        !entry.apiKeyReady &&
+        entry.provider.status !== "disabled",
+    )
     .map((entry) => ({
       provider: entry.apiKeyProvider as ApiKeyProvider,
       providerName: entry.provider.name,
@@ -2810,22 +3811,31 @@ function buildIntegrationReadinessSummary(data: PacketAgentData, workspaceId: st
     recommendedSetup.push("Add a workspace provider so generated agents have a model target.");
   }
   if (missingProviderKinds.length > 0) {
-    recommendedSetup.push(`Add provider records for ${missingProviderKinds.join(", ")} if generated plans should target them.`);
+    recommendedSetup.push(
+      `Add provider records for ${missingProviderKinds.join(", ")} if generated plans should target them.`,
+    );
   }
   if (missingApiKeys.length > 0) {
-    recommendedSetup.push(`Store vault keys or mark external key readiness for ${missingApiKeys.map((entry) => entry.providerName).join(", ")}.`);
+    recommendedSetup.push(
+      `Store vault keys or mark external key readiness for ${missingApiKeys.map((entry) => entry.providerName).join(", ")}.`,
+    );
   }
   if (missingForGeneratedPlans.length > 0) {
-    recommendedSetup.push(`Back generated plan tools with runtime adapters or replace labels: ${missingForGeneratedPlans.slice(0, 8).join(", ")}.`);
+    recommendedSetup.push(
+      `Back generated plan tools with runtime adapters or replace labels: ${missingForGeneratedPlans.slice(0, 8).join(", ")}.`,
+    );
   }
   if (recommendedSetup.length === 0) {
-    recommendedSetup.push("Generated agent plans have provider, API key, and runtime tool coverage.");
+    recommendedSetup.push(
+      "Generated agent plans have provider, API key, and runtime tool coverage.",
+    );
   }
 
   const readyCount = providerReadiness.filter((entry) => entry.ready).length;
-  const status = readyCount > 0 && missingApiKeys.length === 0 && missingForGeneratedPlans.length === 0
-    ? "ready"
-    : "needs_setup";
+  const status =
+    readyCount > 0 && missingApiKeys.length === 0 && missingForGeneratedPlans.length === 0
+      ? "ready"
+      : "needs_setup";
 
   return {
     status,
@@ -2848,7 +3858,9 @@ function buildIntegrationReadinessSummary(data: PacketAgentData, workspaceId: st
 }
 
 function apiKeyProviderForKind(kind: ProviderKind): ApiKeyProvider | null {
-  return (DEFAULT_WORKSPACE_PROVIDER_KINDS as ProviderKind[]).includes(kind) ? (kind as ApiKeyProvider) : null;
+  return (DEFAULT_WORKSPACE_PROVIDER_KINDS as ProviderKind[]).includes(kind)
+    ? (kind as ApiKeyProvider)
+    : null;
 }
 
 function normalizeProviderInput(input: ProviderInput) {
@@ -2856,13 +3868,18 @@ function normalizeProviderInput(input: ProviderInput) {
   if (name.length < 2) throw httpError(400, "provider name must be at least 2 characters");
   const defaultModel = String(input.defaultModel ?? "").trim();
   if (defaultModel.length < 2) throw httpError(400, "default model is required");
-  const kind = input.kind && ["openai", "anthropic", "minimax", "azure_openai", "ollama", "custom"].includes(input.kind)
-    ? input.kind
-    : "custom";
+  const kind =
+    input.kind &&
+    ["openai", "anthropic", "minimax", "azure_openai", "ollama", "custom"].includes(input.kind)
+      ? input.kind
+      : "custom";
   const apiKeyConfigured = Boolean(input.apiKeyConfigured);
-  const status = input.status && ["connected", "missing_key", "disabled"].includes(input.status)
-    ? input.status
-    : apiKeyConfigured || kind === "ollama" ? "connected" : "missing_key";
+  const status =
+    input.status && ["connected", "missing_key", "disabled"].includes(input.status)
+      ? input.status
+      : apiKeyConfigured || kind === "ollama"
+        ? "connected"
+        : "missing_key";
 
   return {
     name,

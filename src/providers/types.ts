@@ -1,4 +1,11 @@
-export type ProviderName = "anthropic" | "openai" | "openrouter" | "minimax" | "ollama" | "gemini" | "stub";
+export type ProviderName =
+  | "anthropic"
+  | "openai"
+  | "openrouter"
+  | "minimax"
+  | "ollama"
+  | "gemini"
+  | "stub";
 
 export interface ProviderMessage {
   role: "system" | "user" | "assistant" | "tool";

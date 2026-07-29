@@ -1,9 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resetDefaultRouterForTests, ProviderRouter, getDefaultRouter, setDefaultRouter } from "../../providers/router.js";
+import {
+  resetDefaultRouterForTests,
+  ProviderRouter,
+  getDefaultRouter,
+  setDefaultRouter,
+} from "../../providers/router.js";
 import { resetStoreForTests } from "../../packetagent-store.js";
 import { resetDefaultToolRegistryForTests, getDefaultToolRegistry } from "../registry.js";
-import type { LLMProvider, ProviderCallOptions, ProviderCallResult, ProviderStreamChunk } from "../../providers/types.js";
+import type {
+  LLMProvider,
+  ProviderCallOptions,
+  ProviderCallResult,
+  ProviderStreamChunk,
+} from "../../providers/types.js";
 import { runAgentLoop } from "../agent-loop.js";
 import type { ToolDefinition } from "../types.js";
 
@@ -19,7 +29,9 @@ function scriptedProvider(scripts: ProviderCallResult[]): LLMProvider {
     async *stream(): AsyncIterable<ProviderStreamChunk> {
       yield { done: true, usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 } };
     },
-    async models() { return ["scripted"]; },
+    async models() {
+      return ["scripted"];
+    },
   };
 }
 
@@ -39,15 +51,18 @@ test("loop returns immediately when model finishes without tool calls", async ()
   resetDefaultRouterForTests();
   getDefaultToolRegistry().register(echoTool);
   const router = new ProviderRouter();
-  router.register("anthropic", scriptedProvider([
-    {
-      content: "Done.",
-      finishReason: "stop",
-      usage: { promptTokens: 5, completionTokens: 2, costUsd: 0.001 },
-      model: "claude-opus-4-7",
-      providerName: "anthropic",
-    },
-  ]));
+  router.register(
+    "anthropic",
+    scriptedProvider([
+      {
+        content: "Done.",
+        finishReason: "stop",
+        usage: { promptTokens: 5, completionTokens: 2, costUsd: 0.001 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic",
+      },
+    ]),
+  );
   setDefaultRouter(router);
   const result = await runAgentLoop({
     workspaceId: "alpha",
@@ -69,23 +84,26 @@ test("loop executes tool calls and returns final answer", async () => {
   resetDefaultRouterForTests();
   getDefaultToolRegistry().register(echoTool);
   const router = new ProviderRouter();
-  router.register("anthropic", scriptedProvider([
-    {
-      content: "",
-      finishReason: "tool_use",
-      toolCalls: [{ id: "call-1", name: "echo_tool", input: { text: "hello" } }],
-      usage: { promptTokens: 5, completionTokens: 5, costUsd: 0.002 },
-      model: "claude-opus-4-7",
-      providerName: "anthropic",
-    },
-    {
-      content: "I echoed: hello",
-      finishReason: "stop",
-      usage: { promptTokens: 10, completionTokens: 3, costUsd: 0.001 },
-      model: "claude-opus-4-7",
-      providerName: "anthropic",
-    },
-  ]));
+  router.register(
+    "anthropic",
+    scriptedProvider([
+      {
+        content: "",
+        finishReason: "tool_use",
+        toolCalls: [{ id: "call-1", name: "echo_tool", input: { text: "hello" } }],
+        usage: { promptTokens: 5, completionTokens: 5, costUsd: 0.002 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic",
+      },
+      {
+        content: "I echoed: hello",
+        finishReason: "stop",
+        usage: { promptTokens: 10, completionTokens: 3, costUsd: 0.001 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic",
+      },
+    ]),
+  );
   setDefaultRouter(router);
   const result = await runAgentLoop({
     workspaceId: "alpha",
@@ -110,14 +128,19 @@ test("loop terminates with max_turns when model keeps calling tools", async () =
   resetDefaultRouterForTests();
   getDefaultToolRegistry().register(echoTool);
   const router = new ProviderRouter();
-  router.register("anthropic", scriptedProvider(Array.from({ length: 5 }, () => ({
-    content: "",
-    finishReason: "tool_use" as const,
-    toolCalls: [{ id: "call-x", name: "echo_tool", input: { text: "again" } }],
-    usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
-    model: "claude-opus-4-7",
-    providerName: "anthropic" as const,
-  }))));
+  router.register(
+    "anthropic",
+    scriptedProvider(
+      Array.from({ length: 5 }, () => ({
+        content: "",
+        finishReason: "tool_use" as const,
+        toolCalls: [{ id: "call-x", name: "echo_tool", input: { text: "again" } }],
+        usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic" as const,
+      })),
+    ),
+  );
   setDefaultRouter(router);
   const result = await runAgentLoop({
     workspaceId: "alpha",
@@ -139,23 +162,26 @@ test("unknown tool produces a synthetic error result and the loop continues", as
   resetDefaultRouterForTests();
   getDefaultToolRegistry().register(echoTool);
   const router = new ProviderRouter();
-  router.register("anthropic", scriptedProvider([
-    {
-      content: "",
-      finishReason: "tool_use",
-      toolCalls: [{ id: "call-1", name: "missing_tool", input: {} }],
-      usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
-      model: "claude-opus-4-7",
-      providerName: "anthropic",
-    },
-    {
-      content: "Sorry, that tool is not available.",
-      finishReason: "stop",
-      usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
-      model: "claude-opus-4-7",
-      providerName: "anthropic",
-    },
-  ]));
+  router.register(
+    "anthropic",
+    scriptedProvider([
+      {
+        content: "",
+        finishReason: "tool_use",
+        toolCalls: [{ id: "call-1", name: "missing_tool", input: {} }],
+        usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic",
+      },
+      {
+        content: "Sorry, that tool is not available.",
+        finishReason: "stop",
+        usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic",
+      },
+    ]),
+  );
   setDefaultRouter(router);
   const result = await runAgentLoop({
     workspaceId: "alpha",

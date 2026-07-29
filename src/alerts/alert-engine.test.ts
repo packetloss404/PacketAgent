@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { evaluateAlerts } from "./alert-engine.js";
-import type { OperationsHealthReport, SubsystemHealth, SubsystemStatus } from "../operations-health.js";
+import type {
+  OperationsHealthReport,
+  SubsystemHealth,
+  SubsystemStatus,
+} from "../operations-health.js";
 import type { JobTypeMetrics } from "../jobs/scheduler-metrics.js";
 
-function makeSubsystem(overrides: Partial<SubsystemHealth> & { name: string; status: SubsystemStatus }): SubsystemHealth {
+function makeSubsystem(
+  overrides: Partial<SubsystemHealth> & { name: string; status: SubsystemStatus },
+): SubsystemHealth {
   return {
     name: overrides.name,
     status: overrides.status,
@@ -14,7 +20,10 @@ function makeSubsystem(overrides: Partial<SubsystemHealth> & { name: string; sta
   };
 }
 
-function makeHealth(subsystems: SubsystemHealth[], overall: SubsystemStatus = "ok"): OperationsHealthReport {
+function makeHealth(
+  subsystems: SubsystemHealth[],
+  overall: SubsystemStatus = "ok",
+): OperationsHealthReport {
   return {
     generatedAt: "2026-04-26T00:00:00.000Z",
     overall,
@@ -271,9 +280,7 @@ test("evaluateAlerts deduplicates by ruleId + subsystem name", () => {
 test("evaluateAlerts uses injected now and generateId for deterministic output", () => {
   const result = evaluateAlerts(
     {
-      health: makeHealth([
-        makeSubsystem({ name: "scheduler", status: "degraded" }),
-      ]),
+      health: makeHealth([makeSubsystem({ name: "scheduler", status: "degraded" })]),
       metrics: [],
     },
     {

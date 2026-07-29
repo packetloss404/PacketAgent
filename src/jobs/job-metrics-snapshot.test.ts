@@ -15,7 +15,7 @@ function makeStore(snapshots: JobMetricSnapshotRecord[] = []): PacketAgentData {
 function makeStoreDeps(data: PacketAgentData) {
   return {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
 }
 
@@ -34,7 +34,9 @@ function makeMetric(overrides: Partial<JobTypeMetrics> & { type: string }): JobT
   };
 }
 
-function makeSnapshot(overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string }): JobMetricSnapshotRecord {
+function makeSnapshot(
+  overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string },
+): JobMetricSnapshotRecord {
   return {
     id: overrides.id,
     capturedAt: overrides.capturedAt,
@@ -163,7 +165,10 @@ test("listJobMetricSnapshots returns ascending by capturedAt", () => {
   ]);
 
   const result = listJobMetricSnapshots({}, { loadStore: () => data });
-  assert.deepEqual(result.map((entry) => entry.id), ["a", "b", "c"]);
+  assert.deepEqual(
+    result.map((entry) => entry.id),
+    ["a", "b", "c"],
+  );
 });
 
 test("listJobMetricSnapshots filters by type, since, and until", () => {
@@ -175,19 +180,28 @@ test("listJobMetricSnapshots filters by type, since, and until", () => {
   ]);
 
   const byType = listJobMetricSnapshots({ type: "alpha" }, { loadStore: () => data });
-  assert.deepEqual(byType.map((entry) => entry.id), ["alpha_old", "alpha_mid", "alpha_new"]);
+  assert.deepEqual(
+    byType.map((entry) => entry.id),
+    ["alpha_old", "alpha_mid", "alpha_new"],
+  );
 
   const sinceFiltered = listJobMetricSnapshots(
     { type: "alpha", since: "2026-04-21T00:00:00.000Z" },
     { loadStore: () => data },
   );
-  assert.deepEqual(sinceFiltered.map((entry) => entry.id), ["alpha_mid", "alpha_new"]);
+  assert.deepEqual(
+    sinceFiltered.map((entry) => entry.id),
+    ["alpha_mid", "alpha_new"],
+  );
 
   const untilFiltered = listJobMetricSnapshots(
     { type: "alpha", until: "2026-04-23T00:00:00.000Z" },
     { loadStore: () => data },
   );
-  assert.deepEqual(untilFiltered.map((entry) => entry.id), ["alpha_old", "alpha_mid"]);
+  assert.deepEqual(
+    untilFiltered.map((entry) => entry.id),
+    ["alpha_old", "alpha_mid"],
+  );
 
   const ranged = listJobMetricSnapshots(
     { since: "2026-04-21T00:00:00.000Z", until: "2026-04-23T00:00:00.000Z" },
@@ -200,7 +214,9 @@ test("listJobMetricSnapshots honors limit defaulting to 100 and capping at 500",
   const many: JobMetricSnapshotRecord[] = [];
   for (let index = 0; index < 600; index += 1) {
     const stamp = new Date(Date.UTC(2026, 0, 1, 0, 0, 0, index)).toISOString();
-    many.push(makeSnapshot({ id: `n_${index.toString().padStart(4, "0")}`, type: "x", capturedAt: stamp }));
+    many.push(
+      makeSnapshot({ id: `n_${index.toString().padStart(4, "0")}`, type: "x", capturedAt: stamp }),
+    );
   }
   const data = makeStore(many);
 
@@ -244,5 +260,8 @@ test("pruneJobMetricSnapshots with retentionDays drops older rows and returns th
   );
 
   assert.equal(result.removed, 2);
-  assert.deepEqual(data.jobMetricSnapshots.map((entry) => entry.id), ["fresh"]);
+  assert.deepEqual(
+    data.jobMetricSnapshots.map((entry) => entry.id),
+    ["fresh"],
+  );
 });

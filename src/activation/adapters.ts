@@ -136,22 +136,35 @@ export function buildSignalSnapshotFromProductRecords(
     completedAt:
       records.completedAt ??
       firstTimestamp(implementation, ["completedAt"]) ??
-      firstTimestamp(firstRecord(passedValidationEvidence), ["completedAt", "passedAt", "confirmedAt"]),
+      firstTimestamp(firstRecord(passedValidationEvidence), [
+        "completedAt",
+        "passedAt",
+        "confirmedAt",
+      ]),
     releasedAt:
       records.releasedAt ??
       firstTimestamp(releaseConfirmation, ["releasedAt", "confirmedAt", "completedAt"]),
-    briefCapturedAt: productSignalTimestamp(records.brief, ["capturedAt", "createdAt", "updatedAt"], records.now),
+    briefCapturedAt: productSignalTimestamp(
+      records.brief,
+      ["capturedAt", "createdAt", "updatedAt"],
+      records.now,
+    ),
     requirementsDefinedAt: productSignalTimestamp(
       firstRecord(requirements),
       ["definedAt", "completedAt", "createdAt", "updatedAt"],
       records.now,
     ),
-    planDefinedAt: productSignalTimestamp(plan, ["plannedAt", "definedAt", "createdAt", "updatedAt"], records.now),
+    planDefinedAt: productSignalTimestamp(
+      plan,
+      ["plannedAt", "definedAt", "createdAt", "updatedAt"],
+      records.now,
+    ),
     implementationStartedAt:
       productSignalTimestamp(implementation, ["startedAt", "createdAt"], records.now) ??
       startedAtFromPlan(plan),
     testsPassedAt: productSignalTimestamp(
-      firstRecord(passedTestEvidence) ?? firstRecord(passedValidationEvidence.filter(isTestEvidence)),
+      firstRecord(passedTestEvidence) ??
+        firstRecord(passedValidationEvidence.filter(isTestEvidence)),
       ["passedAt", "completedAt", "confirmedAt", "createdAt"],
       records.now,
     ),
@@ -170,45 +183,62 @@ export function buildSignalSnapshotFromProductRecords(
     openQuestionCount: openQuestions.length,
     criticalIssueCount:
       activeBlockers.filter(isCriticalRecord).length +
-      validationEvidence.filter((record) => isFailedRecord(record) && isCriticalRecord(record)).length,
+      validationEvidence.filter((record) => isFailedRecord(record) && isCriticalRecord(record))
+        .length,
     scopeChangeCount: (records.scopeChanges ?? []).filter(isUsableRecord).length,
     failedValidationCount: validationEvidence.filter(isFailedRecord).length,
     retryCount: (records.retries ?? []).filter(isUsableRecord).length,
   });
 }
 
-function toRecordArray(records: DurableActivationProductRecordList): DurableActivationProductRecord[] {
+function toRecordArray(
+  records: DurableActivationProductRecordList,
+): DurableActivationProductRecord[] {
   if (!records) return [];
   return Array.isArray(records) ? records : [records];
 }
 
-function firstRecord(records: DurableActivationProductRecord[]): DurableActivationProductRecord | undefined {
+function firstRecord(
+  records: DurableActivationProductRecord[],
+): DurableActivationProductRecord | undefined {
   return records[0];
 }
 
-function isUsableRecord(record: DurableActivationProductRecord | null | undefined): record is DurableActivationProductRecord {
+function isUsableRecord(
+  record: DurableActivationProductRecord | null | undefined,
+): record is DurableActivationProductRecord {
   if (!record) return false;
   return !["cancelled", "canceled", "discarded", "superseded"].includes(normalize(record.status));
 }
 
 function isActiveRecord(record: DurableActivationProductRecord): boolean {
   if (!isUsableRecord(record)) return false;
-  return !["resolved", "closed", "done", "completed"].includes(normalize(record.status)) && !record.resolvedAt;
+  return (
+    !["resolved", "closed", "done", "completed"].includes(normalize(record.status)) &&
+    !record.resolvedAt
+  );
 }
 
 function isOpenQuestion(record: DurableActivationProductRecord): boolean {
   if (!isUsableRecord(record)) return false;
-  return !["answered", "resolved", "closed", "done", "completed"].includes(normalize(record.status)) && !record.resolvedAt;
+  return (
+    !["answered", "resolved", "closed", "done", "completed"].includes(normalize(record.status)) &&
+    !record.resolvedAt
+  );
 }
 
 function isFailedRecord(record: DurableActivationProductRecord): boolean {
-  return Boolean(record.failedAt) || ["failed", "rejected", "error"].includes(normalize(record.status));
+  return (
+    Boolean(record.failedAt) || ["failed", "rejected", "error"].includes(normalize(record.status))
+  );
 }
 
 function isConfirmedReleaseRecord(record: DurableActivationProductRecord): boolean {
   if (!isUsableRecord(record)) return false;
-  return Boolean(record.confirmedAt || record.releasedAt || record.completedAt)
-    || ["confirmed", "released", "completed", "done"].includes(normalize(record.status));
+  return (
+    Boolean(record.confirmedAt || record.releasedAt || record.completedAt) ||
+    ["confirmed", "released", "completed", "done"].includes(normalize(record.status))
+  );
 }
 
 function isCriticalRecord(record: DurableActivationProductRecord): boolean {
@@ -230,9 +260,7 @@ function isTestEvidence(record: DurableActivationProductRecord): boolean {
   });
 }
 
-function startedAtFromPlan(
-  plan: DurableActivationProductRecord | undefined,
-): string | undefined {
+function startedAtFromPlan(plan: DurableActivationProductRecord | undefined): string | undefined {
   if (!plan) return undefined;
   const status = normalize(plan.status);
   if (!["started", "in_progress", "complete", "completed", "done"].includes(status)) {

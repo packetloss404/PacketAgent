@@ -12,7 +12,9 @@ import {
 } from "./job-metric-snapshots-repo.js";
 import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
 
-function makeRecord(overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string }): JobMetricSnapshotRecord {
+function makeRecord(
+  overrides: Partial<JobMetricSnapshotRecord> & { id: string; capturedAt: string; type: string },
+): JobMetricSnapshotRecord {
   return {
     id: overrides.id,
     capturedAt: overrides.capturedAt,
@@ -30,10 +32,12 @@ function makeRecord(overrides: Partial<JobMetricSnapshotRecord> & { id: string; 
 }
 
 function makeJsonRepo(): JobMetricSnapshotsRepository {
-  const data = { jobMetricSnapshots: [] as JobMetricSnapshotRecord[] } as unknown as PacketAgentData;
+  const data = {
+    jobMetricSnapshots: [] as JobMetricSnapshotRecord[],
+  } as unknown as PacketAgentData;
   const deps: JobMetricSnapshotsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonJobMetricSnapshotsRepository(deps);
 }
@@ -112,7 +116,10 @@ test("list filters by type", () => {
       makeRecord({ id: "c", capturedAt: "2026-04-26T12:00:00.000Z", type: "agent.run" }),
     ]);
     const rows = repo.list({ type: "agent.run" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["a", "c"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["a", "c"],
+    );
   });
 });
 
@@ -124,7 +131,10 @@ test("list filters by since (inclusive)", () => {
       makeRecord({ id: "c", capturedAt: "2026-04-26T14:00:00.000Z", type: "agent.run" }),
     ]);
     const rows = repo.list({ since: "2026-04-26T12:00:00.000Z" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["b", "c"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["b", "c"],
+    );
   });
 });
 
@@ -136,7 +146,10 @@ test("list filters by until (inclusive)", () => {
       makeRecord({ id: "c", capturedAt: "2026-04-26T14:00:00.000Z", type: "agent.run" }),
     ]);
     const rows = repo.list({ until: "2026-04-26T12:00:00.000Z" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["a", "b"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["a", "b"],
+    );
   });
 });
 
@@ -145,11 +158,13 @@ test("list applies default limit of 100 and caps at 500", () => {
     const records: JobMetricSnapshotRecord[] = [];
     for (let index = 0; index < 510; index += 1) {
       const minute = String(index).padStart(3, "0");
-      records.push(makeRecord({
-        id: `snap_${minute}`,
-        capturedAt: `2026-04-26T10:00:${String(index % 60).padStart(2, "0")}.${minute}Z`,
-        type: "agent.run",
-      }));
+      records.push(
+        makeRecord({
+          id: `snap_${minute}`,
+          capturedAt: `2026-04-26T10:00:${String(index % 60).padStart(2, "0")}.${minute}Z`,
+          type: "agent.run",
+        }),
+      );
     }
     repo.insertMany(records);
     assert.equal(repo.list({ limit: 1 }).length, 1);
@@ -168,7 +183,10 @@ test("prune removes older rows and returns count", () => {
     const removed = repo.prune("2026-04-01T00:00:00.000Z");
     assert.equal(removed, 2);
     assert.equal(repo.count(), 1);
-    assert.deepEqual(repo.list().map((entry) => entry.id), ["keep"]);
+    assert.deepEqual(
+      repo.list().map((entry) => entry.id),
+      ["keep"],
+    );
   });
 });
 
@@ -185,12 +203,22 @@ test("prune with cutoff matching capturedAt retains the row", () => {
 
 test("insertMany dedupes by id (idempotent re-insert)", () => {
   runOnBoth((repo) => {
-    const record = makeRecord({ id: "dup", capturedAt: "2026-04-26T10:00:00.000Z", type: "agent.run", totalRuns: 1 });
+    const record = makeRecord({
+      id: "dup",
+      capturedAt: "2026-04-26T10:00:00.000Z",
+      type: "agent.run",
+      totalRuns: 1,
+    });
     repo.insertMany([record]);
     repo.insertMany([record]);
     assert.equal(repo.count(), 1);
     assert.equal(repo.list().length, 1);
-    const updated = makeRecord({ id: "dup", capturedAt: "2026-04-26T10:00:00.000Z", type: "agent.run", totalRuns: 7 });
+    const updated = makeRecord({
+      id: "dup",
+      capturedAt: "2026-04-26T10:00:00.000Z",
+      type: "agent.run",
+      totalRuns: 7,
+    });
     repo.insertMany([updated]);
     assert.equal(repo.count(), 1);
     assert.equal(repo.list()[0]?.totalRuns, 7);
@@ -201,12 +229,16 @@ test("createJobMetricSnapshotsRepository selects implementation by env", () => {
   const prevStore = process.env.PACKETAGENT_STORE;
   try {
     delete process.env.PACKETAGENT_STORE;
-    const data = { jobMetricSnapshots: [] as JobMetricSnapshotRecord[] } as unknown as PacketAgentData;
+    const data = {
+      jobMetricSnapshots: [] as JobMetricSnapshotRecord[],
+    } as unknown as PacketAgentData;
     const json = createJobMetricSnapshotsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+      mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
-    json.insertMany([makeRecord({ id: "a", capturedAt: "2026-04-26T10:00:00.000Z", type: "agent.run" })]);
+    json.insertMany([
+      makeRecord({ id: "a", capturedAt: "2026-04-26T10:00:00.000Z", type: "agent.run" }),
+    ]);
     assert.equal(json.count(), 1);
     assert.equal(data.jobMetricSnapshots.length, 1);
   } finally {
@@ -224,7 +256,9 @@ test("createJobMetricSnapshotsRepository returns sqlite impl when env requests i
   process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = createJobMetricSnapshotsRepository({ dbPath });
-    repo.insertMany([makeRecord({ id: "a", capturedAt: "2026-04-26T10:00:00.000Z", type: "agent.run" })]);
+    repo.insertMany([
+      makeRecord({ id: "a", capturedAt: "2026-04-26T10:00:00.000Z", type: "agent.run" }),
+    ]);
     assert.equal(repo.count(), 1);
     assert.equal(repo.list()[0]?.id, "a");
   } finally {

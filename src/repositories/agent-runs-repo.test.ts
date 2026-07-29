@@ -40,7 +40,7 @@ function makeJsonRepo(): AgentRunsRepository {
   const data = { agentRuns: [] as AgentRunRecord[] } as unknown as PacketAgentData;
   const deps: AgentRunsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonAgentRunsRepository(deps);
 }
@@ -105,9 +105,15 @@ test("upsert then list returns the record verbatim", () => {
 
 test("list returns rows sorted descending by createdAt", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T11:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T11:00:00.000Z" }),
+    );
     const ids = repo.list("ws_a").map((entry) => entry.id);
     assert.deepEqual(ids, ["a", "c", "b"]);
   });
@@ -115,9 +121,15 @@ test("list returns rows sorted descending by createdAt", () => {
 
 test("list filters by workspace", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_b", createdAt: "2026-04-26T11:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_b", createdAt: "2026-04-26T11:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }),
+    );
     const aIds = repo.list("ws_a").map((entry) => entry.id);
     assert.deepEqual(aIds, ["c", "a"]);
     const bIds = repo.list("ws_b").map((entry) => entry.id);
@@ -127,10 +139,38 @@ test("list filters by workspace", () => {
 
 test("listForAgent filters by workspace and agent", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", agentId: "agent_x", createdAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_a", agentId: "agent_y", createdAt: "2026-04-26T11:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", agentId: "agent_x", createdAt: "2026-04-26T12:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "d", workspaceId: "ws_b", agentId: "agent_x", createdAt: "2026-04-26T13:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({
+        id: "a",
+        workspaceId: "ws_a",
+        agentId: "agent_x",
+        createdAt: "2026-04-26T10:00:00.000Z",
+      }),
+    );
+    repo.upsert(
+      makeRecord({
+        id: "b",
+        workspaceId: "ws_a",
+        agentId: "agent_y",
+        createdAt: "2026-04-26T11:00:00.000Z",
+      }),
+    );
+    repo.upsert(
+      makeRecord({
+        id: "c",
+        workspaceId: "ws_a",
+        agentId: "agent_x",
+        createdAt: "2026-04-26T12:00:00.000Z",
+      }),
+    );
+    repo.upsert(
+      makeRecord({
+        id: "d",
+        workspaceId: "ws_b",
+        agentId: "agent_x",
+        createdAt: "2026-04-26T13:00:00.000Z",
+      }),
+    );
     const ids = repo.listForAgent("ws_a", "agent_x").map((entry) => entry.id);
     assert.deepEqual(ids, ["c", "a"]);
   });
@@ -138,8 +178,17 @@ test("listForAgent filters by workspace and agent", () => {
 
 test("listForAgent excludes rows where agentId is undefined", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "with", workspaceId: "ws_a", agentId: "agent_x", createdAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "without", workspaceId: "ws_a", createdAt: "2026-04-26T11:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({
+        id: "with",
+        workspaceId: "ws_a",
+        agentId: "agent_x",
+        createdAt: "2026-04-26T10:00:00.000Z",
+      }),
+    );
+    repo.upsert(
+      makeRecord({ id: "without", workspaceId: "ws_a", createdAt: "2026-04-26T11:00:00.000Z" }),
+    );
     const ids = repo.listForAgent("ws_a", "agent_x").map((entry) => entry.id);
     assert.deepEqual(ids, ["with"]);
   });
@@ -334,7 +383,7 @@ test("createAgentRunsRepository returns json impl when env is unset", () => {
     const data = { agentRuns: [] as AgentRunRecord[] } as unknown as PacketAgentData;
     const repo = createAgentRunsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+      mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     repo.upsert(makeRecord({ id: "run_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);

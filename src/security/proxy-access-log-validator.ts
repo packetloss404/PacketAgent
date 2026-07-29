@@ -25,7 +25,10 @@ const PATTERN_RULES: PatternRule[] = [
   { label: "public-share-path", regex: /\/api\/public\/share\/[A-Za-z0-9._~-]+/g },
   { label: "public-webhook-path", regex: /\/api\/public\/webhooks\/agents\/[A-Za-z0-9._~-]+/g },
   { label: "invitation-accept-path", regex: /\/api\/app\/invitations\/[A-Za-z0-9._~-]+\/accept/g },
-  { label: "sensitive-query-param", regex: /[?&](?:token|access_token|api[_-]?key|apikey|key|secret)=[^&\s"']+/gi },
+  {
+    label: "sensitive-query-param",
+    regex: /[?&](?:token|access_token|api[_-]?key|apikey|key|secret)=[^&\s"']+/gi,
+  },
 ];
 
 const ALREADY_REDACTED_MARKERS = ["[redacted]", "***", "<redacted>", "xxx"];
@@ -76,7 +79,9 @@ export function validateAccessLogContent(content: string): ValidationResult {
 }
 
 function writeUsage(): void {
-  console.error("Usage: node --import tsx src/security/proxy-access-log-validator.ts <log-path> [<log-path> ...]");
+  console.error(
+    "Usage: node --import tsx src/security/proxy-access-log-validator.ts <log-path> [<log-path> ...]",
+  );
 }
 
 export async function runValidatorCli(argv: string[] = process.argv.slice(2)): Promise<number> {
@@ -103,7 +108,9 @@ export async function runValidatorCli(argv: string[] = process.argv.slice(2)): P
     totalViolations += violations.length;
 
     for (const violation of violations) {
-      console.error(`${rawPath}:${violation.line}:${violation.column}: ${violation.pattern} ${violation.snippet}`);
+      console.error(
+        `${rawPath}:${violation.line}:${violation.column}: ${violation.pattern} ${violation.snippet}`,
+      );
     }
   }
 
@@ -123,10 +130,12 @@ function isExecutedDirectly(): boolean {
 }
 
 if (isExecutedDirectly()) {
-  runValidatorCli().then((exitCode) => {
-    process.exitCode = exitCode;
-  }).catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
+  runValidatorCli()
+    .then((exitCode) => {
+      process.exitCode = exitCode;
+    })
+    .catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    });
 }

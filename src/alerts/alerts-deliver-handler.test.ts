@@ -21,8 +21,12 @@ function makeRecord(overrides: Partial<AlertEventRecord> & { id: string }): Aler
     context: overrides.context ?? { subsystem: "store" },
     delivered: overrides.delivered ?? false,
     ...(overrides.deliveryError !== undefined ? { deliveryError: overrides.deliveryError } : {}),
-    ...(overrides.deliveryAttempts !== undefined ? { deliveryAttempts: overrides.deliveryAttempts } : {}),
-    ...(overrides.lastDeliveryAttemptAt !== undefined ? { lastDeliveryAttemptAt: overrides.lastDeliveryAttemptAt } : {}),
+    ...(overrides.deliveryAttempts !== undefined
+      ? { deliveryAttempts: overrides.deliveryAttempts }
+      : {}),
+    ...(overrides.lastDeliveryAttemptAt !== undefined
+      ? { lastDeliveryAttemptAt: overrides.lastDeliveryAttemptAt }
+      : {}),
     ...(overrides.deadLettered !== undefined ? { deadLettered: overrides.deadLettered } : {}),
   };
 }
@@ -92,14 +96,8 @@ test("ALERTS_DELIVER_JOB_TYPE constant equals alerts.deliver", () => {
 
 test("handleAlertsDeliverJob throws when alertId is missing", async () => {
   const { deps } = makeDeps({ records: [] });
-  await assert.rejects(
-    () => handleAlertsDeliverJob({ alertId: "" }, deps),
-    /payload\.alertId/,
-  );
-  await assert.rejects(
-    () => handleAlertsDeliverJob({ alertId: "   " }, deps),
-    /payload\.alertId/,
-  );
+  await assert.rejects(() => handleAlertsDeliverJob({ alertId: "" }, deps), /payload\.alertId/);
+  await assert.rejects(() => handleAlertsDeliverJob({ alertId: "   " }, deps), /payload\.alertId/);
   await assert.rejects(
     () => handleAlertsDeliverJob({} as { alertId: string }, deps),
     /payload\.alertId/,

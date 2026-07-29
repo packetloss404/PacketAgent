@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readActivationStatus } from "../api";
-import { InMemoryActivationMilestoneRepository, InMemoryActivationSignalRepository, InMemoryActivationStatusReadModelRepository } from "../repositories";
+import {
+  InMemoryActivationMilestoneRepository,
+  InMemoryActivationSignalRepository,
+  InMemoryActivationStatusReadModelRepository,
+} from "../repositories";
 import { deriveActivationStatus } from "../service";
 import { emptySnapshot, subject } from "./fixtures";
 

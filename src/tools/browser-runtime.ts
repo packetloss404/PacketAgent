@@ -2,7 +2,10 @@ import { mkdirSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 
 export interface BrowserPage {
-  goto(url: string, opts?: { waitUntil?: "load" | "domcontentloaded" | "networkidle" }): Promise<void>;
+  goto(
+    url: string,
+    opts?: { waitUntil?: "load" | "domcontentloaded" | "networkidle" },
+  ): Promise<void>;
   click(selector: string): Promise<void>;
   fill(selector: string, value: string): Promise<void>;
   textContent(selector: string): Promise<string | null>;
@@ -81,7 +84,9 @@ export async function getBrowserDriver(): Promise<BrowserDriver | null> {
 
 const sessionByRun = new Map<string, { context: BrowserContext; page: BrowserPage }>();
 
-export async function getOrCreateBrowserSession(runId: string): Promise<{ context: BrowserContext; page: BrowserPage } | null> {
+export async function getOrCreateBrowserSession(
+  runId: string,
+): Promise<{ context: BrowserContext; page: BrowserPage } | null> {
   const existing = sessionByRun.get(runId);
   if (existing) return existing;
   const driver = await getBrowserDriver();
@@ -97,14 +102,22 @@ export async function closeBrowserSession(runId: string): Promise<void> {
   const session = sessionByRun.get(runId);
   if (!session) return;
   sessionByRun.delete(runId);
-  try { await session.context.close(); } catch { /* ignore */ }
+  try {
+    await session.context.close();
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function shutdownAllBrowserSessions(): Promise<void> {
   const ids = [...sessionByRun.keys()];
   await Promise.all(ids.map(closeBrowserSession));
   if (cachedDriver) {
-    try { await cachedDriver.shutdown(); } catch { /* ignore */ }
+    try {
+      await cachedDriver.shutdown();
+    } catch {
+      /* ignore */
+    }
     cachedDriver = null;
   }
 }

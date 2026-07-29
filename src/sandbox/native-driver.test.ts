@@ -23,7 +23,9 @@ test("native driver runs `echo hello` and reports exit 0 with stdout", async () 
         else stderrChunks.push(chunk.data);
       },
       (event) => {
-        const out: { exitCode: number | null; errorMessage?: string } = { exitCode: event.exitCode };
+        const out: { exitCode: number | null; errorMessage?: string } = {
+          exitCode: event.exitCode,
+        };
         if (event.errorMessage) out.errorMessage = event.errorMessage;
         resolve(out);
       },
@@ -38,7 +40,10 @@ test("native driver runs `echo hello` and reports exit 0 with stdout", async () 
   // surrounding quotes depending on how the shell echoes the literal. Just
   // assert that the literal "hello" appears somewhere on stdout.
   const stdout = stdoutChunks.join("");
-  assert.ok(stdout.includes("hello"), `expected stdout to contain "hello", got ${JSON.stringify(stdout)}`);
+  assert.ok(
+    stdout.includes("hello"),
+    `expected stdout to contain "hello", got ${JSON.stringify(stdout)}`,
+  );
   assert.equal(stderrChunks.join(""), "");
 });
 
@@ -53,15 +58,20 @@ test("native driver kill on cancel terminates the child", async () => {
     timeoutMs: 60_000,
   });
 
-  const exitPromise = new Promise<{ exitCode: number | null; errorMessage?: string; signal: NodeJS.Signals | null }>((resolve) => {
+  const exitPromise = new Promise<{
+    exitCode: number | null;
+    errorMessage?: string;
+    signal: NodeJS.Signals | null;
+  }>((resolve) => {
     driver.subscribe(
       handle,
       () => {},
-      (event) => resolve({
-        exitCode: event.exitCode,
-        signal: event.signal ?? null,
-        ...(event.errorMessage ? { errorMessage: event.errorMessage } : {}),
-      }),
+      (event) =>
+        resolve({
+          exitCode: event.exitCode,
+          signal: event.signal ?? null,
+          ...(event.errorMessage ? { errorMessage: event.errorMessage } : {}),
+        }),
     );
   });
 

@@ -22,7 +22,10 @@ test("rejects commands not on the allowlist", async () => {
 });
 
 test("rejects cwd outside allowlist", async () => {
-  const tool = createSandboxedShellTool({ allowedCommands: ["echo"], cwdAllowlist: [process.cwd()] });
+  const tool = createSandboxedShellTool({
+    allowedCommands: ["echo"],
+    cwdAllowlist: [process.cwd()],
+  });
   const record = await executeTool({
     tool,
     input: { command: "echo", args: ["hi"], cwd: "/etc" },
@@ -60,9 +63,10 @@ test("kills a long-running command via timeout", async () => {
   const dir = makeTempDir();
   try {
     const cmd = process.platform === "win32" ? "cmd" : "node";
-    const args = process.platform === "win32"
-      ? ["/c", "ping", "-n", "10", "127.0.0.1"]
-      : ["-e", "setInterval(()=>{},1000)"];
+    const args =
+      process.platform === "win32"
+        ? ["/c", "ping", "-n", "10", "127.0.0.1"]
+        : ["-e", "setInterval(()=>{},1000)"];
     const tool = createSandboxedShellTool({
       allowedCommands: [cmd],
       cwdAllowlist: [dir],

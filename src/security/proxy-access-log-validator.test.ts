@@ -32,7 +32,9 @@ test("share path with raw token flags", () => {
 });
 
 test("public webhook path with whk token flags", () => {
-  const result = validateAccessLogContent("POST /api/public/webhooks/agents/whk_secret_value HTTP/1.1");
+  const result = validateAccessLogContent(
+    "POST /api/public/webhooks/agents/whk_secret_value HTTP/1.1",
+  );
   const webhook = result.violations.find((v) => v.pattern === "public-webhook-path");
   assert.ok(webhook);
   assert.ok(webhook.snippet.includes("whk_"));
@@ -41,7 +43,9 @@ test("public webhook path with whk token flags", () => {
 });
 
 test("invitation accept path flags", () => {
-  const result = validateAccessLogContent("POST /api/app/invitations/inv_raw_token_value/accept HTTP/1.1");
+  const result = validateAccessLogContent(
+    "POST /api/app/invitations/inv_raw_token_value/accept HTTP/1.1",
+  );
   const invitation = result.violations.find((v) => v.pattern === "invitation-accept-path");
   assert.ok(invitation);
   assert.ok(invitation.snippet.includes("inv_raw_token_value"));
@@ -96,7 +100,10 @@ test("each violation has a non-empty pattern and a snippet within 80 chars", () 
 test("runValidatorCli returns 0 for a clean file", async () => {
   const dir = mkdtempSync(join(tmpdir(), "packetagent-validator-"));
   const file = join(dir, "clean.log");
-  writeFileSync(file, '{"ts":"2026-04-26T00:00:00Z","method":"GET","status":200,"path":"/api/health"}\n');
+  writeFileSync(
+    file,
+    '{"ts":"2026-04-26T00:00:00Z","method":"GET","status":200,"path":"/api/health"}\n',
+  );
   const originalLog = console.log;
   const originalError = console.error;
   console.log = () => {};

@@ -10,7 +10,7 @@ function makeStore(records: AlertEventRecord[] = []): PacketAgentData {
 
 function makeStoreDeps(data: PacketAgentData) {
   return {
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
 }
 
@@ -26,7 +26,9 @@ function makeEvent(overrides: Partial<AlertEvent> & { id: string }): AlertEvent 
   };
 }
 
-function makeRecord(overrides: Partial<AlertEventRecord> & { id: string; observedAt: string }): AlertEventRecord {
+function makeRecord(
+  overrides: Partial<AlertEventRecord> & { id: string; observedAt: string },
+): AlertEventRecord {
   return {
     id: overrides.id,
     ruleId: overrides.ruleId ?? "subsystem-degraded",
@@ -111,9 +113,7 @@ test("recordAlerts with retentionDays prunes older rows", () => {
 });
 
 test("recordAlerts with retentionDays=0 disables pruning", () => {
-  const data = makeStore([
-    makeRecord({ id: "ancient", observedAt: "2020-01-01T00:00:00.000Z" }),
-  ]);
+  const data = makeStore([makeRecord({ id: "ancient", observedAt: "2020-01-01T00:00:00.000Z" })]);
   const events: AlertEvent[] = [makeEvent({ id: "new", observedAt: "2026-04-26T11:00:00.000Z" })];
 
   const result = recordAlerts(
@@ -137,7 +137,10 @@ test("listAlerts returns descending by observedAt", () => {
   ]);
 
   const result = listAlerts({}, { loadStore: () => data });
-  assert.deepEqual(result.map((entry) => entry.id), ["c", "b", "a"]);
+  assert.deepEqual(
+    result.map((entry) => entry.id),
+    ["c", "b", "a"],
+  );
 });
 
 test("listAlerts filters by severity", () => {
@@ -148,7 +151,10 @@ test("listAlerts filters by severity", () => {
   ]);
 
   const result = listAlerts({ severity: "critical" }, { loadStore: () => data });
-  assert.deepEqual(result.map((entry) => entry.id), ["crit_1"]);
+  assert.deepEqual(
+    result.map((entry) => entry.id),
+    ["crit_1"],
+  );
 });
 
 test("listAlerts filters by since and until", () => {
@@ -158,17 +164,32 @@ test("listAlerts filters by since and until", () => {
     makeRecord({ id: "new", observedAt: "2026-04-25T00:00:00.000Z" }),
   ]);
 
-  const sinceFiltered = listAlerts({ since: "2026-04-21T00:00:00.000Z" }, { loadStore: () => data });
-  assert.deepEqual(sinceFiltered.map((entry) => entry.id), ["new", "mid"]);
+  const sinceFiltered = listAlerts(
+    { since: "2026-04-21T00:00:00.000Z" },
+    { loadStore: () => data },
+  );
+  assert.deepEqual(
+    sinceFiltered.map((entry) => entry.id),
+    ["new", "mid"],
+  );
 
-  const untilFiltered = listAlerts({ until: "2026-04-23T00:00:00.000Z" }, { loadStore: () => data });
-  assert.deepEqual(untilFiltered.map((entry) => entry.id), ["mid", "old"]);
+  const untilFiltered = listAlerts(
+    { until: "2026-04-23T00:00:00.000Z" },
+    { loadStore: () => data },
+  );
+  assert.deepEqual(
+    untilFiltered.map((entry) => entry.id),
+    ["mid", "old"],
+  );
 
   const ranged = listAlerts(
     { since: "2026-04-21T00:00:00.000Z", until: "2026-04-23T00:00:00.000Z" },
     { loadStore: () => data },
   );
-  assert.deepEqual(ranged.map((entry) => entry.id), ["mid"]);
+  assert.deepEqual(
+    ranged.map((entry) => entry.id),
+    ["mid"],
+  );
 });
 
 test("listAlerts honors limit defaulting to 100 and capping at 500", () => {
@@ -192,9 +213,7 @@ test("listAlerts honors limit defaulting to 100 and capping at 500", () => {
 });
 
 test("updateAlertDeliveryStatus returns null for unknown alertId", () => {
-  const data = makeStore([
-    makeRecord({ id: "evt_a", observedAt: "2026-04-26T12:00:00.000Z" }),
-  ]);
+  const data = makeStore([makeRecord({ id: "evt_a", observedAt: "2026-04-26T12:00:00.000Z" })]);
   const result = updateAlertDeliveryStatus(
     {
       alertId: "missing",

@@ -3,7 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import type { ProviderCallRecord, PacketAgentData } from "../packetagent-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  mutateStore as defaultMutateStore,
+} from "../packetagent-store.js";
 
 const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
@@ -57,7 +60,9 @@ export function createAsyncProviderCallsRepository(
 ): AsyncProviderCallsRepository {
   if (deps.repository) return asyncProviderCallsRepositoryFromSync(deps.repository);
   if (process.env.PACKETAGENT_STORE === "sqlite") {
-    return asyncProviderCallsRepositoryFromSync(sqliteProviderCallsRepository({ dbPath: deps.dbPath }));
+    return asyncProviderCallsRepositoryFromSync(
+      sqliteProviderCallsRepository({ dbPath: deps.dbPath }),
+    );
   }
   return asyncJsonProviderCallsRepository(deps);
 }
@@ -241,14 +246,18 @@ export function sqliteProviderCallsRepository(
     pruneRetainLatest(maxRows) {
       const db = openDatabase(dbPath);
       try {
-        const result = db.prepare(`
+        const result = db
+          .prepare(
+            `
           delete from provider_calls
           where id not in (
             select id from provider_calls
             order by completed_at desc, id desc
             limit ?
           )
-        `).run(normalizeMaxRows(maxRows));
+        `,
+          )
+          .run(normalizeMaxRows(maxRows));
         return Number(result.changes ?? 0);
       } finally {
         db.close();
@@ -358,9 +367,10 @@ function applySinceAndLimit(
   since: string | undefined,
   limit: number | undefined,
 ): ProviderCallRecord[] {
-  const filtered = since === undefined
-    ? records
-    : records.filter((entry) => Date.parse(entry.completedAt) >= Date.parse(since));
+  const filtered =
+    since === undefined
+      ? records
+      : records.filter((entry) => Date.parse(entry.completedAt) >= Date.parse(since));
   return isPositiveLimit(limit) ? filtered.slice(0, limit) : filtered;
 }
 
@@ -401,9 +411,13 @@ function applyMigrations(db: DatabaseSync): void {
   db.exec(
     "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
   );
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;
     const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");

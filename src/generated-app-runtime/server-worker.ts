@@ -18,7 +18,10 @@ let runtime: ReturnType<typeof openGeneratedAppSqliteRuntime> | null = null;
 let server: ReturnType<typeof createServer> | null = null;
 
 start().catch((error) => {
-  sendParentMessage({ type: "error", error: error instanceof Error ? error.message : String(error) });
+  sendParentMessage({
+    type: "error",
+    error: error instanceof Error ? error.message : String(error),
+  });
   shutdown().finally(() => process.exit(1));
 });
 
@@ -32,7 +35,8 @@ async function start(): Promise<void> {
     try {
       await handleRequest(request, response);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "generated app runtime request failed";
+      const message =
+        error instanceof Error ? error.message : "generated app runtime request failed";
       writeJson(response, 500, { error: message });
     }
   });
@@ -58,7 +62,9 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
   writeJson(response, result.status, result.body);
 }
 
-async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown> | undefined> {
+async function readJsonBody(
+  request: IncomingMessage,
+): Promise<Record<string, unknown> | undefined> {
   const method = (request.method ?? "GET").toUpperCase();
   if (method === "GET" || method === "HEAD") return undefined;
   const contentType = request.headers["content-type"] ?? "";
@@ -69,13 +75,14 @@ async function readJsonBody(request: IncomingMessage): Promise<Record<string, un
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.byteLength;
-    if (size > MAX_REQUEST_BYTES) throw new Error("generated app runtime request body is too large");
+    if (size > MAX_REQUEST_BYTES)
+      throw new Error("generated app runtime request body is too large");
     chunks.push(buffer);
   }
   if (chunks.length === 0) return undefined;
   const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
   return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
+    ? (parsed as Record<string, unknown>)
     : undefined;
 }
 

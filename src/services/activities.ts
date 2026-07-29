@@ -12,11 +12,7 @@ import {
   type WorkflowConcernRecord,
   type PacketAgentData,
 } from "../packetagent-store";
-import {
-  type AuthenticatedContext,
-  httpError,
-  redactActivity,
-} from "./context.js";
+import { type AuthenticatedContext, httpError, redactActivity } from "./context.js";
 
 export function listWorkspaceActivities(context: AuthenticatedContext) {
   return workspaceActivitiesFromData(loadStore(), context.workspace.id, 50).map(redactActivity);
@@ -32,13 +28,22 @@ export function getWorkspaceActivityDetail(context: AuthenticatedContext, activi
   return getWorkspaceActivityDetailFromData(data, context, activityId);
 }
 
-export async function getWorkspaceActivityDetailAsync(context: AuthenticatedContext, activityId: string) {
+export async function getWorkspaceActivityDetailAsync(
+  context: AuthenticatedContext,
+  activityId: string,
+) {
   const data = await loadStoreAsync();
   return getWorkspaceActivityDetailFromData(data, context, activityId);
 }
 
-function getWorkspaceActivityDetailFromData(data: PacketAgentData, context: AuthenticatedContext, activityId: string) {
-  const activities = workspaceActivitiesFromData(data, context.workspace.id, 50).map(redactActivity);
+function getWorkspaceActivityDetailFromData(
+  data: PacketAgentData,
+  context: AuthenticatedContext,
+  activityId: string,
+) {
+  const activities = workspaceActivitiesFromData(data, context.workspace.id, 50).map(
+    redactActivity,
+  );
   const index = activities.findIndex((entry) => entry.id === activityId);
   if (index === -1) throw httpError(404, "activity not found");
 
@@ -95,28 +100,60 @@ function buildActivityRelatedContext(
   const evidenceId = stringDataValue(activity.data, "evidenceId");
   const releaseId = stringDataValue(activity.data, "releaseId");
 
-  const agent = agentId ? data.agents.find((entry) => entry.workspaceId === workspaceId && entry.id === agentId) : undefined;
+  const agent = agentId
+    ? data.agents.find((entry) => entry.workspaceId === workspaceId && entry.id === agentId)
+    : undefined;
   if (agent) related.agent = summarizeAgent(agent);
 
-  const run = runId ? data.agentRuns.find((entry) => entry.workspaceId === workspaceId && entry.id === runId) : undefined;
+  const run = runId
+    ? data.agentRuns.find((entry) => entry.workspaceId === workspaceId && entry.id === runId)
+    : undefined;
   if (run) related.run = summarizeAgentRun(run);
 
-  const blocker = blockerId ? data.workflowConcerns.find((entry) => entry.workspaceId === workspaceId && entry.id === blockerId && entry.kind === "blocker") : undefined;
+  const blocker = blockerId
+    ? data.workflowConcerns.find(
+        (entry) =>
+          entry.workspaceId === workspaceId && entry.id === blockerId && entry.kind === "blocker",
+      )
+    : undefined;
   if (blocker) related.blocker = summarizeWorkflowConcern(blocker);
 
-  const question = questionId ? data.workflowConcerns.find((entry) => entry.workspaceId === workspaceId && entry.id === questionId && entry.kind === "open_question") : undefined;
+  const question = questionId
+    ? data.workflowConcerns.find(
+        (entry) =>
+          entry.workspaceId === workspaceId &&
+          entry.id === questionId &&
+          entry.kind === "open_question",
+      )
+    : undefined;
   if (question) related.question = summarizeWorkflowConcern(question);
 
-  const planItem = planItemId ? data.implementationPlanItems.find((entry) => entry.workspaceId === workspaceId && entry.id === planItemId) : undefined;
+  const planItem = planItemId
+    ? data.implementationPlanItems.find(
+        (entry) => entry.workspaceId === workspaceId && entry.id === planItemId,
+      )
+    : undefined;
   if (planItem) related.planItem = summarizePlanItem(planItem);
 
-  const requirement = requirementId ? data.requirements.find((entry) => entry.workspaceId === workspaceId && entry.id === requirementId) : undefined;
+  const requirement = requirementId
+    ? data.requirements.find(
+        (entry) => entry.workspaceId === workspaceId && entry.id === requirementId,
+      )
+    : undefined;
   if (requirement) related.requirement = summarizeRequirement(requirement);
 
-  const evidence = evidenceId ? data.validationEvidence.find((entry) => entry.workspaceId === workspaceId && entry.id === evidenceId) : undefined;
+  const evidence = evidenceId
+    ? data.validationEvidence.find(
+        (entry) => entry.workspaceId === workspaceId && entry.id === evidenceId,
+      )
+    : undefined;
   if (evidence) related.evidence = summarizeValidationEvidence(evidence);
 
-  const release = releaseId ? listReleaseConfirmationsForWorkspace(data, workspaceId).find((entry) => entry.id === releaseId || entry.workspaceId === releaseId) : undefined;
+  const release = releaseId
+    ? listReleaseConfirmationsForWorkspace(data, workspaceId).find(
+        (entry) => entry.id === releaseId || entry.workspaceId === releaseId,
+      )
+    : undefined;
   if (release) related.release = summarizeReleaseConfirmation(release);
 
   const workflow = {

@@ -60,7 +60,10 @@ test("listAlerts delegates through repository and preserves descending observedA
 
   const result = listAlerts({}, { loadStore: () => data });
 
-  assert.deepEqual(result.map((entry) => entry.id), ["c", "b", "a"]);
+  assert.deepEqual(
+    result.map((entry) => entry.id),
+    ["c", "b", "a"],
+  );
 });
 
 test("listAlerts preserves severity/since/until filtering through the repository", () => {
@@ -72,19 +75,28 @@ test("listAlerts preserves severity/since/until filtering through the repository
   ]);
 
   const bySeverity = listAlerts({ severity: "warning" }, { loadStore: () => data });
-  assert.deepEqual(bySeverity.map((entry) => entry.id), ["warn_new", "warn_mid", "warn_old"]);
+  assert.deepEqual(
+    bySeverity.map((entry) => entry.id),
+    ["warn_new", "warn_mid", "warn_old"],
+  );
 
   const sinceFiltered = listAlerts(
     { severity: "warning", since: "2026-04-21T00:00:00.000Z" },
     { loadStore: () => data },
   );
-  assert.deepEqual(sinceFiltered.map((entry) => entry.id), ["warn_new", "warn_mid"]);
+  assert.deepEqual(
+    sinceFiltered.map((entry) => entry.id),
+    ["warn_new", "warn_mid"],
+  );
 
   const untilFiltered = listAlerts(
     { severity: "warning", until: "2026-04-23T00:00:00.000Z" },
     { loadStore: () => data },
   );
-  assert.deepEqual(untilFiltered.map((entry) => entry.id), ["warn_mid", "warn_old"]);
+  assert.deepEqual(
+    untilFiltered.map((entry) => entry.id),
+    ["warn_mid", "warn_old"],
+  );
 
   const ranged = listAlerts(
     { since: "2026-04-21T00:00:00.000Z", until: "2026-04-23T00:00:00.000Z" },
@@ -130,7 +142,10 @@ test("listAlerts can be backed directly by an injected repository instance", () 
   const viaInjectedRepository = repository.list({});
   const viaListFunction = listAlerts({}, { loadStore: () => data });
 
-  assert.deepEqual(viaInjectedRepository.map((entry) => entry.id), ["second", "first"]);
+  assert.deepEqual(
+    viaInjectedRepository.map((entry) => entry.id),
+    ["second", "first"],
+  );
   assert.deepEqual(
     viaListFunction.map((entry) => entry.id),
     viaInjectedRepository.map((entry) => entry.id),
@@ -150,9 +165,15 @@ test("listAlerts reads from the SQLite repository when PACKETAGENT_STORE=sqlite"
     assert.equal(seedingRepo.count(), 3);
 
     const descending = listAlerts();
-    assert.deepEqual(descending.map((entry) => entry.id), ["sqlite_c", "sqlite_b", "sqlite_a"]);
+    assert.deepEqual(
+      descending.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_b", "sqlite_a"],
+    );
 
     const filtered = listAlerts({ severity: "warning" });
-    assert.deepEqual(filtered.map((entry) => entry.id), ["sqlite_c", "sqlite_a"]);
+    assert.deepEqual(
+      filtered.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_a"],
+    );
   });
 });

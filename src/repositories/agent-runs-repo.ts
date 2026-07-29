@@ -11,7 +11,10 @@ import type {
   AgentTriggerKind,
   PacketAgentData,
 } from "../packetagent-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  mutateStore as defaultMutateStore,
+} from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
@@ -49,9 +52,7 @@ export interface AsyncAgentRunsRepositoryDeps {
   dbPath?: string;
 }
 
-export function createAgentRunsRepository(
-  deps: AgentRunsRepositoryDeps = {},
-): AgentRunsRepository {
+export function createAgentRunsRepository(deps: AgentRunsRepositoryDeps = {}): AgentRunsRepository {
   if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteAgentRunsRepository(deps);
   return jsonAgentRunsRepository(deps);
 }
@@ -88,9 +89,7 @@ export function asyncAgentRunsRepositoryFromSync(
   };
 }
 
-export function jsonAgentRunsRepository(
-  deps: AgentRunsRepositoryDeps = {},
-): AgentRunsRepository {
+export function jsonAgentRunsRepository(deps: AgentRunsRepositoryDeps = {}): AgentRunsRepository {
   const load = deps.loadStore ?? defaultLoadStore;
   const mutate = deps.mutateStore ?? defaultMutateStore;
   return {
@@ -111,7 +110,9 @@ export function jsonAgentRunsRepository(
     find(workspaceId, runId) {
       const data = load();
       const collection = Array.isArray(data.agentRuns) ? data.agentRuns : [];
-      return collection.find((entry) => entry.workspaceId === workspaceId && entry.id === runId) ?? null;
+      return (
+        collection.find((entry) => entry.workspaceId === workspaceId && entry.id === runId) ?? null
+      );
     },
     upsert(record) {
       mutate((data) => {
@@ -155,7 +156,9 @@ export function asyncJsonAgentRunsRepository(
     async find(workspaceId, runId) {
       const data = await load();
       const collection = Array.isArray(data.agentRuns) ? data.agentRuns : [];
-      return collection.find((entry) => entry.workspaceId === workspaceId && entry.id === runId) ?? null;
+      return (
+        collection.find((entry) => entry.workspaceId === workspaceId && entry.id === runId) ?? null
+      );
     },
     async upsert(record) {
       await mutate((data) => {
@@ -176,9 +179,7 @@ export function asyncJsonAgentRunsRepository(
   };
 }
 
-export function sqliteAgentRunsRepository(
-  deps: AgentRunsRepositoryDeps = {},
-): AgentRunsRepository {
+export function sqliteAgentRunsRepository(deps: AgentRunsRepositoryDeps = {}): AgentRunsRepository {
   const dbPath = resolveDbPath(deps.dbPath);
   return {
     list(workspaceId, limit) {
@@ -223,14 +224,16 @@ export function sqliteAgentRunsRepository(
     upsert(record) {
       const db = openDatabase(dbPath);
       try {
-        db.prepare(`
+        db.prepare(
+          `
           insert or replace into agent_runs (
             id, workspace_id, agent_id, title, status, trigger_kind,
             started_at, completed_at, inputs, output, error,
             logs, tool_calls, transcript, model_used, cost_usd,
             created_at, updated_at
           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
+        `,
+        ).run(
           record.id,
           record.workspaceId,
           record.agentId ?? null,
@@ -369,9 +372,13 @@ function applyMigrations(db: DatabaseSync): void {
   db.exec(
     "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
   );
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;
     const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");

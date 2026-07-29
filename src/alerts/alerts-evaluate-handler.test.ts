@@ -19,7 +19,9 @@ function makeStore(jobs: JobRecord[] = []): PacketAgentData {
   return { jobs: [...jobs] } as unknown as PacketAgentData;
 }
 
-function makeJob(overrides: Partial<JobRecord> & { id: string; type: string; status: JobRecord["status"] }): JobRecord {
+function makeJob(
+  overrides: Partial<JobRecord> & { id: string; type: string; status: JobRecord["status"] },
+): JobRecord {
   return {
     id: overrides.id,
     workspaceId: overrides.workspaceId ?? "__system__",
@@ -62,14 +64,16 @@ interface RecordCall {
   options: { retentionDays?: number } | undefined;
 }
 
-function makeDeps(overrides: {
-  events?: AlertEvent[];
-  config?: AlertWebhookConfig | null;
-  deliverResult?: DeliverAlertWebhookResult;
-  metrics?: JobTypeMetrics[];
-  health?: OperationsHealthReport;
-  env?: NodeJS.ProcessEnv;
-} = {}): {
+function makeDeps(
+  overrides: {
+    events?: AlertEvent[];
+    config?: AlertWebhookConfig | null;
+    deliverResult?: DeliverAlertWebhookResult;
+    metrics?: JobTypeMetrics[];
+    health?: OperationsHealthReport;
+    env?: NodeJS.ProcessEnv;
+  } = {},
+): {
   deps: AlertsEvaluateHandlerDeps;
   evaluateCalls: EvaluateAlertsInput[];
   deliverCalls: Array<{ config: AlertWebhookConfig; events: AlertEvent[] }>;
@@ -152,7 +156,9 @@ function captureWarn(): { restore: () => void; calls: unknown[][] } {
 }
 
 test("handleAlertsEvaluateJob with no events skips delivery and records nothing extra", async () => {
-  const { deps, evaluateCalls, deliverCalls, recordCalls, enqueueDeliverCalls } = makeDeps({ events: [] });
+  const { deps, evaluateCalls, deliverCalls, recordCalls, enqueueDeliverCalls } = makeDeps({
+    events: [],
+  });
   const result = await handleAlertsEvaluateJob({}, deps);
 
   assert.equal(evaluateCalls.length, 1);
@@ -216,10 +222,7 @@ test("handleAlertsEvaluateJob records delivery failure when webhook returns ok=f
 });
 
 test("handleAlertsEvaluateJob enqueues a deliver retry job for each undelivered event when delivery fails", async () => {
-  const events = [
-    makeEvent({ id: "evt_1" }),
-    makeEvent({ id: "evt_2", severity: "critical" }),
-  ];
+  const events = [makeEvent({ id: "evt_1" }), makeEvent({ id: "evt_2", severity: "critical" })];
   const config: AlertWebhookConfig = {
     url: "https://example.com/hook",
     secretHeader: "x-packetagent-alert-secret",
@@ -326,7 +329,10 @@ test("handleAlertsEvaluateJob honors workspace env override on retry jobs", asyn
 
 test("handleAlertsEvaluateJob with events but null webhook config persists with informational error", async () => {
   const events = [makeEvent({ id: "evt_1" })];
-  const { deps, deliverCalls, recordCalls, enqueueDeliverCalls } = makeDeps({ events, config: null });
+  const { deps, deliverCalls, recordCalls, enqueueDeliverCalls } = makeDeps({
+    events,
+    config: null,
+  });
   const result = await handleAlertsEvaluateJob({}, deps);
 
   assert.equal(deliverCalls.length, 0);
@@ -415,7 +421,10 @@ test("ensureAlertsCronJob returns skipped and warns when cron is invalid", () =>
     assert.equal(enqueueCalls.length, 0);
     assert.equal(warn.calls.length, 1);
     const message = String(warn.calls[0][0]);
-    assert.ok(message.includes("alerts.evaluate"), `expected warning to mention alerts.evaluate, got: ${message}`);
+    assert.ok(
+      message.includes("alerts.evaluate"),
+      `expected warning to mention alerts.evaluate, got: ${message}`,
+    );
   } finally {
     warn.restore();
   }

@@ -46,7 +46,10 @@ function captureFetch(response: () => Response): {
   return { fetchFn, captured };
 }
 
-function jsonResponse(body: unknown, init: { status?: number; headers?: Record<string, string> } = {}): Response {
+function jsonResponse(
+  body: unknown,
+  init: { status?: number; headers?: Record<string, string> } = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status: init.status ?? 200,
     headers: { "content-type": "application/json", ...(init.headers ?? {}) },
@@ -286,7 +289,11 @@ test("registerDefaultProviders skips gemini when no GOOGLE_API_KEY / GEMINI_API_
     resetRegisteredProvidersForTests();
     registerDefaultProviders();
     const router = getDefaultRouter();
-    assert.equal(router.has("gemini"), false, "gemini should NOT be registered when env keys are absent");
+    assert.equal(
+      router.has("gemini"),
+      false,
+      "gemini should NOT be registered when env keys are absent",
+    );
     assert.equal(readGeminiEnvKey(), undefined);
   } finally {
     if (originalGoogle !== undefined) process.env.GOOGLE_API_KEY = originalGoogle;
@@ -306,7 +313,11 @@ test("registerDefaultProviders registers gemini when GOOGLE_API_KEY is set", () 
     resetRegisteredProvidersForTests();
     registerDefaultProviders();
     const router = getDefaultRouter();
-    assert.equal(router.has("gemini"), true, "gemini should be registered when GOOGLE_API_KEY is set");
+    assert.equal(
+      router.has("gemini"),
+      true,
+      "gemini should be registered when GOOGLE_API_KEY is set",
+    );
   } finally {
     if (originalGoogle === undefined) delete process.env.GOOGLE_API_KEY;
     else process.env.GOOGLE_API_KEY = originalGoogle;

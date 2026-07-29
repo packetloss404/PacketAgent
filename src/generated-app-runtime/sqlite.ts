@@ -44,9 +44,13 @@ const VERSION_TABLE = "__schema_version";
 const RECORDS_TABLE = "generated_records";
 const SCHEMA_SIGNATURE_KEY = "schema_signature";
 
-export function resolveGeneratedAppRuntimeDatabasePath(input: GeneratedAppRuntimeDatabasePathInput): string {
+export function resolveGeneratedAppRuntimeDatabasePath(
+  input: GeneratedAppRuntimeDatabasePathInput,
+): string {
   const rootDir = path.resolve(input.rootDir ?? process.cwd());
-  const runtimeRoot = path.resolve(input.runtimeRoot ?? path.join(rootDir, "data", "generated-app-runtimes"));
+  const runtimeRoot = path.resolve(
+    input.runtimeRoot ?? path.join(rootDir, "data", "generated-app-runtimes"),
+  );
   const workspaceSegment = safePathSegment(input.workspaceId, "workspace");
   const appSegment = safePathSegment(input.appId, "app");
   const dbPath = path.resolve(runtimeRoot, workspaceSegment, appSegment, "runtime.sqlite");
@@ -54,7 +58,9 @@ export function resolveGeneratedAppRuntimeDatabasePath(input: GeneratedAppRuntim
   return dbPath;
 }
 
-export function openGeneratedAppSqliteRuntime(input: GeneratedAppSqliteRuntimeInput): GeneratedAppSqliteRuntime {
+export function openGeneratedAppSqliteRuntime(
+  input: GeneratedAppSqliteRuntimeInput,
+): GeneratedAppSqliteRuntime {
   const dbPath = input.dbPath ?? resolveGeneratedAppRuntimeDatabasePath(input);
   mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
@@ -119,7 +125,9 @@ export class GeneratedAppSqliteRuntime {
       return;
     }
 
-    const row = this.db.prepare(`SELECT COUNT(*) AS count FROM ${RECORDS_TABLE}`).get() as { count: number } | undefined;
+    const row = this.db.prepare(`SELECT COUNT(*) AS count FROM ${RECORDS_TABLE}`).get() as
+      | { count: number }
+      | undefined;
     if ((row?.count ?? 0) === 0) this.seedInitialData();
   }
 
@@ -138,7 +146,8 @@ export class GeneratedAppSqliteRuntime {
     }
 
     if (method === "POST") return this.createRecord(entity, cleanBody(request.body));
-    if ((method === "PATCH" || method === "PUT") && id) return this.updateRecord(entity, id, cleanBody(request.body));
+    if ((method === "PATCH" || method === "PUT") && id)
+      return this.updateRecord(entity, id, cleanBody(request.body));
     if (method === "DELETE" && id) return this.archiveRecord(entity, id);
 
     return { status: 405, body: { error: "Unsupported generated API method." } };
@@ -151,34 +160,50 @@ export class GeneratedAppSqliteRuntime {
   private entityForPath(requestPath: string): RuntimeSchemaEntity | undefined {
     const normalizedPath = normalizeLookup(requestPath);
     if (!normalizedPath) {
-      return this.model.schema.find((entity) => entity.name === this.model.primaryEntity) ?? this.model.schema[0];
+      return (
+        this.model.schema.find((entity) => entity.name === this.model.primaryEntity) ??
+        this.model.schema[0]
+      );
     }
     return this.model.schema.find((entity) => {
       const normalizedEntity = normalizeLookup(entity.name);
-      return normalizedPath.includes(normalizedEntity) || normalizedPath.includes(`${normalizedEntity}s`);
+      return (
+        normalizedPath.includes(normalizedEntity) || normalizedPath.includes(`${normalizedEntity}s`)
+      );
     });
   }
 
   private listRecords(entity: RuntimeSchemaEntity): GeneratedRecord[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT id, body, archived, archived_at
       FROM ${RECORDS_TABLE}
       WHERE entity = ? AND archived = 0
       ORDER BY created_at ASC
-    `).all(entity.name) as unknown as RecordRow[];
+    `,
+      )
+      .all(entity.name) as unknown as RecordRow[];
     return rows.map(recordFromRow);
   }
 
   private findRecord(entity: RuntimeSchemaEntity, id: string): GeneratedRecord | null {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT id, body, archived, archived_at
       FROM ${RECORDS_TABLE}
       WHERE entity = ? AND id = ? AND archived = 0
-    `).get(entity.name, id) as RecordRow | undefined;
+    `,
+      )
+      .get(entity.name, id) as RecordRow | undefined;
     return row ? recordFromRow(row) : null;
   }
 
-  private createRecord(entity: RuntimeSchemaEntity, body: Record<string, unknown>): GeneratedAppRuntimeApiResult {
+  private createRecord(
+    entity: RuntimeSchemaEntity,
+    body: Record<string, unknown>,
+  ): GeneratedAppRuntimeApiResult {
     const missingFields = missingRequiredFields(entity, body);
     if (missingFields.length > 0) {
       return { status: 400, body: { error: "Missing required fields.", missingFields } };
@@ -189,7 +214,11 @@ export class GeneratedAppSqliteRuntime {
     return { status: 201, body: record };
   }
 
-  private updateRecord(entity: RuntimeSchemaEntity, id: string, body: Record<string, unknown>): GeneratedAppRuntimeApiResult {
+  private updateRecord(
+    entity: RuntimeSchemaEntity,
+    id: string,
+    body: Record<string, unknown>,
+  ): GeneratedAppRuntimeApiResult {
     const existing = this.findRecord(entity, id);
     if (!existing) return { status: 404, body: { error: "Record not found." } };
     const record = sanitizeRecord({ ...existing, ...body, id });
@@ -206,9 +235,17 @@ export class GeneratedAppSqliteRuntime {
     return { status: 200, body: { ok: true, archivedId: id } };
   }
 
-  private upsertRecord(entity: string, id: string, record: GeneratedRecord, archived: boolean, archivedAt: string | null): void {
+  private upsertRecord(
+    entity: string,
+    id: string,
+    record: GeneratedRecord,
+    archived: boolean,
+    archivedAt: string | null,
+  ): void {
     const now = new Date().toISOString();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO ${RECORDS_TABLE} (entity, id, body, archived, archived_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(entity, id) DO UPDATE SET
@@ -216,7 +253,9 @@ export class GeneratedAppSqliteRuntime {
         archived = excluded.archived,
         archived_at = excluded.archived_at,
         updated_at = excluded.updated_at
-    `).run(entity, id, JSON.stringify(record), archived ? 1 : 0, archivedAt, now, now);
+    `,
+      )
+      .run(entity, id, JSON.stringify(record), archived ? 1 : 0, archivedAt, now, now);
   }
 
   private seedInitialData(): void {
@@ -224,22 +263,34 @@ export class GeneratedAppSqliteRuntime {
       const records = this.model.seedData[entity.name] ?? [];
       for (const seed of records) {
         const id = String(seed.id ?? nextRecordId(entity.name));
-        this.upsertRecord(entity.name, id, sanitizeRecord({ id, ...seed, archived: false }), false, null);
+        this.upsertRecord(
+          entity.name,
+          id,
+          sanitizeRecord({ id, ...seed, archived: false }),
+          false,
+          null,
+        );
       }
     }
   }
 
   private getVersion(key: string): string | null {
-    const row = this.db.prepare(`SELECT value FROM ${VERSION_TABLE} WHERE key = ?`).get(key) as { value: string } | undefined;
+    const row = this.db.prepare(`SELECT value FROM ${VERSION_TABLE} WHERE key = ?`).get(key) as
+      | { value: string }
+      | undefined;
     return row?.value ?? null;
   }
 
   private setVersion(key: string, value: string): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO ${VERSION_TABLE} (key, value, updated_at)
       VALUES (?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-    `).run(key, value, new Date().toISOString());
+    `,
+      )
+      .run(key, value, new Date().toISOString());
   }
 }
 
@@ -251,7 +302,10 @@ function recordFromRow(row: RecordRow): GeneratedRecord {
   return { ...parsed, id: row.id };
 }
 
-function missingRequiredFields(entity: RuntimeSchemaEntity, body: Record<string, unknown>): string[] {
+function missingRequiredFields(
+  entity: RuntimeSchemaEntity,
+  body: Record<string, unknown>,
+): string[] {
   return entity.requiredFields
     .filter((field) => field !== "id")
     .filter((field) => body[field] === undefined || body[field] === null || body[field] === "");
@@ -266,11 +320,11 @@ function sanitizeRecord(record: Record<string, unknown>): GeneratedRecord {
   const out: GeneratedRecord = {};
   for (const [key, value] of Object.entries(record)) {
     if (
-      typeof value === "string"
-      || typeof value === "number"
-      || typeof value === "boolean"
-      || value === null
-      || value === undefined
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      value === null ||
+      value === undefined
     ) {
       out[key] = value;
     } else {
@@ -281,12 +335,14 @@ function sanitizeRecord(record: Record<string, unknown>): GeneratedRecord {
 }
 
 function recordIdForPath(requestPath: string, entity: RuntimeSchemaEntity): string | undefined {
-  const segments = requestPath.split("?")[0]?.split("#")[0]?.split("/").map(safeDecode).filter(Boolean) ?? [];
+  const segments =
+    requestPath.split("?")[0]?.split("#")[0]?.split("/").map(safeDecode).filter(Boolean) ?? [];
   const last = segments.at(-1);
   if (!last) return undefined;
   const normalizedLast = normalizeLookup(last);
   const normalizedEntity = normalizeLookup(entity.name);
-  if (normalizedLast === normalizedEntity || normalizedLast === `${normalizedEntity}s`) return undefined;
+  if (normalizedLast === normalizedEntity || normalizedLast === `${normalizedEntity}s`)
+    return undefined;
   return last;
 }
 
@@ -307,7 +363,11 @@ function safeDecode(value: string): string {
 }
 
 function safePathSegment(value: string, fallback: string): string {
-  const segment = value.trim().replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;
+  const segment =
+    value
+      .trim()
+      .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || fallback;
   if (segment === "." || segment === ".." || segment.includes("..")) {
     throw new Error(`unsafe generated app runtime path segment: ${value}`);
   }

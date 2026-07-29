@@ -47,9 +47,10 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     .filter((t): t is ToolDefinition => Boolean(t));
   const toolDefs = tools.map(toolDefForProvider);
   const router = getDefaultRouter();
-  const route = input.providerName && input.model
-    ? { provider: input.providerName, model: input.model }
-    : { ...router.resolve(input.routeKey), ...(input.model ? { model: input.model } : {}) };
+  const route =
+    input.providerName && input.model
+      ? { provider: input.providerName, model: input.model }
+      : { ...router.resolve(input.routeKey), ...(input.model ? { model: input.model } : {}) };
   if (route.provider !== "stub" && !router.has(route.provider)) {
     throw new Error(`provider "${route.provider}" is not registered for agent execution`);
   }
@@ -74,17 +75,23 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     }
 
     const callResult = await recordedCall(
-      { workspaceId: input.workspaceId, routeKey: input.routeKey, provider: route.provider, model: route.model },
-      () => router.call({
+      {
         workspaceId: input.workspaceId,
         routeKey: input.routeKey,
         provider: route.provider,
-        messages,
-        ...(toolDefs.length > 0 ? { tools: toolDefs } : {}),
         model: route.model,
-        ...(input.signal ? { signal: input.signal } : {}),
-        maxTokens: 2048,
-      }),
+      },
+      () =>
+        router.call({
+          workspaceId: input.workspaceId,
+          routeKey: input.routeKey,
+          provider: route.provider,
+          messages,
+          ...(toolDefs.length > 0 ? { tools: toolDefs } : {}),
+          model: route.model,
+          ...(input.signal ? { signal: input.signal } : {}),
+          maxTokens: 2048,
+        }),
     );
 
     modelUsed = callResult.model;
@@ -95,8 +102,19 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
       messages.push({ role: "assistant", content: callResult.content });
     }
 
-    if (callResult.finishReason !== "tool_use" || !callResult.toolCalls || callResult.toolCalls.length === 0) {
-      return { finalContent: callResult.content, toolCalls, modelUsed, costUsd: totalCost, turnsUsed, finishReason };
+    if (
+      callResult.finishReason !== "tool_use" ||
+      !callResult.toolCalls ||
+      callResult.toolCalls.length === 0
+    ) {
+      return {
+        finalContent: callResult.content,
+        toolCalls,
+        modelUsed,
+        costUsd: totalCost,
+        turnsUsed,
+        finishReason,
+      };
     }
 
     for (const toolCall of callResult.toolCalls) {
@@ -133,9 +151,10 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
         },
       });
       toolCalls.push({ ...record, id: toolCall.id });
-      const payload = record.status === "ok"
-        ? { result: record.output }
-        : { error: record.error, output: record.output };
+      const payload =
+        record.status === "ok"
+          ? { result: record.output }
+          : { error: record.error, output: record.output };
       messages.push({
         role: "tool",
         toolCallId: toolCall.id,

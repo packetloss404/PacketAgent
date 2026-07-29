@@ -14,7 +14,9 @@ function makeStore(jobs: JobRecord[] = []): PacketAgentData {
   return { jobs: [...jobs] } as unknown as PacketAgentData;
 }
 
-function makeJob(overrides: Partial<JobRecord> & { id: string; type: string; status: JobRecord["status"] }): JobRecord {
+function makeJob(
+  overrides: Partial<JobRecord> & { id: string; type: string; status: JobRecord["status"] },
+): JobRecord {
   return {
     id: overrides.id,
     workspaceId: overrides.workspaceId ?? "__system__",
@@ -164,7 +166,10 @@ test("ensureMetricsSnapshotCronJob returns skipped and warns when cron is invali
     assert.equal(enqueueCalls.length, 0);
     assert.equal(warn.calls.length, 1);
     const message = String(warn.calls[0][0]);
-    assert.ok(message.includes("metrics.snapshot"), `expected warning to mention metrics.snapshot, got: ${message}`);
+    assert.ok(
+      message.includes("metrics.snapshot"),
+      `expected warning to mention metrics.snapshot, got: ${message}`,
+    );
   } finally {
     warn.restore();
   }
@@ -233,7 +238,10 @@ test("ensureMetricsSnapshotCronJob enqueues with default workspaceId, retentionD
   assert.ok(call.scheduledAt, "scheduledAt should be set");
   const scheduledMs = Date.parse(call.scheduledAt!);
   const expectedAtLeast = nextAfter(cron, before).getTime();
-  assert.ok(scheduledMs >= expectedAtLeast, `scheduledAt ${call.scheduledAt} should be >= ${new Date(expectedAtLeast).toISOString()}`);
+  assert.ok(
+    scheduledMs >= expectedAtLeast,
+    `scheduledAt ${call.scheduledAt} should be >= ${new Date(expectedAtLeast).toISOString()}`,
+  );
   assert.ok(scheduledMs > Date.now(), "scheduledAt should be in the future");
 });
 
@@ -286,11 +294,20 @@ test("ensureMetricsSnapshotCronJob falls back to default retentionDays when env 
       loadStore: () => makeStore(),
       enqueue: (input) => {
         enqueueCalls.push(input);
-        return makeJob({ id: "new-fallback", type: input.type, status: "queued", cron: input.cron });
+        return makeJob({
+          id: "new-fallback",
+          type: input.type,
+          status: "queued",
+          cron: input.cron,
+        });
       },
     });
     assert.equal(enqueueCalls.length, 1, `expected enqueue for value=${JSON.stringify(value)}`);
-    assert.deepEqual(enqueueCalls[0].payload, { retentionDays: 30 }, `expected fallback for value=${JSON.stringify(value)}`);
+    assert.deepEqual(
+      enqueueCalls[0].payload,
+      { retentionDays: 30 },
+      `expected fallback for value=${JSON.stringify(value)}`,
+    );
   }
 });
 

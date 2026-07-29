@@ -10,17 +10,28 @@ import type {
 } from "./types.js";
 
 export function buildAuth(pages: PageDraft[]): AuthDraft {
-  const publicRoutes = pages.filter((entry) => entry.access === "public").map((entry) => entry.path);
-  const privateRoutes = pages.filter((entry) => entry.access === "private").map((entry) => entry.path);
+  const publicRoutes = pages
+    .filter((entry) => entry.access === "public")
+    .map((entry) => entry.path);
+  const privateRoutes = pages
+    .filter((entry) => entry.access === "private")
+    .map((entry) => entry.path);
   const adminRoutes = pages.filter((entry) => entry.access === "admin").map((entry) => entry.path);
 
   return {
     defaultPolicy: "authenticated-by-default",
     publicRoutes,
     privateRoutes,
-    roleRoutes: adminRoutes.length > 0
-      ? [{ role: "admin", routes: adminRoutes, reason: "Administration pages mutate shared configuration or customer access." }]
-      : [],
+    roleRoutes:
+      adminRoutes.length > 0
+        ? [
+            {
+              role: "admin",
+              routes: adminRoutes,
+              reason: "Administration pages mutate shared configuration or customer access.",
+            },
+          ]
+        : [],
     decisions: [
       "Only explicitly public pages can be viewed without a session.",
       "Private API routes require an authenticated workspace user.",
@@ -106,7 +117,9 @@ export function cloneEntities(entities: EntitySchemaDraft[]): EntitySchemaDraft[
   }));
 }
 
-export function cloneSeedData(seedData: Record<string, SeedRecord[]>): Record<string, SeedRecord[]> {
+export function cloneSeedData(
+  seedData: Record<string, SeedRecord[]>,
+): Record<string, SeedRecord[]> {
   return Object.fromEntries(
     Object.entries(seedData).map(([key, records]) => [
       key,
@@ -116,9 +129,13 @@ export function cloneSeedData(seedData: Record<string, SeedRecord[]>): Record<st
 }
 
 export function requiredFieldNames(entityDraft: EntitySchemaDraft): string[] {
-  return entityDraft.fields.filter((entry) => entry.required && entry.name !== "id").map((entry) => entry.name);
+  return entityDraft.fields
+    .filter((entry) => entry.required && entry.name !== "id")
+    .map((entry) => entry.name);
 }
 
 export function editableFieldNames(entityDraft: EntitySchemaDraft): string[] {
-  return entityDraft.fields.filter((entry) => entry.name !== "id" && !entry.name.endsWith("At")).map((entry) => entry.name);
+  return entityDraft.fields
+    .filter((entry) => entry.name !== "id" && !entry.name.endsWith("At"))
+    .map((entry) => entry.name);
 }

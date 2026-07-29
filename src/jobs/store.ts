@@ -4,7 +4,18 @@ import {
   createJobsRepository,
   type JobPatch,
 } from "../repositories/jobs-repo.js";
-import { clearStoreCache, findJobIndexed, listJobsForWorkspaceIndexed, loadStoreAsync, mutateStore, mutateStoreAsync, type AgentRecord, type JobRecord, type JobStatus, type PacketAgentData } from "../packetagent-store.js";
+import {
+  clearStoreCache,
+  findJobIndexed,
+  listJobsForWorkspaceIndexed,
+  loadStoreAsync,
+  mutateStore,
+  mutateStoreAsync,
+  type AgentRecord,
+  type JobRecord,
+  type JobStatus,
+  type PacketAgentData,
+} from "../packetagent-store.js";
 import { nextAfter } from "./cron.js";
 
 const STALE_RUNNING_MS = 5 * 60 * 1000;
@@ -42,7 +53,10 @@ export interface JobSchedulerStorage {
   enqueueJob(input: EnqueueJobInput): Promise<JobRecord>;
   maintainScheduledAgentJobs(agentId?: string): Promise<JobRecord[]>;
   enqueueRecurringJob(job: JobRecord, scheduledAt: string): Promise<JobRecord | null>;
-  listJobs(workspaceId: string, opts?: { status?: JobStatus; limit?: number }): Promise<JobRecord[]>;
+  listJobs(
+    workspaceId: string,
+    opts?: { status?: JobStatus; limit?: number },
+  ): Promise<JobRecord[]>;
   findJob(workspaceId: string, id: string): Promise<JobRecord | null>;
   updateJob(workspaceId: string, id: string, patch: JobPatch): Promise<JobRecord | null>;
   cancelJob(workspaceId: string, id: string): Promise<JobRecord | null>;
@@ -89,7 +103,11 @@ export function enqueueJob(input: EnqueueJobInput): JobRecord {
 }
 
 function isScheduledAgentRunJob(job: JobRecord, agentId: string): boolean {
-  return job.type === "agent.run" && job.payload?.agentId === agentId && job.payload?.triggerKind === "schedule";
+  return (
+    job.type === "agent.run" &&
+    job.payload?.agentId === agentId &&
+    job.payload?.triggerKind === "schedule"
+  );
 }
 
 function activeSchedule(agent: AgentRecord): string | null {
@@ -106,7 +124,10 @@ function cancelQueued(job: JobRecord, timestamp: string): void {
   job.updatedAt = timestamp;
 }
 
-function scheduledAgentPayload(agentId: string, payload?: Record<string, unknown>): Record<string, unknown> {
+function scheduledAgentPayload(
+  agentId: string,
+  payload?: Record<string, unknown>,
+): Record<string, unknown> {
   return { ...(payload ?? {}), agentId, triggerKind: "schedule" };
 }
 
@@ -123,8 +144,11 @@ function ensureScheduledAgentJob(
   payload?: Record<string, unknown>,
 ): ScheduledAgentResult {
   let schedule: string | null = null;
-  try { schedule = activeSchedule(agent); }
-  catch { schedule = null; }
+  try {
+    schedule = activeSchedule(agent);
+  } catch {
+    schedule = null;
+  }
 
   const queued = data.jobs
     .filter((job) => job.status === "queued" && isScheduledAgentRunJob(job, agent.id))
@@ -184,7 +208,11 @@ export function maintainScheduledAgentJobs(agentId?: string): JobRecord[] {
 }
 
 export function enqueueRecurringJob(job: JobRecord, scheduledAt: string): JobRecord | null {
-  if (job.type === "agent.run" && job.payload?.triggerKind === "schedule" && typeof job.payload.agentId === "string") {
+  if (
+    job.type === "agent.run" &&
+    job.payload?.triggerKind === "schedule" &&
+    typeof job.payload.agentId === "string"
+  ) {
     return mutateStore((data) => {
       const agent = data.agents.find((entry) => entry.id === job.payload.agentId);
       if (!agent) return null;
@@ -214,15 +242,9 @@ export function findJob(workspaceId: string, id: string): JobRecord | null {
   return findJobIndexed(workspaceId, id);
 }
 
-export function updateJob(
-  workspaceId: string,
-  id: string,
-  patch: JobPatch,
-): JobRecord | null {
+export function updateJob(workspaceId: string, id: string, patch: JobPatch): JobRecord | null {
   const updated = mutateStore((data) => {
-    const job = data.jobs.find(
-      (entry) => entry.workspaceId === workspaceId && entry.id === id,
-    );
+    const job = data.jobs.find((entry) => entry.workspaceId === workspaceId && entry.id === id);
     if (!job) return null;
     Object.assign(job, patch, { updatedAt: nowIso() });
     return job;
@@ -232,9 +254,7 @@ export function updateJob(
 
 export function cancelJob(workspaceId: string, id: string): JobRecord | null {
   const updated = mutateStore((data) => {
-    const job = data.jobs.find(
-      (entry) => entry.workspaceId === workspaceId && entry.id === id,
-    );
+    const job = data.jobs.find((entry) => entry.workspaceId === workspaceId && entry.id === id);
     if (!job) return null;
     job.cancelRequested = true;
     job.updatedAt = nowIso();
@@ -258,7 +278,9 @@ export async function claimNextJob(now: Date): Promise<JobRecord | null> {
 
   const previous = claimMutex;
   let release!: () => void;
-  claimMutex = new Promise<void>((resolve) => { release = resolve; });
+  claimMutex = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   await previous;
   try {
     const claimed = mutateStore((data) => {
@@ -278,7 +300,10 @@ export async function claimNextJob(now: Date): Promise<JobRecord | null> {
   }
 }
 
-export function sweepStaleRunningJobs(staleAfterMs: number = STALE_RUNNING_MS, now: Date = new Date()): number {
+export function sweepStaleRunningJobs(
+  staleAfterMs: number = STALE_RUNNING_MS,
+  now: Date = new Date(),
+): number {
   if (isSqliteMode()) {
     const swept = createJobsRepository({}).sweepStaleRunning(staleAfterMs, now);
     if (swept > 0) clearStoreCache();
@@ -346,8 +371,15 @@ async function maintainScheduledAgentJobsViaAsyncStore(agentId?: string): Promis
   });
 }
 
-async function enqueueRecurringJobViaAsyncStore(job: JobRecord, scheduledAt: string): Promise<JobRecord | null> {
-  if (job.type === "agent.run" && job.payload?.triggerKind === "schedule" && typeof job.payload.agentId === "string") {
+async function enqueueRecurringJobViaAsyncStore(
+  job: JobRecord,
+  scheduledAt: string,
+): Promise<JobRecord | null> {
+  if (
+    job.type === "agent.run" &&
+    job.payload?.triggerKind === "schedule" &&
+    typeof job.payload.agentId === "string"
+  ) {
     return mutateStoreAsync((data) => {
       const agent = data.agents.find((entry) => entry.id === job.payload.agentId);
       if (!agent) return null;
@@ -378,10 +410,7 @@ async function enqueueRecurringJobViaAsyncStore(job: JobRecord, scheduledAt: str
           )
         : undefined;
       const trigger = version?.content.triggers.find(
-        (entry) =>
-          entry.id === job.payload.triggerId &&
-          entry.kind === "cron" &&
-          entry.enabled,
+        (entry) => entry.id === job.payload.triggerId && entry.kind === "cron" && entry.enabled,
       );
       if (
         !deployment ||
@@ -455,9 +484,7 @@ export function createAsyncJobSchedulerStorage(): JobSchedulerStorage {
     },
     async cancelJob(workspaceId, id) {
       const updated = await mutateStoreAsync((data) => {
-        const job = data.jobs.find(
-          (entry) => entry.workspaceId === workspaceId && entry.id === id,
-        );
+        const job = data.jobs.find((entry) => entry.workspaceId === workspaceId && entry.id === id);
         if (!job) return null;
         job.cancelRequested = true;
         job.updatedAt = nowIso();
@@ -478,7 +505,9 @@ export function createAsyncJobSchedulerStorage(): JobSchedulerStorage {
 
       const previous = claimAsyncMutex;
       let release!: () => void;
-      claimAsyncMutex = new Promise<void>((resolve) => { release = resolve; });
+      claimAsyncMutex = new Promise<void>((resolve) => {
+        release = resolve;
+      });
       await previous;
       try {
         const claimed = await mutateStoreAsync((data) => {
@@ -539,7 +568,9 @@ export function createSyncJobSchedulerStorage(): JobSchedulerStorageSync {
   };
 }
 
-export function asyncJobSchedulerStorage(syncStorage?: JobSchedulerStorageSync): JobSchedulerStorage {
+export function asyncJobSchedulerStorage(
+  syncStorage?: JobSchedulerStorageSync,
+): JobSchedulerStorage {
   if (!syncStorage) return createAsyncJobSchedulerStorage();
   return {
     async enqueueJob(input) {
@@ -582,7 +613,10 @@ export function maintainScheduledAgentJobsAsync(agentId?: string): Promise<JobRe
   return defaultJobSchedulerStorage.maintainScheduledAgentJobs(agentId);
 }
 
-export function enqueueRecurringJobAsync(job: JobRecord, scheduledAt: string): Promise<JobRecord | null> {
+export function enqueueRecurringJobAsync(
+  job: JobRecord,
+  scheduledAt: string,
+): Promise<JobRecord | null> {
   return defaultJobSchedulerStorage.enqueueRecurringJob(job, scheduledAt);
 }
 
@@ -593,10 +627,7 @@ export function listJobsAsync(
   return defaultJobSchedulerStorage.listJobs(workspaceId, opts);
 }
 
-export function findJobAsync(
-  workspaceId: string,
-  id: string,
-): Promise<JobRecord | null> {
+export function findJobAsync(workspaceId: string, id: string): Promise<JobRecord | null> {
   return defaultJobSchedulerStorage.findJob(workspaceId, id);
 }
 
@@ -608,10 +639,7 @@ export function updateJobAsync(
   return defaultJobSchedulerStorage.updateJob(workspaceId, id, patch);
 }
 
-export function cancelJobAsync(
-  workspaceId: string,
-  id: string,
-): Promise<JobRecord | null> {
+export function cancelJobAsync(workspaceId: string, id: string): Promise<JobRecord | null> {
   return defaultJobSchedulerStorage.cancelJob(workspaceId, id);
 }
 
@@ -619,6 +647,9 @@ export function claimNextJobAsync(now: Date): Promise<JobRecord | null> {
   return defaultJobSchedulerStorage.claimNextJob(now);
 }
 
-export function sweepStaleRunningJobsAsync(staleAfterMs: number = STALE_RUNNING_MS, now: Date = new Date()): Promise<number> {
+export function sweepStaleRunningJobsAsync(
+  staleAfterMs: number = STALE_RUNNING_MS,
+  now: Date = new Date(),
+): Promise<number> {
   return defaultJobSchedulerStorage.sweepStaleRunningJobs(staleAfterMs, now);
 }

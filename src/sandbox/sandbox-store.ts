@@ -11,7 +11,11 @@ import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore, type PacketAgentData } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  mutateStore as defaultMutateStore,
+  type PacketAgentData,
+} from "../packetagent-store.js";
 import type {
   SandboxDriver as SandboxDriverId,
   SandboxExecRecord,
@@ -99,7 +103,9 @@ export function createJsonSandboxStore(deps: SandboxStoreDeps = {}): SandboxStor
     async getExec(workspaceId, id) {
       const data = (await load()) as MutablePacketAgentData;
       const collection = Array.isArray(data.sandboxExecs) ? data.sandboxExecs : [];
-      return collection.find((entry) => entry.workspaceId === workspaceId && entry.id === id) ?? null;
+      return (
+        collection.find((entry) => entry.workspaceId === workspaceId && entry.id === id) ?? null
+      );
     },
   };
 }
@@ -204,14 +210,16 @@ interface SandboxExecRow {
 }
 
 function upsertRow(db: DatabaseSync, record: SandboxExecRecord): void {
-  db.prepare(`
+  db.prepare(
+    `
     insert or replace into sandbox_execs (
       id, workspace_id, app_id, checkpoint_id, sandbox_id, driver, runtime,
       command, working_dir, env, status, exit_code, started_at, completed_at,
       duration_ms, stdout_preview, stderr_preview, error_message,
       cpu_limit_ms, memory_limit_mb, created_at, updated_at
     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `,
+  ).run(
     record.id,
     record.workspaceId,
     record.appId ?? null,
@@ -309,9 +317,13 @@ function applyMigrations(db: DatabaseSync): void {
   db.exec(
     "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
   );
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;
     const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");

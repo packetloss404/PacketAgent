@@ -2,10 +2,7 @@ import type { AnthropicClientFactory } from "../providers/anthropic.js";
 import type { LLMProvider, ProviderStreamChunk } from "../providers/types.js";
 import { getDefaultRouter } from "../providers/router.js";
 import { registerDefaultProviders } from "../providers/bootstrap.js";
-import {
-  resolvePresetToProviderModel,
-  type ModelPreset,
-} from "../providers/preset-resolver.js";
+import { resolvePresetToProviderModel, type ModelPreset } from "../providers/preset-resolver.js";
 import {
   APP_BUILDER_SYSTEM_PROMPT,
   APP_BUILDER_TOOL_DESCRIPTION,
@@ -179,7 +176,11 @@ export async function generateAppDraftViaLLM(
         return null;
       }
       if (chunk.delta && emit) {
-        try { await emit(chunk.delta); } catch { /* emit must not break generation */ }
+        try {
+          await emit(chunk.delta);
+        } catch {
+          /* emit must not break generation */
+        }
         proseLength += chunk.delta.length;
       }
       if (chunk.toolCall && chunk.toolCall.name === APP_BUILDER_TOOL_NAME) {
@@ -192,7 +193,9 @@ export async function generateAppDraftViaLLM(
   }
 
   if (!toolInput) {
-    console.warn(`[app-builder-llm] model did not call ${APP_BUILDER_TOOL_NAME} (prose=${proseLength}b)`);
+    console.warn(
+      `[app-builder-llm] model did not call ${APP_BUILDER_TOOL_NAME} (prose=${proseLength}b)`,
+    );
     return null;
   }
 
@@ -241,7 +244,9 @@ function coerceLLMResultToAppDraft(prompt: string, raw: Record<string, unknown>)
   const auth = coerceAuth(raw.auth, pageMap);
   const acceptanceChecks = coerceStringArray(raw.acceptanceChecks);
   const integrationMetadata = coerceIntegrationMetadata(raw.integrationMetadata);
-  const appName = asString(raw.appName) || `${titleCase(prompt.split(/\s+/).slice(0, 2).join(" ") || "Workspace")} App`;
+  const appName =
+    asString(raw.appName) ||
+    `${titleCase(prompt.split(/\s+/).slice(0, 2).join(" ") || "Workspace")} App`;
   const summary = asString(raw.summary) || `${appName} draft for: ${prompt}`;
 
   return {
@@ -261,10 +266,18 @@ function coerceLLMResultToAppDraft(prompt: string, raw: Record<string, unknown>)
   };
 }
 
-const TEMPLATE_IDS: AppDraftTemplateId[] = ["crm", "booking", "internal_dashboard", "task_tracker", "customer_portal"];
+const TEMPLATE_IDS: AppDraftTemplateId[] = [
+  "crm",
+  "booking",
+  "internal_dashboard",
+  "task_tracker",
+  "customer_portal",
+];
 
 function coerceTemplateId(value: unknown): AppDraftTemplateId {
-  return TEMPLATE_IDS.includes(value as AppDraftTemplateId) ? (value as AppDraftTemplateId) : "task_tracker";
+  return TEMPLATE_IDS.includes(value as AppDraftTemplateId)
+    ? (value as AppDraftTemplateId)
+    : "task_tracker";
 }
 
 function coerceAccess(value: unknown): RouteAccess {
@@ -272,7 +285,8 @@ function coerceAccess(value: unknown): RouteAccess {
 }
 
 function coercePageMap(value: unknown): PageDraft[] {
-  if (!Array.isArray(value) || value.length === 0) throw new Error("pageMap must be a non-empty array");
+  if (!Array.isArray(value) || value.length === 0)
+    throw new Error("pageMap must be a non-empty array");
   return value.map((entry) => {
     const obj = (entry ?? {}) as Record<string, unknown>;
     const draft: PageDraft = {
@@ -293,11 +307,15 @@ function coerceComponents(value: unknown): ComponentDraft[] {
   return value.map((entry) => {
     const obj = (entry ?? {}) as Record<string, unknown>;
     const typeValue = asString(obj.type);
-    const type: ComponentDraft["type"] = (
-      typeValue === "layout" || typeValue === "list" || typeValue === "form" || typeValue === "detail" || typeValue === "chart" || typeValue === "navigation"
+    const type: ComponentDraft["type"] =
+      typeValue === "layout" ||
+      typeValue === "list" ||
+      typeValue === "form" ||
+      typeValue === "detail" ||
+      typeValue === "chart" ||
+      typeValue === "navigation"
         ? typeValue
-        : "list"
-    );
+        : "list";
     return {
       name: asString(obj.name) || "Component",
       type,
@@ -312,11 +330,13 @@ function coerceApiRouteStubs(value: unknown): ApiRouteStub[] {
   return value.map((entry) => {
     const obj = (entry ?? {}) as Record<string, unknown>;
     const methodValue = asString(obj.method).toUpperCase();
-    const method: ApiRouteStub["method"] = (
-      methodValue === "GET" || methodValue === "POST" || methodValue === "PATCH" || methodValue === "DELETE"
+    const method: ApiRouteStub["method"] =
+      methodValue === "GET" ||
+      methodValue === "POST" ||
+      methodValue === "PATCH" ||
+      methodValue === "DELETE"
         ? methodValue
-        : "GET"
-    );
+        : "GET";
     const stub: ApiRouteStub = {
       method,
       path: asString(obj.path) || "/api/app/generated/unknown",
@@ -354,19 +374,26 @@ function coerceFields(value: unknown): FieldSchemaDraft[] {
   return value.map((entry) => {
     const obj = (entry ?? {}) as Record<string, unknown>;
     const typeValue = asString(obj.type);
-    const type: FieldSchemaDraft["type"] = (
-      typeValue === "uuid" || typeValue === "string" || typeValue === "text" || typeValue === "number"
-        || typeValue === "boolean" || typeValue === "date" || typeValue === "datetime" || typeValue === "enum"
+    const type: FieldSchemaDraft["type"] =
+      typeValue === "uuid" ||
+      typeValue === "string" ||
+      typeValue === "text" ||
+      typeValue === "number" ||
+      typeValue === "boolean" ||
+      typeValue === "date" ||
+      typeValue === "datetime" ||
+      typeValue === "enum"
         ? typeValue
-        : "string"
-    );
+        : "string";
     const field: FieldSchemaDraft = {
       name: asString(obj.name) || "field",
       type,
       required: obj.required === true,
     };
     if (Array.isArray(obj.enumValues)) {
-      field.enumValues = (obj.enumValues as unknown[]).map((entryValue) => asString(entryValue)).filter((v) => v.length > 0);
+      field.enumValues = (obj.enumValues as unknown[])
+        .map((entryValue) => asString(entryValue))
+        .filter((v) => v.length > 0);
     }
     const ref = asString(obj.references);
     if (ref) field.references = ref;
@@ -383,7 +410,10 @@ function coerceSeedData(value: unknown): Record<string, SeedRecord[]> {
       const record: SeedRecord = {};
       if (row && typeof row === "object") {
         for (const [field, raw] of Object.entries(row as Record<string, unknown>)) {
-          if (raw === null) { record[field] = null; continue; }
+          if (raw === null) {
+            record[field] = null;
+            continue;
+          }
           if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
             record[field] = raw;
           } else {
@@ -440,18 +470,32 @@ function coerceAuth(value: unknown, pages: PageDraft[]): AuthDraft {
     publicRoutes,
     privateRoutes,
     roleRoutes,
-    decisions: decisions.length > 0 ? decisions : [
-      "Only explicitly public pages can be viewed without a session.",
-      "Private API routes require an authenticated workspace user.",
-      "Admin routes require an admin role in addition to authentication.",
-    ],
+    decisions:
+      decisions.length > 0
+        ? decisions
+        : [
+            "Only explicitly public pages can be viewed without a session.",
+            "Private API routes require an authenticated workspace user.",
+            "Admin routes require an admin role in addition to authentication.",
+          ],
   };
 }
 
 function coerceIntegrationMetadata(value: unknown): Phase71IntegrationMetadata {
   const obj = (value ?? {}) as Record<string, unknown>;
   const requestedRaw = Array.isArray(obj.requested) ? obj.requested : [];
-  const validIds: Phase71IntegrationId[] = ["openai", "anthropic", "ollama", "custom_api", "slack_webhook", "email", "github", "browser", "stripe", "database"];
+  const validIds: Phase71IntegrationId[] = [
+    "openai",
+    "anthropic",
+    "ollama",
+    "custom_api",
+    "slack_webhook",
+    "email",
+    "github",
+    "browser",
+    "stripe",
+    "database",
+  ];
   const requested = requestedRaw
     .map((entry) => {
       const r = (entry ?? {}) as Record<string, unknown>;
@@ -469,7 +513,8 @@ function coerceIntegrationMetadata(value: unknown): Phase71IntegrationMetadata {
   const setupGuidance = coerceStringArray(obj.setupGuidance);
   return {
     requested,
-    setupGuidance: setupGuidance.length > 0 ? setupGuidance : requested.flatMap((entry) => entry.setupGuidance),
+    setupGuidance:
+      setupGuidance.length > 0 ? setupGuidance : requested.flatMap((entry) => entry.setupGuidance),
   };
 }
 

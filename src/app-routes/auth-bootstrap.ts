@@ -1,8 +1,15 @@
 import { type Context, type Hono } from "hono";
 import { networkInterfaces as defaultNetworkInterfaces } from "node:os";
-import { applyCsrfCookie, clearCsrfCookie, rejectCrossOriginPrivateMutation } from "../route-security.js";
+import {
+  applyCsrfCookie,
+  clearCsrfCookie,
+  rejectCrossOriginPrivateMutation,
+} from "../route-security.js";
 import { buildIntegrationMarketplace } from "../integration-marketplace.js";
-import { inspectIntegrationSandbox, type IntegrationSandboxConnectorId } from "../integration-sandbox.js";
+import {
+  inspectIntegrationSandbox,
+  type IntegrationSandboxConnectorId,
+} from "../integration-sandbox.js";
 import { buildModelRoutingPresets } from "../model-routing-presets.js";
 import {
   applySessionCookie,
@@ -55,13 +62,18 @@ let hostInfoSources: HostInfoSources = DEFAULT_HOST_INFO_SOURCES;
 
 export function setHostInfoSourcesForTests(overrides: Partial<HostInfoSources> | null): () => void {
   const previous = hostInfoSources;
-  hostInfoSources = overrides ? { ...DEFAULT_HOST_INFO_SOURCES, ...overrides } : DEFAULT_HOST_INFO_SOURCES;
+  hostInfoSources = overrides
+    ? { ...DEFAULT_HOST_INFO_SOURCES, ...overrides }
+    : DEFAULT_HOST_INFO_SOURCES;
   return () => {
     hostInfoSources = previous;
   };
 }
 
-export function buildHostInfoPayload(sources: HostInfoSources = hostInfoSources): { lanIps: string[]; port: number } {
+export function buildHostInfoPayload(sources: HostInfoSources = hostInfoSources): {
+  lanIps: string[];
+  port: number;
+} {
   const lanIps: string[] = [];
   let interfaces: ReturnType<typeof defaultNetworkInterfaces> = {};
   try {
@@ -99,7 +111,8 @@ async function builderProviderStatus(c: Context) {
     // Lazy-import to avoid a circular dep between app-routes and provider
     // bootstrap (which itself imports route-adjacent modules in some setups).
     const { registerDefaultProviders } = await import("../providers/bootstrap.js");
-    const { snapshotPresetResolutions, availableProviders } = await import("../providers/preset-resolver.js");
+    const { snapshotPresetResolutions, availableProviders } =
+      await import("../providers/preset-resolver.js");
     registerDefaultProviders();
     const snapshot = snapshotPresetResolutions();
     const available = availableProviders();
@@ -170,10 +183,14 @@ async function integrationSandboxTest(c: Context, connectorId: IntegrationSandbo
   }
 }
 
-async function workspaceIntegrationSandboxEnv(context: Awaited<ReturnType<typeof requireAuthenticatedContextAsync>>) {
+async function workspaceIntegrationSandboxEnv(
+  context: Awaited<ReturnType<typeof requireAuthenticatedContextAsync>>,
+) {
   const data = await loadStoreAsync();
   const env: Record<string, string | undefined> = {};
-  for (const entry of data.workspaceEnvVars.filter((item) => item.workspaceId === context.workspace.id && item.scope !== "build")) {
+  for (const entry of data.workspaceEnvVars.filter(
+    (item) => item.workspaceId === context.workspace.id && item.scope !== "build",
+  )) {
     env[entry.key] = entry.value || "configured";
   }
 
@@ -182,17 +199,27 @@ async function workspaceIntegrationSandboxEnv(context: Awaited<ReturnType<typeof
       .filter((entry) => entry.workspaceId === context.workspace.id)
       .map((entry) => entry.provider),
   );
-  if (apiKeyProviders.has("openai")) env.OPENAI_API_KEY = env.OPENAI_API_KEY ?? "workspace-vault-key";
-  if (apiKeyProviders.has("anthropic")) env.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY ?? "workspace-vault-key";
-  if (apiKeyProviders.has("ollama")) env.OLLAMA_BASE_URL = env.OLLAMA_BASE_URL ?? "workspace-vault-key";
+  if (apiKeyProviders.has("openai"))
+    env.OPENAI_API_KEY = env.OPENAI_API_KEY ?? "workspace-vault-key";
+  if (apiKeyProviders.has("anthropic"))
+    env.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY ?? "workspace-vault-key";
+  if (apiKeyProviders.has("ollama"))
+    env.OLLAMA_BASE_URL = env.OLLAMA_BASE_URL ?? "workspace-vault-key";
 
-  for (const provider of data.providers.filter((entry) => entry.workspaceId === context.workspace.id && entry.status !== "disabled")) {
-    if (provider.kind === "openai" && provider.apiKeyConfigured) env.OPENAI_API_KEY = env.OPENAI_API_KEY ?? "workspace-provider-key";
-    if (provider.kind === "anthropic" && provider.apiKeyConfigured) env.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY ?? "workspace-provider-key";
-    if (provider.kind === "ollama") env.OLLAMA_BASE_URL = provider.baseUrl ?? env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+  for (const provider of data.providers.filter(
+    (entry) => entry.workspaceId === context.workspace.id && entry.status !== "disabled",
+  )) {
+    if (provider.kind === "openai" && provider.apiKeyConfigured)
+      env.OPENAI_API_KEY = env.OPENAI_API_KEY ?? "workspace-provider-key";
+    if (provider.kind === "anthropic" && provider.apiKeyConfigured)
+      env.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY ?? "workspace-provider-key";
+    if (provider.kind === "ollama")
+      env.OLLAMA_BASE_URL = provider.baseUrl ?? env.OLLAMA_BASE_URL ?? "http://localhost:11434";
     if (provider.kind === "custom") {
-      env.CUSTOM_PROVIDER_BASE_URL = provider.baseUrl ?? env.CUSTOM_PROVIDER_BASE_URL ?? "workspace-custom-provider";
-      if (provider.apiKeyConfigured) env.CUSTOM_PROVIDER_API_KEY = env.CUSTOM_PROVIDER_API_KEY ?? "workspace-provider-key";
+      env.CUSTOM_PROVIDER_BASE_URL =
+        provider.baseUrl ?? env.CUSTOM_PROVIDER_BASE_URL ?? "workspace-custom-provider";
+      if (provider.apiKeyConfigured)
+        env.CUSTOM_PROVIDER_API_KEY = env.CUSTOM_PROVIDER_API_KEY ?? "workspace-provider-key";
     }
   }
 
@@ -227,12 +254,16 @@ function connectorForIntegrationTestKind(kind: string): IntegrationSandboxConnec
   }
 }
 
-function integrationSandboxSummary(connectorId: IntegrationSandboxConnectorId, body: Record<string, unknown>): string {
-  const bodyText = typeof body.provider === "string"
-    ? body.provider
-    : typeof body.mode === "string"
-      ? body.mode
-      : JSON.stringify(body.body ?? body.sample ?? body).slice(0, 240);
+function integrationSandboxSummary(
+  connectorId: IntegrationSandboxConnectorId,
+  body: Record<string, unknown>,
+): string {
+  const bodyText =
+    typeof body.provider === "string"
+      ? body.provider
+      : typeof body.mode === "string"
+        ? body.mode
+        : JSON.stringify(body.body ?? body.sample ?? body).slice(0, 240);
   const labels: Record<IntegrationSandboxConnectorId, string> = {
     model_provider: "model provider OpenAI Anthropic Ollama custom API",
     database: "database Postgres persistence",
@@ -265,7 +296,11 @@ export function registerAuthBootstrapRoutes(app: Hono): void {
 
   app.post("/auth/register", async (c) => {
     try {
-      const body = (await c.req.json()) as { email?: string; password?: string; displayName?: string };
+      const body = (await c.req.json()) as {
+        email?: string;
+        password?: string;
+        displayName?: string;
+      };
       // Combine IP + submitted email so one attacker can't exhaust the shared
       // login/register bucket and lock every account out (see clientKey()).
       await enforceRateLimit(c, "auth:register", AUTH_RATE_LIMIT, body.email);
@@ -367,7 +402,9 @@ export function registerAuthBootstrapRoutes(app: Hono): void {
   app.get("/app/builder/providers/status", async (c) => builderProviderStatus(c));
   app.post("/app/llm/test", async (c) => integrationSandboxTest(c, "model_provider"));
   app.post("/app/tools/browser/test", async (c) => integrationSandboxTest(c, "browser"));
-  app.post("/app/integrations/:kind/test", async (c) => integrationSandboxTest(c, connectorForIntegrationTestKind(c.req.param("kind"))));
+  app.post("/app/integrations/:kind/test", async (c) =>
+    integrationSandboxTest(c, connectorForIntegrationTestKind(c.req.param("kind"))),
+  );
 }
 
 export function registerWorkspaceMemberRoutes(app: Hono): void {
@@ -416,7 +453,11 @@ export function registerWorkspaceMemberRoutes(app: Hono): void {
     try {
       const context = await requireAuthenticatedContextAsync(c);
       await requireWorkspacePermission(context, "manageWorkspace");
-      const body = (await c.req.json()) as { name?: string; website?: string; automationGoal?: string };
+      const body = (await c.req.json()) as {
+        name?: string;
+        website?: string;
+        automationGoal?: string;
+      };
       const workspace = await updateWorkspace(context, {
         name: body.name ?? "",
         website: body.website ?? "",
@@ -445,10 +486,12 @@ export function registerWorkspaceMemberRoutes(app: Hono): void {
       await requireWorkspacePermission(context, "manageWorkspace");
       const body = (await c.req.json()) as { email?: string; role?: string };
       c.status(201);
-      return c.json(await createWorkspaceInvitation(context, {
-        email: body.email ?? "",
-        role: body.role ?? "member",
-      }));
+      return c.json(
+        await createWorkspaceInvitation(context, {
+          email: body.email ?? "",
+          role: body.role ?? "member",
+        }),
+      );
     } catch (error) {
       return errorResponse(c, error);
     }
@@ -490,7 +533,9 @@ export function registerWorkspaceMemberRoutes(app: Hono): void {
       const context = await requireAuthenticatedContextAsync(c);
       await requireWorkspacePermission(context, "manageWorkspace");
       const body = (await c.req.json()) as { role?: string };
-      return c.json(await updateWorkspaceMemberRole(context, c.req.param("userId"), { role: body.role ?? "" }));
+      return c.json(
+        await updateWorkspaceMemberRole(context, c.req.param("userId"), { role: body.role ?? "" }),
+      );
     } catch (error) {
       return errorResponse(c, error);
     }

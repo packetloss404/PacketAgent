@@ -3,11 +3,7 @@ import {
   type AuthorAndValidateAppOptions,
 } from "../codegen/llm-author.js";
 import { deriveDraftFromFiles } from "../codegen/derived-draft.js";
-import type {
-  AppDraftEmit,
-  AppDraftLLMOptions,
-  GenerateAppDraftResult,
-} from "./llm-draft.js";
+import type { AppDraftEmit, AppDraftLLMOptions, GenerateAppDraftResult } from "./llm-draft.js";
 
 /**
  * Track B file-tree path (now the default in `generateAppDraftWithLLM`):
@@ -55,7 +51,9 @@ export async function tryFileTreeCodegen(
       files: result.files,
     };
     if (!validation.ok && validation.source === "real" && validation.errors.length > 0) {
-      out.validationErrors = validation.errors.map((e) => `${e.file}${e.line ? `:${e.line}` : ""}: ${e.message}`);
+      out.validationErrors = validation.errors.map(
+        (e) => `${e.file}${e.line ? `:${e.line}` : ""}: ${e.message}`,
+      );
     }
     return out;
   } catch (error) {

@@ -37,7 +37,9 @@ function resolveProcessId(env: SchedulerLeaderEnv): string {
   return defaultProcessId();
 }
 
-export function selectSchedulerLeaderLock(env: SchedulerLeaderEnv = process.env): SchedulerLeaderLock {
+export function selectSchedulerLeaderLock(
+  env: SchedulerLeaderEnv = process.env,
+): SchedulerLeaderLock {
   const rawMode = env.PACKETAGENT_SCHEDULER_LEADER_MODE;
   const mode = rawMode === undefined ? "off" : rawMode.trim().toLowerCase();
 
@@ -61,7 +63,9 @@ export function selectSchedulerLeaderLock(env: SchedulerLeaderEnv = process.env)
   if (mode === "http") {
     const url = env.PACKETAGENT_SCHEDULER_LEADER_HTTP_URL;
     if (!url || url.length === 0) {
-      throw new Error("PACKETAGENT_SCHEDULER_LEADER_HTTP_URL must be set when PACKETAGENT_SCHEDULER_LEADER_MODE=\"http\"");
+      throw new Error(
+        'PACKETAGENT_SCHEDULER_LEADER_HTTP_URL must be set when PACKETAGENT_SCHEDULER_LEADER_MODE="http"',
+      );
     }
     const secret = env.PACKETAGENT_SCHEDULER_LEADER_HTTP_SECRET;
     const failOpen = env.PACKETAGENT_SCHEDULER_LEADER_HTTP_FAIL_OPEN === "true";
@@ -75,5 +79,7 @@ export function selectSchedulerLeaderLock(env: SchedulerLeaderEnv = process.env)
     });
   }
 
-  throw new Error(`PACKETAGENT_SCHEDULER_LEADER_MODE must be one of: off, file, http (got: "${rawMode ?? ""}")`);
+  throw new Error(
+    `PACKETAGENT_SCHEDULER_LEADER_MODE must be one of: off, file, http (got: "${rawMode ?? ""}")`,
+  );
 }

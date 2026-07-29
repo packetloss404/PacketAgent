@@ -109,7 +109,13 @@ test("runs an allowed command without shell interpolation and captures output", 
     });
 
     assert.equal(record.status, "ok");
-    const out = record.output as { exitCode: number; stdout: string; command: string; args: string[]; killed: boolean };
+    const out = record.output as {
+      exitCode: number;
+      stdout: string;
+      command: string;
+      args: string[];
+      killed: boolean;
+    };
     assert.equal(out.exitCode, 0);
     assert.equal(out.command, "node");
     assert.deepEqual(out.args.slice(-2), ["hello; echo nope", "$HOME"]);
@@ -180,7 +186,11 @@ test("kills a long-running command via timeout", async () => {
 
     assert.equal(record.status, "error");
     assert.match(record.error ?? "", /timeout/);
-    const out = record.output as { killed: boolean; exitCode: number | null; signal: NodeJS.Signals | null };
+    const out = record.output as {
+      killed: boolean;
+      exitCode: number | null;
+      signal: NodeJS.Signals | null;
+    };
     assert.equal(out.killed, true);
     assert.equal(out.exitCode, null);
     assert.ok(out.signal === "SIGTERM" || out.signal === "SIGKILL");

@@ -50,31 +50,37 @@ test("builds a readable request with risk summaries", () => {
   assert.equal(request.required, true);
   assert.equal(request.workspaceId, "workspace-1");
   assert.equal(request.agentId, "agent-1");
-  assert.equal(request.expiresAt, new Date(now.getTime() + DEFAULT_TOOL_APPROVAL_TTL_MS).toISOString());
+  assert.equal(
+    request.expiresAt,
+    new Date(now.getTime() + DEFAULT_TOOL_APPROVAL_TTL_MS).toISOString(),
+  );
   assert.match(request.summary, /http_fetch \(low\)/);
   assert.match(request.summary, /slack_post_webhook \(medium\)/);
   assert.match(request.summary, /shell_for_agent \(high\)/);
-  assert.deepEqual(request.tools.map((approvalTool) => ({
-    name: approvalTool.name,
-    risk: approvalTool.risk,
-    riskSummary: approvalTool.riskSummary,
-  })), [
-    {
-      name: "http_fetch",
-      risk: "low",
-      riskSummary: "http_fetch is read-only.",
-    },
-    {
-      name: "slack_post_webhook",
-      risk: "medium",
-      riskSummary: "slack_post_webhook can make changes or call external side-effect APIs.",
-    },
-    {
-      name: "shell_for_agent",
-      risk: "high",
-      riskSummary: "shell_for_agent can execute commands or high-impact operations.",
-    },
-  ]);
+  assert.deepEqual(
+    request.tools.map((approvalTool) => ({
+      name: approvalTool.name,
+      risk: approvalTool.risk,
+      riskSummary: approvalTool.riskSummary,
+    })),
+    [
+      {
+        name: "http_fetch",
+        risk: "low",
+        riskSummary: "http_fetch is read-only.",
+      },
+      {
+        name: "slack_post_webhook",
+        risk: "medium",
+        riskSummary: "slack_post_webhook can make changes or call external side-effect APIs.",
+      },
+      {
+        name: "shell_for_agent",
+        risk: "high",
+        riskSummary: "shell_for_agent can execute commands or high-impact operations.",
+      },
+    ],
+  );
   assert.equal(toolCapabilityRisk(tool("shell_for_agent", "read")), "high");
 
   const tokenBody = decodeTokenBody(request.approvalToken);
@@ -83,10 +89,7 @@ test("builds a readable request with risk summaries", () => {
 });
 
 test("verifies a valid launch token", () => {
-  const tools = [
-    tool("email_send", "write"),
-    tool("http_fetch", "read"),
-  ];
+  const tools = [tool("email_send", "write"), tool("http_fetch", "read")];
   const request = buildToolCapabilityApprovalRequest({
     workspaceId: "workspace-1",
     agentId: "agent-1",
@@ -116,19 +119,22 @@ test("verifies a valid launch token", () => {
     assert.equal(result.expiresAt, request.expiresAt);
   }
 
-  const nestedPayloadResult = verifyToolCapabilityApproval({
-    decision: "launch",
-    token: request.approvalToken,
-    approvedTools: ["email_send", "http_fetch"],
-  }, {
-    workspaceId: "workspace-1",
-    agentId: "agent-1",
-    triggerKind: "webhook",
-    tools,
-    inputs: { a: 1, b: 2 },
-    now,
-    secret,
-  });
+  const nestedPayloadResult = verifyToolCapabilityApproval(
+    {
+      decision: "launch",
+      token: request.approvalToken,
+      approvedTools: ["email_send", "http_fetch"],
+    },
+    {
+      workspaceId: "workspace-1",
+      agentId: "agent-1",
+      triggerKind: "webhook",
+      tools,
+      inputs: { a: 1, b: 2 },
+      now,
+      secret,
+    },
+  );
   assert.equal(nestedPayloadResult.ok, true);
 });
 
@@ -229,10 +235,7 @@ test("rejects an expired token", () => {
 });
 
 test("rejects changed inputs or tools", () => {
-  const tools = [
-    tool("http_fetch", "read"),
-    tool("email_send", "write"),
-  ];
+  const tools = [tool("http_fetch", "read"), tool("email_send", "write")];
   const request = buildToolCapabilityApprovalRequest({
     workspaceId: "workspace-1",
     agentId: "agent-1",
@@ -263,10 +266,7 @@ test("rejects changed inputs or tools", () => {
     workspaceId: "workspace-1",
     agentId: "agent-1",
     triggerKind: "manual",
-    tools: [
-      tool("http_fetch", "read"),
-      tool("shell_for_agent", "exec"),
-    ],
+    tools: [tool("http_fetch", "read"), tool("shell_for_agent", "exec")],
     inputs: { ticket: "APP-42" },
     now,
     secret,
@@ -280,10 +280,7 @@ test("rejects changed inputs or tools", () => {
 });
 
 test("rejects cancel or a missing required approved tool", () => {
-  const tools = [
-    tool("http_fetch", "read"),
-    tool("email_send", "write"),
-  ];
+  const tools = [tool("http_fetch", "read"), tool("email_send", "write")];
   const request = buildToolCapabilityApprovalRequest({
     workspaceId: "workspace-1",
     agentId: "agent-1",

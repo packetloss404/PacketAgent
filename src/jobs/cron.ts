@@ -22,7 +22,11 @@ function normalizeDayOfWeek(value: number): number {
   return value === 7 ? 0 : value;
 }
 
-function parseField(token: string, [min, max]: [number, number], normalize: (value: number) => number = (value) => value): CronField {
+function parseField(
+  token: string,
+  [min, max]: [number, number],
+  normalize: (value: number) => number = (value) => value,
+): CronField {
   const values = new Set<number>();
   for (const piece of token.split(",")) {
     let step = 1;
@@ -38,7 +42,8 @@ function parseField(token: string, [min, max]: [number, number], normalize: (val
       range = [min, max];
     } else if (body.includes("-")) {
       const [a, b] = body.split("-").map(Number);
-      if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error(`cron: invalid range "${piece}"`);
+      if (!Number.isFinite(a) || !Number.isFinite(b))
+        throw new Error(`cron: invalid range "${piece}"`);
       if (a > b) throw new Error(`cron: invalid range "${piece}"`);
       range = [a, b];
     } else {
@@ -84,11 +89,7 @@ export function nextAfter(exprStr: string, after: Date): Date {
   throw new Error(`cron: no match within a year for "${exprStr}"`);
 }
 
-export function nextAfterInTimezone(
-  exprStr: string,
-  after: Date,
-  timezone: string,
-): Date {
+export function nextAfterInTimezone(exprStr: string, after: Date, timezone: string): Date {
   const expr = parseCron(exprStr);
   let formatter: Intl.DateTimeFormat;
   try {
@@ -120,9 +121,7 @@ export function nextAfterInTimezone(
     }
     cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
   }
-  throw new Error(
-    `cron: no match within a year for "${exprStr}" in timezone "${timezone}"`,
-  );
+  throw new Error(`cron: no match within a year for "${exprStr}" in timezone "${timezone}"`);
 }
 
 function zonedParts(
@@ -141,9 +140,7 @@ function zonedParts(
       .filter((part) => part.type !== "literal")
       .map((part) => [part.type, part.value]),
   );
-  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(
-    values.weekday,
-  );
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(values.weekday);
   if (weekday < 0) throw new Error("cron: could not resolve timezone weekday");
   return {
     minute: Number(values.minute),

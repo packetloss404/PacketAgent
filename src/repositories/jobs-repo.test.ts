@@ -40,7 +40,7 @@ function makeJsonRepo(): JobsRepository {
   const data = { jobs: [] as JobRecord[] } as unknown as PacketAgentData;
   const deps: JobsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonJobsRepository(deps);
 }
@@ -102,9 +102,15 @@ test("upsert then list returns the record verbatim", () => {
 
 test("list returns rows sorted descending by createdAt", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T11:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T11:00:00.000Z" }),
+    );
     const ids = repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id);
     assert.deepEqual(ids, ["a", "c", "b"]);
   });
@@ -112,9 +118,15 @@ test("list returns rows sorted descending by createdAt", () => {
 
 test("list filters by workspace", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_b", createdAt: "2026-04-26T11:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_b", createdAt: "2026-04-26T11:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }),
+    );
     const aIds = repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id);
     assert.deepEqual(aIds, ["c", "a"]);
     const bIds = repo.list({ workspaceId: "ws_b" }).map((entry) => entry.id);
@@ -125,13 +137,28 @@ test("list filters by workspace", () => {
 test("list filters by status", () => {
   runOnBoth((repo) => {
     repo.upsert(
-      makeRecord({ id: "a", workspaceId: "ws_a", status: "queued", createdAt: "2026-04-26T10:00:00.000Z" }),
+      makeRecord({
+        id: "a",
+        workspaceId: "ws_a",
+        status: "queued",
+        createdAt: "2026-04-26T10:00:00.000Z",
+      }),
     );
     repo.upsert(
-      makeRecord({ id: "b", workspaceId: "ws_a", status: "running", createdAt: "2026-04-26T11:00:00.000Z" }),
+      makeRecord({
+        id: "b",
+        workspaceId: "ws_a",
+        status: "running",
+        createdAt: "2026-04-26T11:00:00.000Z",
+      }),
     );
     repo.upsert(
-      makeRecord({ id: "c", workspaceId: "ws_a", status: "queued", createdAt: "2026-04-26T12:00:00.000Z" }),
+      makeRecord({
+        id: "c",
+        workspaceId: "ws_a",
+        status: "queued",
+        createdAt: "2026-04-26T12:00:00.000Z",
+      }),
     );
     const queued = repo.list({ workspaceId: "ws_a", status: "queued" }).map((entry) => entry.id);
     assert.deepEqual(queued, ["c", "a"]);
@@ -217,11 +244,14 @@ test("upsert refuses to replace a job owned by another workspace", () => {
     repo.upsert(original);
 
     assert.throws(
-      () => repo.upsert(makeRecord({
-        id: original.id,
-        workspaceId: "ws_b",
-        status: "success",
-      })),
+      () =>
+        repo.upsert(
+          makeRecord({
+            id: original.id,
+            workspaceId: "ws_b",
+            status: "success",
+          }),
+        ),
       /already owned by another workspace/,
     );
     assert.deepEqual(repo.find("ws_a", original.id), original);
@@ -255,20 +285,16 @@ test("update applies the patch and bumps updatedAt", () => {
 
 test("update cannot mutate a job through another workspace", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({
-      id: "job_workspace_scoped_update",
-      workspaceId: "ws_b",
-      status: "queued",
-    }));
+    repo.upsert(
+      makeRecord({
+        id: "job_workspace_scoped_update",
+        workspaceId: "ws_b",
+        status: "queued",
+      }),
+    );
 
-    assert.equal(
-      repo.update("ws_a", "job_workspace_scoped_update", { status: "success" }),
-      null,
-    );
-    assert.equal(
-      repo.find("ws_b", "job_workspace_scoped_update")?.status,
-      "queued",
-    );
+    assert.equal(repo.update("ws_a", "job_workspace_scoped_update", { status: "success" }), null);
+    assert.equal(repo.find("ws_b", "job_workspace_scoped_update")?.status, "queued");
   });
 });
 
@@ -664,7 +690,7 @@ test("createJobsRepository returns json impl when env is unset", () => {
     const data = { jobs: [] as JobRecord[] } as unknown as PacketAgentData;
     const repo = createJobsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+      mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     repo.upsert(makeRecord({ id: "job_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);
@@ -682,7 +708,7 @@ test("createAsyncJobsRepository wraps the selected repository implementation", a
     const data = { jobs: [] as JobRecord[] } as unknown as PacketAgentData;
     const repo = createAsyncJobsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+      mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
 
     await repo.upsert(makeRecord({ id: "job_1", workspaceId: "ws_a" }));
@@ -704,7 +730,7 @@ test("createAsyncJobsRepository accepts awaitable store dependencies", async () 
     let mutations = 0;
     const repo = createAsyncJobsRepository({
       loadStore: async () => data,
-      mutateStore: async <T,>(mutator: (target: PacketAgentData) => T | Promise<T>) => {
+      mutateStore: async <T>(mutator: (target: PacketAgentData) => T | Promise<T>) => {
         mutations += 1;
         return mutator(data);
       },

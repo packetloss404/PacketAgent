@@ -42,7 +42,11 @@ class MockProvider implements LLMProvider {
   name: ProviderName;
   private turns: ScriptedTurn[];
   private throwAtCall: number | undefined;
-  public calls: Array<{ tools: string[]; messages: ProviderCallOptions["messages"]; model: string }> = [];
+  public calls: Array<{
+    tools: string[];
+    messages: ProviderCallOptions["messages"];
+    model: string;
+  }> = [];
 
   constructor(opts: MockProviderOptions) {
     this.name = opts.name ?? "stub";
@@ -528,10 +532,7 @@ test("authorAppViaLLM: 15-file plan chunks the write phase into two rounds (8 + 
     }
     // And does NOT mention paths from the second chunk's exclusive set.
     for (const p of secondChunkPaths) {
-      assert.ok(
-        !round1Text.includes(p),
-        `round 1 prompt should not mention chunk-2 path ${p}`,
-      );
+      assert.ok(!round1Text.includes(p), `round 1 prompt should not mention chunk-2 path ${p}`);
     }
   });
 });
@@ -617,28 +618,46 @@ test("authorAndValidateAppViaLLM: repairs once after validation failure", async 
       name: "anthropic",
       turns: [
         [{ delta: planJson(initialPlan) }],
-        [{
-          toolCall: {
-            id: "w1",
-            name: "write_file",
-            input: { path: "src/App.tsx", content: "export default function App(){ return missing; }\n" },
+        [
+          {
+            toolCall: {
+              id: "w1",
+              name: "write_file",
+              input: {
+                path: "src/App.tsx",
+                content: "export default function App(){ return missing; }\n",
+              },
+            },
           },
-        }],
+        ],
         [{ delta: planJson(repairedPlan) }],
-        [{
-          toolCall: {
-            id: "w2",
-            name: "write_file",
-            input: { path: "src/App.tsx", content: "export default function App(){ return null; }\n" },
+        [
+          {
+            toolCall: {
+              id: "w2",
+              name: "write_file",
+              input: {
+                path: "src/App.tsx",
+                content: "export default function App(){ return null; }\n",
+              },
+            },
           },
-        }],
+        ],
       ],
     });
     const validations: ValidationResult[] = [
       {
         ok: false,
         source: "real",
-        errors: [{ file: "src/App.tsx", line: 1, message: "Cannot find name 'missing'.", severity: "error", phase: "typecheck" }],
+        errors: [
+          {
+            file: "src/App.tsx",
+            line: 1,
+            message: "Cannot find name 'missing'.",
+            severity: "error",
+            phase: "typecheck",
+          },
+        ],
         warnings: [],
         durationMs: 12,
         phases: { typecheck: "failed", build: "skipped" },
@@ -652,8 +671,10 @@ test("authorAndValidateAppViaLLM: repairs once after validation failure", async 
         phases: { typecheck: "passed", build: "passed" },
       },
     ];
-    const validateFn = async (_files: Array<{ path: string; content: string }>, _options: ValidateOptions = {}) =>
-      validations.shift() ?? validations[validations.length - 1]!;
+    const validateFn = async (
+      _files: Array<{ path: string; content: string }>,
+      _options: ValidateOptions = {},
+    ) => validations.shift() ?? validations[validations.length - 1]!;
 
     const emitted: string[] = [];
     const result = await authorAndValidateAppViaLLM(
@@ -664,7 +685,9 @@ test("authorAndValidateAppViaLLM: repairs once after validation failure", async 
         resolvePrompts: fixedPrompts,
         validateFn,
       },
-      (chunk) => { emitted.push(chunk); },
+      (chunk) => {
+        emitted.push(chunk);
+      },
     );
 
     assert.ok(result);
@@ -682,15 +705,39 @@ test("authorAndValidateAppViaLLM: stops on repeated validation signature", async
       name: "anthropic",
       turns: [
         [{ delta: planJson(plan) }],
-        [{ toolCall: { id: "w1", name: "write_file", input: { path: "src/App.tsx", content: "broken one" } } }],
+        [
+          {
+            toolCall: {
+              id: "w1",
+              name: "write_file",
+              input: { path: "src/App.tsx", content: "broken one" },
+            },
+          },
+        ],
         [{ delta: planJson(plan) }],
-        [{ toolCall: { id: "w2", name: "write_file", input: { path: "src/App.tsx", content: "broken two" } } }],
+        [
+          {
+            toolCall: {
+              id: "w2",
+              name: "write_file",
+              input: { path: "src/App.tsx", content: "broken two" },
+            },
+          },
+        ],
       ],
     });
     const repeated: ValidationResult = {
       ok: false,
       source: "real",
-      errors: [{ file: "src/App.tsx", line: 3, message: "Cannot find name 'missing'.", severity: "error", phase: "typecheck" }],
+      errors: [
+        {
+          file: "src/App.tsx",
+          line: 3,
+          message: "Cannot find name 'missing'.",
+          severity: "error",
+          phase: "typecheck",
+        },
+      ],
       warnings: [],
       durationMs: 1,
       phases: { typecheck: "failed", build: "skipped" },

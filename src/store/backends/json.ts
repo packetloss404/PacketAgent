@@ -16,7 +16,9 @@ export function jsonStoreBackend(): StoreBackend {
     key: `json:${DATA_FILE}`,
     load() {
       try {
-        return normalizeStore(JSON.parse(readFileSync(DATA_FILE, "utf8")) as Partial<PacketAgentData>);
+        return normalizeStore(
+          JSON.parse(readFileSync(DATA_FILE, "utf8")) as Partial<PacketAgentData>,
+        );
       } catch {
         const seeded = seedStore();
         persistJsonStore(seeded);

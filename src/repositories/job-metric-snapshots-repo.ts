@@ -3,7 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  mutateStore as defaultMutateStore,
+} from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 100;
 const MAX_LIST_LIMIT = 500;
@@ -58,7 +61,9 @@ export function createAsyncJobMetricSnapshotsRepository(
 ): AsyncJobMetricSnapshotsRepository {
   if (deps.repository) return asyncJobMetricSnapshotsRepositoryFromSync(deps.repository);
   if (process.env.PACKETAGENT_STORE === "sqlite") {
-    return asyncJobMetricSnapshotsRepositoryFromSync(sqliteJobMetricSnapshotsRepository({ dbPath: deps.dbPath }));
+    return asyncJobMetricSnapshotsRepositoryFromSync(
+      sqliteJobMetricSnapshotsRepository({ dbPath: deps.dbPath }),
+    );
   }
   return asyncJsonJobMetricSnapshotsRepository(deps);
 }
@@ -259,7 +264,9 @@ export function sqliteJobMetricSnapshotsRepository(
     prune(retainAfterIso) {
       const db = openDatabase(dbPath);
       try {
-        const result = db.prepare("delete from job_metric_snapshots where captured_at < ?").run(retainAfterIso);
+        const result = db
+          .prepare("delete from job_metric_snapshots where captured_at < ?")
+          .run(retainAfterIso);
         return Number(result.changes ?? 0);
       } finally {
         db.close();
@@ -268,7 +275,9 @@ export function sqliteJobMetricSnapshotsRepository(
     count() {
       const db = openDatabase(dbPath);
       try {
-        const row = db.prepare("select count(*) as count from job_metric_snapshots").get() as { count: number } | undefined;
+        const row = db.prepare("select count(*) as count from job_metric_snapshots").get() as
+          | { count: number }
+          | undefined;
         return row?.count ?? 0;
       } finally {
         db.close();
@@ -322,7 +331,10 @@ function applyListFilter(
     if (untilMs !== null && !Number.isNaN(untilMs) && capturedMs > untilMs) return false;
     return true;
   });
-  filtered.sort((left, right) => left.capturedAt.localeCompare(right.capturedAt) || left.id.localeCompare(right.id));
+  filtered.sort(
+    (left, right) =>
+      left.capturedAt.localeCompare(right.capturedAt) || left.id.localeCompare(right.id),
+  );
   const requestedLimit = filter.limit ?? DEFAULT_LIST_LIMIT;
   const limit = Math.min(Math.max(requestedLimit, 0), MAX_LIST_LIMIT);
   return filtered.slice(0, limit);
@@ -345,10 +357,16 @@ function openDatabase(dbPath: string): DatabaseSync {
 }
 
 function applyMigrations(db: DatabaseSync): void {
-  db.exec("create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))");
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  db.exec(
+    "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
+  );
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;
     const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");

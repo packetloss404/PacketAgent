@@ -56,12 +56,7 @@ test("nextAfterInTimezone honors daylight-saving offsets", () => {
     "2026-12-01T15:00:00.000Z",
   );
   assert.throws(
-    () =>
-      nextAfterInTimezone(
-        "0 9 * * *",
-        new Date("2026-07-27T12:00:00.000Z"),
-        "Mars/Olympus",
-      ),
+    () => nextAfterInTimezone("0 9 * * *", new Date("2026-07-27T12:00:00.000Z"), "Mars/Olympus"),
     /invalid timezone/,
   );
 });

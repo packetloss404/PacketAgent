@@ -109,7 +109,10 @@ test("getJobTypeMetrics returns multiple types sorted ascending", () => {
   recordJobRun({ type: "alpha", startedAt, finishedAt, durationMs: 100, status: "success" });
   recordJobRun({ type: "mu", startedAt, finishedAt, durationMs: 100, status: "success" });
   const metrics = getJobTypeMetrics();
-  assert.deepEqual(metrics.map((entry) => entry.type), ["alpha", "mu", "zeta"]);
+  assert.deepEqual(
+    metrics.map((entry) => entry.type),
+    ["alpha", "mu", "zeta"],
+  );
 });
 
 test("__resetSchedulerMetricsForTests clears every record", () => {

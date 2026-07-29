@@ -322,12 +322,7 @@ export function assertWorkerRunUpdate(previous: WorkerRun, next: WorkerRun): voi
     throw new WorkerTransitionError("WorkerRun", previous.status, next.status, "run.revision");
   }
   if (next.runtimeFence < previous.runtimeFence) {
-    throw new WorkerTransitionError(
-      "WorkerRun",
-      previous.status,
-      next.status,
-      "run.runtime_fence",
-    );
+    throw new WorkerTransitionError("WorkerRun", previous.status, next.status, "run.runtime_fence");
   }
   if (previous.status !== next.status) assertWorkerRunTransition(previous.status, next.status);
 }

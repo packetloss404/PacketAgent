@@ -16,8 +16,12 @@ function makeIo() {
     out,
     err,
     write: {
-      out: (line: string) => { out.push(line); },
-      err: (line: string) => { err.push(line); },
+      out: (line: string) => {
+        out.push(line);
+      },
+      err: (line: string) => {
+        err.push(line);
+      },
     },
   };
 }
@@ -33,7 +37,10 @@ test("returns 2 with a useful err message when neither --path nor env path is se
   assert.equal(code, 2);
   assert.equal(io.out.length, 0);
   assert.equal(io.err.length, 1);
-  assert.match(io.err[0], /access-log:rotate requires --path=<file> or PACKETAGENT_ACCESS_LOG_PATH/);
+  assert.match(
+    io.err[0],
+    /access-log:rotate requires --path=<file> or PACKETAGENT_ACCESS_LOG_PATH/,
+  );
 });
 
 test("returns 0 with rotated:false when the configured path does not exist", async () => {

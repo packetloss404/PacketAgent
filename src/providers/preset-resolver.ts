@@ -110,13 +110,20 @@ const LOCAL_PROVIDERS: ReadonlySet<ProviderName> = new Set(["ollama"]);
 
 function envKeyName(provider: ProviderName): string | null {
   switch (provider) {
-    case "anthropic": return "ANTHROPIC_API_KEY";
-    case "openai": return "OPENAI_API_KEY";
-    case "minimax": return "MINIMAX_API_KEY";
-    case "gemini": return "GEMINI_API_KEY";
-    case "openrouter": return "OPENROUTER_API_KEY";
-    case "ollama": return null; // local; no key required
-    case "stub": return null;
+    case "anthropic":
+      return "ANTHROPIC_API_KEY";
+    case "openai":
+      return "OPENAI_API_KEY";
+    case "minimax":
+      return "MINIMAX_API_KEY";
+    case "gemini":
+      return "GEMINI_API_KEY";
+    case "openrouter":
+      return "OPENROUTER_API_KEY";
+    case "ollama":
+      return null; // local; no key required
+    case "stub":
+      return null;
   }
 }
 
@@ -128,7 +135,10 @@ function envKeyName(provider: ProviderName): string | null {
  * detected here; the resolver is meant to give callers a server-wide signal
  * about what is configured, not what a specific workspace can use.
  */
-export function providerHasCredentials(provider: ProviderName, env: NodeJS.ProcessEnv = process.env): boolean {
+export function providerHasCredentials(
+  provider: ProviderName,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
   if (provider === "ollama") return true; // assume reachable; ollama provider degrades gracefully
   const key = envKeyName(provider);
   if (!key) return false;
@@ -155,10 +165,20 @@ export function availableProviders(opts: ResolvePresetOptions = {}): ProviderNam
 function parsePriorityOverride(env: NodeJS.ProcessEnv): ProviderName[] | null {
   const raw = env.PACKETAGENT_PROVIDER_PRIORITY;
   if (!raw || raw.trim().length === 0) return null;
-  const parts = raw.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean);
+  const parts = raw
+    .split(",")
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
   const valid: ProviderName[] = [];
   for (const part of parts) {
-    if (part === "anthropic" || part === "openai" || part === "minimax" || part === "ollama" || part === "gemini" || part === "openrouter") {
+    if (
+      part === "anthropic" ||
+      part === "openai" ||
+      part === "minimax" ||
+      part === "ollama" ||
+      part === "gemini" ||
+      part === "openrouter"
+    ) {
       valid.push(part);
     }
   }
@@ -186,9 +206,10 @@ export function resolvePresetToProviderModel(
   if (options.providerOverride) {
     const provider = options.providerOverride;
     if (!providerHasCredentials(provider, env)) return null;
-    const model = options.modelOverride && options.modelOverride.trim().length > 0
-      ? options.modelOverride.trim()
-      : PRESET_MODELS[provider][effectivePreset];
+    const model =
+      options.modelOverride && options.modelOverride.trim().length > 0
+        ? options.modelOverride.trim()
+        : PRESET_MODELS[provider][effectivePreset];
     return { provider, model, local: LOCAL_PROVIDERS.has(provider) };
   }
 
@@ -200,9 +221,10 @@ export function resolvePresetToProviderModel(
     if (!registered.has(provider)) continue;
     if (!providerHasCredentials(provider, env)) continue;
     if (effectivePreset === "local" && !LOCAL_PROVIDERS.has(provider)) continue;
-    const model = options.modelOverride && options.modelOverride.trim().length > 0
-      ? options.modelOverride.trim()
-      : PRESET_MODELS[provider][effectivePreset];
+    const model =
+      options.modelOverride && options.modelOverride.trim().length > 0
+        ? options.modelOverride.trim()
+        : PRESET_MODELS[provider][effectivePreset];
     return { provider, model, local: LOCAL_PROVIDERS.has(provider) };
   }
 

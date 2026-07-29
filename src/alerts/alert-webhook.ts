@@ -41,12 +41,19 @@ function readPositiveInt(env: NodeJS.ProcessEnv, key: string, fallback: number):
   return Math.floor(parsed);
 }
 
-export function resolveAlertWebhookConfig(env: NodeJS.ProcessEnv = process.env): AlertWebhookConfig | null {
+export function resolveAlertWebhookConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): AlertWebhookConfig | null {
   const url = readString(env, ALERT_WEBHOOK_URL_ENV);
   if (!url) return null;
   const secret = readString(env, ALERT_WEBHOOK_SECRET_ENV);
-  const secretHeader = readString(env, ALERT_WEBHOOK_SECRET_HEADER_ENV) ?? DEFAULT_ALERT_WEBHOOK_SECRET_HEADER;
-  const timeoutMs = readPositiveInt(env, ALERT_WEBHOOK_TIMEOUT_MS_ENV, DEFAULT_ALERT_WEBHOOK_TIMEOUT_MS);
+  const secretHeader =
+    readString(env, ALERT_WEBHOOK_SECRET_HEADER_ENV) ?? DEFAULT_ALERT_WEBHOOK_SECRET_HEADER;
+  const timeoutMs = readPositiveInt(
+    env,
+    ALERT_WEBHOOK_TIMEOUT_MS_ENV,
+    DEFAULT_ALERT_WEBHOOK_TIMEOUT_MS,
+  );
   const config: AlertWebhookConfig = { url, secretHeader, timeoutMs };
   if (secret) config.secret = secret;
   return config;

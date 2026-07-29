@@ -28,7 +28,11 @@ test("local JSON runtime is allowed by default", () => {
   assert.equal(report.managedDatabaseRuntimeBlocked, false);
   assert.equal(report.blockers.length, 0);
   assert.ok(report.summary.includes("local JSON"));
-  assert.ok(report.checks.some((check) => check.id === "supported-runtime-store" && check.status === "pass"));
+  assert.ok(
+    report.checks.some(
+      (check) => check.id === "supported-runtime-store" && check.status === "pass",
+    ),
+  );
 });
 
 test("single-node SQLite runtime is allowed", () => {
@@ -74,9 +78,13 @@ test("managed database URL is redacted and blocked", () => {
   assert.equal(urlEntry.redacted, true);
   assert.equal(urlEntry.value, "[redacted]");
   assert.equal(report.observed.databaseUrl, "[redacted]");
-  assert.ok(report.blockers.some((blocker) => blocker.includes("recognized managed Postgres adapter")));
+  assert.ok(
+    report.blockers.some((blocker) => blocker.includes("recognized managed Postgres adapter")),
+  );
   assert.ok(report.warnings.some((warning) => warning.includes("redacted")));
-  assert.ok(report.nextSteps.some((step) => step.includes("PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres")));
+  assert.ok(
+    report.nextSteps.some((step) => step.includes("PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres")),
+  );
 });
 
 test("recognized postgres adapter and managed URL allow managed Postgres startup", () => {
@@ -116,8 +124,12 @@ test("PACKETAGENT_STORE=postgres without adapter is blocked at the managed runti
   assert.equal(report.status, "fail");
   assert.equal(report.classification, "managed-database-blocked");
   assert.equal(report.observed.store, "postgres");
-  assert.ok(report.blockers.some((blocker) => blocker.includes("managed database runtime boundary")));
-  assert.ok(report.nextSteps.some((step) => step.includes("PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres")));
+  assert.ok(
+    report.blockers.some((blocker) => blocker.includes("managed database runtime boundary")),
+  );
+  assert.ok(
+    report.nextSteps.some((step) => step.includes("PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres")),
+  );
   assert.throws(
     () =>
       assertManagedDatabaseRuntimeSupported({
@@ -156,7 +168,11 @@ test("PACKETAGENT_STORE=postgres is allowed when managed Postgres adapter and UR
   assert.equal(report.status, "pass");
   assert.equal(report.classification, "managed-postgres");
   assert.equal(report.observed.store, "postgres");
-  assert.ok(report.checks.some((check) => check.id === "supported-runtime-store" && check.status === "pass"));
+  assert.ok(
+    report.checks.some(
+      (check) => check.id === "supported-runtime-store" && check.status === "pass",
+    ),
+  );
 });
 
 test("PACKETAGENT_STORE=managed without adapter is blocked at the managed runtime boundary", () => {
@@ -171,7 +187,9 @@ test("PACKETAGENT_STORE=managed without adapter is blocked at the managed runtim
   assert.equal(report.status, "fail");
   assert.equal(report.classification, "managed-database-blocked");
   assert.equal(report.observed.store, "managed");
-  assert.ok(report.blockers.some((blocker) => blocker.includes("managed database runtime boundary")));
+  assert.ok(
+    report.blockers.some((blocker) => blocker.includes("managed database runtime boundary")),
+  );
 });
 
 test("PACKETAGENT_STORE=managed is allowed when managed Postgres adapter and URL are configured", () => {
@@ -208,7 +226,9 @@ test("managed URL hints are redacted and block strict startup", () => {
   assert.equal(managedUrl.redacted, true);
   assert.equal(packetagentDatabaseUrl.value, "[redacted]");
   assert.equal(packetagentDatabaseUrl.redacted, true);
-  assert.ok(report.warnings.some((warning) => warning.includes("recognized managed Postgres adapter")));
+  assert.ok(
+    report.warnings.some((warning) => warning.includes("recognized managed Postgres adapter")),
+  );
   assert.throws(
     () =>
       assertManagedDatabaseRuntimeSupported({
@@ -230,7 +250,9 @@ test("unrecognized adapter does not unlock managed Postgres startup", () => {
 
   assert.equal(report.allowed, false);
   assert.equal(report.classification, "managed-database-blocked");
-  assert.ok(report.warnings.some((warning) => warning.includes("recognized postgres adapter value")));
+  assert.ok(
+    report.warnings.some((warning) => warning.includes("recognized postgres adapter value")),
+  );
 });
 
 test("unsupported store is classified and blocked", () => {
@@ -244,7 +266,9 @@ test("unsupported store is classified and blocked", () => {
   assert.equal(report.status, "fail");
   assert.equal(report.classification, "unsupported-store");
   assert.equal(report.observed.store, "memory");
-  assert.ok(report.blockers.some((blocker) => blocker.includes("not a supported runtime storage mode")));
+  assert.ok(
+    report.blockers.some((blocker) => blocker.includes("not a supported runtime storage mode")),
+  );
   assert.ok(report.nextSteps.some((step) => step.includes("PACKETAGENT_STORE=json")));
 });
 
@@ -263,7 +287,11 @@ test("bypass flag downgrades a blocked managed runtime to a warning", () => {
   assert.equal(report.observed.bypassEnabled, true);
   assert.equal(observedEnvValue(report, "PACKETAGENT_MANAGED_DATABASE_URL").value, "[redacted]");
   assert.ok(report.blockers.length > 0);
-  assert.ok(report.warnings.some((warning) => warning.includes("bypassed the managed database runtime guard")));
+  assert.ok(
+    report.warnings.some((warning) =>
+      warning.includes("bypassed the managed database runtime guard"),
+    ),
+  );
   assert.ok(report.summary.includes("bypassed"));
   assert.doesNotThrow(() =>
     assertManagedDatabaseRuntimeSupported({

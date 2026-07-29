@@ -32,7 +32,11 @@ function captureFetch(response: () => Response): {
     }
     let parsedBody: unknown = undefined;
     if (typeof init?.body === "string") {
-      try { parsedBody = JSON.parse(init.body); } catch { parsedBody = init.body; }
+      try {
+        parsedBody = JSON.parse(init.body);
+      } catch {
+        parsedBody = init.body;
+      }
     }
     captured.push({
       url: url.toString(),
@@ -141,7 +145,11 @@ test("call() with apiFormat=openai posts to /v1/chat/completions with OpenAI pay
       id: "x1",
       model: "qwen2.5-coder-32b-instruct",
       choices: [
-        { index: 0, message: { role: "assistant", content: "hi from vllm" }, finish_reason: "stop" },
+        {
+          index: 0,
+          message: { role: "assistant", content: "hi from vllm" },
+          finish_reason: "stop",
+        },
       ],
       usage: { prompt_tokens: 5, completion_tokens: 4, total_tokens: 9 },
     }),
@@ -160,7 +168,11 @@ test("call() with apiFormat=openai posts to /v1/chat/completions with OpenAI pay
   assert.equal(captured.length, 1);
   assert.equal(captured[0].method, "POST");
   assert.equal(captured[0].url, "http://gpu-box:8000/v1/chat/completions");
-  const body = captured[0].body as { model: string; messages: { role: string; content: string }[]; stream: boolean };
+  const body = captured[0].body as {
+    model: string;
+    messages: { role: string; content: string }[];
+    stream: boolean;
+  };
   assert.equal(body.model, "qwen2.5-coder-32b-instruct");
   assert.equal(body.stream, false);
   assert.deepEqual(body.messages, [{ role: "user", content: "ping" }]);
@@ -292,7 +304,9 @@ test("OllamaProvider: LOCAL_LLM_MODEL also overrides the model in OpenAI-compat 
       jsonResponse({
         id: "x",
         model: "deepseek-coder-v2:236b",
-        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        choices: [
+          { index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" },
+        ],
         usage: { prompt_tokens: 1, completion_tokens: 1 },
       }),
     );
@@ -328,7 +342,11 @@ test("call() with apiFormat=openai parses tool_calls", async () => {
             role: "assistant",
             content: null,
             tool_calls: [
-              { id: "call_1", type: "function", function: { name: "search", arguments: '{"q":"packetagent"}' } },
+              {
+                id: "call_1",
+                type: "function",
+                function: { name: "search", arguments: '{"q":"packetagent"}' },
+              },
             ],
           },
           finish_reason: "tool_calls",

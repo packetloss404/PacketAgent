@@ -82,7 +82,12 @@ test("buildSignalSnapshotFromProductRecords counts only unresolved blockers and 
     blockers: [
       { id: "blocker_1", status: "open", severity: "critical" },
       { id: "blocker_2", status: "active", dependency: true },
-      { id: "blocker_3", status: "resolved", dependency: true, resolvedAt: "2026-04-21T10:00:00.000Z" },
+      {
+        id: "blocker_3",
+        status: "resolved",
+        dependency: true,
+        resolvedAt: "2026-04-21T10:00:00.000Z",
+      },
       { id: "blocker_4", status: "cancelled" },
     ],
     questions: [
@@ -90,7 +95,12 @@ test("buildSignalSnapshotFromProductRecords counts only unresolved blockers and 
       { id: "question_2", status: "answered" },
     ],
     validationEvidence: [
-      { id: "validation_1", status: "failed", severity: "critical", failedAt: "2026-04-21T11:00:00.000Z" },
+      {
+        id: "validation_1",
+        status: "failed",
+        severity: "critical",
+        failedAt: "2026-04-21T11:00:00.000Z",
+      },
       { id: "validation_2", status: "passed", passedAt: "2026-04-21T12:00:00.000Z" },
     ],
   });

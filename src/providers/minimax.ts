@@ -30,7 +30,10 @@ interface MiniMaxChatMessage {
 interface MiniMaxChatRequest {
   model: string;
   messages: MiniMaxChatMessage[];
-  tools?: { type: "function"; function: { name: string; description?: string; parameters: Record<string, unknown> } }[];
+  tools?: {
+    type: "function";
+    function: { name: string; description?: string; parameters: Record<string, unknown> };
+  }[];
   max_tokens?: number;
   temperature?: number;
   stream?: boolean;
@@ -53,13 +56,22 @@ interface MiniMaxChatResponse {
 interface MiniMaxStreamDelta {
   role?: string;
   content?: string;
-  tool_calls?: { index: number; id?: string; type?: "function"; function?: { name?: string; arguments?: string } }[];
+  tool_calls?: {
+    index: number;
+    id?: string;
+    type?: "function";
+    function?: { name?: string; arguments?: string };
+  }[];
 }
 
 interface MiniMaxStreamChunk {
   id?: string;
   model?: string;
-  choices?: { index: number; delta: MiniMaxStreamDelta; finish_reason: MiniMaxChatChoice["finish_reason"] }[];
+  choices?: {
+    index: number;
+    delta: MiniMaxStreamDelta;
+    finish_reason: MiniMaxChatChoice["finish_reason"];
+  }[];
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }
 
@@ -74,15 +86,24 @@ function mapMessages(messages: ProviderMessage[]): MiniMaxChatMessage[] {
 
 function mapTools(tools: ProviderToolDef[] | undefined) {
   if (!tools || tools.length === 0) return undefined;
-  return tools.map((t) => ({ type: "function" as const, function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
+  return tools.map((t) => ({
+    type: "function" as const,
+    function: { name: t.name, description: t.description, parameters: t.inputSchema },
+  }));
 }
 
-function mapFinishReason(reason: MiniMaxChatChoice["finish_reason"]): ProviderCallResult["finishReason"] {
+function mapFinishReason(
+  reason: MiniMaxChatChoice["finish_reason"],
+): ProviderCallResult["finishReason"] {
   switch (reason) {
-    case "stop": return "stop";
-    case "length": return "length";
-    case "tool_calls": return "tool_use";
-    default: return "error";
+    case "stop":
+      return "stop";
+    case "length":
+      return "length";
+    case "tool_calls":
+      return "tool_use";
+    default:
+      return "error";
   }
 }
 
@@ -120,13 +141,15 @@ export class MiniMaxProvider implements LLMProvider {
     }
     const env = process.env.MINIMAX_API_KEY;
     if (env) return env;
-    throw new Error("minimax: no API key available (vault returned null and MINIMAX_API_KEY not set)");
+    throw new Error(
+      "minimax: no API key available (vault returned null and MINIMAX_API_KEY not set)",
+    );
   }
 
   private buildHeaders(apiKey: string): Record<string, string> {
     const h: Record<string, string> = {
       "content-type": "application/json",
-      "authorization": `Bearer ${apiKey}`,
+      authorization: `Bearer ${apiKey}`,
     };
     if (this.groupId) h["x-minimax-group-id"] = this.groupId;
     return h;
@@ -153,14 +176,20 @@ export class MiniMaxProvider implements LLMProvider {
     }
     const json = (await res.json()) as MiniMaxChatResponse;
     if (json.base_resp && json.base_resp.status_code !== 0) {
-      throw new Error(`minimax: ${json.base_resp.status_msg} (status ${json.base_resp.status_code})`);
+      throw new Error(
+        `minimax: ${json.base_resp.status_msg} (status ${json.base_resp.status_code})`,
+      );
     }
     const choice = json.choices[0];
     const toolCalls: ProviderToolCall[] = [];
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
         let parsed: Record<string, unknown> = {};
-        try { parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {}; } catch { parsed = {}; }
+        try {
+          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
+        } catch {
+          parsed = {};
+        }
         toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
       }
     }
@@ -168,7 +197,11 @@ export class MiniMaxProvider implements LLMProvider {
       content: choice?.message.content ?? "",
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
       finishReason: mapFinishReason(choice?.finish_reason ?? null),
-      usage: priceUsage(json.model, json.usage?.prompt_tokens ?? 0, json.usage?.completion_tokens ?? 0),
+      usage: priceUsage(
+        json.model,
+        json.usage?.prompt_tokens ?? 0,
+        json.usage?.completion_tokens ?? 0,
+      ),
       model: json.model,
       providerName: "minimax",
     };
@@ -176,8 +209,12 @@ export class MiniMaxProvider implements LLMProvider {
 
   async *stream(opts: ProviderCallOptions): AsyncIterable<ProviderStreamChunk> {
     let apiKey: string;
-    try { apiKey = await this.resolveApiKey(opts.workspaceId); }
-    catch (error) { yield { error: (error as Error).message }; return; }
+    try {
+      apiKey = await this.resolveApiKey(opts.workspaceId);
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     const body: MiniMaxChatRequest = {
       model: opts.model,
@@ -196,24 +233,35 @@ export class MiniMaxProvider implements LLMProvider {
         body: JSON.stringify(body),
         signal: opts.signal,
       });
-    } catch (error) { yield { error: (error as Error).message }; return; }
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       yield { error: `minimax: HTTP ${res.status} ${text}` };
       return;
     }
-    if (!res.body) { yield { error: "minimax: empty stream body" }; return; }
+    if (!res.body) {
+      yield { error: "minimax: empty stream body" };
+      return;
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     const partials = new Map<number, { id?: string; name?: string; argsAccum: string }>();
     let buffer = "";
-    let prompt = 0, completion = 0, model = opts.model;
+    let prompt = 0,
+      completion = 0,
+      model = opts.model;
 
     try {
       while (true) {
-        if (opts.signal?.aborted) { yield { error: "aborted" }; return; }
+        if (opts.signal?.aborted) {
+          yield { error: "aborted" };
+          return;
+        }
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -226,7 +274,11 @@ export class MiniMaxProvider implements LLMProvider {
             const data = trimmed.slice(5).trim();
             if (data === "[DONE]") continue;
             let parsed: MiniMaxStreamChunk;
-            try { parsed = JSON.parse(data) as MiniMaxStreamChunk; } catch { continue; }
+            try {
+              parsed = JSON.parse(data) as MiniMaxStreamChunk;
+            } catch {
+              continue;
+            }
             if (parsed.model) model = parsed.model;
             const choice = parsed.choices?.[0];
             if (choice?.delta.content) yield { delta: choice.delta.content };
@@ -243,7 +295,11 @@ export class MiniMaxProvider implements LLMProvider {
               for (const slot of partials.values()) {
                 if (!slot.id || !slot.name) continue;
                 let parsedArgs: Record<string, unknown> = {};
-                try { parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {}; } catch { parsedArgs = {}; }
+                try {
+                  parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
+                } catch {
+                  parsedArgs = {};
+                }
                 yield { toolCall: { id: slot.id, name: slot.name, input: parsedArgs } };
               }
               partials.clear();
@@ -255,7 +311,10 @@ export class MiniMaxProvider implements LLMProvider {
           }
         }
       }
-    } catch (error) { yield { error: (error as Error).message }; return; }
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     yield { done: true, usage: priceUsage(model, prompt, completion) };
   }

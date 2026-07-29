@@ -22,10 +22,16 @@ export function openStoreDatabase(dbPath: string): DatabaseSync {
 }
 
 function applyStoreMigrations(db: DatabaseSync): void {
-  db.exec("create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))");
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  db.exec(
+    "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
+  );
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
 
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;

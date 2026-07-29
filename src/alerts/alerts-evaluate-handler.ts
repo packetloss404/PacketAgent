@@ -10,7 +10,12 @@ import { getJobTypeMetrics, type JobTypeMetrics } from "../jobs/scheduler-metric
 import { enqueueJob, enqueueJobAsync, type EnqueueJobInput } from "../jobs/store.js";
 import { activateWorkerAlertEvents } from "../workers/adapters.js";
 import { nextAfter } from "../jobs/cron.js";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, type JobRecord, type PacketAgentData } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  loadStoreAsync as defaultLoadStoreAsync,
+  type JobRecord,
+  type PacketAgentData,
+} from "../packetagent-store.js";
 
 export const ALERTS_EVALUATE_JOB_TYPE = "alerts.evaluate" as const;
 
@@ -134,7 +139,8 @@ export async function handleAlertsEvaluateJob(
     payload.jobFailureMinSamples ??
     readNumberFromEnv(env, ALERT_JOB_FAILURE_MIN_SAMPLES_ENV) ??
     DEFAULT_JOB_FAILURE_MIN_SAMPLES;
-  const retentionDays = payload.retentionDays ?? parseRetentionFromEnv(env[ALERT_RETENTION_DAYS_ENV]);
+  const retentionDays =
+    payload.retentionDays ?? parseRetentionFromEnv(env[ALERT_RETENTION_DAYS_ENV]);
 
   const events: AlertEvent[] = evaluate({
     health: await healthFn(),
@@ -194,9 +200,7 @@ export async function handleAlertsEvaluateJob(
   return result;
 }
 
-export function ensureAlertsCronJob(
-  deps: EnsureAlertsCronJobDeps = {},
-): EnsureAlertsCronJobResult {
+export function ensureAlertsCronJob(deps: EnsureAlertsCronJobDeps = {}): EnsureAlertsCronJobResult {
   const env = deps.env ?? process.env;
   const loadStore = deps.loadStore ?? defaultLoadStore;
   const enqueue = deps.enqueue ?? enqueueJob;

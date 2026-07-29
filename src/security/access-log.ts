@@ -48,7 +48,11 @@ function readConfig(): AccessLogConfig {
 
 function closeCachedFd(): void {
   if (cachedFileFd !== null) {
-    try { closeSync(cachedFileFd); } catch { /* ignore */ }
+    try {
+      closeSync(cachedFileFd);
+    } catch {
+      /* ignore */
+    }
   }
   cachedFileFd = null;
   cachedFilePath = null;
@@ -93,13 +97,21 @@ export function rotateAccessLogFile(filePath: string, maxFiles: number): RotateA
   try {
     const top = `${filePath}.${ceiling}`;
     if (existsSync(top)) {
-      try { rmSync(top, { force: true }); } catch { /* ignore */ }
+      try {
+        rmSync(top, { force: true });
+      } catch {
+        /* ignore */
+      }
     }
     for (let i = ceiling - 1; i >= 1; i -= 1) {
       const src = `${filePath}.${i}`;
       const dst = `${filePath}.${i + 1}`;
       if (existsSync(src)) {
-        try { renameSync(src, dst); } catch { /* ignore */ }
+        try {
+          renameSync(src, dst);
+        } catch {
+          /* ignore */
+        }
       }
     }
     renameSync(filePath, `${filePath}.1`);
@@ -156,7 +168,11 @@ export function accessLogMiddleware(): (c: Context, next: () => Promise<void>) =
         const projected = cachedFileSize + serialized.length;
         if (projected > config.maxBytes) {
           closeCachedFd();
-          try { rotateAccessLogFile(config.filePath, config.maxFiles); } catch { /* ignore */ }
+          try {
+            rotateAccessLogFile(config.filePath, config.maxFiles);
+          } catch {
+            /* ignore */
+          }
         }
       }
       try {

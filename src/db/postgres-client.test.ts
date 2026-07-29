@@ -19,7 +19,10 @@ const databaseUrl = "postgres://packetagent:database-secret@database.internal/pa
 class FakePool implements ManagedPostgresPool {
   static instances: FakePool[] = [];
 
-  readonly queries: Array<{ queryTextOrConfig: string | QueryConfig<unknown[]>; values?: unknown[] }> = [];
+  readonly queries: Array<{
+    queryTextOrConfig: string | QueryConfig<unknown[]>;
+    values?: unknown[];
+  }> = [];
   readonly clients: FakeClient[] = [];
   ended = false;
 
@@ -86,7 +89,10 @@ test("resolves managed Postgres URL using the documented env priority", () => {
   assert.equal(config.source, "PACKETAGENT_MANAGED_DATABASE_URL");
   assert.equal(config.connectionString, managedUrl);
   assert.equal(config.redactedConnectionString, "[redacted]");
-  assert.equal(config.summary, "Managed Postgres is configured from PACKETAGENT_MANAGED_DATABASE_URL ([redacted]).");
+  assert.equal(
+    config.summary,
+    "Managed Postgres is configured from PACKETAGENT_MANAGED_DATABASE_URL ([redacted]).",
+  );
   assert.equal(config.summary.includes("super-secret"), false);
   assert.equal(config.summary.includes("db.example.com"), false);
 });
@@ -143,7 +149,9 @@ test("client forwards query, connect, and close to the underlying pool", async (
   const pool = FakePool.instances[0];
   assert.equal(client.config.source, "PACKETAGENT_MANAGED_DATABASE_URL");
   assert.equal(result.rows[0]?.ok, true);
-  assert.deepEqual(pool?.queries, [{ queryTextOrConfig: "select $1::text as value", values: ["ready"] }]);
+  assert.deepEqual(pool?.queries, [
+    { queryTextOrConfig: "select $1::text as value", values: ["ready"] },
+  ]);
   assert.equal(pool?.clients[0]?.released, true);
   assert.equal(pool?.ended, true);
 });

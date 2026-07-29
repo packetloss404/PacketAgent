@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_ROUTES, ProviderRouter, StubProvider } from "../index.js";
-import type { LLMProvider, ProviderCallOptions, ProviderCallResult, ProviderStreamChunk } from "../types.js";
+import type {
+  LLMProvider,
+  ProviderCallOptions,
+  ProviderCallResult,
+  ProviderStreamChunk,
+} from "../types.js";
 
 function callOpts(overrides: Partial<ProviderCallOptions> = {}): ProviderCallOptions {
   return {
@@ -93,7 +98,7 @@ test("missing-provider fallback emits warn and routes to stub", async () => {
   try {
     const res = await router.call(callOpts({ routeKey: "code.generation" }));
     assert.equal(res.providerName, "stub");
-    assert.ok(calls.some((c) => String(c[0]).includes("no provider registered for \"minimax\"")));
+    assert.ok(calls.some((c) => String(c[0]).includes('no provider registered for "minimax"')));
   } finally {
     console.warn = original;
   }
@@ -130,7 +135,11 @@ test("provider override routes calls through the selected provider and model", a
   };
   router.register("openai", fakeOpenAI);
 
-  const result = await router.call({ ...callOpts({ routeKey: "agent.reasoning" }), provider: "openai", model: "gpt-agent" });
+  const result = await router.call({
+    ...callOpts({ routeKey: "agent.reasoning" }),
+    provider: "openai",
+    model: "gpt-agent",
+  });
 
   assert.equal(result.providerName, "openai");
   assert.equal(result.model, "gpt-agent");

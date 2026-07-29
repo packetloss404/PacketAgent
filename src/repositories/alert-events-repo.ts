@@ -3,7 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  mutateStore as defaultMutateStore,
+} from "../packetagent-store.js";
 
 const DEFAULT_LIST_LIMIT = 100;
 const MAX_LIST_LIMIT = 500;
@@ -27,7 +30,10 @@ export interface UpdateAlertDeliveryStatusPatch {
 export interface AlertEventsRepository {
   list(filter?: ListAlertsFilter): AlertEventRecord[];
   insertMany(records: AlertEventRecord[]): void;
-  updateDeliveryStatus(alertId: string, patch: UpdateAlertDeliveryStatusPatch): AlertEventRecord | null;
+  updateDeliveryStatus(
+    alertId: string,
+    patch: UpdateAlertDeliveryStatusPatch,
+  ): AlertEventRecord | null;
   prune(retainAfterIso: string): number;
   count(): number;
 }
@@ -143,7 +149,8 @@ export function jsonAlertEventsRepository(
         const target = data.alertEvents.find((entry) => entry.id === alertId);
         if (!target) return null;
 
-        const previousAttempts = typeof target.deliveryAttempts === "number" ? target.deliveryAttempts : 0;
+        const previousAttempts =
+          typeof target.deliveryAttempts === "number" ? target.deliveryAttempts : 0;
         target.deliveryAttempts = previousAttempts + 1;
         target.lastDeliveryAttemptAt = patch.attemptedAt;
         target.delivered = patch.delivered;
@@ -226,7 +233,8 @@ export function asyncJsonAlertEventsRepository(
         const target = data.alertEvents.find((entry) => entry.id === alertId);
         if (!target) return null;
 
-        const previousAttempts = typeof target.deliveryAttempts === "number" ? target.deliveryAttempts : 0;
+        const previousAttempts =
+          typeof target.deliveryAttempts === "number" ? target.deliveryAttempts : 0;
         target.deliveryAttempts = previousAttempts + 1;
         target.lastDeliveryAttemptAt = patch.attemptedAt;
         target.delivered = patch.delivered;
@@ -347,7 +355,8 @@ export function sqliteAlertEventsRepository(
           | undefined;
         if (!existing) return null;
 
-        const previousAttempts = typeof existing.delivery_attempts === "number" ? existing.delivery_attempts : 0;
+        const previousAttempts =
+          typeof existing.delivery_attempts === "number" ? existing.delivery_attempts : 0;
         const nextAttempts = previousAttempts + 1;
         const nextDelivered = patch.delivered ? 1 : 0;
 
@@ -361,11 +370,7 @@ export function sqliteAlertEventsRepository(
         }
 
         const nextDeadLettered =
-          patch.deadLettered === undefined
-            ? existing.dead_lettered
-            : patch.deadLettered
-              ? 1
-              : 0;
+          patch.deadLettered === undefined ? existing.dead_lettered : patch.deadLettered ? 1 : 0;
 
         db.prepare(
           `update alert_events
@@ -395,7 +400,9 @@ export function sqliteAlertEventsRepository(
     prune(retainAfterIso) {
       const db = openDatabase(dbPath);
       try {
-        const result = db.prepare("delete from alert_events where observed_at < ?").run(retainAfterIso);
+        const result = db
+          .prepare("delete from alert_events where observed_at < ?")
+          .run(retainAfterIso);
         return Number(result.changes ?? 0);
       } finally {
         db.close();
@@ -404,7 +411,9 @@ export function sqliteAlertEventsRepository(
     count() {
       const db = openDatabase(dbPath);
       try {
-        const row = db.prepare("select count(*) as count from alert_events").get() as { count: number } | undefined;
+        const row = db.prepare("select count(*) as count from alert_events").get() as
+          | { count: number }
+          | undefined;
         return row?.count ?? 0;
       } finally {
         db.close();
@@ -441,7 +450,8 @@ function rowToRecord(row: AlertEventRow): AlertEventRecord {
   };
   if (row.delivery_error !== null) record.deliveryError = row.delivery_error;
   if (row.delivery_attempts !== null) record.deliveryAttempts = row.delivery_attempts;
-  if (row.last_delivery_attempt_at !== null) record.lastDeliveryAttemptAt = row.last_delivery_attempt_at;
+  if (row.last_delivery_attempt_at !== null)
+    record.lastDeliveryAttemptAt = row.last_delivery_attempt_at;
   if (row.dead_lettered !== null) record.deadLettered = row.dead_lettered === 1;
   return record;
 }
@@ -498,10 +508,16 @@ function openDatabase(dbPath: string): DatabaseSync {
 }
 
 function applyMigrations(db: DatabaseSync): void {
-  db.exec("create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))");
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  db.exec(
+    "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
+  );
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;
     const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");

@@ -151,9 +151,7 @@ async function writeTree(workspaceDir: string, files: GeneratedFile[]): Promise<
       // Preserve the historical "escapes workspace" wording so existing
       // callers/tests that match on it keep working, while surfacing the
       // validator's specific reason for diagnostics.
-      throw new Error(
-        `generated file path escapes workspace: ${file.path} (${check.reason})`,
-      );
+      throw new Error(`generated file path escapes workspace: ${file.path} (${check.reason})`);
     }
     const target = resolve(workspaceDir, check.normalized ?? file.path);
     await mkdir(dirname(target), { recursive: true });
@@ -439,9 +437,7 @@ export async function validateFileTree(
     } else {
       const tscBinary = resolveTscBinary();
       if (!tscBinary) {
-        console.warn(
-          `${LOG_PREFIX} could not resolve typescript binary; returning skipped result`,
-        );
+        console.warn(`${LOG_PREFIX} could not resolve typescript binary; returning skipped result`);
         return skipped(Date.now() - started);
       }
       tscCommand = buildTscCommand(tscBinary);
@@ -521,9 +517,7 @@ export async function validateFileTree(
     } else {
       const viteBinary = resolveViteBinary();
       if (!viteBinary) {
-        console.warn(
-          `${LOG_PREFIX} could not resolve vite binary; returning skipped result`,
-        );
+        console.warn(`${LOG_PREFIX} could not resolve vite binary; returning skipped result`);
         // tsc already passed, but we couldn't even attempt the build. Treat
         // this as overall skipped so the caller doesn't silently get a
         // build-skipped pass under the "real" source. The contract for the
@@ -545,9 +539,7 @@ export async function validateFileTree(
       viteResult = await runner(runArgs);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(
-        `${LOG_PREFIX} vite sandbox spawn failed: ${message}; returning skipped result`,
-      );
+      console.warn(`${LOG_PREFIX} vite sandbox spawn failed: ${message}; returning skipped result`);
       return skipped(Date.now() - started);
     }
 
@@ -581,9 +573,7 @@ export async function validateFileTree(
       viteResult.exitCode !== 0 &&
       viteErrors.length === 0
     ) {
-      viteErrors.push(
-        genericViteError(viteCombined, viteResult.exitCode, viteResult.errorMessage),
-      );
+      viteErrors.push(genericViteError(viteCombined, viteResult.exitCode, viteResult.errorMessage));
     }
 
     const buildPassed = viteErrors.length === 0;

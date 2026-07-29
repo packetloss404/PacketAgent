@@ -31,7 +31,7 @@ function makeJsonRepo(): ActivitiesRepository {
   const data = { activities: [] as ActivityRecord[] } as unknown as PacketAgentData;
   const deps: ActivitiesRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonActivitiesRepository(deps);
 }
@@ -90,20 +90,40 @@ test("upsert then list and find return the record verbatim", () => {
 
 test("list filters by workspaceId", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", occurredAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_b", occurredAt: "2026-04-26T11:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", occurredAt: "2026-04-26T12:00:00.000Z" }));
-    assert.deepEqual(repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id), ["c", "a"]);
-    assert.deepEqual(repo.list({ workspaceId: "ws_b" }).map((entry) => entry.id), ["b"]);
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", occurredAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_b", occurredAt: "2026-04-26T11:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", occurredAt: "2026-04-26T12:00:00.000Z" }),
+    );
+    assert.deepEqual(
+      repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id),
+      ["c", "a"],
+    );
+    assert.deepEqual(
+      repo.list({ workspaceId: "ws_b" }).map((entry) => entry.id),
+      ["b"],
+    );
   });
 });
 
 test("list sorts by occurredAt descending then id descending", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", occurredAt: "2026-04-26T12:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", occurredAt: "2026-04-26T12:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_a", occurredAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "d", workspaceId: "ws_a", occurredAt: "2026-04-26T11:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", occurredAt: "2026-04-26T12:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", occurredAt: "2026-04-26T12:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_a", occurredAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "d", workspaceId: "ws_a", occurredAt: "2026-04-26T11:00:00.000Z" }),
+    );
     const ids = repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id);
     assert.deepEqual(ids, ["c", "a", "d", "b"]);
   });
@@ -179,7 +199,10 @@ test("asyncActivitiesRepositoryFromSync delegates to an existing sync repository
   await asyncRepo.upsert(record);
 
   assert.deepEqual(await asyncRepo.find(record.id), syncRepo.find(record.id));
-  assert.deepEqual(await asyncRepo.list({ workspaceId: "ws_a" }), syncRepo.list({ workspaceId: "ws_a" }));
+  assert.deepEqual(
+    await asyncRepo.list({ workspaceId: "ws_a" }),
+    syncRepo.list({ workspaceId: "ws_a" }),
+  );
   assert.equal(await asyncRepo.count(), 1);
 });
 
@@ -195,7 +218,7 @@ test("createAsyncActivitiesRepository accepts awaitable store dependencies", asy
         loads += 1;
         return data;
       },
-      mutateStore: async <T,>(mutator: (target: PacketAgentData) => T | Promise<T>) => {
+      mutateStore: async <T>(mutator: (target: PacketAgentData) => T | Promise<T>) => {
         mutations += 1;
         return mutator(data);
       },
@@ -304,14 +327,25 @@ test("a corrupt payload row does not break list() or find()", () => {
       db.prepare(
         `insert into activities (id, workspace_id, occurred_at, type, payload, user_id, related_subject)
          values (?, ?, ?, ?, ?, ?, ?)`,
-      ).run("corrupt", "ws_a", "2026-04-26T11:00:00.000Z", "activity.broken", "{not valid json", null, null);
+      ).run(
+        "corrupt",
+        "ws_a",
+        "2026-04-26T11:00:00.000Z",
+        "activity.broken",
+        "{not valid json",
+        null,
+        null,
+      );
     } finally {
       db.close();
     }
 
     // list() must still return every row (corrupt one falls back, not throws).
     const rows = repo.list({ workspaceId: "ws_a" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["good_2", "corrupt", "good_1"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["good_2", "corrupt", "good_1"],
+    );
     const corrupt = rows.find((entry) => entry.id === "corrupt");
     assert.ok(corrupt);
     assert.equal(corrupt?.workspaceId, "ws_a");
@@ -334,7 +368,7 @@ test("createActivitiesRepository selects JSON implementation by default", () => 
     const data = { activities: [] as ActivityRecord[] } as unknown as PacketAgentData;
     const repo = createActivitiesRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+      mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     repo.upsert(makeRecord({ id: "act_1", workspaceId: "ws_a" }));
     assert.equal(repo.count(), 1);

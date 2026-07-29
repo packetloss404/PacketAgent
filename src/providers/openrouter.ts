@@ -45,7 +45,10 @@ interface OpenRouterChatMessage {
 interface OpenRouterChatRequest {
   model: string;
   messages: OpenRouterChatMessage[];
-  tools?: { type: "function"; function: { name: string; description?: string; parameters: Record<string, unknown> } }[];
+  tools?: {
+    type: "function";
+    function: { name: string; description?: string; parameters: Record<string, unknown> };
+  }[];
   max_tokens?: number;
   temperature?: number;
   stream?: boolean;
@@ -68,13 +71,22 @@ interface OpenRouterChatResponse {
 interface OpenRouterStreamDelta {
   role?: string;
   content?: string;
-  tool_calls?: { index: number; id?: string; type?: "function"; function?: { name?: string; arguments?: string } }[];
+  tool_calls?: {
+    index: number;
+    id?: string;
+    type?: "function";
+    function?: { name?: string; arguments?: string };
+  }[];
 }
 
 interface OpenRouterStreamChunk {
   id?: string;
   model?: string;
-  choices?: { index: number; delta: OpenRouterStreamDelta; finish_reason: OpenRouterChatChoice["finish_reason"] }[];
+  choices?: {
+    index: number;
+    delta: OpenRouterStreamDelta;
+    finish_reason: OpenRouterChatChoice["finish_reason"];
+  }[];
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
   error?: { message: string; code?: number | string };
 }
@@ -90,17 +102,25 @@ function mapMessages(messages: ProviderMessage[]): OpenRouterChatMessage[] {
 
 function mapTools(tools: ProviderToolDef[] | undefined) {
   if (!tools || tools.length === 0) return undefined;
-  return tools.map((t) => ({ type: "function" as const, function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
+  return tools.map((t) => ({
+    type: "function" as const,
+    function: { name: t.name, description: t.description, parameters: t.inputSchema },
+  }));
 }
 
-function mapFinishReason(reason: OpenRouterChatChoice["finish_reason"]): ProviderCallResult["finishReason"] {
+function mapFinishReason(
+  reason: OpenRouterChatChoice["finish_reason"],
+): ProviderCallResult["finishReason"] {
   switch (reason) {
-    case "stop": return "stop";
-    case "length": return "length";
+    case "stop":
+      return "stop";
+    case "length":
+      return "length";
     case "tool_calls":
     case "function_call":
       return "tool_use";
-    default: return "error";
+    default:
+      return "error";
   }
 }
 
@@ -151,7 +171,9 @@ export class OpenRouterProvider implements LLMProvider {
     }
     const env = process.env.OPENROUTER_API_KEY;
     if (env) return env;
-    throw new Error("openrouter: no API key available (vault returned null and OPENROUTER_API_KEY not set)");
+    throw new Error(
+      "openrouter: no API key available (vault returned null and OPENROUTER_API_KEY not set)",
+    );
   }
 
   private buildHeaders(apiKey: string): Record<string, string> {
@@ -160,7 +182,7 @@ export class OpenRouterProvider implements LLMProvider {
     // overridable via OPENROUTER_SITE_URL and OPENROUTER_APP_NAME.
     return {
       "content-type": "application/json",
-      "authorization": `Bearer ${apiKey}`,
+      authorization: `Bearer ${apiKey}`,
       "HTTP-Referer": this.siteUrl,
       "X-Title": this.appName,
     };
@@ -196,7 +218,11 @@ export class OpenRouterProvider implements LLMProvider {
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
         let parsed: Record<string, unknown> = {};
-        try { parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {}; } catch { parsed = {}; }
+        try {
+          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
+        } catch {
+          parsed = {};
+        }
         toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
       }
     }
@@ -204,7 +230,11 @@ export class OpenRouterProvider implements LLMProvider {
       content: choice?.message.content ?? "",
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
       finishReason: mapFinishReason(choice?.finish_reason ?? null),
-      usage: priceUsage(json.model, json.usage?.prompt_tokens ?? 0, json.usage?.completion_tokens ?? 0),
+      usage: priceUsage(
+        json.model,
+        json.usage?.prompt_tokens ?? 0,
+        json.usage?.completion_tokens ?? 0,
+      ),
       model: json.model,
       providerName: "openrouter",
     };
@@ -212,8 +242,12 @@ export class OpenRouterProvider implements LLMProvider {
 
   async *stream(opts: ProviderCallOptions): AsyncIterable<ProviderStreamChunk> {
     let apiKey: string;
-    try { apiKey = await this.resolveApiKey(opts.workspaceId); }
-    catch (error) { yield { error: (error as Error).message }; return; }
+    try {
+      apiKey = await this.resolveApiKey(opts.workspaceId);
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     const body: OpenRouterChatRequest = {
       model: opts.model,
@@ -232,24 +266,35 @@ export class OpenRouterProvider implements LLMProvider {
         body: JSON.stringify(body),
         signal: opts.signal,
       });
-    } catch (error) { yield { error: (error as Error).message }; return; }
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       yield { error: authErrorMessage(res.status, text) };
       return;
     }
-    if (!res.body) { yield { error: "openrouter: empty stream body" }; return; }
+    if (!res.body) {
+      yield { error: "openrouter: empty stream body" };
+      return;
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     const partials = new Map<number, { id?: string; name?: string; argsAccum: string }>();
     let buffer = "";
-    let prompt = 0, completion = 0, model = opts.model;
+    let prompt = 0,
+      completion = 0,
+      model = opts.model;
 
     try {
       while (true) {
-        if (opts.signal?.aborted) { yield { error: "aborted" }; return; }
+        if (opts.signal?.aborted) {
+          yield { error: "aborted" };
+          return;
+        }
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -262,8 +307,15 @@ export class OpenRouterProvider implements LLMProvider {
             const data = trimmed.slice(5).trim();
             if (data === "[DONE]") continue;
             let parsed: OpenRouterStreamChunk;
-            try { parsed = JSON.parse(data) as OpenRouterStreamChunk; } catch { continue; }
-            if (parsed.error) { yield { error: `openrouter: ${parsed.error.message}` }; return; }
+            try {
+              parsed = JSON.parse(data) as OpenRouterStreamChunk;
+            } catch {
+              continue;
+            }
+            if (parsed.error) {
+              yield { error: `openrouter: ${parsed.error.message}` };
+              return;
+            }
             if (parsed.model) model = parsed.model;
             const choice = parsed.choices?.[0];
             if (choice?.delta.content) yield { delta: choice.delta.content };
@@ -280,7 +332,11 @@ export class OpenRouterProvider implements LLMProvider {
               for (const slot of partials.values()) {
                 if (!slot.id || !slot.name) continue;
                 let parsedArgs: Record<string, unknown> = {};
-                try { parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {}; } catch { parsedArgs = {}; }
+                try {
+                  parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
+                } catch {
+                  parsedArgs = {};
+                }
                 yield { toolCall: { id: slot.id, name: slot.name, input: parsedArgs } };
               }
               partials.clear();
@@ -292,7 +348,10 @@ export class OpenRouterProvider implements LLMProvider {
           }
         }
       }
-    } catch (error) { yield { error: (error as Error).message }; return; }
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     yield { done: true, usage: priceUsage(model, prompt, completion) };
   }

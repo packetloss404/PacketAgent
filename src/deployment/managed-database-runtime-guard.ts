@@ -235,7 +235,10 @@ export function assessManagedDatabaseRuntimeGuard(
   const checks: ManagedDatabaseRuntimeGuardCheck[] = [];
   const warnings: string[] = [];
 
-  if (supportedStore(store, supportedLocalModes) || (managedStoreRequested(store) && managedPostgresSupported)) {
+  if (
+    supportedStore(store, supportedLocalModes) ||
+    (managedStoreRequested(store) && managedPostgresSupported)
+  ) {
     pushCheck(
       checks,
       "supported-runtime-store",
@@ -243,8 +246,8 @@ export function assessManagedDatabaseRuntimeGuard(
       managedStoreRequested(store)
         ? `PACKETAGENT_STORE=${store} is allowed by a recognized managed Postgres adapter and managed database URL.`
         : store === "sqlite"
-        ? "PACKETAGENT_STORE=sqlite is supported only for single-node SQLite runtime."
-        : "PACKETAGENT_STORE is using the supported local JSON runtime.",
+          ? "PACKETAGENT_STORE=sqlite is supported only for single-node SQLite runtime."
+          : "PACKETAGENT_STORE is using the supported local JSON runtime.",
     );
   } else {
     pushCheck(
@@ -269,7 +272,9 @@ export function assessManagedDatabaseRuntimeGuard(
   );
 
   if (store === "sqlite" && !configured(env.PACKETAGENT_DB_PATH)) {
-    warnings.push(`PACKETAGENT_DB_PATH is not set; SQLite will use the default local path ${DEFAULT_SQLITE_PATH}.`);
+    warnings.push(
+      `PACKETAGENT_DB_PATH is not set; SQLite will use the default local path ${DEFAULT_SQLITE_PATH}.`,
+    );
   }
   if (hasManagedDatabaseUrl) {
     warnings.push(
@@ -313,8 +318,8 @@ export function assessManagedDatabaseRuntimeGuard(
       : hasManagedIntent && managedPostgresSupported
         ? "Managed database runtime guard allows managed Postgres startup with a recognized adapter and managed database URL."
         : store === "sqlite"
-        ? "Managed database runtime guard allows supported single-node SQLite runtime."
-        : "Managed database runtime guard allows supported local JSON runtime."
+          ? "Managed database runtime guard allows supported single-node SQLite runtime."
+          : "Managed database runtime guard allows supported local JSON runtime."
     : "Managed database runtime guard blocked unsupported managed database runtime configuration.";
 
   const observedEnv = buildObservedEnv(env);

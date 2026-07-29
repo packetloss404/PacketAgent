@@ -3,7 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import type { ActivityRecord, PacketAgentData } from "../packetagent-store.js";
-import { loadStore as defaultLoadStore, mutateStore as defaultMutateStore } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  mutateStore as defaultMutateStore,
+} from "../packetagent-store.js";
 
 const DEFAULT_DB_FILE = "data/packetagent.sqlite";
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
@@ -42,7 +45,9 @@ export interface AsyncActivitiesRepositoryDeps {
   dbPath?: string;
 }
 
-export function createActivitiesRepository(deps: ActivitiesRepositoryDeps = {}): ActivitiesRepository {
+export function createActivitiesRepository(
+  deps: ActivitiesRepositoryDeps = {},
+): ActivitiesRepository {
   if (process.env.PACKETAGENT_STORE === "sqlite") return sqliteActivitiesRepository(deps);
   return jsonActivitiesRepository(deps);
 }
@@ -76,7 +81,9 @@ export function asyncActivitiesRepositoryFromSync(
   };
 }
 
-export function jsonActivitiesRepository(deps: ActivitiesRepositoryDeps = {}): ActivitiesRepository {
+export function jsonActivitiesRepository(
+  deps: ActivitiesRepositoryDeps = {},
+): ActivitiesRepository {
   const load = deps.loadStore ?? defaultLoadStore;
   const mutate = deps.mutateStore ?? defaultMutateStore;
   return {
@@ -146,7 +153,9 @@ export function asyncJsonActivitiesRepository(
   };
 }
 
-export function sqliteActivitiesRepository(deps: ActivitiesRepositoryDeps = {}): ActivitiesRepository {
+export function sqliteActivitiesRepository(
+  deps: ActivitiesRepositoryDeps = {},
+): ActivitiesRepository {
   const dbPath = resolveDbPath(deps.dbPath);
   return {
     list(filter) {
@@ -170,7 +179,9 @@ export function sqliteActivitiesRepository(deps: ActivitiesRepositoryDeps = {}):
       const db = openDatabase(dbPath);
       try {
         const row = db
-          .prepare("select id, workspace_id, occurred_at, type, payload from activities where id = ?")
+          .prepare(
+            "select id, workspace_id, occurred_at, type, payload from activities where id = ?",
+          )
           .get(id) as ActivityRow | undefined;
         return row ? rowToRecord(row) : null;
       } finally {
@@ -274,9 +285,13 @@ function applyMigrations(db: DatabaseSync): void {
   db.exec(
     "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
   );
-  const appliedRows = db.prepare("select name from schema_migrations order by name").all() as Array<{ name: string }>;
+  const appliedRows = db
+    .prepare("select name from schema_migrations order by name")
+    .all() as Array<{ name: string }>;
   const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql")).sort();
+  const migrations = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   for (const name of migrations) {
     if (alreadyApplied.has(name)) continue;
     const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");

@@ -34,7 +34,8 @@ export function register(input: { email: string; password: string; displayName: 
   const email = normalizeEmail(input.email);
   if (!email.includes("@")) throw httpError(400, "valid email is required");
   if (input.password.length < 8) throw httpError(400, "password must be at least 8 characters");
-  if (input.displayName.trim().length < 2) throw httpError(400, "display name must be at least 2 characters");
+  if (input.displayName.trim().length < 2)
+    throw httpError(400, "display name must be at least 2 characters");
 
   return mutateStore((data) => {
     if (data.users.some((user) => normalizeEmail(user.email) === email)) {
@@ -83,8 +84,28 @@ export function register(input: { email: string; password: string; displayName: 
     });
 
     data.activationFacts[workspaceId] = { now: timestamp };
-    recordActivity(data, makeActivity(workspaceId, "account", "account.created", { type: "user", id: userId, displayName }, { title: `Account created for ${displayName}` }, timestamp));
-    recordActivity(data, makeActivity(workspaceId, "workspace", "workspace.created", { type: "user", id: userId, displayName }, { title: `Workspace ${workspaceName} created` }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        workspaceId,
+        "account",
+        "account.created",
+        { type: "user", id: userId, displayName },
+        { title: `Account created for ${displayName}` },
+        timestamp,
+      ),
+    );
+    recordActivity(
+      data,
+      makeActivity(
+        workspaceId,
+        "workspace",
+        "workspace.created",
+        { type: "user", id: userId, displayName },
+        { title: `Workspace ${workspaceName} created` },
+        timestamp,
+      ),
+    );
 
     const session = createSessionRecord(userId, timestamp);
     data.sessions.push(session.record);
@@ -95,11 +116,16 @@ export function register(input: { email: string; password: string; displayName: 
   });
 }
 
-export async function registerAsync(input: { email: string; password: string; displayName: string }) {
+export async function registerAsync(input: {
+  email: string;
+  password: string;
+  displayName: string;
+}) {
   const email = normalizeEmail(input.email);
   if (!email.includes("@")) throw httpError(400, "valid email is required");
   if (input.password.length < 8) throw httpError(400, "password must be at least 8 characters");
-  if (input.displayName.trim().length < 2) throw httpError(400, "display name must be at least 2 characters");
+  if (input.displayName.trim().length < 2)
+    throw httpError(400, "display name must be at least 2 characters");
 
   return mutateStoreAsync((data) => {
     if (data.users.some((user) => normalizeEmail(user.email) === email)) {
@@ -148,8 +174,28 @@ export async function registerAsync(input: { email: string; password: string; di
     });
 
     data.activationFacts[workspaceId] = { now: timestamp };
-    recordActivity(data, makeActivity(workspaceId, "account", "account.created", { type: "user", id: userId, displayName }, { title: `Account created for ${displayName}` }, timestamp));
-    recordActivity(data, makeActivity(workspaceId, "workspace", "workspace.created", { type: "user", id: userId, displayName }, { title: `Workspace ${workspaceName} created` }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        workspaceId,
+        "account",
+        "account.created",
+        { type: "user", id: userId, displayName },
+        { title: `Account created for ${displayName}` },
+        timestamp,
+      ),
+    );
+    recordActivity(
+      data,
+      makeActivity(
+        workspaceId,
+        "workspace",
+        "workspace.created",
+        { type: "user", id: userId, displayName },
+        { title: `Workspace ${workspaceName} created` },
+        timestamp,
+      ),
+    );
 
     const session = createSessionRecord(userId, timestamp);
     data.sessions.push(session.record);
@@ -246,13 +292,19 @@ export async function restoreSessionAsync(c: Context): Promise<AuthenticatedCont
 }
 
 export async function getPrivateBootstrap(context: AuthenticatedContext) {
-  const status = await syncWorkspaceActivation(context.workspace.id, false, { type: "system", id: "bootstrap" });
+  const status = await syncWorkspaceActivation(context.workspace.id, false, {
+    type: "system",
+    id: "bootstrap",
+  });
   const data = await loadStoreAsync();
   const workspace =
-    data.workspaces.find((entry) => entry.id === context.workspace.id) ??
-    context.workspace;
-  const onboarding = data.onboardingStates.find((entry) => entry.workspaceId === context.workspace.id);
-  const activities = data.activities.filter((entry) => entry.workspaceId === context.workspace.id).slice(0, 20);
+    data.workspaces.find((entry) => entry.id === context.workspace.id) ?? context.workspace;
+  const onboarding = data.onboardingStates.find(
+    (entry) => entry.workspaceId === context.workspace.id,
+  );
+  const activities = data.activities
+    .filter((entry) => entry.workspaceId === context.workspace.id)
+    .slice(0, 20);
 
   return {
     user: {
@@ -290,7 +342,9 @@ export async function getActivationDetail(context: AuthenticatedContext) {
 
 export function getSessionPayload(context: AuthenticatedContext) {
   const data = loadStore();
-  const onboarding = data.onboardingStates.find((entry) => entry.workspaceId === context.workspace.id);
+  const onboarding = data.onboardingStates.find(
+    (entry) => entry.workspaceId === context.workspace.id,
+  );
 
   return {
     authenticated: true,
@@ -328,7 +382,9 @@ export function getSessionPayload(context: AuthenticatedContext) {
 
 export async function getSessionPayloadAsync(context: AuthenticatedContext) {
   const data = await loadStoreAsync();
-  const onboarding = data.onboardingStates.find((entry) => entry.workspaceId === context.workspace.id);
+  const onboarding = data.onboardingStates.find(
+    (entry) => entry.workspaceId === context.workspace.id,
+  );
 
   return {
     authenticated: true,
@@ -368,7 +424,8 @@ export async function updateProfile(
   context: AuthenticatedContext,
   input: { displayName: string; timezone: string },
 ) {
-  if (input.displayName.trim().length < 2) throw httpError(400, "display name must be at least 2 characters");
+  if (input.displayName.trim().length < 2)
+    throw httpError(400, "display name must be at least 2 characters");
   if (!input.timezone.trim()) throw httpError(400, "timezone is required");
 
   return mutateStoreAsync((data) => {
@@ -377,7 +434,17 @@ export async function updateProfile(
     user.displayName = input.displayName.trim();
     user.timezone = input.timezone.trim();
     user.updatedAt = now();
-    recordActivity(data, makeActivity(context.workspace.id, "account", "account.profile_updated", { type: "user", id: user.id, displayName: user.displayName }, { title: "Profile updated" }, user.updatedAt));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "account",
+        "account.profile_updated",
+        { type: "user", id: user.id, displayName: user.displayName },
+        { title: "Profile updated" },
+        user.updatedAt,
+      ),
+    );
     return user;
   });
 }

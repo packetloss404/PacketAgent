@@ -64,8 +64,9 @@ export function reconcileInvitationEmails(
   const mutateStore = deps.mutateStore ?? defaultMutateStore;
   const apply = deps.apply ?? applyInvitationEmailReconciliation;
   const now = options.now ?? deps.now ?? (() => new Date().toISOString());
-  const enqueueRetry = deps.enqueueRetry ?? ((delivery: InvitationEmailDeliveryRecord) =>
-    defaultEnqueueRetry(loadStore(), delivery));
+  const enqueueRetry =
+    deps.enqueueRetry ??
+    ((delivery: InvitationEmailDeliveryRecord) => defaultEnqueueRetry(loadStore(), delivery));
 
   const data = loadStore();
   const allDeliveries = data.invitationEmailDeliveries ?? [];
@@ -79,7 +80,10 @@ export function reconcileInvitationEmails(
   const needsReconciliation = filtered
     .filter((entry) => entry.status === "failed" && entry.providerStatus !== "delivered")
     .slice()
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id));
+    .sort(
+      (left, right) =>
+        right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+    );
 
   const failedDeliveries: ReconcileFailedDelivery[] = needsReconciliation.map((entry) => ({
     deliveryId: entry.id,
@@ -197,7 +201,10 @@ function reconciliationFailureDetail(
   }
 }
 
-function defaultEnqueueRetry(data: PacketAgentData, delivery: InvitationEmailDeliveryRecord): string {
+function defaultEnqueueRetry(
+  data: PacketAgentData,
+  delivery: InvitationEmailDeliveryRecord,
+): string {
   const invitation = findInvitation(data, delivery.invitationId, delivery.workspaceId);
   const payload: Record<string, unknown> = {
     invitationId: delivery.invitationId,

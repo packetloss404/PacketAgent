@@ -30,7 +30,9 @@ function makeJob(overrides: Partial<JobRecord> & { id: string }): JobRecord {
     ...(overrides.cron !== undefined ? { cron: overrides.cron } : {}),
     ...(overrides.result !== undefined ? { result: overrides.result } : {}),
     ...(overrides.error !== undefined ? { error: overrides.error } : {}),
-    ...(overrides.cancelRequested !== undefined ? { cancelRequested: overrides.cancelRequested } : {}),
+    ...(overrides.cancelRequested !== undefined
+      ? { cancelRequested: overrides.cancelRequested }
+      : {}),
     createdAt: overrides.createdAt ?? "2026-04-26T09:00:00.000Z",
     updatedAt: overrides.updatedAt ?? "2026-04-26T09:00:00.000Z",
   };
@@ -38,7 +40,12 @@ function makeJob(overrides: Partial<JobRecord> & { id: string }): JobRecord {
 
 test("asyncJobSchedulerStorage returns the underlying sync boundary results", async () => {
   const enqueued = makeJob({ id: "enqueued" });
-  const claimed = makeJob({ id: "claimed", status: "running", attempts: 1, startedAt: "2026-04-26T10:00:00.000Z" });
+  const claimed = makeJob({
+    id: "claimed",
+    status: "running",
+    attempts: 1,
+    startedAt: "2026-04-26T10:00:00.000Z",
+  });
   const syncStorage: JobSchedulerStorageSync = {
     enqueueJob(input: EnqueueJobInput) {
       return { ...enqueued, workspaceId: input.workspaceId, type: input.type };
@@ -70,9 +77,15 @@ test("asyncJobSchedulerStorage returns the underlying sync boundary results", as
   };
   const storage = asyncJobSchedulerStorage(syncStorage);
 
-  assert.deepEqual(await storage.enqueueJob({ workspaceId: "alpha", type: "async.boundary" }), enqueued);
+  assert.deepEqual(
+    await storage.enqueueJob({ workspaceId: "alpha", type: "async.boundary" }),
+    enqueued,
+  );
   assert.deepEqual(await storage.claimNextJob(new Date("2026-04-26T10:00:00.000Z")), claimed);
-  assert.equal(await storage.sweepStaleRunningJobs(5 * 60 * 1000, new Date("2026-04-26T10:10:00.000Z")), 1);
+  assert.equal(
+    await storage.sweepStaleRunningJobs(5 * 60 * 1000, new Date("2026-04-26T10:10:00.000Z")),
+    1,
+  );
 });
 
 test("default async job scheduler boundary enqueues, claims, and sweeps through the existing store", async () => {
@@ -95,7 +108,10 @@ test("default async job scheduler boundary enqueues, claims, and sweeps through 
     assert.equal(findJob("alpha", job.id)?.status, "running");
     assert.equal(findJob("alpha", job.id)?.startedAt, claimTime.toISOString());
 
-    const swept = await sweepStaleRunningJobsAsync(5 * 60 * 1000, new Date("2026-04-26T10:10:00.000Z"));
+    const swept = await sweepStaleRunningJobsAsync(
+      5 * 60 * 1000,
+      new Date("2026-04-26T10:10:00.000Z"),
+    );
     assert.equal(swept, 1);
     assert.equal(findJob("alpha", job.id)?.status, "queued");
     assert.equal(findJob("alpha", job.id)?.startedAt, undefined);

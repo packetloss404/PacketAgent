@@ -32,15 +32,21 @@ test("GET appends query, sends headers and signal, and returns JSON with safe he
   const tool = createHttpFetchTool({ fetchImpl });
   const ctrl = new AbortController();
 
-  const result = await tool.handle({
-    url: "https://api.example.com/v1/items?existing=1",
-    headers: { authorization: "Bearer secret-token", "x-client": "packetagent" },
-    query: { q: "search", page: 2, active: true, skip: null, tag: ["a", "b"] },
-  }, ctx(ctrl.signal));
+  const result = await tool.handle(
+    {
+      url: "https://api.example.com/v1/items?existing=1",
+      headers: { authorization: "Bearer secret-token", "x-client": "packetagent" },
+      query: { q: "search", page: 2, active: true, skip: null, tag: ["a", "b"] },
+    },
+    ctx(ctrl.signal),
+  );
 
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "https://api.example.com/v1/items?existing=1&q=search&page=2&active=true&tag=a&tag=b");
+  assert.equal(
+    calls[0].url,
+    "https://api.example.com/v1/items?existing=1&q=search&page=2&active=true&tag=a&tag=b",
+  );
   assert.equal(calls[0].init.method, "GET");
   assert.equal(calls[0].init.signal, ctrl.signal);
   const requestHeaders = calls[0].init.headers as Headers;
@@ -79,11 +85,14 @@ test("POST JSON body sets content type and returns HTTP errors with output", asy
   };
   const tool = createHttpFetchTool({ fetchImpl });
 
-  const result = await tool.handle({
-    url: "https://api.example.com/jobs",
-    method: "POST",
-    json: { name: "nightly", enabled: true },
-  }, ctx());
+  const result = await tool.handle(
+    {
+      url: "https://api.example.com/jobs",
+      method: "POST",
+      json: { name: "nightly", enabled: true },
+    },
+    ctx(),
+  );
 
   assert.equal(result.ok, false);
   assert.equal(result.error, "HTTP 503");
@@ -107,19 +116,25 @@ test("supports PUT, PATCH, and DELETE with raw string bodies", async () => {
   const tool = createHttpFetchTool({ fetchImpl });
 
   for (const method of ["PUT", "PATCH", "DELETE"] satisfies HttpFetchMethod[]) {
-    const result = await tool.handle({
-      url: `https://api.example.com/${method.toLowerCase()}`,
-      method,
-      body: `raw ${method}`,
-    }, ctx());
+    const result = await tool.handle(
+      {
+        url: `https://api.example.com/${method.toLowerCase()}`,
+        method,
+        body: `raw ${method}`,
+      },
+      ctx(),
+    );
     assert.equal(result.ok, true);
   }
 
-  assert.deepEqual(calls.map((call) => [call.init.method, call.init.body]), [
-    ["PUT", "raw PUT"],
-    ["PATCH", "raw PATCH"],
-    ["DELETE", "raw DELETE"],
-  ]);
+  assert.deepEqual(
+    calls.map((call) => [call.init.method, call.init.body]),
+    [
+      ["PUT", "raw PUT"],
+      ["PATCH", "raw PATCH"],
+      ["DELETE", "raw DELETE"],
+    ],
+  );
 });
 
 test("rejects ambiguous or unsupported request inputs before fetch", async () => {
@@ -130,27 +145,36 @@ test("rejects ambiguous or unsupported request inputs before fetch", async () =>
   };
   const tool = createHttpFetchTool({ fetchImpl });
 
-  const bothBodies = await tool.handle({
-    url: "https://api.example.com",
-    method: "POST",
-    body: "raw",
-    json: { raw: false },
-  }, ctx());
+  const bothBodies = await tool.handle(
+    {
+      url: "https://api.example.com",
+      method: "POST",
+      body: "raw",
+      json: { raw: false },
+    },
+    ctx(),
+  );
   assert.equal(bothBodies.ok, false);
   assert.match(bothBodies.error ?? "", /either json or body/);
 
-  const getBody = await tool.handle({
-    url: "https://api.example.com",
-    method: "GET",
-    body: "raw",
-  }, ctx());
+  const getBody = await tool.handle(
+    {
+      url: "https://api.example.com",
+      method: "GET",
+      body: "raw",
+    },
+    ctx(),
+  );
   assert.equal(getBody.ok, false);
   assert.match(getBody.error ?? "", /GET requests cannot include a body/);
 
-  const badMethod = await tool.handle({
-    url: "https://api.example.com",
-    method: "HEAD" as HttpFetchMethod,
-  }, ctx());
+  const badMethod = await tool.handle(
+    {
+      url: "https://api.example.com",
+      method: "HEAD" as HttpFetchMethod,
+    },
+    ctx(),
+  );
   assert.equal(badMethod.ok, false);
   assert.match(badMethod.error ?? "", /not allowed/);
   assert.equal(calls, 0);
@@ -195,14 +219,17 @@ test("redacts sensitive request header values from fetch errors", async () => {
   };
   const tool = createHttpFetchTool({ fetchImpl });
 
-  const result = await tool.handle({
-    url: "https://api.example.com/private",
-    headers: {
-      authorization: "Bearer top-secret-token",
-      "x-api-key": "api-key-123",
-      "x-safe": "visible",
+  const result = await tool.handle(
+    {
+      url: "https://api.example.com/private",
+      headers: {
+        authorization: "Bearer top-secret-token",
+        "x-api-key": "api-key-123",
+        "x-safe": "visible",
+      },
     },
-  }, ctx());
+    ctx(),
+  );
 
   assert.equal(result.ok, false);
   assert.match(result.error ?? "", /fetch failed/);
@@ -211,17 +238,18 @@ test("redacts sensitive request header values from fetch errors", async () => {
 });
 
 test("truncates large response bodies and skips JSON parsing when truncated", async () => {
-  const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({ message: "hello" }), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
+  const fetchImpl: typeof fetch = async () =>
+    new Response(JSON.stringify({ message: "hello" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   const tool = createHttpFetchTool({ fetchImpl, maxBodyChars: 6 });
 
   const result = await tool.handle({ url: "https://api.example.com/large" }, ctx());
 
   assert.equal(result.ok, true);
   const output = result.output as { body: string; bodyTruncated: boolean; json?: unknown };
-  assert.equal(output.body, "{\"mess\n...[truncated]");
+  assert.equal(output.body, '{"mess\n...[truncated]');
   assert.equal(output.bodyTruncated, true);
   assert.equal(output.json, undefined);
 });

@@ -29,8 +29,10 @@ function makeRecord(
   if (overrides.sentAt !== undefined) record.sentAt = overrides.sentAt;
   if (overrides.error !== undefined) record.error = overrides.error;
   if (overrides.providerStatus !== undefined) record.providerStatus = overrides.providerStatus;
-  if (overrides.providerDeliveryId !== undefined) record.providerDeliveryId = overrides.providerDeliveryId;
-  if (overrides.providerStatusAt !== undefined) record.providerStatusAt = overrides.providerStatusAt;
+  if (overrides.providerDeliveryId !== undefined)
+    record.providerDeliveryId = overrides.providerDeliveryId;
+  if (overrides.providerStatusAt !== undefined)
+    record.providerStatusAt = overrides.providerStatusAt;
   if (overrides.providerError !== undefined) record.providerError = overrides.providerError;
   return record;
 }
@@ -41,7 +43,7 @@ function makeJsonRepo(): InvitationEmailDeliveriesRepository {
   } as unknown as PacketAgentData;
   const deps: InvitationEmailDeliveriesRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonInvitationEmailDeliveriesRepository(deps);
 }
@@ -101,9 +103,15 @@ test("upsert then list returns the record verbatim", () => {
 
 test("list returns rows sorted descending by createdAt", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T11:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T11:00:00.000Z" }),
+    );
     const ids = repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id);
     assert.deepEqual(ids, ["a", "c", "b"]);
   });
@@ -111,9 +119,15 @@ test("list returns rows sorted descending by createdAt", () => {
 
 test("list filters by workspaceId", () => {
   runOnBoth((repo) => {
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "b", workspaceId: "ws_b", createdAt: "2026-04-26T11:00:00.000Z" }));
-    repo.upsert(makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "b", workspaceId: "ws_b", createdAt: "2026-04-26T11:00:00.000Z" }),
+    );
+    repo.upsert(
+      makeRecord({ id: "c", workspaceId: "ws_a", createdAt: "2026-04-26T12:00:00.000Z" }),
+    );
     const idsA = repo.list({ workspaceId: "ws_a" }).map((entry) => entry.id);
     const idsB = repo.list({ workspaceId: "ws_b" }).map((entry) => entry.id);
     assert.deepEqual(idsA, ["c", "a"]);
@@ -124,13 +138,28 @@ test("list filters by workspaceId", () => {
 test("list filters by invitationId", () => {
   runOnBoth((repo) => {
     repo.upsert(
-      makeRecord({ id: "a", workspaceId: "ws_a", invitationId: "inv_1", createdAt: "2026-04-26T10:00:00.000Z" }),
+      makeRecord({
+        id: "a",
+        workspaceId: "ws_a",
+        invitationId: "inv_1",
+        createdAt: "2026-04-26T10:00:00.000Z",
+      }),
     );
     repo.upsert(
-      makeRecord({ id: "b", workspaceId: "ws_a", invitationId: "inv_2", createdAt: "2026-04-26T11:00:00.000Z" }),
+      makeRecord({
+        id: "b",
+        workspaceId: "ws_a",
+        invitationId: "inv_2",
+        createdAt: "2026-04-26T11:00:00.000Z",
+      }),
     );
     repo.upsert(
-      makeRecord({ id: "c", workspaceId: "ws_a", invitationId: "inv_1", createdAt: "2026-04-26T12:00:00.000Z" }),
+      makeRecord({
+        id: "c",
+        workspaceId: "ws_a",
+        invitationId: "inv_1",
+        createdAt: "2026-04-26T12:00:00.000Z",
+      }),
     );
     const ids = repo.list({ workspaceId: "ws_a", invitationId: "inv_1" }).map((entry) => entry.id);
     assert.deepEqual(ids, ["c", "a"]);
@@ -243,9 +272,11 @@ test("createInvitationEmailDeliveriesRepository selects implementation by env", 
     } as unknown as PacketAgentData;
     const json = createInvitationEmailDeliveriesRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+      mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
-    json.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
+    json.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }),
+    );
     assert.equal(json.count(), 1);
     assert.equal(data.invitationEmailDeliveries.length, 1);
   } finally {
@@ -263,7 +294,9 @@ test("createInvitationEmailDeliveriesRepository returns sqlite impl when env req
   process.env.PACKETAGENT_DB_PATH = dbPath;
   try {
     const repo = createInvitationEmailDeliveriesRepository({ dbPath });
-    repo.upsert(makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }));
+    repo.upsert(
+      makeRecord({ id: "a", workspaceId: "ws_a", createdAt: "2026-04-26T10:00:00.000Z" }),
+    );
     assert.equal(repo.count(), 1);
     assert.equal(repo.list({ workspaceId: "ws_a" })[0]?.id, "a");
   } finally {

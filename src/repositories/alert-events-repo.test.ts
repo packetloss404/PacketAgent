@@ -12,7 +12,9 @@ import {
 } from "./alert-events-repo.js";
 import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 
-function makeRecord(overrides: Partial<AlertEventRecord> & { id: string; observedAt: string }): AlertEventRecord {
+function makeRecord(
+  overrides: Partial<AlertEventRecord> & { id: string; observedAt: string },
+): AlertEventRecord {
   const record: AlertEventRecord = {
     id: overrides.id,
     ruleId: overrides.ruleId ?? "rule_default",
@@ -24,8 +26,10 @@ function makeRecord(overrides: Partial<AlertEventRecord> & { id: string; observe
     delivered: overrides.delivered ?? false,
   };
   if (overrides.deliveryError !== undefined) record.deliveryError = overrides.deliveryError;
-  if (overrides.deliveryAttempts !== undefined) record.deliveryAttempts = overrides.deliveryAttempts;
-  if (overrides.lastDeliveryAttemptAt !== undefined) record.lastDeliveryAttemptAt = overrides.lastDeliveryAttemptAt;
+  if (overrides.deliveryAttempts !== undefined)
+    record.deliveryAttempts = overrides.deliveryAttempts;
+  if (overrides.lastDeliveryAttemptAt !== undefined)
+    record.lastDeliveryAttemptAt = overrides.lastDeliveryAttemptAt;
   if (overrides.deadLettered !== undefined) record.deadLettered = overrides.deadLettered;
   return record;
 }
@@ -34,7 +38,7 @@ function makeJsonRepo(): AlertEventsRepository {
   const data = { alertEvents: [] as AlertEventRecord[] } as unknown as PacketAgentData;
   const deps: AlertEventsRepositoryDeps = {
     loadStore: () => data,
-    mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+    mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
   };
   return jsonAlertEventsRepository(deps);
 }
@@ -112,7 +116,10 @@ test("list filters by severity", () => {
       makeRecord({ id: "c", observedAt: "2026-04-26T12:00:00.000Z", severity: "critical" }),
     ]);
     const rows = repo.list({ severity: "critical" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["c", "b"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["c", "b"],
+    );
   });
 });
 
@@ -124,7 +131,10 @@ test("list filters by since (inclusive)", () => {
       makeRecord({ id: "c", observedAt: "2026-04-26T14:00:00.000Z" }),
     ]);
     const rows = repo.list({ since: "2026-04-26T12:00:00.000Z" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["c", "b"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["c", "b"],
+    );
   });
 });
 
@@ -136,7 +146,10 @@ test("list filters by until (inclusive)", () => {
       makeRecord({ id: "c", observedAt: "2026-04-26T14:00:00.000Z" }),
     ]);
     const rows = repo.list({ until: "2026-04-26T12:00:00.000Z" });
-    assert.deepEqual(rows.map((entry) => entry.id), ["b", "a"]);
+    assert.deepEqual(
+      rows.map((entry) => entry.id),
+      ["b", "a"],
+    );
   });
 });
 
@@ -169,15 +182,16 @@ test("prune removes older rows and returns count", () => {
     const removed = repo.prune("2026-04-01T00:00:00.000Z");
     assert.equal(removed, 2);
     assert.equal(repo.count(), 1);
-    assert.deepEqual(repo.list().map((entry) => entry.id), ["keep"]);
+    assert.deepEqual(
+      repo.list().map((entry) => entry.id),
+      ["keep"],
+    );
   });
 });
 
 test("prune with cutoff matching observedAt retains the row", () => {
   runOnBoth((repo) => {
-    repo.insertMany([
-      makeRecord({ id: "boundary", observedAt: "2026-04-26T00:00:00.000Z" }),
-    ]);
+    repo.insertMany([makeRecord({ id: "boundary", observedAt: "2026-04-26T00:00:00.000Z" })]);
     const removed = repo.prune("2026-04-26T00:00:00.000Z");
     assert.equal(removed, 0);
     assert.equal(repo.count(), 1);
@@ -186,12 +200,20 @@ test("prune with cutoff matching observedAt retains the row", () => {
 
 test("insertMany dedupes by id (idempotent re-insert)", () => {
   runOnBoth((repo) => {
-    const record = makeRecord({ id: "dup", observedAt: "2026-04-26T10:00:00.000Z", title: "first" });
+    const record = makeRecord({
+      id: "dup",
+      observedAt: "2026-04-26T10:00:00.000Z",
+      title: "first",
+    });
     repo.insertMany([record]);
     repo.insertMany([record]);
     assert.equal(repo.count(), 1);
     assert.equal(repo.list().length, 1);
-    const updated = makeRecord({ id: "dup", observedAt: "2026-04-26T10:00:00.000Z", title: "second" });
+    const updated = makeRecord({
+      id: "dup",
+      observedAt: "2026-04-26T10:00:00.000Z",
+      title: "second",
+    });
     repo.insertMany([updated]);
     assert.equal(repo.count(), 1);
     assert.equal(repo.list()[0]?.title, "second");
@@ -311,7 +333,7 @@ test("createAlertEventsRepository selects implementation by env", () => {
     const data = { alertEvents: [] as AlertEventRecord[] } as unknown as PacketAgentData;
     const json = createAlertEventsRepository({
       loadStore: () => data,
-      mutateStore: <T,>(mutator: (target: PacketAgentData) => T) => mutator(data),
+      mutateStore: <T>(mutator: (target: PacketAgentData) => T) => mutator(data),
     });
     json.insertMany([makeRecord({ id: "a", observedAt: "2026-04-26T10:00:00.000Z" })]);
     assert.equal(json.count(), 1);

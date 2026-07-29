@@ -90,7 +90,11 @@ interface GeminiStreamDelta {
 interface GeminiStreamChunk {
   id: string;
   model: string;
-  choices: { index: number; delta: GeminiStreamDelta; finish_reason: GeminiChatChoice["finish_reason"] }[];
+  choices: {
+    index: number;
+    delta: GeminiStreamDelta;
+    finish_reason: GeminiChatChoice["finish_reason"];
+  }[];
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }
 
@@ -111,7 +115,9 @@ function mapTools(tools: ProviderToolDef[] | undefined): GeminiToolDef[] | undef
   }));
 }
 
-function mapFinishReason(reason: GeminiChatChoice["finish_reason"]): ProviderCallResult["finishReason"] {
+function mapFinishReason(
+  reason: GeminiChatChoice["finish_reason"],
+): ProviderCallResult["finishReason"] {
   switch (reason) {
     case "stop":
       return "stop";

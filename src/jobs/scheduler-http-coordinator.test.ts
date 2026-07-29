@@ -19,7 +19,12 @@ function jsonResponse(status: number, body: unknown): Response {
 function recordingFetch(handler: (call: CapturedCall) => Response | Promise<Response>) {
   const calls: CapturedCall[] = [];
   const fetchImpl: typeof fetch = async (input, init) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
     const method = (init?.method ?? "GET").toUpperCase();
     const headers = new Headers(init?.headers ?? {});
     const rawBody = init?.body;
@@ -128,16 +133,21 @@ test("acquire throws on 401 and 403 even with failOpen", async () => {
       failOpen: true,
     });
 
-    await assert.rejects(() => lock.acquire(), (error: unknown) => {
-      assert.ok(error instanceof Error);
-      assert.match(error.message, new RegExp(String(status)));
-      return true;
-    });
+    await assert.rejects(
+      () => lock.acquire(),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, new RegExp(String(status)));
+        return true;
+      },
+    );
   }
 });
 
 test("acquire returns false on network error when failOpen is false (default)", async () => {
-  const fetchImpl: typeof fetch = async () => { throw new Error("network down"); };
+  const fetchImpl: typeof fetch = async () => {
+    throw new Error("network down");
+  };
   const lock = httpLeaderLock({ url: "https://coord", processId: "p", ttlMs: 1000, fetchImpl });
 
   const result = await lock.acquire();
@@ -170,12 +180,13 @@ test("acquire preserves held flag on network error when failOpen is true", async
 
 test("acquire honors timeoutMs when fetch never resolves", async () => {
   let observedAbort = false;
-  const fetchImpl: typeof fetch = (_input, init) => new Promise((_, reject) => {
-    init?.signal?.addEventListener("abort", () => {
-      observedAbort = true;
-      reject(new Error("aborted"));
+  const fetchImpl: typeof fetch = (_input, init) =>
+    new Promise((_, reject) => {
+      init?.signal?.addEventListener("abort", () => {
+        observedAbort = true;
+        reject(new Error("aborted"));
+      });
     });
-  });
   const lock = httpLeaderLock({
     url: "https://coord",
     processId: "p",

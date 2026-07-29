@@ -65,7 +65,11 @@ export class ProviderRouter {
     return this.routes.get(routeKey) ?? FALLBACK_ROUTE;
   }
 
-  private select(routeKey: string, modelOverride?: string, providerOverride?: ProviderName): { provider: LLMProvider; route: ProviderRoute } {
+  private select(
+    routeKey: string,
+    modelOverride?: string,
+    providerOverride?: ProviderName,
+  ): { provider: LLMProvider; route: ProviderRoute } {
     const baseRoute = this.resolve(routeKey);
     const route = providerOverride ? { ...baseRoute, provider: providerOverride } : baseRoute;
     let provider = this.providers.get(route.provider);
@@ -77,22 +81,32 @@ export class ProviderRouter {
     }
     return {
       provider,
-      route: { provider: provider.name, model: modelOverride && modelOverride.length > 0 ? modelOverride : route.model },
+      route: {
+        provider: provider.name,
+        model: modelOverride && modelOverride.length > 0 ? modelOverride : route.model,
+      },
     };
   }
 
-  async call(opts: Omit<ProviderCallOptions, "model"> & { model?: string; provider?: ProviderName }): Promise<ProviderCallResult> {
+  async call(
+    opts: Omit<ProviderCallOptions, "model"> & { model?: string; provider?: ProviderName },
+  ): Promise<ProviderCallResult> {
     const { provider, route } = this.select(opts.routeKey, opts.model, opts.provider);
     return provider.call({ ...opts, model: route.model });
   }
 
-  stream(opts: Omit<ProviderCallOptions, "model"> & { model?: string; provider?: ProviderName }): AsyncIterable<ProviderStreamChunk> {
+  stream(
+    opts: Omit<ProviderCallOptions, "model"> & { model?: string; provider?: ProviderName },
+  ): AsyncIterable<ProviderStreamChunk> {
     const { provider, route } = this.select(opts.routeKey, opts.model, opts.provider);
     return provider.stream({ ...opts, model: route.model });
   }
 
   has(name: ProviderName): boolean {
-    return this.providers.get(name) !== undefined && (name === "stub" || this.providers.get(name) !== this.providers.get("stub"));
+    return (
+      this.providers.get(name) !== undefined &&
+      (name === "stub" || this.providers.get(name) !== this.providers.get("stub"))
+    );
   }
 
   /**

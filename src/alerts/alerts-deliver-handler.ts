@@ -5,7 +5,10 @@ import {
   deliverAlertWebhook,
   type AlertWebhookConfig,
 } from "./alert-webhook.js";
-import { updateAlertDeliveryStatusAsync, type UpdateAlertDeliveryStatusInput } from "./alert-store.js";
+import {
+  updateAlertDeliveryStatusAsync,
+  type UpdateAlertDeliveryStatusInput,
+} from "./alert-store.js";
 import { redactedErrorMessage } from "../security/redaction.js";
 import type { AlertEvent } from "./alert-engine.js";
 
@@ -31,7 +34,9 @@ export interface AlertsDeliverHandlerDeps {
   loadStore?: () => PacketAgentData | Promise<PacketAgentData>;
   webhookConfig?: () => AlertWebhookConfig | null;
   deliver?: typeof deliverAlertWebhook;
-  updateStatus?: (input: UpdateAlertDeliveryStatusInput) => AlertEventRecord | null | Promise<AlertEventRecord | null>;
+  updateStatus?: (
+    input: UpdateAlertDeliveryStatusInput,
+  ) => AlertEventRecord | null | Promise<AlertEventRecord | null>;
   now?: () => Date;
   env?: NodeJS.ProcessEnv;
 }

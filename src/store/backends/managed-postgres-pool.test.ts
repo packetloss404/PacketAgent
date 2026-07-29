@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolvePacketAgentStoreMode } from "../mode.js";
-import type {
-  ManagedPostgresStoreQueryClient,
-  ManagedPostgresStoreQueryResult,
-} from "../types.js";
+import type { ManagedPostgresStoreQueryClient, ManagedPostgresStoreQueryResult } from "../types.js";
 import {
   managedDatabaseAsyncStoreBackend,
   setManagedPostgresPoolClientFactoryForTests,
@@ -29,9 +26,7 @@ test("the production managed Postgres adapter reuses its pool until shutdown", a
         const normalized = sql.replace(/\s+/g, " ").trim().toLowerCase();
         if (normalized.startsWith("select payload from packetagent_document_store")) {
           return {
-            rows: payloadJson
-              ? ([{ payload: payloadJson }] as unknown as TRow[])
-              : [],
+            rows: payloadJson ? ([{ payload: payloadJson }] as unknown as TRow[]) : [],
           };
         }
         if (normalized.startsWith("insert into packetagent_document_store")) {

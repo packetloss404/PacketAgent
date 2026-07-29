@@ -31,20 +31,28 @@ test("call() POSTs JSON and returns content + cost", async () => {
       captured.body = init?.body as string;
       captured.headers = init?.headers as Record<string, string>;
       return fakeResponse({
-        id: "c1", model: "abab6.5-chat",
-        choices: [{ index: 0, message: { role: "assistant", content: "hello" }, finish_reason: "stop" }],
+        id: "c1",
+        model: "abab6.5-chat",
+        choices: [
+          { index: 0, message: { role: "assistant", content: "hello" }, finish_reason: "stop" },
+        ],
         usage: { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300 },
         base_resp: { status_code: 0, status_msg: "ok" },
       });
     }) as unknown as typeof fetch,
   });
   const res = await provider.call({
-    model: "abab6.5-chat", workspaceId: "w", routeKey: "code.generation",
+    model: "abab6.5-chat",
+    workspaceId: "w",
+    routeKey: "code.generation",
     messages: [{ role: "user", content: "hi" }],
   });
   assert.equal(res.content, "hello");
   assert.equal(res.providerName, "minimax");
-  const expected = (100 * MINIMAX_MODEL_PRICING["abab6.5-chat"].input + 200 * MINIMAX_MODEL_PRICING["abab6.5-chat"].output) / 1_000_000;
+  const expected =
+    (100 * MINIMAX_MODEL_PRICING["abab6.5-chat"].input +
+      200 * MINIMAX_MODEL_PRICING["abab6.5-chat"].output) /
+    1_000_000;
   assert.ok(Math.abs(res.usage.costUsd - expected) < 1e-9);
   assert.match(captured.url ?? "", /\/chat\/completions$/);
   assert.equal(captured.headers?.authorization, "Bearer k");
@@ -56,7 +64,13 @@ test("HTTP 4xx surfaces as thrown error", async () => {
     fetchFn: (async () => fakeResponse("bad request", { status: 400 })) as unknown as typeof fetch,
   });
   await assert.rejects(
-    () => provider.call({ model: "abab6.5-chat", workspaceId: "w", routeKey: "x", messages: [{ role: "user", content: "x" }] }),
+    () =>
+      provider.call({
+        model: "abab6.5-chat",
+        workspaceId: "w",
+        routeKey: "x",
+        messages: [{ role: "user", content: "x" }],
+      }),
     /HTTP 400/,
   );
 });
@@ -64,14 +78,22 @@ test("HTTP 4xx surfaces as thrown error", async () => {
 test("base_resp non-zero throws", async () => {
   const provider = new MiniMaxProvider({
     apiKeyResolver: async () => "k",
-    fetchFn: (async () => fakeResponse({
-      id: "c1", model: "abab6.5-chat",
-      choices: [],
-      base_resp: { status_code: 1004, status_msg: "rate limited" },
-    })) as unknown as typeof fetch,
+    fetchFn: (async () =>
+      fakeResponse({
+        id: "c1",
+        model: "abab6.5-chat",
+        choices: [],
+        base_resp: { status_code: 1004, status_msg: "rate limited" },
+      })) as unknown as typeof fetch,
   });
   await assert.rejects(
-    () => provider.call({ model: "abab6.5-chat", workspaceId: "w", routeKey: "x", messages: [{ role: "user", content: "x" }] }),
+    () =>
+      provider.call({
+        model: "abab6.5-chat",
+        workspaceId: "w",
+        routeKey: "x",
+        messages: [{ role: "user", content: "x" }],
+      }),
     /rate limited/,
   );
 });
@@ -79,9 +101,40 @@ test("base_resp non-zero throws", async () => {
 test("stream() parses SSE deltas, tool calls, and final usage", async () => {
   const toolArgs = JSON.stringify({ q: "hi" });
   const events = [
-    "data: " + JSON.stringify({ model: "abab6.5-chat", choices: [{ index: 0, delta: { content: "hi " }, finish_reason: null }] }) + "\n\n",
-    "data: " + JSON.stringify({ model: "abab6.5-chat", choices: [{ index: 0, delta: { content: "world" }, finish_reason: null }] }) + "\n\n",
-    "data: " + JSON.stringify({ model: "abab6.5-chat", choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "tc", type: "function", function: { name: "search", arguments: toolArgs } }] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 5, completion_tokens: 10, total_tokens: 15 } }) + "\n\n",
+    "data: " +
+      JSON.stringify({
+        model: "abab6.5-chat",
+        choices: [{ index: 0, delta: { content: "hi " }, finish_reason: null }],
+      }) +
+      "\n\n",
+    "data: " +
+      JSON.stringify({
+        model: "abab6.5-chat",
+        choices: [{ index: 0, delta: { content: "world" }, finish_reason: null }],
+      }) +
+      "\n\n",
+    "data: " +
+      JSON.stringify({
+        model: "abab6.5-chat",
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "tc",
+                  type: "function",
+                  function: { name: "search", arguments: toolArgs },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+        usage: { prompt_tokens: 5, completion_tokens: 10, total_tokens: 15 },
+      }) +
+      "\n\n",
     "data: [DONE]\n\n",
   ];
   const provider = new MiniMaxProvider({
@@ -92,7 +145,9 @@ test("stream() parses SSE deltas, tool calls, and final usage", async () => {
   let toolCall: { name: string; input: Record<string, unknown> } | undefined;
   let done = false;
   for await (const c of provider.stream({
-    model: "abab6.5-chat", workspaceId: "w", routeKey: "code.generation",
+    model: "abab6.5-chat",
+    workspaceId: "w",
+    routeKey: "code.generation",
     messages: [{ role: "user", content: "x" }],
   })) {
     if (c.delta) text.push(c.delta);
@@ -115,7 +170,13 @@ test("apiKeyResolver null falls back to env, both null throws", async () => {
     fetchFn: (async () => fakeResponse({})) as unknown as typeof fetch,
   });
   await assert.rejects(
-    () => provider.call({ model: "abab6.5-chat", workspaceId: "w", routeKey: "x", messages: [{ role: "user", content: "x" }] }),
+    () =>
+      provider.call({
+        model: "abab6.5-chat",
+        workspaceId: "w",
+        routeKey: "x",
+        messages: [{ role: "user", content: "x" }],
+      }),
     /no API key/,
   );
   process.env.MINIMAX_API_KEY = "from-env";
@@ -125,14 +186,22 @@ test("apiKeyResolver null falls back to env, both null throws", async () => {
     fetchFn: (async (_url: string | URL, init?: RequestInit) => {
       receivedAuth = (init?.headers as Record<string, string>).authorization;
       return fakeResponse({
-        id: "c1", model: "abab6.5-chat",
-        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        id: "c1",
+        model: "abab6.5-chat",
+        choices: [
+          { index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" },
+        ],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
         base_resp: { status_code: 0, status_msg: "ok" },
       });
     }) as unknown as typeof fetch,
   });
-  await provider2.call({ model: "abab6.5-chat", workspaceId: "w", routeKey: "x", messages: [{ role: "user", content: "x" }] });
+  await provider2.call({
+    model: "abab6.5-chat",
+    workspaceId: "w",
+    routeKey: "x",
+    messages: [{ role: "user", content: "x" }],
+  });
   assert.equal(receivedAuth, "Bearer from-env");
   if (original === undefined) delete process.env.MINIMAX_API_KEY;
   else process.env.MINIMAX_API_KEY = original;
@@ -145,8 +214,11 @@ test("signal abort propagates to fetch", async () => {
     fetchFn: (async (_url: string | URL, init?: RequestInit) => {
       receivedSignal = init?.signal as AbortSignal | undefined;
       return fakeResponse({
-        id: "c1", model: "abab6.5-chat",
-        choices: [{ index: 0, message: { role: "assistant", content: "x" }, finish_reason: "stop" }],
+        id: "c1",
+        model: "abab6.5-chat",
+        choices: [
+          { index: 0, message: { role: "assistant", content: "x" }, finish_reason: "stop" },
+        ],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
         base_resp: { status_code: 0, status_msg: "ok" },
       });
@@ -154,7 +226,9 @@ test("signal abort propagates to fetch", async () => {
   });
   const ctrl = new AbortController();
   await provider.call({
-    model: "abab6.5-chat", workspaceId: "w", routeKey: "x",
+    model: "abab6.5-chat",
+    workspaceId: "w",
+    routeKey: "x",
     messages: [{ role: "user", content: "x" }],
     signal: ctrl.signal,
   });

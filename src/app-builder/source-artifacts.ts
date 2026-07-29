@@ -9,11 +9,7 @@ import type {
   GeneratedAppSourceFileKind,
   RouteAccess,
 } from "./types.js";
-import {
-  buildGeneratedPageData,
-  editableFieldNames,
-  requiredFieldNames,
-} from "./draft-helpers.js";
+import { buildGeneratedPageData, editableFieldNames, requiredFieldNames } from "./draft-helpers.js";
 import { appSlug, escapeHtml, generatedArtifactCopy } from "./text-helpers.js";
 
 export function generateAppSourceArtifactBundle(draft: AppDraft): GeneratedAppSourceArtifactBundle {
@@ -57,7 +53,11 @@ export function generateAppSourceArtifactBundle(draft: AppDraft): GeneratedAppSo
     sourceFile("src/main.tsx", "source", renderGeneratedMainTsx()),
     sourceFile("src/App.tsx", "source", renderGeneratedAppTsx(draft, pages, slug)),
     sourceFile("src/styles.css", "source", renderGeneratedStylesCss()),
-    sourceFile("src/routes/page-data.ts", "route-data", renderGeneratedPageDataTs(pages, routeSummary)),
+    sourceFile(
+      "src/routes/page-data.ts",
+      "route-data",
+      renderGeneratedPageDataTs(pages, routeSummary),
+    ),
     sourceFile("src/api/generated-api.ts", "api", renderGeneratedApiTs(apiRoutes, dataContracts)),
     sourceFile("src/data/seed-data.json", "seed-data", JSON.stringify(draft.seedData, null, 2)),
     sourceFile("README.md", "documentation", renderGeneratedReadme(draft, pages, apiRoutes)),
@@ -72,7 +72,11 @@ export function generateAppSourceArtifactBundle(draft: AppDraft): GeneratedAppSo
   };
 }
 
-function sourceFile(path: string, kind: GeneratedAppSourceFileKind, contents: string): GeneratedAppSourceFile {
+function sourceFile(
+  path: string,
+  kind: GeneratedAppSourceFileKind,
+  contents: string,
+): GeneratedAppSourceFile {
   const normalized = normalizeGeneratedFileContents(contents);
   return {
     path,
@@ -88,25 +92,29 @@ function normalizeGeneratedFileContents(contents: string): string {
 }
 
 function renderGeneratedPackageJson(slug: string): string {
-  return JSON.stringify({
-    name: slug,
-    version: "0.1.0",
-    private: true,
-    type: "module",
-    scripts: {
-      dev: "vite",
-      build: "vite build",
-      preview: "vite preview",
+  return JSON.stringify(
+    {
+      name: slug,
+      version: "0.1.0",
+      private: true,
+      type: "module",
+      scripts: {
+        dev: "vite",
+        build: "vite build",
+        preview: "vite preview",
+      },
+      dependencies: {
+        "@vitejs/plugin-react": "^5.0.2",
+        vite: "^7.1.3",
+        typescript: "^5.9.2",
+        react: "^19.1.1",
+        "react-dom": "^19.1.1",
+      },
+      devDependencies: {},
     },
-    dependencies: {
-      "@vitejs/plugin-react": "^5.0.2",
-      vite: "^7.1.3",
-      typescript: "^5.9.2",
-      react: "^19.1.1",
-      "react-dom": "^19.1.1",
-    },
-    devDependencies: {},
-  }, null, 2);
+    null,
+    2,
+  );
 }
 
 function renderGeneratedIndexHtml(appName: string): string {
@@ -126,27 +134,31 @@ function renderGeneratedIndexHtml(appName: string): string {
 }
 
 function renderGeneratedTsConfig(): string {
-  return JSON.stringify({
-    compilerOptions: {
-      target: "ES2022",
-      useDefineForClassFields: true,
-      lib: ["DOM", "DOM.Iterable", "ES2022"],
-      allowJs: false,
-      skipLibCheck: true,
-      esModuleInterop: true,
-      allowSyntheticDefaultImports: true,
-      strict: true,
-      forceConsistentCasingInFileNames: true,
-      module: "ESNext",
-      moduleResolution: "Bundler",
-      resolveJsonModule: true,
-      isolatedModules: true,
-      noEmit: true,
-      jsx: "react-jsx",
+  return JSON.stringify(
+    {
+      compilerOptions: {
+        target: "ES2022",
+        useDefineForClassFields: true,
+        lib: ["DOM", "DOM.Iterable", "ES2022"],
+        allowJs: false,
+        skipLibCheck: true,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        strict: true,
+        forceConsistentCasingInFileNames: true,
+        module: "ESNext",
+        moduleResolution: "Bundler",
+        resolveJsonModule: true,
+        isolatedModules: true,
+        noEmit: true,
+        jsx: "react-jsx",
+      },
+      include: ["src"],
+      references: [],
     },
-    include: ["src"],
-    references: [],
-  }, null, 2);
+    null,
+    2,
+  );
 }
 
 function renderGeneratedViteConfig(): string {
@@ -1598,11 +1610,24 @@ function entityFromRoute(path: string) {
 function renderGeneratedReadme(
   draft: AppDraft,
   pages: ReturnType<typeof buildGeneratedPageData>,
-  apiRoutes: Array<{ method: ApiRouteStub["method"]; path: string; access: RouteAccess; responseShape: string }>,
+  apiRoutes: Array<{
+    method: ApiRouteStub["method"];
+    path: string;
+    access: RouteAccess;
+    responseShape: string;
+  }>,
 ): string {
-  const pageLines = pages.map((pageDraft) => `- ${pageDraft.name} (${pageDraft.route}) - ${pageDraft.access}: ${pageDraft.purpose}`);
-  const apiLines = apiRoutes.map((route) => `- ${route.method} ${route.path} - ${route.access}, returns ${route.responseShape}`);
-  const dataLines = draft.dataSchema.entities.map((entityDraft) => `- ${entityDraft.name}: ${entityDraft.fields.map((fieldDraft) => fieldDraft.name).join(", ")}`);
+  const pageLines = pages.map(
+    (pageDraft) =>
+      `- ${pageDraft.name} (${pageDraft.route}) - ${pageDraft.access}: ${pageDraft.purpose}`,
+  );
+  const apiLines = apiRoutes.map(
+    (route) => `- ${route.method} ${route.path} - ${route.access}, returns ${route.responseShape}`,
+  );
+  const dataLines = draft.dataSchema.entities.map(
+    (entityDraft) =>
+      `- ${entityDraft.name}: ${entityDraft.fields.map((fieldDraft) => fieldDraft.name).join(", ")}`,
+  );
 
   return `# ${draft.appName}
 

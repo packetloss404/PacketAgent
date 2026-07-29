@@ -46,7 +46,8 @@ export function resolveLocalLlmBaseURL(env: NodeJS.ProcessEnv = process.env): st
   const local = env.LOCAL_LLM_BASE_URL;
   if (typeof local === "string" && local.trim().length > 0) return local.trim().replace(/\/+$/, "");
   const ollama = env.OLLAMA_BASE_URL;
-  if (typeof ollama === "string" && ollama.trim().length > 0) return ollama.trim().replace(/\/+$/, "");
+  if (typeof ollama === "string" && ollama.trim().length > 0)
+    return ollama.trim().replace(/\/+$/, "");
   return OLLAMA_DEFAULT_BASE_URL;
 }
 
@@ -70,7 +71,10 @@ export function resolveLocalLlmApiFormat(env: NodeJS.ProcessEnv = process.env): 
  * the operator wants every local call to hit a specific model on their server,
  * this lets them set it once instead of editing the preset map.
  */
-export function resolveLocalLlmModel(requested: string, env: NodeJS.ProcessEnv = process.env): string {
+export function resolveLocalLlmModel(
+  requested: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
   const override = env.LOCAL_LLM_MODEL;
   if (typeof override === "string" && override.trim().length > 0) return override.trim();
   return requested;
@@ -101,7 +105,11 @@ interface OllamaChatRequest {
 
 interface OllamaChatResponse {
   model: string;
-  message: { role: string; content: string; tool_calls?: { function: { name: string; arguments: Record<string, unknown> } }[] };
+  message: {
+    role: string;
+    content: string;
+    tool_calls?: { function: { name: string; arguments: Record<string, unknown> } }[];
+  };
   done: boolean;
   done_reason?: "stop" | "length" | string;
   prompt_eval_count?: number;
@@ -114,7 +122,10 @@ function mapOllamaMessages(messages: ProviderMessage[]): OllamaChatMessage[] {
 
 function mapOllamaTools(tools: ProviderToolDef[] | undefined): OllamaToolDef[] | undefined {
   if (!tools || tools.length === 0) return undefined;
-  return tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
+  return tools.map((t) => ({
+    type: "function",
+    function: { name: t.name, description: t.description, parameters: t.inputSchema },
+  }));
 }
 
 function mapOllamaDoneReason(reason?: string): ProviderCallResult["finishReason"] {
@@ -152,7 +163,15 @@ interface OpenAICompatChatResponse {
   model?: string;
   choices: Array<{
     index: number;
-    message: { role: string; content?: string | null; tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[] };
+    message: {
+      role: string;
+      content?: string | null;
+      tool_calls?: {
+        id: string;
+        type: "function";
+        function: { name: string; arguments: string };
+      }[];
+    };
     finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | null;
   }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
@@ -161,13 +180,22 @@ interface OpenAICompatChatResponse {
 interface OpenAICompatStreamDelta {
   role?: string;
   content?: string;
-  tool_calls?: { index: number; id?: string; type?: "function"; function?: { name?: string; arguments?: string } }[];
+  tool_calls?: {
+    index: number;
+    id?: string;
+    type?: "function";
+    function?: { name?: string; arguments?: string };
+  }[];
 }
 
 interface OpenAICompatStreamChunk {
   id?: string;
   model?: string;
-  choices: Array<{ index: number; delta: OpenAICompatStreamDelta; finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | null }>;
+  choices: Array<{
+    index: number;
+    delta: OpenAICompatStreamDelta;
+    finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | null;
+  }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
 }
 
@@ -182,15 +210,24 @@ function mapOpenAIMessages(messages: ProviderMessage[]): OpenAICompatMessage[] {
 
 function mapOpenAITools(tools: ProviderToolDef[] | undefined): OpenAICompatToolDef[] | undefined {
   if (!tools || tools.length === 0) return undefined;
-  return tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
+  return tools.map((t) => ({
+    type: "function",
+    function: { name: t.name, description: t.description, parameters: t.inputSchema },
+  }));
 }
 
-function mapOpenAIFinishReason(reason: OpenAICompatChatResponse["choices"][number]["finish_reason"]): ProviderCallResult["finishReason"] {
+function mapOpenAIFinishReason(
+  reason: OpenAICompatChatResponse["choices"][number]["finish_reason"],
+): ProviderCallResult["finishReason"] {
   switch (reason) {
-    case "stop": return "stop";
-    case "length": return "length";
-    case "tool_calls": return "tool_use";
-    default: return "stop";
+    case "stop":
+      return "stop";
+    case "length":
+      return "length";
+    case "tool_calls":
+      return "tool_use";
+    default:
+      return "stop";
   }
 }
 
@@ -226,9 +263,15 @@ export class OllamaProvider implements LLMProvider {
   }
 
   /** Exposed for tests + diagnostics. */
-  getBaseURL(): string { return this.baseURL; }
-  getApiFormat(): LocalLLMApiFormat { return this.apiFormat; }
-  getModelOverride(): string | undefined { return this.modelOverride; }
+  getBaseURL(): string {
+    return this.baseURL;
+  }
+  getApiFormat(): LocalLLMApiFormat {
+    return this.apiFormat;
+  }
+  getModelOverride(): string | undefined {
+    return this.modelOverride;
+  }
 
   private effectiveModel(model: string): string {
     if (this.modelOverride && this.modelOverride.length > 0) return this.modelOverride;
@@ -241,7 +284,10 @@ export class OllamaProvider implements LLMProvider {
   }
 
   async *stream(opts: ProviderCallOptions): AsyncIterable<ProviderStreamChunk> {
-    if (this.apiFormat === "openai") { yield* this.streamOpenAI(opts); return; }
+    if (this.apiFormat === "openai") {
+      yield* this.streamOpenAI(opts);
+      return;
+    }
     yield* this.streamOllama(opts);
   }
 
@@ -255,8 +301,13 @@ export class OllamaProvider implements LLMProvider {
       messages: mapOllamaMessages(opts.messages),
       stream: false,
       ...(opts.tools ? { tools: mapOllamaTools(opts.tools) } : {}),
-      ...((opts.temperature !== undefined || opts.maxTokens !== undefined)
-        ? { options: { ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}), ...(opts.maxTokens !== undefined ? { num_predict: opts.maxTokens } : {}) } }
+      ...(opts.temperature !== undefined || opts.maxTokens !== undefined
+        ? {
+            options: {
+              ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+              ...(opts.maxTokens !== undefined ? { num_predict: opts.maxTokens } : {}),
+            },
+          }
         : {}),
     };
     let res: Response;
@@ -268,7 +319,9 @@ export class OllamaProvider implements LLMProvider {
         signal: opts.signal,
       });
     } catch (error) {
-      throw new Error(`ollama: connection failed (is Ollama running at ${this.baseURL}?): ${(error as Error).message}`);
+      throw new Error(
+        `ollama: connection failed (is Ollama running at ${this.baseURL}?): ${(error as Error).message}`,
+      );
     }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -278,14 +331,22 @@ export class OllamaProvider implements LLMProvider {
     const toolCalls: ProviderToolCall[] = [];
     if (json.message.tool_calls) {
       for (const tc of json.message.tool_calls) {
-        toolCalls.push({ id: `ollama-${toolCalls.length}`, name: tc.function.name, input: tc.function.arguments });
+        toolCalls.push({
+          id: `ollama-${toolCalls.length}`,
+          name: tc.function.name,
+          input: tc.function.arguments,
+        });
       }
     }
     return {
       content: json.message.content ?? "",
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
       finishReason: mapOllamaDoneReason(json.done_reason),
-      usage: { promptTokens: json.prompt_eval_count ?? 0, completionTokens: json.eval_count ?? 0, costUsd: 0 },
+      usage: {
+        promptTokens: json.prompt_eval_count ?? 0,
+        completionTokens: json.eval_count ?? 0,
+        costUsd: 0,
+      },
       model: json.model,
       providerName: "ollama",
     };
@@ -297,8 +358,13 @@ export class OllamaProvider implements LLMProvider {
       messages: mapOllamaMessages(opts.messages),
       stream: true,
       ...(opts.tools ? { tools: mapOllamaTools(opts.tools) } : {}),
-      ...((opts.temperature !== undefined || opts.maxTokens !== undefined)
-        ? { options: { ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}), ...(opts.maxTokens !== undefined ? { num_predict: opts.maxTokens } : {}) } }
+      ...(opts.temperature !== undefined || opts.maxTokens !== undefined
+        ? {
+            options: {
+              ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+              ...(opts.maxTokens !== undefined ? { num_predict: opts.maxTokens } : {}),
+            },
+          }
         : {}),
     };
     let res: Response;
@@ -310,7 +376,9 @@ export class OllamaProvider implements LLMProvider {
         signal: opts.signal,
       });
     } catch (error) {
-      yield { error: `ollama: connection failed (is Ollama running at ${this.baseURL}?): ${(error as Error).message}` };
+      yield {
+        error: `ollama: connection failed (is Ollama running at ${this.baseURL}?): ${(error as Error).message}`,
+      };
       return;
     }
     if (!res.ok) {
@@ -318,16 +386,23 @@ export class OllamaProvider implements LLMProvider {
       yield { error: `ollama: HTTP ${res.status} ${text}` };
       return;
     }
-    if (!res.body) { yield { error: "ollama: empty stream body" }; return; }
+    if (!res.body) {
+      yield { error: "ollama: empty stream body" };
+      return;
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let prompt = 0, completion = 0;
+    let prompt = 0,
+      completion = 0;
 
     try {
       while (true) {
-        if (opts.signal?.aborted) { yield { error: "aborted" }; return; }
+        if (opts.signal?.aborted) {
+          yield { error: "aborted" };
+          return;
+        }
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -337,11 +412,21 @@ export class OllamaProvider implements LLMProvider {
           const trimmed = line.trim();
           if (!trimmed) continue;
           let parsed: OllamaChatResponse;
-          try { parsed = JSON.parse(trimmed) as OllamaChatResponse; } catch { continue; }
+          try {
+            parsed = JSON.parse(trimmed) as OllamaChatResponse;
+          } catch {
+            continue;
+          }
           if (parsed.message?.content) yield { delta: parsed.message.content };
           if (parsed.message?.tool_calls) {
             for (const tc of parsed.message.tool_calls) {
-              yield { toolCall: { id: `ollama-${tc.function.name}`, name: tc.function.name, input: tc.function.arguments } };
+              yield {
+                toolCall: {
+                  id: `ollama-${tc.function.name}`,
+                  name: tc.function.name,
+                  input: tc.function.arguments,
+                },
+              };
             }
           }
           if (parsed.done) {
@@ -350,7 +435,10 @@ export class OllamaProvider implements LLMProvider {
           }
         }
       }
-    } catch (error) { yield { error: (error as Error).message }; return; }
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     yield { done: true, usage: { promptTokens: prompt, completionTokens: completion, costUsd: 0 } };
   }
@@ -377,7 +465,9 @@ export class OllamaProvider implements LLMProvider {
         signal: opts.signal,
       });
     } catch (error) {
-      throw new Error(`ollama: connection failed (is the local LLM server running at ${this.baseURL}?): ${(error as Error).message}`);
+      throw new Error(
+        `ollama: connection failed (is the local LLM server running at ${this.baseURL}?): ${(error as Error).message}`,
+      );
     }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -389,7 +479,11 @@ export class OllamaProvider implements LLMProvider {
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
         let parsed: Record<string, unknown> = {};
-        try { parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {}; } catch { parsed = {}; }
+        try {
+          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
+        } catch {
+          parsed = {};
+        }
         toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
       }
     }
@@ -425,7 +519,9 @@ export class OllamaProvider implements LLMProvider {
         signal: opts.signal,
       });
     } catch (error) {
-      yield { error: `ollama: connection failed (is the local LLM server running at ${this.baseURL}?): ${(error as Error).message}` };
+      yield {
+        error: `ollama: connection failed (is the local LLM server running at ${this.baseURL}?): ${(error as Error).message}`,
+      };
       return;
     }
     if (!res.ok) {
@@ -433,17 +529,24 @@ export class OllamaProvider implements LLMProvider {
       yield { error: `ollama: HTTP ${res.status} ${text}` };
       return;
     }
-    if (!res.body) { yield { error: "ollama: empty stream body" }; return; }
+    if (!res.body) {
+      yield { error: "ollama: empty stream body" };
+      return;
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let prompt = 0, completion = 0;
+    let prompt = 0,
+      completion = 0;
     const partials = new Map<number, { id?: string; name?: string; argsAccum: string }>();
 
     try {
       while (true) {
-        if (opts.signal?.aborted) { yield { error: "aborted" }; return; }
+        if (opts.signal?.aborted) {
+          yield { error: "aborted" };
+          return;
+        }
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -462,7 +565,11 @@ export class OllamaProvider implements LLMProvider {
           const payload = dataLines.join("");
           if (!payload || payload === "[DONE]") continue;
           let parsed: OpenAICompatStreamChunk;
-          try { parsed = JSON.parse(payload) as OpenAICompatStreamChunk; } catch { continue; }
+          try {
+            parsed = JSON.parse(payload) as OpenAICompatStreamChunk;
+          } catch {
+            continue;
+          }
           const choice = parsed.choices?.[0];
           if (!choice) {
             if (parsed.usage) {
@@ -485,7 +592,11 @@ export class OllamaProvider implements LLMProvider {
             for (const slot of partials.values()) {
               if (!slot.id || !slot.name) continue;
               let parsedArgs: Record<string, unknown> = {};
-              try { parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {}; } catch { parsedArgs = {}; }
+              try {
+                parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
+              } catch {
+                parsedArgs = {};
+              }
               yield { toolCall: { id: slot.id, name: slot.name, input: parsedArgs } };
             }
             partials.clear();
@@ -496,7 +607,10 @@ export class OllamaProvider implements LLMProvider {
           }
         }
       }
-    } catch (error) { yield { error: (error as Error).message }; return; }
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     yield { done: true, usage: { promptTokens: prompt, completionTokens: completion, costUsd: 0 } };
   }

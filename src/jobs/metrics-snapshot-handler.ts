@@ -1,7 +1,12 @@
 import { snapshotJobMetricsAsync, type SnapshotJobMetricsResult } from "./job-metrics-snapshot.js";
 import { enqueueJob, enqueueJobAsync, type EnqueueJobInput } from "./store.js";
 import { nextAfter } from "./cron.js";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, type JobRecord, type PacketAgentData } from "../packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  loadStoreAsync as defaultLoadStoreAsync,
+  type JobRecord,
+  type PacketAgentData,
+} from "../packetagent-store.js";
 
 export const METRICS_SNAPSHOT_JOB_TYPE = "metrics.snapshot" as const;
 
@@ -20,7 +25,9 @@ export interface MetricsSnapshotJobResult {
 }
 
 export interface MetricsSnapshotHandlerDeps {
-  snapshot?: (options: { retentionDays?: number }) => SnapshotJobMetricsResult | Promise<SnapshotJobMetricsResult>;
+  snapshot?: (options: {
+    retentionDays?: number;
+  }) => SnapshotJobMetricsResult | Promise<SnapshotJobMetricsResult>;
 }
 
 export interface EnsureMetricsSnapshotCronJobDeps {
@@ -100,7 +107,8 @@ export function ensureMetricsSnapshotCronJob(
   );
   if (existing) return { action: "exists", jobId: existing.id };
 
-  const workspaceId = env.PACKETAGENT_JOB_METRICS_SNAPSHOT_WORKSPACE_ID?.trim() || DEFAULT_WORKSPACE_ID;
+  const workspaceId =
+    env.PACKETAGENT_JOB_METRICS_SNAPSHOT_WORKSPACE_ID?.trim() || DEFAULT_WORKSPACE_ID;
   const retentionDays = parseRetentionFromEnv(env.PACKETAGENT_JOB_METRICS_SNAPSHOT_RETENTION_DAYS);
 
   const created = enqueue({
@@ -144,7 +152,8 @@ export async function ensureMetricsSnapshotCronJobAsync(
   );
   if (existing) return { action: "exists", jobId: existing.id };
 
-  const workspaceId = env.PACKETAGENT_JOB_METRICS_SNAPSHOT_WORKSPACE_ID?.trim() || DEFAULT_WORKSPACE_ID;
+  const workspaceId =
+    env.PACKETAGENT_JOB_METRICS_SNAPSHOT_WORKSPACE_ID?.trim() || DEFAULT_WORKSPACE_ID;
   const retentionDays = parseRetentionFromEnv(env.PACKETAGENT_JOB_METRICS_SNAPSHOT_RETENTION_DAYS);
 
   const created = await enqueue({

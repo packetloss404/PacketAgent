@@ -20,7 +20,12 @@ export const DEFAULT_PROVIDER_NAMES = [
   "gemini",
 ] as const satisfies readonly ProviderName[];
 
-const VAULT_PROVIDERS: ReadonlySet<ProviderName> = new Set(["anthropic", "openai", "minimax", "ollama"]);
+const VAULT_PROVIDERS: ReadonlySet<ProviderName> = new Set([
+  "anthropic",
+  "openai",
+  "minimax",
+  "ollama",
+]);
 
 const adaptedResolver: ApiKeyResolver = (workspaceId: string, provider: ProviderName) => {
   if (provider === "stub") return Promise.resolve(null);

@@ -87,7 +87,10 @@ test("deliverAlertWebhook posts JSON body and returns ok on 2xx", async () => {
   const headers = new Headers(call.init?.headers);
   assert.equal(headers.get("content-type"), "application/json");
   assert.equal(headers.get("x-packetagent-alert-secret"), "shhh");
-  const parsed = JSON.parse(String(call.init?.body)) as { alerts: AlertEvent[]; deliveredAt: string };
+  const parsed = JSON.parse(String(call.init?.body)) as {
+    alerts: AlertEvent[];
+    deliveredAt: string;
+  };
   assert.deepEqual(parsed.alerts, events);
   assert.equal(typeof parsed.deliveredAt, "string");
   assert.ok(!Number.isNaN(Date.parse(parsed.deliveredAt)));
@@ -118,7 +121,11 @@ test("deliverAlertWebhook omits secret header when no secret is configured", asy
 test("deliverAlertWebhook returns http error for non-2xx", async () => {
   const fetchImpl = (async () => new Response("oops", { status: 502 })) as unknown as typeof fetch;
   const result = await deliverAlertWebhook(
-    { url: "https://example.com/alerts", secretHeader: "x-packetagent-alert-secret", timeoutMs: 5000 },
+    {
+      url: "https://example.com/alerts",
+      secretHeader: "x-packetagent-alert-secret",
+      timeoutMs: 5000,
+    },
     [makeEvent()],
     { fetchImpl },
   );
@@ -130,7 +137,11 @@ test("deliverAlertWebhook returns network error and never throws", async () => {
     throw new Error("ECONNREFUSED");
   }) as unknown as typeof fetch;
   const result = await deliverAlertWebhook(
-    { url: "https://example.com/alerts", secretHeader: "x-packetagent-alert-secret", timeoutMs: 5000 },
+    {
+      url: "https://example.com/alerts",
+      secretHeader: "x-packetagent-alert-secret",
+      timeoutMs: 5000,
+    },
     [makeEvent()],
     { fetchImpl },
   );
@@ -173,7 +184,11 @@ test("deliverAlertWebhook returns timeout when fetch is aborted", async () => {
   }) as unknown as typeof fetch;
 
   const result = await deliverAlertWebhook(
-    { url: "https://example.com/alerts", secretHeader: "x-packetagent-alert-secret", timeoutMs: 10 },
+    {
+      url: "https://example.com/alerts",
+      secretHeader: "x-packetagent-alert-secret",
+      timeoutMs: 10,
+    },
     [makeEvent()],
     { fetchImpl },
   );
@@ -190,13 +205,20 @@ test("deliverAlertWebhook body shape contains alerts and deliveredAt", async () 
 
   const events = [makeEvent({ id: "a" }), makeEvent({ id: "b", severity: "critical" })];
   await deliverAlertWebhook(
-    { url: "https://example.com/alerts", secretHeader: "x-packetagent-alert-secret", timeoutMs: 5000 },
+    {
+      url: "https://example.com/alerts",
+      secretHeader: "x-packetagent-alert-secret",
+      timeoutMs: 5000,
+    },
     events,
     { fetchImpl },
   );
 
   assert.ok(capturedBody);
-  const parsed = JSON.parse(capturedBody as string) as { alerts: AlertEvent[]; deliveredAt: string };
+  const parsed = JSON.parse(capturedBody as string) as {
+    alerts: AlertEvent[];
+    deliveredAt: string;
+  };
   assert.equal(Array.isArray(parsed.alerts), true);
   assert.equal(parsed.alerts.length, 2);
   assert.equal(parsed.alerts[0].id, "a");

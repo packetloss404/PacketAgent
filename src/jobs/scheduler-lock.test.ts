@@ -25,7 +25,12 @@ test("fileLeaderLock first acquire writes the lock file with our processId", asy
   const dir = makeTempDir();
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const lockPath = path.join(dir, "scheduler.lock");
-  const lock = fileLeaderLock({ path: lockPath, processId: "proc-a", ttlMs: 5_000, now: () => 1_000 });
+  const lock = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-a",
+    ttlMs: 5_000,
+    now: () => 1_000,
+  });
 
   const acquired = await lock.acquire();
   assert.equal(acquired, true);
@@ -42,7 +47,12 @@ test("fileLeaderLock same-processId re-acquire renews the TTL", async (t) => {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const lockPath = path.join(dir, "scheduler.lock");
   let now = 1_000;
-  const lock = fileLeaderLock({ path: lockPath, processId: "proc-a", ttlMs: 5_000, now: () => now });
+  const lock = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-a",
+    ttlMs: 5_000,
+    now: () => now,
+  });
 
   assert.equal(await lock.acquire(), true);
   const first = JSON.parse(readFileSync(lockPath, "utf8")) as { expiresAt: number };
@@ -51,7 +61,10 @@ test("fileLeaderLock same-processId re-acquire renews the TTL", async (t) => {
   now = 3_000;
   assert.equal(await lock.acquire(), true);
   assert.equal(lock.isHeld(), true);
-  const renewed = JSON.parse(readFileSync(lockPath, "utf8")) as { expiresAt: number; processId: string };
+  const renewed = JSON.parse(readFileSync(lockPath, "utf8")) as {
+    expiresAt: number;
+    processId: string;
+  };
   assert.equal(renewed.expiresAt, 8_000);
   assert.equal(renewed.processId, "proc-a");
 });
@@ -60,8 +73,18 @@ test("fileLeaderLock different processId fails to acquire while non-expired lock
   const dir = makeTempDir();
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const lockPath = path.join(dir, "scheduler.lock");
-  const owner = fileLeaderLock({ path: lockPath, processId: "proc-a", ttlMs: 5_000, now: () => 1_000 });
-  const challenger = fileLeaderLock({ path: lockPath, processId: "proc-b", ttlMs: 5_000, now: () => 2_000 });
+  const owner = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-a",
+    ttlMs: 5_000,
+    now: () => 1_000,
+  });
+  const challenger = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-b",
+    ttlMs: 5_000,
+    now: () => 2_000,
+  });
 
   assert.equal(await owner.acquire(), true);
   assert.equal(await challenger.acquire(), false);
@@ -75,14 +98,27 @@ test("fileLeaderLock different processId can take over after the lock expires", 
   const dir = makeTempDir();
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const lockPath = path.join(dir, "scheduler.lock");
-  const owner = fileLeaderLock({ path: lockPath, processId: "proc-a", ttlMs: 5_000, now: () => 1_000 });
-  const challenger = fileLeaderLock({ path: lockPath, processId: "proc-b", ttlMs: 5_000, now: () => 10_000 });
+  const owner = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-a",
+    ttlMs: 5_000,
+    now: () => 1_000,
+  });
+  const challenger = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-b",
+    ttlMs: 5_000,
+    now: () => 10_000,
+  });
 
   assert.equal(await owner.acquire(), true);
   assert.equal(await challenger.acquire(), true);
   assert.equal(challenger.isHeld(), true);
 
-  const state = JSON.parse(readFileSync(lockPath, "utf8")) as { processId: string; expiresAt: number };
+  const state = JSON.parse(readFileSync(lockPath, "utf8")) as {
+    processId: string;
+    expiresAt: number;
+  };
   assert.equal(state.processId, "proc-b");
   assert.equal(state.expiresAt, 15_000);
 });
@@ -91,8 +127,18 @@ test("fileLeaderLock release deletes the file when we own it; new owner can then
   const dir = makeTempDir();
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const lockPath = path.join(dir, "scheduler.lock");
-  const owner = fileLeaderLock({ path: lockPath, processId: "proc-a", ttlMs: 5_000, now: () => 1_000 });
-  const challenger = fileLeaderLock({ path: lockPath, processId: "proc-b", ttlMs: 5_000, now: () => 2_000 });
+  const owner = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-a",
+    ttlMs: 5_000,
+    now: () => 1_000,
+  });
+  const challenger = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-b",
+    ttlMs: 5_000,
+    now: () => 2_000,
+  });
 
   assert.equal(await owner.acquire(), true);
   await owner.release();
@@ -108,8 +154,18 @@ test("fileLeaderLock release does not delete the file when a different processId
   const dir = makeTempDir();
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const lockPath = path.join(dir, "scheduler.lock");
-  const owner = fileLeaderLock({ path: lockPath, processId: "proc-a", ttlMs: 5_000, now: () => 1_000 });
-  const stranger = fileLeaderLock({ path: lockPath, processId: "proc-b", ttlMs: 5_000, now: () => 2_000 });
+  const owner = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-a",
+    ttlMs: 5_000,
+    now: () => 1_000,
+  });
+  const stranger = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-b",
+    ttlMs: 5_000,
+    now: () => 2_000,
+  });
 
   assert.equal(await owner.acquire(), true);
   await stranger.release();
@@ -125,7 +181,12 @@ test("fileLeaderLock treats a corrupt JSON file as no-holder and acquires", asyn
   const lockPath = path.join(dir, "scheduler.lock");
   writeFileSync(lockPath, "{not valid json", "utf8");
 
-  const lock = fileLeaderLock({ path: lockPath, processId: "proc-a", ttlMs: 5_000, now: () => 1_000 });
+  const lock = fileLeaderLock({
+    path: lockPath,
+    processId: "proc-a",
+    ttlMs: 5_000,
+    now: () => 1_000,
+  });
   assert.equal(await lock.acquire(), true);
   assert.equal(lock.isHeld(), true);
 
@@ -134,7 +195,16 @@ test("fileLeaderLock treats a corrupt JSON file as no-holder and acquires", asyn
 });
 
 test("fileLeaderLock acquire throws when parent directory does not exist", async () => {
-  const missing = path.join(tmpdir(), `packetagent-leader-missing-${randomUUID()}`, "scheduler.lock");
-  const lock = fileLeaderLock({ path: missing, processId: "proc-a", ttlMs: 5_000, now: () => 1_000 });
+  const missing = path.join(
+    tmpdir(),
+    `packetagent-leader-missing-${randomUUID()}`,
+    "scheduler.lock",
+  );
+  const lock = fileLeaderLock({
+    path: missing,
+    processId: "proc-a",
+    ttlMs: 5_000,
+    now: () => 1_000,
+  });
   await assert.rejects(() => lock.acquire(), /parent directory/);
 });
