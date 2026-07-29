@@ -23,6 +23,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   high package entries for one React Router RSC advisory. PacketAgent does not
   expose the affected RSC/server-action path; the deliberate exact-pin and
   re-audit trigger are documented.
+- Converted the compatibility store facade's import-only type/value exports to
+  direct re-exports, preserving its public API while removing 66 inherited
+  ESLint warnings.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

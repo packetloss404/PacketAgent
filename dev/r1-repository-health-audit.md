@@ -68,8 +68,10 @@ are inputs to this re-audit, not active task lists.
   7.18.2. A prior local browser pass covered signed-out login,
   seeded authentication, PacketAgent branding, sidebar/button semantics,
   project tabs, and project-card layout.
-- `npm run lint`: zero errors and 143 inherited warnings, down from 145.
-- `npm run format:check`: 307 files remain, down from 326.
+- `npm run lint`: zero errors and 77 inherited warnings, down from 145. The
+  storage-facade export-hygiene slice removed 66 import-only warnings without
+  changing its public API.
+- `npm run format:check`: 306 files remain, down from 326.
 - `npm run test:api`: 1,521 passed, 4 intentionally skipped live probes, 0
   failed (1,525 total).
 - `npm audit` and `npm audit --omit=dev`: two high package entries for the
