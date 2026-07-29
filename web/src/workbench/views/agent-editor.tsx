@@ -2,9 +2,15 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import { useNavigate, useParams } from "react-router-dom";
 import { I } from "../icons";
 import { Topbar } from "../Shell";
-import { useWorkbench } from "../WorkbenchContext";
+import { useWorkbench } from "../workbench-state";
 import { api } from "@/lib/api";
-import { describeNextRun, triggerLabel, TRIGGER_KINDS, validateCronSchedule, formatDuration } from "@/lib/agent-runtime";
+import {
+  describeNextRun,
+  triggerLabel,
+  TRIGGER_KINDS,
+  validateCronSchedule,
+  formatDuration,
+} from "@/lib/agent-runtime";
 import { canEditWorkflowRole, canManageWorkspaceRole } from "@/lib/roles";
 import type {
   AgentInputField,
@@ -110,25 +116,34 @@ export function AgentEditorView() {
       }
     };
     void load();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [id]);
 
-  const defaults = useMemo<SaveAgentInput>(() => ({
-    name: agent?.name ?? "",
-    description: agent?.description ?? "",
-    instructions: agent?.instructions ?? "",
-    providerId: agent?.providerId ?? providers[0]?.id ?? "",
-    model: agent?.model ?? providers[0]?.defaultModel ?? "",
-    tools: agent?.tools ?? [],
-    schedule: agent?.schedule ?? "",
-    triggerKind: agent?.triggerKind ?? "manual",
-    playbook: agent?.playbook ?? [],
-    status: agent?.status ?? "active",
-  }), [agent, providers]);
+  const defaults = useMemo<SaveAgentInput>(
+    () => ({
+      name: agent?.name ?? "",
+      description: agent?.description ?? "",
+      instructions: agent?.instructions ?? "",
+      providerId: agent?.providerId ?? providers[0]?.id ?? "",
+      model: agent?.model ?? providers[0]?.defaultModel ?? "",
+      tools: agent?.tools ?? [],
+      schedule: agent?.schedule ?? "",
+      triggerKind: agent?.triggerKind ?? "manual",
+      playbook: agent?.playbook ?? [],
+      status: agent?.status ?? "active",
+    }),
+    [agent, providers],
+  );
 
-  const nextRunLabel = useMemo(() => describeNextRun(schedule, triggerKind), [schedule, triggerKind]);
+  const nextRunLabel = useMemo(
+    () => describeNextRun(schedule, triggerKind),
+    [schedule, triggerKind],
+  );
   const scheduleValidation = triggerKind === "schedule" ? validateCronSchedule(schedule) : null;
-  const showScheduleValidation = triggerKind === "schedule" && scheduleValidation && scheduleTouched;
+  const showScheduleValidation =
+    triggerKind === "schedule" && scheduleValidation && scheduleTouched;
 
   const saveAgent = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -137,7 +152,9 @@ export function AgentEditorView() {
       setMessage(null);
       return;
     }
-    const invalidEnum = inputSchema.find((f) => f.type === "enum" && (f.options ?? []).length === 0);
+    const invalidEnum = inputSchema.find(
+      (f) => f.type === "enum" && (f.options ?? []).length === 0,
+    );
     if (invalidEnum) {
       setError(`enum input ${invalidEnum.key || invalidEnum.label} needs at least one option`);
       setMessage(null);
@@ -161,7 +178,10 @@ export function AgentEditorView() {
       instructions: fieldValue(form, "instructions"),
       providerId: fieldValue(form, "providerId") || undefined,
       model: fieldValue(form, "model") || undefined,
-      tools: fieldValue(form, "tools").split(",").map((t) => t.trim()).filter(Boolean),
+      tools: fieldValue(form, "tools")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
       schedule: fieldValue(form, "schedule") || undefined,
       triggerKind,
       playbook: playbook.map((step) => ({
@@ -225,7 +245,12 @@ export function AgentEditorView() {
     setError(null);
     try {
       const token = await api.rotateAgentWebhook(agent.id);
-      setAgent({ ...agent, webhookToken: token, webhookTokenPreview: undefined, hasWebhookToken: true });
+      setAgent({
+        ...agent,
+        webhookToken: token,
+        webhookTokenPreview: undefined,
+        hasWebhookToken: true,
+      });
       setMessage("Webhook token rotated. Full URL is shown until this page refreshes.");
     } catch (e) {
       setError((e as Error).message);
@@ -240,7 +265,12 @@ export function AgentEditorView() {
     setError(null);
     try {
       await api.removeAgentWebhook(agent.id);
-      setAgent({ ...agent, webhookToken: undefined, webhookTokenPreview: undefined, hasWebhookToken: false });
+      setAgent({
+        ...agent,
+        webhookToken: undefined,
+        webhookTokenPreview: undefined,
+        hasWebhookToken: false,
+      });
       setMessage("Webhook removed.");
     } catch (e) {
       setError((e as Error).message);
@@ -412,21 +442,42 @@ export function AgentEditorView() {
   };
 
   const webhookPathToken = agent?.webhookToken ?? agent?.webhookTokenPreview;
-  const hasWebhook = Boolean(agent?.webhookToken || agent?.webhookTokenPreview || agent?.hasWebhookToken);
+  const hasWebhook = Boolean(
+    agent?.webhookToken || agent?.webhookTokenPreview || agent?.hasWebhookToken,
+  );
 
   return (
     <>
       <Topbar
-        crumbs={["__WS__", "Agents", isNew ? "New" : agent?.name ?? "Edit"]}
+        crumbs={["__WS__", "Agents", isNew ? "New" : (agent?.name ?? "Edit")]}
         actions={
           !isNew && agent ? (
             <>
-              <button className="top-btn" onClick={() => { void runNow(); }} disabled={!canRunAgent || running || saving}>
-                {running ? <span className="spin"><I.refresh size={13}/></span> : <I.play size={13}/>} Run now
+              <button
+                className="top-btn"
+                onClick={() => {
+                  void runNow();
+                }}
+                disabled={!canRunAgent || running || saving}
+              >
+                {running ? (
+                  <span className="spin">
+                    <I.refresh size={13} />
+                  </span>
+                ) : (
+                  <I.play size={13} />
+                )}{" "}
+                Run now
               </button>
               {canManageAgent && (
-                <button className="top-btn" onClick={() => { void archive(); }} disabled={saving}>
-                  <I.trash size={13}/> Archive
+                <button
+                  className="top-btn"
+                  onClick={() => {
+                    void archive();
+                  }}
+                  disabled={saving}
+                >
+                  <I.trash size={13} /> Archive
                 </button>
               )}
             </>
@@ -435,32 +486,72 @@ export function AgentEditorView() {
       />
 
       <div style={{ padding: "26px 28px 60px", maxWidth: 1280 }}>
-        {loading && <div className="muted" style={{ padding: 16 }}>Loading agent…</div>}
+        {loading && (
+          <div className="muted" style={{ padding: 16 }}>
+            Loading agent…
+          </div>
+        )}
 
         {!loading && !canManageAgent && (
-          <div className="card" style={{ padding: "10px 14px", marginBottom: 14, borderColor: "var(--line-2)" }}>
-            <span className="mono muted" style={{ fontSize: 11 }}>Admin role required to create, edit, archive, or manage webhooks for agents.</span>
+          <div
+            className="card"
+            style={{ padding: "10px 14px", marginBottom: 14, borderColor: "var(--line-2)" }}
+          >
+            <span className="mono muted" style={{ fontSize: 11 }}>
+              Admin role required to create, edit, archive, or manage webhooks for agents.
+            </span>
           </div>
         )}
 
         {error && (
-          <div className="card" style={{ padding: "10px 14px", marginBottom: 14, borderColor: "rgba(242,107,92,0.3)", background: "rgba(242,107,92,0.06)", color: "var(--danger)" }}>
-            <span className="mono" style={{ fontSize: 11.5 }}>ERR · {error}</span>
+          <div
+            className="card"
+            style={{
+              padding: "10px 14px",
+              marginBottom: 14,
+              borderColor: "rgba(242,107,92,0.3)",
+              background: "rgba(242,107,92,0.06)",
+              color: "var(--danger)",
+            }}
+          >
+            <span className="mono" style={{ fontSize: 11.5 }}>
+              ERR · {error}
+            </span>
           </div>
         )}
         {message && !error && (
-          <div className="card" style={{ padding: "10px 14px", marginBottom: 14, borderColor: "rgba(184,242,92,0.3)", background: "rgba(184,242,92,0.06)", color: "var(--green)" }}>
-            <span className="mono" style={{ fontSize: 11.5 }}>OK · {message}</span>
+          <div
+            className="card"
+            style={{
+              padding: "10px 14px",
+              marginBottom: 14,
+              borderColor: "rgba(184,242,92,0.3)",
+              background: "rgba(184,242,92,0.06)",
+              color: "var(--green)",
+            }}
+          >
+            <span className="mono" style={{ fontSize: 11.5 }}>
+              OK · {message}
+            </span>
           </div>
         )}
 
         {!loading && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: 24, alignItems: "start" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+              gap: 24,
+              alignItems: "start",
+            }}
+          >
             <form onSubmit={saveAgent}>
               <fieldset disabled={!canManageAgent} style={{ border: 0, padding: 0, margin: 0 }}>
                 <Section number="01 / 05" kicker="CONFIGURATION" title="Identity & instructions">
                   <Row>
-                    <Field label="Name"><input name="name" defaultValue={defaults.name} className="field" required/></Field>
+                    <Field label="Name">
+                      <input name="name" defaultValue={defaults.name} className="field" required />
+                    </Field>
                     <Field label="Status">
                       <select name="status" defaultValue={defaults.status} className="field">
                         <option value="active">active</option>
@@ -469,26 +560,62 @@ export function AgentEditorView() {
                     </Field>
                   </Row>
                   <Field label="Description">
-                    <input name="description" defaultValue={defaults.description} className="field" placeholder="What this agent does"/>
+                    <input
+                      name="description"
+                      defaultValue={defaults.description}
+                      className="field"
+                      placeholder="What this agent does"
+                    />
                   </Field>
                   <Field label="Instructions · system prompt">
-                    <textarea name="instructions" defaultValue={defaults.instructions} rows={6} className="field" required/>
+                    <textarea
+                      name="instructions"
+                      defaultValue={defaults.instructions}
+                      rows={6}
+                      className="field"
+                      required
+                    />
                   </Field>
                   <Row>
                     <Field label="Provider">
-                      <select name="providerId" defaultValue={defaults.providerId} className="field">
+                      <select
+                        name="providerId"
+                        defaultValue={defaults.providerId}
+                        className="field"
+                      >
                         <option value="">— no provider yet —</option>
-                        {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {providers.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
                       </select>
                     </Field>
-                    <Field label="Model"><input name="model" defaultValue={defaults.model} className="field" placeholder="gpt-4.1-mini"/></Field>
+                    <Field label="Model">
+                      <input
+                        name="model"
+                        defaultValue={defaults.model}
+                        className="field"
+                        placeholder="gpt-4.1-mini"
+                      />
+                    </Field>
                   </Row>
                   <Field label="Tools / integrations · comma-separated tags">
-                    <input name="tools" defaultValue={defaults.tools?.join(", ")} className="field" placeholder="gmail, slack, github"/>
+                    <input
+                      name="tools"
+                      defaultValue={defaults.tools?.join(", ")}
+                      className="field"
+                      placeholder="gmail, slack, github"
+                    />
                   </Field>
                 </Section>
 
-                <Section number="02 / 05" kicker="TRIGGER" title="Invocation rules" sub="How this agent gets invoked. Manual always works; schedules drive the next-run estimate.">
+                <Section
+                  number="02 / 05"
+                  kicker="TRIGGER"
+                  title="Invocation rules"
+                  sub="How this agent gets invoked. Manual always works; schedules drive the next-run estimate."
+                >
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
                     {TRIGGER_KINDS.map((kind) => {
                       const active = triggerKind === kind;
@@ -505,67 +632,169 @@ export function AgentEditorView() {
                     })}
                   </div>
                   <Row>
-                    <Field label={triggerKind === "schedule" ? "Cron schedule *" : "Cron schedule · optional"}>
+                    <Field
+                      label={
+                        triggerKind === "schedule" ? "Cron schedule *" : "Cron schedule · optional"
+                      }
+                    >
                       <input
                         name="schedule"
                         className="field mono"
                         value={schedule}
                         onBlur={() => setScheduleTouched(true)}
-                        onChange={(e) => { setSchedule(e.target.value); setScheduleTouched(true); }}
+                        onChange={(e) => {
+                          setSchedule(e.target.value);
+                          setScheduleTouched(true);
+                        }}
                         placeholder="0 8 * * 1-5"
                         required={triggerKind === "schedule"}
                       />
                       <p className="mono muted" style={{ fontSize: 10, marginTop: 6 }}>
-                        Five-field cron in workspace time. Examples: <span style={{ color: "var(--silver-200)" }}>0 8 * * 1-5</span> weekdays at 08:00, <span style={{ color: "var(--silver-200)" }}>*/30 * * * *</span> every 30m.
+                        Five-field cron in workspace time. Examples:{" "}
+                        <span style={{ color: "var(--silver-200)" }}>0 8 * * 1-5</span> weekdays at
+                        08:00, <span style={{ color: "var(--silver-200)" }}>*/30 * * * *</span>{" "}
+                        every 30m.
                       </p>
                       {showScheduleValidation && (
-                        <p className="mono" style={{ fontSize: 10.5, marginTop: 4, color: "var(--danger)" }}>ERR · {scheduleValidation}</p>
+                        <p
+                          className="mono"
+                          style={{ fontSize: 10.5, marginTop: 4, color: "var(--danger)" }}
+                        >
+                          ERR · {scheduleValidation}
+                        </p>
                       )}
                     </Field>
                     <Field label={triggerKind === "schedule" ? "Next run" : "Trigger mode"}>
-                      <div className="field mono" style={{ background: "var(--bg-elev)" }}>{nextRunLabel}</div>
+                      <div className="field mono" style={{ background: "var(--bg-elev)" }}>
+                        {nextRunLabel}
+                      </div>
                     </Field>
                   </Row>
                   {!isNew && agent && (
-                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-                      <div className="kicker" style={{ marginBottom: 6 }}>WEBHOOK TRIGGER</div>
+                    <div
+                      style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}
+                    >
+                      <div className="kicker" style={{ marginBottom: 6 }}>
+                        WEBHOOK TRIGGER
+                      </div>
                       {hasWebhook ? (
                         <div style={{ display: "grid", gap: 8 }}>
-                          <div className="mono" style={{ fontSize: 11, padding: "8px 10px", background: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--silver-200)", wordBreak: "break-all" }}>
-                            POST {webhookOrigin()}/api/public/webhooks/agents/{webhookPathToken ?? "[redacted]"}
+                          <div
+                            className="mono"
+                            style={{
+                              fontSize: 11,
+                              padding: "8px 10px",
+                              background: "var(--ink)",
+                              border: "1px solid var(--line)",
+                              borderRadius: 6,
+                              color: "var(--silver-200)",
+                              wordBreak: "break-all",
+                            }}
+                          >
+                            POST {webhookOrigin()}/api/public/webhooks/agents/
+                            {webhookPathToken ?? "[redacted]"}
                           </div>
                           <p className="mono muted" style={{ fontSize: 10 }}>
-                            Body is forwarded as the run's `inputs`. Trigger kind = webhook. Full token is only shown immediately after rotation.
+                            Body is forwarded as the run's `inputs`. Trigger kind = webhook. Full
+                            token is only shown immediately after rotation.
                           </p>
                           <div style={{ display: "flex", gap: 6 }}>
-                            <button type="button" className="btn btn-sm" onClick={() => { void rotateWebhook(); }} disabled={webhookBusy}><I.refresh size={11}/> Rotate token</button>
-                            <button type="button" className="btn btn-sm" onClick={() => { void removeWebhook(); }} disabled={webhookBusy} style={{ color: "var(--danger)" }}><I.trash size={11}/> Remove</button>
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              onClick={() => {
+                                void rotateWebhook();
+                              }}
+                              disabled={webhookBusy}
+                            >
+                              <I.refresh size={11} /> Rotate token
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              onClick={() => {
+                                void removeWebhook();
+                              }}
+                              disabled={webhookBusy}
+                              style={{ color: "var(--danger)" }}
+                            >
+                              <I.trash size={11} /> Remove
+                            </button>
                           </div>
                         </div>
                       ) : (
-                        <button type="button" className="btn btn-sm" onClick={() => { void rotateWebhook(); }} disabled={webhookBusy}><I.plus size={11}/> Generate webhook URL</button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => {
+                            void rotateWebhook();
+                          }}
+                          disabled={webhookBusy}
+                        >
+                          <I.plus size={11} /> Generate webhook URL
+                        </button>
                       )}
                     </div>
                   )}
                 </Section>
 
-                <Section number="03 / 05" kicker={`PLAYBOOK · ${playbook.length} STEP${playbook.length === 1 ? "" : "S"}`} title="Ordered steps">
-                  <PlaybookEditor steps={playbook} showValidation={playbookValidationVisible} onChange={updatePlaybook}/>
+                <Section
+                  number="03 / 05"
+                  kicker={`PLAYBOOK · ${playbook.length} STEP${playbook.length === 1 ? "" : "S"}`}
+                  title="Ordered steps"
+                >
+                  <PlaybookEditor
+                    steps={playbook}
+                    showValidation={playbookValidationVisible}
+                    onChange={updatePlaybook}
+                  />
                 </Section>
 
                 <div ref={toolSectionRef}>
-                  <Section number="04 / 05" kicker={`TOOLS · ${enabledTools.length} ENABLED`} title="Available tool registry" sub="Enabling any tool runs the agent through the tool-use loop on save.">
-                    <ToolPicker tools={availableTools} enabled={enabledTools} onChange={updateEnabledTools}/>
+                  <Section
+                    number="04 / 05"
+                    kicker={`TOOLS · ${enabledTools.length} ENABLED`}
+                    title="Available tool registry"
+                    sub="Enabling any tool runs the agent through the tool-use loop on save."
+                  >
+                    <ToolPicker
+                      tools={availableTools}
+                      enabled={enabledTools}
+                      onChange={updateEnabledTools}
+                    />
                   </Section>
                 </div>
 
-                <Section number="05 / 05" kicker="INPUT SCHEMA" title="Typed parameters" sub="Validated server-side. Coerced into typed inputs on every run.">
-                  <InputSchemaEditor schema={inputSchema} onChange={updateInputSchema}/>
+                <Section
+                  number="05 / 05"
+                  kicker="INPUT SCHEMA"
+                  title="Typed parameters"
+                  sub="Validated server-side. Coerced into typed inputs on every run."
+                >
+                  <InputSchemaEditor schema={inputSchema} onChange={updateInputSchema} />
                 </Section>
 
-                <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)", display: "flex", justifyContent: "flex-end" }}>
-                  <button type="submit" className="btn btn-primary" disabled={!canManageAgent || saving}>
-                    {saving ? <span className="spin"><I.refresh size={13}/></span> : <I.check size={13}/>}
+                <div
+                  style={{
+                    marginTop: 18,
+                    paddingTop: 16,
+                    borderTop: "1px solid var(--line)",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={!canManageAgent || saving}
+                  >
+                    {saving ? (
+                      <span className="spin">
+                        <I.refresh size={13} />
+                      </span>
+                    ) : (
+                      <I.check size={13} />
+                    )}
                     {isNew ? " Create agent" : " Save agent"}
                   </button>
                 </div>
@@ -575,9 +804,16 @@ export function AgentEditorView() {
             <aside style={{ display: "flex", flexDirection: "column", gap: 18 }}>
               {!isNew && agent && (
                 <div>
-                  <div className="kicker" style={{ marginBottom: 8 }}>RUN WITH INPUTS</div>
+                  <div className="kicker" style={{ marginBottom: 8 }}>
+                    RUN WITH INPUTS
+                  </div>
                   {inputSchema.length === 0 ? (
-                    <div className="card muted" style={{ padding: "12px 14px", fontSize: 12, textAlign: "center" }}>— no inputs defined —</div>
+                    <div
+                      className="card muted"
+                      style={{ padding: "12px 14px", fontSize: 12, textAlign: "center" }}
+                    >
+                      — no inputs defined —
+                    </div>
                   ) : (
                     <div style={{ display: "grid", gap: 8 }}>
                       {inputSchema.map((f) => (
@@ -594,10 +830,18 @@ export function AgentEditorView() {
                     type="button"
                     className="btn btn-primary"
                     style={{ width: "100%", marginTop: 10, justifyContent: "center" }}
-                    onClick={() => { void runNow(); }}
+                    onClick={() => {
+                      void runNow();
+                    }}
                     disabled={!canRunAgent || running || saving}
                   >
-                    {running ? <span className="spin"><I.refresh size={13}/></span> : <I.play size={13}/>}
+                    {running ? (
+                      <span className="spin">
+                        <I.refresh size={13} />
+                      </span>
+                    ) : (
+                      <I.play size={13} />
+                    )}
                     {canRunAgent ? " Execute" : " Member role required"}
                   </button>
                   {pendingApproval && (
@@ -606,7 +850,9 @@ export function AgentEditorView() {
                       running={running}
                       saving={saving}
                       canRunAgent={canRunAgent}
-                      onLaunch={() => { void launchPendingApproval(); }}
+                      onLaunch={() => {
+                        void launchPendingApproval();
+                      }}
                       onEditTools={editPendingTools}
                       onCancel={cancelPendingApproval}
                     />
@@ -615,9 +861,16 @@ export function AgentEditorView() {
               )}
 
               <div>
-                <div className="kicker" style={{ marginBottom: 8 }}>RECENT RUNS</div>
+                <div className="kicker" style={{ marginBottom: 8 }}>
+                  RECENT RUNS
+                </div>
                 {runs.length === 0 ? (
-                  <div className="card muted" style={{ padding: "12px 14px", fontSize: 12, textAlign: "center" }}>— no runs recorded —</div>
+                  <div
+                    className="card muted"
+                    style={{ padding: "12px 14px", fontSize: 12, textAlign: "center" }}
+                  >
+                    — no runs recorded —
+                  </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {runs.map((r) => {
@@ -628,28 +881,88 @@ export function AgentEditorView() {
                             type="button"
                             onClick={() => {
                               setExpandedRun(expanded ? null : r.id);
-                              if (expanded && playbookReviewRunId === r.id) setPlaybookReviewRunId(null);
+                              if (expanded && playbookReviewRunId === r.id)
+                                setPlaybookReviewRunId(null);
                             }}
-                            style={{ background: "transparent", border: "none", padding: 0, color: "var(--silver-100)", cursor: "pointer", textAlign: "left", width: "100%", display: "flex", gap: 8, alignItems: "flex-start" }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: 0,
+                              color: "var(--silver-100)",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              width: "100%",
+                              display: "flex",
+                              gap: 8,
+                              alignItems: "flex-start",
+                            }}
                           >
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                                <span className={`pill ${r.status === "success" ? "good" : r.status === "failed" ? "danger" : r.status === "running" ? "warn" : "muted"}`}>
-                                  <span className="dot"></span>{r.status}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  marginBottom: 4,
+                                }}
+                              >
+                                <span
+                                  className={`pill ${r.status === "success" ? "good" : r.status === "failed" ? "danger" : r.status === "running" ? "warn" : "muted"}`}
+                                >
+                                  <span className="dot"></span>
+                                  {r.status}
                                 </span>
-                                <span style={{ fontSize: 12, color: "var(--silver-100)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    color: "var(--silver-100)",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {r.title}
+                                </span>
                               </div>
-                              <div className="mono muted" style={{ fontSize: 10.5 }}>{new Date(r.createdAt).toLocaleString()} · {triggerLabel(r.triggerKind)}</div>
+                              <div className="mono muted" style={{ fontSize: 10.5 }}>
+                                {new Date(r.createdAt).toLocaleString()} ·{" "}
+                                {triggerLabel(r.triggerKind)}
+                              </div>
                             </div>
-                            <span className="mono muted" style={{ fontSize: 11 }}>{expanded ? "[ − ]" : "[ + ]"}</span>
+                            <span className="mono muted" style={{ fontSize: 11 }}>
+                              {expanded ? "[ − ]" : "[ + ]"}
+                            </span>
                           </button>
-                          {r.error && <div className="mono" style={{ fontSize: 11, color: "var(--danger)", marginTop: 6 }}>ERR · {r.error}</div>}
+                          {r.error && (
+                            <div
+                              className="mono"
+                              style={{ fontSize: 11, color: "var(--danger)", marginTop: 6 }}
+                            >
+                              ERR · {r.error}
+                            </div>
+                          )}
                           {expanded && (
-                            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 10 }}>
-                              <RunTranscript steps={r.transcript}/>
+                            <div
+                              style={{
+                                marginTop: 10,
+                                paddingTop: 10,
+                                borderTop: "1px solid var(--line)",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 10,
+                              }}
+                            >
+                              <RunTranscript steps={r.transcript} />
                               {r.toolCalls && r.toolCalls.length > 0 && (
                                 <div>
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      marginBottom: 6,
+                                    }}
+                                  >
                                     <div className="kicker">TOOL CALLS · {r.toolCalls.length}</div>
                                     <button
                                       type="button"
@@ -658,8 +971,16 @@ export function AgentEditorView() {
                                       disabled={!canManageAgent || recordingRunId === r.id}
                                       title="Review the replacement playbook before updating this agent"
                                     >
-                                      {recordingRunId === r.id ? <span className="spin"><I.refresh size={11}/></span> : <I.eye size={11}/>}
-                                      {recordingRunId === r.id ? " Replacing..." : " Review replacement"}
+                                      {recordingRunId === r.id ? (
+                                        <span className="spin">
+                                          <I.refresh size={11} />
+                                        </span>
+                                      ) : (
+                                        <I.eye size={11} />
+                                      )}
+                                      {recordingRunId === r.id
+                                        ? " Replacing..."
+                                        : " Review replacement"}
                                     </button>
                                   </div>
                                   {playbookReviewRunId === r.id && (
@@ -668,15 +989,32 @@ export function AgentEditorView() {
                                       currentStepCount={playbook.length}
                                       recording={recordingRunId === r.id}
                                       canRunAgent={canManageAgent}
-                                      onConfirm={() => { void recordAsPlaybook(r.id); }}
+                                      onConfirm={() => {
+                                        void recordAsPlaybook(r.id);
+                                      }}
                                       onCancel={() => setPlaybookReviewRunId(null)}
                                     />
                                   )}
-                                  <ToolCallTimeline calls={r.toolCalls}/>
+                                  <ToolCallTimeline calls={r.toolCalls} />
                                 </div>
                               )}
                               {r.output && (
-                                <pre className="mono" style={{ margin: 0, padding: 10, fontSize: 11, lineHeight: 1.5, background: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--silver-200)", whiteSpace: "pre-wrap" }}>{r.output}</pre>
+                                <pre
+                                  className="mono"
+                                  style={{
+                                    margin: 0,
+                                    padding: 10,
+                                    fontSize: 11,
+                                    lineHeight: 1.5,
+                                    background: "var(--ink)",
+                                    border: "1px solid var(--line)",
+                                    borderRadius: 6,
+                                    color: "var(--silver-200)",
+                                    whiteSpace: "pre-wrap",
+                                  }}
+                                >
+                                  {r.output}
+                                </pre>
                               )}
                             </div>
                           )}
@@ -694,16 +1032,45 @@ export function AgentEditorView() {
   );
 }
 
-function Section({ number, kicker, title, sub, children }: { number: string; kicker: string; title: string; sub?: string; children: ReactNode }) {
+function Section({
+  number,
+  kicker,
+  title,
+  sub,
+  children,
+}: {
+  number: string;
+  kicker: string;
+  title: string;
+  sub?: string;
+  children: ReactNode;
+}) {
   return (
     <div className="card" style={{ padding: 22, marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
         <div>
-          <div className="kicker" style={{ marginBottom: 4 }}>{kicker}</div>
-          <h2 className="h2" style={{ fontSize: 18 }}>{title}</h2>
-          {sub && <p className="muted" style={{ fontSize: 12.5, marginTop: 4, maxWidth: 480 }}>{sub}</p>}
+          <div className="kicker" style={{ marginBottom: 4 }}>
+            {kicker}
+          </div>
+          <h2 className="h2" style={{ fontSize: 18 }}>
+            {title}
+          </h2>
+          {sub && (
+            <p className="muted" style={{ fontSize: 12.5, marginTop: 4, maxWidth: 480 }}>
+              {sub}
+            </p>
+          )}
         </div>
-        <span className="mono muted" style={{ fontSize: 10.5, letterSpacing: "0.12em" }}>§ {number}</span>
+        <span className="mono muted" style={{ fontSize: 10.5, letterSpacing: "0.12em" }}>
+          § {number}
+        </span>
       </div>
       {children}
     </div>
@@ -711,7 +1078,11 @@ function Section({ number, kicker, title, sub, children }: { number: string; kic
 }
 
 function Row({ children }: { children: ReactNode }) {
-  return <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>{children}</div>;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+      {children}
+    </div>
+  );
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -728,7 +1099,10 @@ function fieldValue(form: FormData, key: string) {
 }
 
 function lines(value: string) {
-  return value.split(/\r?\n|,/).map((entry) => entry.trim()).filter(Boolean);
+  return value
+    .split(/\r?\n|,/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function seedRunInputs(schema: AgentInputField[]): Record<string, string> {
@@ -741,7 +1115,10 @@ function seedRunInputs(schema: AgentInputField[]): Record<string, string> {
   return next;
 }
 
-function buildRunInputPayload(schema: AgentInputField[], values: Record<string, string>): Record<string, string | number | boolean> {
+function buildRunInputPayload(
+  schema: AgentInputField[],
+  values: Record<string, string>,
+): Record<string, string | number | boolean> {
   const payload: Record<string, string | number | boolean> = {};
   for (const f of schema) {
     const raw = values[f.key];
@@ -759,7 +1136,7 @@ function buildRunInputPayload(schema: AgentInputField[], values: Record<string, 
 }
 
 function missingPlaybookTitleIndexes(steps: AgentPlaybookStep[]) {
-  return steps.flatMap((step, index) => step.title.trim().length > 0 ? [] : [index]);
+  return steps.flatMap((step, index) => (step.title.trim().length > 0 ? [] : [index]));
 }
 
 function formatStepNumber(index: number) {
@@ -772,7 +1149,9 @@ function formatStepList(indexes: number[]) {
   return `${labels.join(", ")} +${indexes.length - labels.length} more`;
 }
 
-function isApprovalResult(result: RunAgentResult | null | undefined): result is Extract<RunAgentResult, { approval: ToolCapabilityApprovalRequest }> {
+function isApprovalResult(
+  result: RunAgentResult | null | undefined,
+): result is Extract<RunAgentResult, { approval: ToolCapabilityApprovalRequest }> {
   return Boolean(result && typeof result === "object" && "approval" in result && result.approval);
 }
 
@@ -820,46 +1199,107 @@ function ApprovalPanel({
 }) {
   const { approval } = pending;
   return (
-    <div className="card" style={{ marginTop: 10, padding: 12, borderColor: "rgba(242,196,92,0.32)", background: "rgba(242,196,92,0.045)" }}>
+    <div
+      className="card"
+      style={{
+        marginTop: 10,
+        padding: 12,
+        borderColor: "rgba(242,196,92,0.32)",
+        background: "rgba(242,196,92,0.045)",
+      }}
+    >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <I.shield size={14} style={{ color: "var(--warn)", marginTop: 1 }}/>
+        <I.shield size={14} style={{ color: "var(--warn)", marginTop: 1 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="kicker" style={{ color: "var(--warn)", marginBottom: 4 }}>TOOL APPROVAL</div>
+          <div className="kicker" style={{ color: "var(--warn)", marginBottom: 4 }}>
+            TOOL APPROVAL
+          </div>
           <div className="mono" style={{ fontSize: 11, color: "var(--silver-200)" }}>
-            {triggerLabel(approval.triggerKind)} run · {approval.tools.length} tool{approval.tools.length === 1 ? "" : "s"}
+            {triggerLabel(approval.triggerKind)} run · {approval.tools.length} tool
+            {approval.tools.length === 1 ? "" : "s"}
           </div>
         </div>
       </div>
 
       {approval.summary && (
-        <p style={{ margin: "9px 0 0", fontSize: 12, lineHeight: 1.45, color: "var(--silver-300)" }}>{approval.summary}</p>
+        <p
+          style={{ margin: "9px 0 0", fontSize: 12, lineHeight: 1.45, color: "var(--silver-300)" }}
+        >
+          {approval.summary}
+        </p>
       )}
 
-      <div style={{ marginTop: 10, borderTop: "1px solid var(--line)", paddingTop: 8, display: "grid", gap: 6 }}>
+      <div
+        style={{
+          marginTop: 10,
+          borderTop: "1px solid var(--line)",
+          paddingTop: 8,
+          display: "grid",
+          gap: 6,
+        }}
+      >
         {approval.tools.map((tool) => {
           const risk = riskForApprovalTool(tool);
           return (
             <div key={tool.name} style={{ display: "grid", gap: 3 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                <span className="mono" style={{ fontSize: 11.5, color: "var(--silver-100)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tool.name}</span>
-                <span className={`pill ${riskPillClass(risk)}`} style={{ fontSize: 9, padding: "1px 5px", flexShrink: 0 }}>{risk}/{tool.side}</span>
+                <span
+                  className="mono"
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--silver-100)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {tool.name}
+                </span>
+                <span
+                  className={`pill ${riskPillClass(risk)}`}
+                  style={{ fontSize: 9, padding: "1px 5px", flexShrink: 0 }}
+                >
+                  {risk}/{tool.side}
+                </span>
               </div>
-              <div className="muted" style={{ fontSize: 10.5, lineHeight: 1.35 }}>{tool.riskSummary || tool.description}</div>
+              <div className="muted" style={{ fontSize: 10.5, lineHeight: 1.35 }}>
+                {tool.riskSummary || tool.description}
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="mono muted" style={{ marginTop: 9, fontSize: 10 }}>expires {formatApprovalExpiry(approval.expiresAt)}</div>
+      <div className="mono muted" style={{ marginTop: 9, fontSize: 10 }}>
+        expires {formatApprovalExpiry(approval.expiresAt)}
+      </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-        <button type="button" className="btn btn-sm btn-primary" onClick={onLaunch} disabled={!canRunAgent || running || saving}>
-          {running ? <span className="spin"><I.refresh size={11}/></span> : <I.rocket size={11}/>} Launch
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          onClick={onLaunch}
+          disabled={!canRunAgent || running || saving}
+        >
+          {running ? (
+            <span className="spin">
+              <I.refresh size={11} />
+            </span>
+          ) : (
+            <I.rocket size={11} />
+          )}{" "}
+          Launch
         </button>
         <button type="button" className="btn btn-sm" onClick={onEditTools} disabled={running}>
-          <I.edit size={11}/> Edit tools
+          <I.edit size={11} /> Edit tools
         </button>
-        <button type="button" className="btn btn-sm" onClick={onCancel} disabled={running} style={{ color: "var(--danger)" }}>
-          <I.close size={11}/> Cancel
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={onCancel}
+          disabled={running}
+          style={{ color: "var(--danger)" }}
+        >
+          <I.close size={11} /> Cancel
         </button>
       </div>
     </div>
@@ -884,37 +1324,100 @@ function PlaybookReplacementReview({
   const preview = playbookPreviewFromToolCalls(run.toolCalls ?? []);
   if (preview.length === 0) return null;
   return (
-    <div role="group" aria-label="Review playbook replacement" style={{ border: "1px solid rgba(242,196,92,0.32)", background: "rgba(242,196,92,0.045)", borderRadius: 6, padding: 10, display: "grid", gap: 9 }}>
+    <div
+      role="group"
+      aria-label="Review playbook replacement"
+      style={{
+        border: "1px solid rgba(242,196,92,0.32)",
+        background: "rgba(242,196,92,0.045)",
+        borderRadius: 6,
+        padding: 10,
+        display: "grid",
+        gap: 9,
+      }}
+    >
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-        <I.alert size={13} style={{ color: "var(--warn)", marginTop: 1, flexShrink: 0 }}/>
+        <I.alert size={13} style={{ color: "var(--warn)", marginTop: 1, flexShrink: 0 }} />
         <div>
-          <div className="kicker" style={{ color: "var(--warn)", marginBottom: 4 }}>REVIEW REPLACEMENT</div>
+          <div className="kicker" style={{ color: "var(--warn)", marginBottom: 4 }}>
+            REVIEW REPLACEMENT
+          </div>
           <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.45, color: "var(--silver-300)" }}>
-            This will replace the current {formatStepCount(currentStepCount)} with {formatStepCount(preview.length)} captured from this run.
+            This will replace the current {formatStepCount(currentStepCount)} with{" "}
+            {formatStepCount(preview.length)} captured from this run.
           </p>
         </div>
       </div>
 
       <div style={{ display: "grid", gap: 6 }}>
         {preview.slice(0, 5).map((step, index) => (
-          <div key={`${step.title}-${index}`} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, alignItems: "start" }}>
-            <span className="mono muted" style={{ fontSize: 10.5 }}>{formatStepNumber(index)}</span>
+          <div
+            key={`${step.title}-${index}`}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "26px 1fr",
+              gap: 8,
+              alignItems: "start",
+            }}
+          >
+            <span className="mono muted" style={{ fontSize: 10.5 }}>
+              {formatStepNumber(index)}
+            </span>
             <span style={{ minWidth: 0 }}>
-              <span className="mono" style={{ display: "block", fontSize: 11.5, color: "var(--silver-100)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{step.title}</span>
-              <span className="muted" style={{ display: "block", fontSize: 10.5, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{step.instruction}</span>
+              <span
+                className="mono"
+                style={{
+                  display: "block",
+                  fontSize: 11.5,
+                  color: "var(--silver-100)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {step.title}
+              </span>
+              <span
+                className="muted"
+                style={{
+                  display: "block",
+                  fontSize: 10.5,
+                  lineHeight: 1.35,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {step.instruction}
+              </span>
             </span>
           </div>
         ))}
-        {preview.length > 5 && <div className="mono muted" style={{ fontSize: 10.5 }}>+{preview.length - 5} more steps</div>}
+        {preview.length > 5 && (
+          <div className="mono muted" style={{ fontSize: 10.5 }}>
+            +{preview.length - 5} more steps
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <button type="button" className="btn btn-sm btn-primary" onClick={onConfirm} disabled={!canRunAgent || recording}>
-          {recording ? <span className="spin"><I.refresh size={11}/></span> : <I.check size={11}/>}
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          onClick={onConfirm}
+          disabled={!canRunAgent || recording}
+        >
+          {recording ? (
+            <span className="spin">
+              <I.refresh size={11} />
+            </span>
+          ) : (
+            <I.check size={11} />
+          )}
           {recording ? " Replacing..." : " Confirm replace"}
         </button>
         <button type="button" className="btn btn-sm" onClick={onCancel} disabled={recording}>
-          <I.close size={11}/> Cancel
+          <I.close size={11} /> Cancel
         </button>
       </div>
     </div>
@@ -956,8 +1459,20 @@ function PlaybookEditor({
     next[index] = { ...next[index]!, ...patch };
     onChange(next);
   };
-  const addStep = () => onChange([...steps, { id: `step_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, title: "", instruction: "" }]);
-  const removeStep = (index: number) => { const next = steps.slice(); next.splice(index, 1); onChange(next); };
+  const addStep = () =>
+    onChange([
+      ...steps,
+      {
+        id: `step_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        title: "",
+        instruction: "",
+      },
+    ]);
+  const removeStep = (index: number) => {
+    const next = steps.slice();
+    next.splice(index, 1);
+    onChange(next);
+  };
   const move = (index: number, delta: -1 | 1) => {
     const target = index + delta;
     if (target < 0 || target >= steps.length) return;
@@ -976,8 +1491,21 @@ function PlaybookEditor({
   return (
     <div>
       {showValidation && missingTitles.length > 0 && (
-        <div role="alert" style={{ border: "1px solid rgba(242,107,92,0.34)", background: "rgba(242,107,92,0.06)", borderRadius: 6, padding: "9px 10px", marginBottom: 10, display: "flex", gap: 8, alignItems: "flex-start", color: "var(--danger)" }}>
-          <I.alert size={13} style={{ marginTop: 1, flexShrink: 0 }}/>
+        <div
+          role="alert"
+          style={{
+            border: "1px solid rgba(242,107,92,0.34)",
+            background: "rgba(242,107,92,0.06)",
+            borderRadius: 6,
+            padding: "9px 10px",
+            marginBottom: 10,
+            display: "flex",
+            gap: 8,
+            alignItems: "flex-start",
+            color: "var(--danger)",
+          }}
+        >
+          <I.alert size={13} style={{ marginTop: 1, flexShrink: 0 }} />
           <span className="mono" style={{ fontSize: 11, lineHeight: 1.4 }}>
             {missingTitles.length === 1
               ? `Step ${formatStepList(missingTitles)} needs a title before this playbook can be saved.`
@@ -986,17 +1514,38 @@ function PlaybookEditor({
         </div>
       )}
       {steps.length === 0 ? (
-        <div className="card muted" style={{ padding: "12px 14px", textAlign: "center", fontSize: 12 }}>— empty playbook · add a step so each run produces a transcript —</div>
+        <div
+          className="card muted"
+          style={{ padding: "12px 14px", textAlign: "center", fontSize: 12 }}
+        >
+          — empty playbook · add a step so each run produces a transcript —
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {steps.map((step, index) => {
             const stepNumber = formatStepNumber(index);
             const missingTitle = step.title.trim().length === 0;
-            const showTitleError = missingTitle && (showValidation || touchedTitleIds.has(step.id) || step.instruction.trim().length > 0);
+            const showTitleError =
+              missingTitle &&
+              (showValidation ||
+                touchedTitleIds.has(step.id) ||
+                step.instruction.trim().length > 0);
             const titleErrorId = `playbook_${step.id}_title_error`;
             return (
-              <div key={step.id} className="card" style={{ padding: 12, display: "grid", gridTemplateColumns: "32px 1fr 36px", gap: 10, borderColor: showTitleError ? "rgba(242,107,92,0.38)" : undefined }}>
-                <div className="mono muted" style={{ fontSize: 11, paddingTop: 21 }}>{stepNumber}</div>
+              <div
+                key={step.id}
+                className="card"
+                style={{
+                  padding: 12,
+                  display: "grid",
+                  gridTemplateColumns: "32px 1fr 36px",
+                  gap: 10,
+                  borderColor: showTitleError ? "rgba(242,107,92,0.38)" : undefined,
+                }}
+              >
+                <div className="mono muted" style={{ fontSize: 11, paddingTop: 21 }}>
+                  {stepNumber}
+                </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   <label style={{ display: "grid", gap: 4 }}>
                     <span className="label">Title</span>
@@ -1010,17 +1559,37 @@ function PlaybookEditor({
                       onChange={(e) => update(index, { title: e.target.value })}
                     />
                     {showTitleError && (
-                      <span id={titleErrorId} role="alert" className="mono" style={{ fontSize: 10.5, color: "var(--danger)" }}>
+                      <span
+                        id={titleErrorId}
+                        role="alert"
+                        className="mono"
+                        style={{ fontSize: 10.5, color: "var(--danger)" }}
+                      >
                         ERR · Step {stepNumber} needs a title or should be removed.
                       </span>
                     )}
                   </label>
                   <label style={{ display: "grid", gap: 4 }}>
                     <span className="label">Instruction</span>
-                    <textarea className="field" rows={2} placeholder="What the agent should do" value={step.instruction} onChange={(e) => update(index, { instruction: e.target.value })}/>
+                    <textarea
+                      className="field"
+                      rows={2}
+                      placeholder="What the agent should do"
+                      value={step.instruction}
+                      onChange={(e) => update(index, { instruction: e.target.value })}
+                    />
                   </label>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, fontSize: 11, paddingTop: 18 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: 4,
+                    fontSize: 11,
+                    paddingTop: 18,
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => move(index, -1)}
@@ -1028,9 +1597,15 @@ function PlaybookEditor({
                     aria-label={`Move step ${stepNumber} up`}
                     title={`Move step ${stepNumber} up`}
                     className="btn btn-sm"
-                    style={{ width: 30, height: 26, padding: 0, justifyContent: "center", opacity: index === 0 ? 0.3 : 1 }}
+                    style={{
+                      width: 30,
+                      height: 26,
+                      padding: 0,
+                      justifyContent: "center",
+                      opacity: index === 0 ? 0.3 : 1,
+                    }}
                   >
-                    <I.arrowUp size={11}/>
+                    <I.arrowUp size={11} />
                   </button>
                   <button
                     type="button"
@@ -1039,9 +1614,15 @@ function PlaybookEditor({
                     aria-label={`Move step ${stepNumber} down`}
                     title={`Move step ${stepNumber} down`}
                     className="btn btn-sm"
-                    style={{ width: 30, height: 26, padding: 0, justifyContent: "center", opacity: index === steps.length - 1 ? 0.3 : 1 }}
+                    style={{
+                      width: 30,
+                      height: 26,
+                      padding: 0,
+                      justifyContent: "center",
+                      opacity: index === steps.length - 1 ? 0.3 : 1,
+                    }}
                   >
-                    <I.chevDown size={12}/>
+                    <I.chevDown size={12} />
                   </button>
                   <button
                     type="button"
@@ -1049,9 +1630,15 @@ function PlaybookEditor({
                     aria-label={`Remove step ${stepNumber}`}
                     title={`Remove step ${stepNumber}`}
                     className="btn btn-sm"
-                    style={{ width: 30, height: 26, padding: 0, justifyContent: "center", color: "var(--danger)" }}
+                    style={{
+                      width: 30,
+                      height: 26,
+                      padding: 0,
+                      justifyContent: "center",
+                      color: "var(--danger)",
+                    }}
                   >
-                    <I.trash size={11}/>
+                    <I.trash size={11} />
                   </button>
                 </div>
               </div>
@@ -1060,39 +1647,85 @@ function PlaybookEditor({
         </div>
       )}
       <div style={{ marginTop: 10 }}>
-        <button type="button" onClick={addStep} className="btn btn-sm"><I.plus size={11}/> Add step</button>
+        <button type="button" onClick={addStep} className="btn btn-sm">
+          <I.plus size={11} /> Add step
+        </button>
       </div>
     </div>
   );
 }
 
 // ─── ToolPicker ─────────────────────────────────────────────────────────────
-function ToolPicker({ tools, enabled, onChange }: { tools: AvailableTool[]; enabled: string[]; onChange: (next: string[]) => void }) {
+function ToolPicker({
+  tools,
+  enabled,
+  onChange,
+}: {
+  tools: AvailableTool[];
+  enabled: string[];
+  onChange: (next: string[]) => void;
+}) {
   const enabledSet = new Set(enabled);
   if (tools.length === 0) {
-    return <div className="card muted" style={{ padding: "12px 14px", textAlign: "center", fontSize: 12 }}>— tool registry empty —</div>;
+    return (
+      <div
+        className="card muted"
+        style={{ padding: "12px 14px", textAlign: "center", fontSize: 12 }}
+      >
+        — tool registry empty —
+      </div>
+    );
   }
-  const groups: Record<"read" | "write" | "exec", AvailableTool[]> = { read: [], write: [], exec: [] };
+  const groups: Record<"read" | "write" | "exec", AvailableTool[]> = {
+    read: [],
+    write: [],
+    exec: [],
+  };
   for (const t of tools) groups[t.side].push(t);
   const toggle = (name: string) => {
     if (enabledSet.has(name)) onChange(enabled.filter((n) => n !== name));
     else onChange([...enabled, name]);
   };
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 10 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+        gap: 10,
+      }}
+    >
       {(["read", "write", "exec"] as const).map((side) => (
         <div key={side} className="card" style={{ padding: 12 }}>
-          <div className="kicker" style={{ marginBottom: 8, color: "var(--green)" }}>{side.toUpperCase()} · {groups[side].length}</div>
+          <div className="kicker" style={{ marginBottom: 8, color: "var(--green)" }}>
+            {side.toUpperCase()} · {groups[side].length}
+          </div>
           {groups[side].length === 0 ? (
-            <p className="mono muted" style={{ fontSize: 11 }}>— none —</p>
+            <p className="mono muted" style={{ fontSize: 11 }}>
+              — none —
+            </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {groups[side].map((t) => (
-                <label key={t.name} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
-                  <input type="checkbox" checked={enabledSet.has(t.name)} onChange={() => toggle(t.name)} style={{ marginTop: 2, accentColor: "var(--green)" }}/>
+                <label
+                  key={t.name}
+                  style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={enabledSet.has(t.name)}
+                    onChange={() => toggle(t.name)}
+                    style={{ marginTop: 2, accentColor: "var(--green)" }}
+                  />
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span className="mono" style={{ fontSize: 11.5, color: "var(--silver-100)", display: "block" }}>{t.name}</span>
-                    <span className="muted" style={{ fontSize: 10.5, lineHeight: 1.4 }}>{t.description}</span>
+                    <span
+                      className="mono"
+                      style={{ fontSize: 11.5, color: "var(--silver-100)", display: "block" }}
+                    >
+                      {t.name}
+                    </span>
+                    <span className="muted" style={{ fontSize: 10.5, lineHeight: 1.4 }}>
+                      {t.description}
+                    </span>
                   </span>
                 </label>
               ))}
@@ -1105,47 +1738,146 @@ function ToolPicker({ tools, enabled, onChange }: { tools: AvailableTool[]; enab
 }
 
 // ─── InputSchemaEditor ──────────────────────────────────────────────────────
-function InputSchemaEditor({ schema, onChange }: { schema: AgentInputField[]; onChange: (next: AgentInputField[]) => void }) {
-  const update = (index: number, patch: Partial<AgentInputField>) => onChange(schema.map((f, i) => i === index ? { ...f, ...patch } : f));
+function InputSchemaEditor({
+  schema,
+  onChange,
+}: {
+  schema: AgentInputField[];
+  onChange: (next: AgentInputField[]) => void;
+}) {
+  const update = (index: number, patch: Partial<AgentInputField>) =>
+    onChange(schema.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   const remove = (index: number) => onChange(schema.filter((_, i) => i !== index));
-  const add = () => onChange([...schema, { key: `field_${schema.length + 1}`, label: `Field ${schema.length + 1}`, type: "string", required: false }]);
+  const add = () =>
+    onChange([
+      ...schema,
+      {
+        key: `field_${schema.length + 1}`,
+        label: `Field ${schema.length + 1}`,
+        type: "string",
+        required: false,
+      },
+    ]);
 
   return (
     <div>
       {schema.length === 0 ? (
-        <div className="card muted" style={{ padding: "12px 14px", textAlign: "center", fontSize: 12 }}>— empty schema · add a field to capture per-run parameters —</div>
+        <div
+          className="card muted"
+          style={{ padding: "12px 14px", textAlign: "center", fontSize: 12 }}
+        >
+          — empty schema · add a field to capture per-run parameters —
+        </div>
       ) : (
         <div className="card" style={{ overflow: "hidden", padding: 0 }}>
           <table className="tbl">
-            <thead><tr><th>Key</th><th>Label</th><th>Type</th><th>Req</th><th>Options</th><th>Default</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Label</th>
+                <th>Type</th>
+                <th>Req</th>
+                <th>Options</th>
+                <th>Default</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody>
               {schema.map((f, index) => (
                 <tr key={index}>
                   <td>
-                    <input className="field mono" style={{ fontSize: 11, padding: "5px 8px" }} placeholder="key" value={f.key} onChange={(e) => update(index, { key: e.target.value.replace(/[^a-zA-Z0-9_]/g, "") })}/>
+                    <input
+                      className="field mono"
+                      style={{ fontSize: 11, padding: "5px 8px" }}
+                      placeholder="key"
+                      value={f.key}
+                      onChange={(e) =>
+                        update(index, { key: e.target.value.replace(/[^a-zA-Z0-9_]/g, "") })
+                      }
+                    />
                   </td>
                   <td>
-                    <input className="field" style={{ fontSize: 12, padding: "5px 8px" }} placeholder="Label" value={f.label} onChange={(e) => update(index, { label: e.target.value })}/>
+                    <input
+                      className="field"
+                      style={{ fontSize: 12, padding: "5px 8px" }}
+                      placeholder="Label"
+                      value={f.label}
+                      onChange={(e) => update(index, { label: e.target.value })}
+                    />
                   </td>
                   <td>
-                    <select className="field mono" style={{ fontSize: 11, padding: "5px 8px" }} value={f.type} onChange={(e) => {
-                      const type = e.target.value as AgentInputFieldType;
-                      update(index, { type, options: type === "enum" ? (f.options && f.options.length > 0 ? f.options : ["option_a"]) : undefined });
-                    }}>
-                      {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    <select
+                      className="field mono"
+                      style={{ fontSize: 11, padding: "5px 8px" }}
+                      value={f.type}
+                      onChange={(e) => {
+                        const type = e.target.value as AgentInputFieldType;
+                        update(index, {
+                          type,
+                          options:
+                            type === "enum"
+                              ? f.options && f.options.length > 0
+                                ? f.options
+                                : ["option_a"]
+                              : undefined,
+                        });
+                      }}
+                    >
+                      {FIELD_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
                     </select>
                   </td>
-                  <td><input type="checkbox" checked={f.required} onChange={(e) => update(index, { required: e.target.checked })} style={{ accentColor: "var(--green)" }}/></td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={f.required}
+                      onChange={(e) => update(index, { required: e.target.checked })}
+                      style={{ accentColor: "var(--green)" }}
+                    />
+                  </td>
                   <td>
                     {f.type === "enum" ? (
-                      <textarea className="field mono" style={{ fontSize: 11, padding: "5px 8px", minHeight: 50, minWidth: 140, resize: "none" }} placeholder="one per line" rows={2} value={(f.options ?? []).join("\n")} onChange={(e) => update(index, { options: lines(e.target.value) })}/>
-                    ) : <span className="mono muted" style={{ fontSize: 11 }}>—</span>}
+                      <textarea
+                        className="field mono"
+                        style={{
+                          fontSize: 11,
+                          padding: "5px 8px",
+                          minHeight: 50,
+                          minWidth: 140,
+                          resize: "none",
+                        }}
+                        placeholder="one per line"
+                        rows={2}
+                        value={(f.options ?? []).join("\n")}
+                        onChange={(e) => update(index, { options: lines(e.target.value) })}
+                      />
+                    ) : (
+                      <span className="mono muted" style={{ fontSize: 11 }}>
+                        —
+                      </span>
+                    )}
                   </td>
                   <td>
-                    <input className="field" style={{ fontSize: 12, padding: "5px 8px" }} placeholder="—" value={f.defaultValue ?? ""} onChange={(e) => update(index, { defaultValue: e.target.value })}/>
+                    <input
+                      className="field"
+                      style={{ fontSize: 12, padding: "5px 8px" }}
+                      placeholder="—"
+                      value={f.defaultValue ?? ""}
+                      onChange={(e) => update(index, { defaultValue: e.target.value })}
+                    />
                   </td>
                   <td>
-                    <button type="button" onClick={() => remove(index)} className="btn btn-sm" style={{ padding: "3px 6px", color: "var(--danger)" }}>×</button>
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="btn btn-sm"
+                      style={{ padding: "3px 6px", color: "var(--danger)" }}
+                    >
+                      ×
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1154,34 +1886,68 @@ function InputSchemaEditor({ schema, onChange }: { schema: AgentInputField[]; on
         </div>
       )}
       <div style={{ marginTop: 10 }}>
-        <button type="button" onClick={add} className="btn btn-sm"><I.plus size={11}/> Add field</button>
+        <button type="button" onClick={add} className="btn btn-sm">
+          <I.plus size={11} /> Add field
+        </button>
       </div>
     </div>
   );
 }
 
-function RunInputControl({ field: f, value, onChange }: { field: AgentInputField; value: string; onChange: (next: string) => void }) {
+function RunInputControl({
+  field: f,
+  value,
+  onChange,
+}: {
+  field: AgentInputField;
+  value: string;
+  onChange: (next: string) => void;
+}) {
   if (f.type === "enum") {
     return (
       <Field label={`${f.label}${f.required ? " *" : ""}`}>
         <select className="field" value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">— select —</option>
-          {(f.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
+          {(f.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
         </select>
       </Field>
     );
   }
   if (f.type === "boolean") {
     return (
-      <label className="mono" style={{ fontSize: 12, color: "var(--silver-200)", display: "flex", alignItems: "center", gap: 8 }}>
-        <input type="checkbox" checked={value === "true"} onChange={(e) => onChange(e.target.checked ? "true" : "false")} style={{ accentColor: "var(--green)" }}/>
+      <label
+        className="mono"
+        style={{
+          fontSize: 12,
+          color: "var(--silver-200)",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={value === "true"}
+          onChange={(e) => onChange(e.target.checked ? "true" : "false")}
+          style={{ accentColor: "var(--green)" }}
+        />
         {f.label}
       </label>
     );
   }
   return (
     <Field label={`${f.label}${f.required ? " *" : ""}`}>
-      <input className="field" type={f.type === "number" ? "number" : f.type === "url" ? "url" : "text"} value={value} onChange={(e) => onChange(e.target.value)} placeholder={f.description}/>
+      <input
+        className="field"
+        type={f.type === "number" ? "number" : f.type === "url" ? "url" : "text"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={f.description}
+      />
     </Field>
   );
 }
@@ -1189,23 +1955,55 @@ function RunInputControl({ field: f, value, onChange }: { field: AgentInputField
 // ─── RunTranscript / ToolCallTimeline (workbench-styled) ────────────────────
 export function RunTranscript({ steps }: { steps: AgentRunStep[] | undefined }) {
   if (!steps || steps.length === 0) {
-    return <div className="mono muted" style={{ fontSize: 11, padding: "8px 10px", border: "1px dashed var(--line-2)", borderRadius: 6 }}>— no transcript captured for this run —</div>;
+    return (
+      <div
+        className="mono muted"
+        style={{
+          fontSize: 11,
+          padding: "8px 10px",
+          border: "1px dashed var(--line-2)",
+          borderRadius: 6,
+        }}
+      >
+        — no transcript captured for this run —
+      </div>
+    );
   }
-  const statusPill = (s: AgentRunStepStatus) => s === "success" ? "good" : s === "failed" ? "danger" : "muted";
-  const statusLabel = (s: AgentRunStepStatus) => s === "success" ? "OK" : s === "failed" ? "FAIL" : "SKIP";
+  const statusPill = (s: AgentRunStepStatus) =>
+    s === "success" ? "good" : s === "failed" ? "danger" : "muted";
+  const statusLabel = (s: AgentRunStepStatus) =>
+    s === "success" ? "OK" : s === "failed" ? "FAIL" : "SKIP";
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {steps.map((step, index) => (
-        <div key={step.id} style={{ display: "grid", gridTemplateColumns: "32px 1fr auto", alignItems: "baseline", gap: 10, padding: "10px 0", borderTop: index === 0 ? "none" : "1px solid var(--line)" }}>
-          <div className="mono muted" style={{ fontSize: 11 }}>{String(index + 1).padStart(2, "0")}</div>
+        <div
+          key={step.id}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "32px 1fr auto",
+            alignItems: "baseline",
+            gap: 10,
+            padding: "10px 0",
+            borderTop: index === 0 ? "none" : "1px solid var(--line)",
+          }}
+        >
+          <div className="mono muted" style={{ fontSize: 11 }}>
+            {String(index + 1).padStart(2, "0")}
+          </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span className={`pill ${statusPill(step.status)}`}>{statusLabel(step.status)}</span>
               <span style={{ fontSize: 12.5, color: "var(--silver-100)" }}>{step.title}</span>
             </div>
-            {step.output && <p style={{ marginTop: 4, fontSize: 11.5, color: "var(--silver-400)" }}>{step.output}</p>}
+            {step.output && (
+              <p style={{ marginTop: 4, fontSize: 11.5, color: "var(--silver-400)" }}>
+                {step.output}
+              </p>
+            )}
           </div>
-          <div className="mono muted" style={{ fontSize: 11 }}>{formatDuration(step.durationMs)}</div>
+          <div className="mono muted" style={{ fontSize: 11 }}>
+            {formatDuration(step.durationMs)}
+          </div>
         </div>
       ))}
     </div>
@@ -1215,38 +2013,108 @@ export function RunTranscript({ steps }: { steps: AgentRunStep[] | undefined }) 
 export function ToolCallTimeline({ calls }: { calls: AgentRunToolCall[] | undefined }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   if (!calls || calls.length === 0) return null;
-  const statusPill = (s: AgentRunToolCall["status"]) => s === "ok" ? "good" : s === "timeout" ? "warn" : "danger";
-  const statusLabel = (s: AgentRunToolCall["status"]) => s === "ok" ? "OK" : s === "timeout" ? "T/O" : "ERR";
+  const statusPill = (s: AgentRunToolCall["status"]) =>
+    s === "ok" ? "good" : s === "timeout" ? "warn" : "danger";
+  const statusLabel = (s: AgentRunToolCall["status"]) =>
+    s === "ok" ? "OK" : s === "timeout" ? "T/O" : "ERR";
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {calls.map((call, index) => {
         const open = expanded === call.id;
         return (
-          <div key={call.id} style={{ padding: "8px 0", borderTop: index === 0 ? "none" : "1px solid var(--line)" }}>
+          <div
+            key={call.id}
+            style={{ padding: "8px 0", borderTop: index === 0 ? "none" : "1px solid var(--line)" }}
+          >
             <button
               type="button"
               onClick={() => setExpanded(open ? null : call.id)}
-              style={{ display: "grid", gridTemplateColumns: "32px 1fr 60px 30px", gap: 8, alignItems: "baseline", textAlign: "left", width: "100%", border: "none", background: "transparent", color: "inherit", padding: 0, cursor: "pointer" }}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "32px 1fr 60px 30px",
+                gap: 8,
+                alignItems: "baseline",
+                textAlign: "left",
+                width: "100%",
+                border: "none",
+                background: "transparent",
+                color: "inherit",
+                padding: 0,
+                cursor: "pointer",
+              }}
             >
-              <span className="mono muted" style={{ fontSize: 11 }}>{String(index + 1).padStart(2, "0")}</span>
-              <span className="mono" style={{ fontSize: 11, color: "var(--silver-200)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                <span className={`pill ${statusPill(call.status)}`}>{statusLabel(call.status)}</span>
-                <span style={{ marginLeft: 8, color: "var(--green)" }}>{call.toolName}</span>
-                {call.error && <span style={{ marginLeft: 8, color: "var(--danger)" }}>{call.error}</span>}
+              <span className="mono muted" style={{ fontSize: 11 }}>
+                {String(index + 1).padStart(2, "0")}
               </span>
-              <span className="mono muted" style={{ fontSize: 10, textAlign: "right" }}>{call.durationMs}ms</span>
-              <span className="mono muted" style={{ fontSize: 10, textAlign: "right" }}>{open ? "[ − ]" : "[ + ]"}</span>
+              <span
+                className="mono"
+                style={{
+                  fontSize: 11,
+                  color: "var(--silver-200)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span className={`pill ${statusPill(call.status)}`}>
+                  {statusLabel(call.status)}
+                </span>
+                <span style={{ marginLeft: 8, color: "var(--green)" }}>{call.toolName}</span>
+                {call.error && (
+                  <span style={{ marginLeft: 8, color: "var(--danger)" }}>{call.error}</span>
+                )}
+              </span>
+              <span className="mono muted" style={{ fontSize: 10, textAlign: "right" }}>
+                {call.durationMs}ms
+              </span>
+              <span className="mono muted" style={{ fontSize: 10, textAlign: "right" }}>
+                {open ? "[ − ]" : "[ + ]"}
+              </span>
             </button>
             {open && (
               <div style={{ marginTop: 8, paddingLeft: 40, display: "grid", gap: 8 }}>
                 <div>
-                  <div className="kicker" style={{ marginBottom: 4 }}>INPUT</div>
-                  <pre className="mono" style={{ margin: 0, padding: 8, fontSize: 10.5, lineHeight: 1.5, background: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--silver-200)", overflow: "auto" }}>{safeStringify(call.input)}</pre>
+                  <div className="kicker" style={{ marginBottom: 4 }}>
+                    INPUT
+                  </div>
+                  <pre
+                    className="mono"
+                    style={{
+                      margin: 0,
+                      padding: 8,
+                      fontSize: 10.5,
+                      lineHeight: 1.5,
+                      background: "var(--ink)",
+                      border: "1px solid var(--line)",
+                      borderRadius: 6,
+                      color: "var(--silver-200)",
+                      overflow: "auto",
+                    }}
+                  >
+                    {safeStringify(call.input)}
+                  </pre>
                 </div>
                 {call.output !== undefined && (
                   <div>
-                    <div className="kicker" style={{ marginBottom: 4 }}>OUTPUT</div>
-                    <pre className="mono" style={{ margin: 0, padding: 8, fontSize: 10.5, lineHeight: 1.5, background: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--silver-200)", overflow: "auto" }}>{safeStringify(call.output)}</pre>
+                    <div className="kicker" style={{ marginBottom: 4 }}>
+                      OUTPUT
+                    </div>
+                    <pre
+                      className="mono"
+                      style={{
+                        margin: 0,
+                        padding: 8,
+                        fontSize: 10.5,
+                        lineHeight: 1.5,
+                        background: "var(--ink)",
+                        border: "1px solid var(--line)",
+                        borderRadius: 6,
+                        color: "var(--silver-200)",
+                        overflow: "auto",
+                      }}
+                    >
+                      {safeStringify(call.output)}
+                    </pre>
                   </div>
                 )}
               </div>

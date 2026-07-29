@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { I, type IconKey } from "../icons";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
-import { useWorkbench } from "../WorkbenchContext";
+import { useWorkbench } from "../workbench-state";
 import { api } from "@/lib/api";
 import { canManageWorkspaceRole } from "@/lib/roles";
 

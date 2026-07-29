@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { I, type IconKey } from "./icons";
-import { useUser, useWorkbench, useWorkspaceName } from "./WorkbenchContext";
+import { useUser, useWorkbench, useWorkspaceName } from "./workbench-state";
 import { useCommandPalette } from "./CommandPalette";
 import { brand } from "@/config/brand";
 

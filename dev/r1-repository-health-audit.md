@@ -68,15 +68,17 @@ are inputs to this re-audit, not active task lists.
   7.18.2. A prior local browser pass covered signed-out login,
   seeded authentication, PacketAgent branding, sidebar/button semantics,
   project tabs, and project-card layout.
-- `npm run lint`: zero errors and 50 frontend-only inherited warnings, down
+- `npm run lint`: zero errors and 40 frontend-only inherited warnings, down
   from 145; backend warnings are closed. The
   storage-facade export-hygiene slice removed 66 import-only warnings without
   changing its public API; the first small backend cleanup removed seven more
   unused bindings without changing behavior; typed Hono status boundaries and
   onboarding facts/steps removed ten `any` uses; provider SDK factories now use
   native ESM imports instead of four CommonJS `require` calls; dead helpers and
-  imports were removed from the large builder/runtime/workflow modules.
-- `npm run format:check`: 289 files remain, down from 326.
+  imports were removed from the large builder/runtime/workflow modules. Auth,
+  toast, and workbench state/hooks now live outside component-only provider
+  modules, and auth bootstrap updates state only from async callbacks.
+- `npm run format:check`: 279 files remain, down from 326.
 - `npm run test:api`: 1,521 passed, 4 intentionally skipped live probes, 0
   failed (1,525 total).
 - `npm audit` and `npm audit --omit=dev`: two high package entries for the

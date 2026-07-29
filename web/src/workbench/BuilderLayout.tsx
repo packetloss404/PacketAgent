@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth-state";
 import { WorkbenchProvider } from "./WorkbenchContext";
 import { LoggedOutView } from "./views/logged-out";
 
@@ -15,7 +15,14 @@ export function BuilderLayout({ children }: { children: ReactNode }) {
   if (loading) {
     return (
       <div className="wb-root">
-        <div style={{ height: "100vh", display: "grid", placeItems: "center", color: "var(--silver-300)" }}>
+        <div
+          style={{
+            height: "100vh",
+            display: "grid",
+            placeItems: "center",
+            color: "var(--silver-300)",
+          }}
+        >
           Loading workbench…
         </div>
       </div>

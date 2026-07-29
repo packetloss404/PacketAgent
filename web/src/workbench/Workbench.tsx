@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth-state";
 import { api } from "@/lib/api";
 import { Sidebar } from "./Shell";
 import { WorkbenchProvider } from "./WorkbenchContext";
@@ -29,7 +29,14 @@ export default function Workbench() {
   if (loading) {
     return (
       <div className="wb-root">
-        <div style={{ height: "100vh", display: "grid", placeItems: "center", color: "var(--silver-300)" }}>
+        <div
+          style={{
+            height: "100vh",
+            display: "grid",
+            placeItems: "center",
+            color: "var(--silver-300)",
+          }}
+        >
           Loading workbench…
         </div>
       </div>
@@ -104,6 +111,8 @@ function WorkbenchInner() {
 
 function RedirectToBuilder() {
   const navigate = useNavigate();
-  useEffect(() => { navigate("/builder", { replace: true }); }, [navigate]);
+  useEffect(() => {
+    navigate("/builder", { replace: true });
+  }, [navigate]);
   return null;
 }

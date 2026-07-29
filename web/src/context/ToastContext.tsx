@@ -1,30 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+
 import { I, type IconKey } from "@/workbench/icons";
-
-export type ToastTone = "success" | "error" | "info" | "warn";
-
-export interface Toast {
-  id: string;
-  tone: ToastTone;
-  title: string;
-  description?: string;
-  durationMs: number;
-}
-
-interface ToastContextValue {
-  toasts: Toast[];
-  push: (input: { tone?: ToastTone; title: string; description?: string; durationMs?: number }) => string;
-  dismiss: (id: string) => void;
-  clear: () => void;
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
-
-let externalPush: ToastContextValue["push"] | null = null;
-
-export function pushExternalToast(input: { tone?: ToastTone; title: string; description?: string; durationMs?: number }) {
-  if (externalPush) externalPush(input);
-}
+import {
+  setExternalToastPush,
+  ToastContext,
+  type Toast,
+  type ToastContextValue,
+  type ToastTone,
+} from "./toast-state";
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -49,9 +32,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => setToasts([]), []);
 
   useEffect(() => {
-    externalPush = push;
+    setExternalToastPush(push);
     return () => {
-      externalPush = null;
+      setExternalToastPush(null);
     };
   }, [push]);
 
@@ -63,12 +46,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <ToastViewport toasts={toasts} dismiss={dismiss} />
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  const value = useContext(ToastContext);
-  if (!value) throw new Error("useToast must be used within ToastProvider");
-  return value;
 }
 
 function ToastViewport({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: string) => void }) {
@@ -129,26 +106,36 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         boxShadow: "0 12px 30px -10px rgba(0,0,0,0.6)",
       }}
     >
-      <Ico size={15} style={{ marginTop: 1, color: style.iconColor, flexShrink: 0 }}/>
+      <Ico size={15} style={{ marginTop: 1, color: style.iconColor, flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 500, lineHeight: 1.4, color: "var(--silver-50)" }}>{toast.title}</div>
-        {toast.description && <div className="muted" style={{ marginTop: 4, fontSize: 11.5, lineHeight: 1.5 }}>{toast.description}</div>}
+        <div style={{ fontWeight: 500, lineHeight: 1.4, color: "var(--silver-50)" }}>
+          {toast.title}
+        </div>
+        {toast.description && (
+          <div className="muted" style={{ marginTop: 4, fontSize: 11.5, lineHeight: 1.5 }}>
+            {toast.description}
+          </div>
+        )}
       </div>
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss notification"
         style={{
-          marginRight: -2, marginTop: -2,
-          width: 22, height: 22, borderRadius: 4,
+          marginRight: -2,
+          marginTop: -2,
+          width: 22,
+          height: 22,
+          borderRadius: 4,
           background: "transparent",
           border: "none",
           color: "var(--silver-400)",
           cursor: "pointer",
-          display: "grid", placeItems: "center",
+          display: "grid",
+          placeItems: "center",
         }}
       >
-        <I.close size={12}/>
+        <I.close size={12} />
       </button>
     </div>
   );

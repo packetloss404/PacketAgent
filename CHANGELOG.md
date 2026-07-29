@@ -40,6 +40,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Closed the backend ESLint-warning baseline by removing dead builder publish
   helpers and unused iteration/runtime/workflow imports; 92 focused builder,
   runtime, and workflow tests passed with one intentional Windows sandbox skip.
+- Split auth, toast, and workbench context state/hooks from component-only
+  provider modules, stabilized auth callbacks and bootstrap state updates, and
+  retained the existing import consumers through explicit state modules.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 
