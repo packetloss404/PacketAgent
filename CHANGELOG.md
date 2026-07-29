@@ -6,6 +6,20 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R4.1 generated-app runtime operations
+
+- Added authenticated workspace aggregate and owned-app generated-runtime
+  health endpoints without starting idle app processes.
+- Added process, active-request, request/outcome/retry/start/crash/
+  schema-restart/eviction metrics plus bounded recent crash metadata that
+  excludes raw error and secret content.
+- Kept the existing one-retry supervision contract visible as degraded health
+  for five minutes after request, startup, or unexpected-exit failures.
+- Added per-app runtime status and counters to the Builder Sandbox tab.
+- Documented the supervised warm-pool default of four child processes, the
+  `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` setting, its 1-64 clamp,
+  and least-recently-used idle eviction.
+
 ### 2026-07-29 - R3 file-tree generation depth
 
 - Added deterministic TypeScript/Vite failure clustering and diagnostic/file

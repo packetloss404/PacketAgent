@@ -87,6 +87,7 @@ import type {
   SandboxExecRecord,
   SandboxExecRequest,
   SandboxExecStatus,
+  GeneratedAppRuntimeHealth,
   WorkerAttentionView,
   WorkerOperationsHealth,
   WorkerOperationsPageInfo,
@@ -878,6 +879,10 @@ export const api = {
     return j<unknown>(`/api/app/operations/job-metrics/history${qs ? `?${qs}` : ""}`);
   },
   getSandboxStatus: () => j<SandboxStatus>("/api/app/sandbox/status"),
+  getGeneratedAppRuntimeHealth: (appId: string) =>
+    j<{ health: GeneratedAppRuntimeHealth }>(
+      `/api/app/generated-apps/${encodeURIComponent(appId)}/runtime/health`,
+    ).then((payload) => payload.health),
   listSandboxRuntimes: () =>
     j<{ runtimes: SandboxRuntimeInfo[] }>("/api/app/sandbox/runtimes").then((p) => p.runtimes),
   startSandboxExec: (body: SandboxExecRequest) =>

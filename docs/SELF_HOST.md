@@ -275,6 +275,39 @@ DNS, TLS, reverse-proxy, and public URL configuration are your responsibility. T
 
 For hosted-only conveniences PacketAgent does not ship (free public subdomain, auto TLS, managed App Store submission, hosted OAuth proxy), see [CLOUD.md](../CLOUD.md) for the full deferred-features inventory.
 
+### Monitor the generated-app runtime
+
+Preview/API requests for generated apps run in supervised per-app Node child
+processes. The pool defaults to four warm processes per PacketAgent server.
+Set `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` to a value from `1` to
+`64` before startup to change the limit; out-of-range values are clamped. When
+the pool is full, PacketAgent evicts the least-recently-used idle process.
+Each active app therefore consumes one child process in addition to the main
+PacketAgent server.
+
+After authenticating as a workspace viewer, inspect the whole workspace:
+
+```bash
+curl -s --cookie /tmp/jar \
+  http://localhost:8484/api/app/generated-app-runtime/health
+```
+
+Or inspect one owned app:
+
+```bash
+curl -s --cookie /tmp/jar \
+  http://localhost:8484/api/app/generated-apps/<app-id>/runtime/health
+```
+
+An app that has never received a runtime request is `idle`; reading the health
+endpoint does not start it. A live process with no recent failure is
+`healthy`. A request failure, startup failure, or unexpected exit leaves the
+app `degraded` for five minutes and records bounded reason/code/signal
+metadata. PacketAgent retries a failed request once. Request totals, failures,
+retries, starts, crashes, schema restarts, and LRU evictions are process-local
+operational counters and reset when the PacketAgent server restarts. The
+Builder's **Sandbox** tab presents the same per-app status and recent failure.
+
 ---
 
 ## Troubleshooting

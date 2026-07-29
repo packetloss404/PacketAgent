@@ -12,6 +12,10 @@ export function SandboxBuilderTab({ appId, appName }: { appId: string | null; ap
     () => (appId ? api.listSandboxExecs({ appId, limit: 50 }) : Promise.resolve([])),
     [appId],
   );
+  const runtimeHealth = useApiData(
+    () => (appId ? api.getGeneratedAppRuntimeHealth(appId) : Promise.resolve(null)),
+    [appId],
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const list = execs.data ?? EMPTY_EXECS;
   const selected = useMemo(() => list.find((e) => e.id === selectedId) ?? null, [list, selectedId]);
@@ -34,11 +38,66 @@ export function SandboxBuilderTab({ appId, appName }: { appId: string | null; ap
           type="button"
           className="btn btn-sm"
           style={{ marginLeft: "auto" }}
-          onClick={() => void execs.refresh()}
+          onClick={() => {
+            void execs.refresh();
+            void runtimeHealth.refresh();
+          }}
         >
           <I.refresh size={11} /> Refresh
         </button>
       </div>
+      {runtimeHealth.data && (
+        <div
+          className="card"
+          style={{
+            padding: 14,
+            marginBottom: 14,
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div className="muted" style={{ fontSize: 10.5 }}>
+              Runtime
+            </div>
+            <span
+              className={`pill ${
+                runtimeHealth.data.status === "healthy"
+                  ? "good"
+                  : runtimeHealth.data.status === "degraded"
+                    ? "danger"
+                    : "muted"
+              }`}
+            >
+              {runtimeHealth.data.status}
+            </span>
+          </div>
+          <RuntimeMetric
+            label="Processes"
+            value={`${runtimeHealth.data.processCount}/${runtimeHealth.data.maxProcesses}`}
+          />
+          <RuntimeMetric label="Requests" value={runtimeHealth.data.metrics.requests} />
+          <RuntimeMetric
+            label="Crashes / retries"
+            value={`${runtimeHealth.data.metrics.crashes}/${runtimeHealth.data.metrics.retryAttempts}`}
+          />
+          {runtimeHealth.data.recentCrashes[0] && (
+            <div
+              style={{ gridColumn: "1 / -1", color: "var(--danger)", fontSize: 11.5 }}
+              role="status"
+            >
+              Last runtime failure: {runtimeHealth.data.recentCrashes[0].reason} ·{" "}
+              {new Date(runtimeHealth.data.recentCrashes[0].at).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
+      {runtimeHealth.error && (
+        <div className="card" style={{ padding: 12, marginBottom: 14, color: "var(--danger)" }}>
+          Runtime health unavailable: {runtimeHealth.error}
+        </div>
+      )}
       {execs.loading && (
         <div className="muted" style={{ padding: 12 }}>
           Loading…
@@ -74,6 +133,19 @@ export function SandboxBuilderTab({ appId, appName }: { appId: string | null; ap
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function RuntimeMetric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div>
+      <div className="muted" style={{ fontSize: 10.5 }}>
+        {label}
+      </div>
+      <div className="mono" style={{ marginTop: 4, color: "var(--silver-100)" }}>
+        {value}
+      </div>
     </div>
   );
 }

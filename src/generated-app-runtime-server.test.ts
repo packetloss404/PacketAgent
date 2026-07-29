@@ -78,6 +78,13 @@ test("generated app runtime process pool reuses a warm worker for the same app s
   assert.equal(starts, 1);
   assert.equal(second.process.pid, 10_001);
   assert.equal(pool.snapshot().length, 1);
+  const health = pool.health({ workspaceId: "alpha", appId: "gapp_1" });
+  assert.equal(health.status, "healthy");
+  assert.equal(health.processCount, 1);
+  assert.equal(health.metrics.requests, 2);
+  assert.equal(health.metrics.successfulRequests, 2);
+  assert.equal(health.metrics.workerStarts, 1);
+  assert.deepEqual(health.recentCrashes, []);
 });
 
 test("generated app runtime process pool restarts an app when the schema signature changes", async (t) => {
@@ -180,6 +187,7 @@ test("generated app runtime process pool evicts least-recently-used workers", as
 
   assert.equal(starts, 3);
   assert.deepEqual(stoppedApps, ["gapp_a"]);
+  assert.equal(pool.health({ workspaceId: "alpha" }).metrics.evictions, 1);
   assert.deepEqual(
     pool
       .snapshot()
@@ -219,4 +227,51 @@ test("generated app runtime process pool restarts and retries after a worker cra
   assert.equal(starts, 2);
   assert.equal((result.body as { recovered?: boolean }).recovered, true);
   assert.equal(result.process.restarts, 1);
+  const health = pool.health({ workspaceId: "alpha", appId: "gapp_1" });
+  assert.equal(health.status, "degraded");
+  assert.equal(health.metrics.requests, 1);
+  assert.equal(health.metrics.successfulRequests, 1);
+  assert.equal(health.metrics.failedRequests, 0);
+  assert.equal(health.metrics.retryAttempts, 1);
+  assert.equal(health.metrics.workerStarts, 2);
+  assert.equal(health.metrics.crashes, 1);
+  assert.equal(health.recentCrashes[0]?.reason, "request-failed");
+});
+
+test("generated app runtime health stays workspace-scoped and clamps process limits", async (t) => {
+  let starts = 0;
+  const pool = new GeneratedAppRuntimeProcessPool({
+    maxProcesses: 999,
+    workerFactory: async () => ({
+      pid: 50_000 + ++starts,
+      startedAt: "2026-05-18T12:00:00.000Z",
+      request: async () => ({ status: 200, body: { ok: true } }),
+      stop: async () => undefined,
+    }),
+  });
+  t.after(() => pool.shutdown());
+  const model = buildGeneratedAppRuntimeModel(draft);
+  await pool.request({
+    appId: "gapp_alpha",
+    workspaceId: "alpha",
+    model,
+    method: "GET",
+    path: "account",
+  });
+  await pool.request({
+    appId: "gapp_beta",
+    workspaceId: "beta",
+    model,
+    method: "GET",
+    path: "account",
+  });
+
+  const alpha = pool.health({ workspaceId: "alpha" });
+  assert.equal(alpha.maxProcesses, 64);
+  assert.deepEqual(
+    alpha.processes.map((process) => process.appId),
+    ["gapp_alpha"],
+  );
+  assert.equal(alpha.metrics.requests, 1);
+  assert.equal(JSON.stringify(alpha).includes("gapp_beta"), false);
 });

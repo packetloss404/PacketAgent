@@ -231,34 +231,53 @@ A first-class sandbox runtime ships under `/api/app/sandbox/*` with a `/sandbox`
 - **Workbench UI.** Status panel, runtime readiness, command composer, exec history, and a live log viewer with stdout / stderr tabs and follow-tail. The Builder also gains a per-app Sandbox tab.
 - **Smoke integration.** With `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`, draft-apply, change-apply, and preview-refresh route every smoke check through the sandbox. Per-check details get `sandbox: exit N  |  Mms` appended and the message is suffixed with `(verified via sandbox  |  driver=...)`. Off by default - enable once Docker is available.
 
+## Generated-app runtime
+
+Generated apps call PacketAgent's workspace-scoped API and store their data in
+one SQLite database per app. A supervised Node child process starts on the
+first runtime request, stays warm, and is reused until the least-recently-used
+idle process must be evicted. `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES`
+sets the per-server pool limit; it defaults to `4` and is clamped to `1-64`.
+
+An authenticated workspace viewer can inspect aggregate health at
+`GET /api/app/generated-app-runtime/health` or an owned app at
+`GET /api/app/generated-apps/:appId/runtime/health`. The response reports
+process state, active requests, request/failure/retry/start/restart/eviction
+counters, and bounded recent crash metadata without raw error or secret
+content. An unexpected exit or failed request gets one supervised retry and
+remains `degraded` in health for five minutes. The same per-app health is
+visible in the Builder's Sandbox tab. Reading health does not start an idle
+runtime.
+
 ## Configuration
 
 Common environment variables:
 
-| Variable                                 | Default                   | Purpose                                                                                                                                                                                               |
-| ---------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                               | `development`             | Set to `production` to mark cookies `Secure` and disable dev shortcuts.                                                                                                                               |
-| `PORT`                                   | `8484`                    | API server port.                                                                                                                                                                                      |
-| `PACKETAGENT_STORE`                      | `json`                    | `json`, `sqlite`, or `postgres`. A configured managed URL also selects managed mode unless SQLite is explicit.                                                                                        |
-| `PACKETAGENT_DB_PATH`                    | `data/packetagent.sqlite` | SQLite database path when store is `sqlite`.                                                                                                                                                          |
-| `PACKETAGENT_DATABASE_URL`               | _unset_                   | Managed Postgres URL. `PACKETAGENT_MANAGED_DATABASE_URL` and `DATABASE_URL` are accepted aliases.                                                                                                     |
-| `PACKETAGENT_MANAGED_DATABASE_ADAPTER`   | _unset_                   | Set to `postgres` when enabling the managed adapter.                                                                                                                                                  |
-| `PACKETAGENT_TRUST_PROXY`                | `false`                   | Trust `X-Forwarded-Host` / `X-Forwarded-For` from a known proxy.                                                                                                                                      |
-| `PACKETAGENT_RATE_LIMIT_KEY_SALT`        | _unset_                   | Salt for hashed rate-limit bucket IDs. Set in production.                                                                                                                                             |
-| `PACKETAGENT_SANDBOX_DRIVER`             | `auto`                    | `docker`, `native`, or `auto`.                                                                                                                                                                        |
-| `PACKETAGENT_SANDBOX_DEFAULT_RUNTIME`    | `node-20`                 | Default container image.                                                                                                                                                                              |
-| `PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS` | `30000`                   | Per-exec timeout.                                                                                                                                                                                     |
-| `PACKETAGENT_SANDBOX_MEMORY_MB`          | `512`                     | Container memory limit.                                                                                                                                                                               |
-| `PACKETAGENT_SANDBOX_CPUS`               | `1`                       | Container CPU limit.                                                                                                                                                                                  |
-| `PACKETAGENT_SANDBOX_SMOKE_ENABLED`      | `0`                       | Route builder smoke checks through the sandbox. Also gates the file-tree validator's `tsc --noEmit` and `vite build` phases.                                                                          |
-| `PACKETAGENT_ARTIFACT_SERVING_ENABLED`   | `false`                   | Opt in to artifact-file serving. Reads still require an authenticated viewer in the workspace that owns the exact run ID in the URL.                                                                  |
-| `PACKETAGENT_LEGACY_TEMPLATES`           | _unset_                   | Set to `1` to force the legacy template path and skip the file-tree codegen orchestrator entirely. The previous opt-in flag `PACKETAGENT_FILETREE_CODEGEN=1` is preserved as a no-op for back-compat. |
-| `PACKETAGENT_PROVIDER_PRIORITY`          | _unset_                   | Comma-separated provider override (e.g. `ollama,openrouter,anthropic`). Applied to every preset; first registered provider with a configured key wins.                                                |
-| `LOCAL_LLM_BASE_URL`                     | _unset_                   | Base URL of a local LLM server (vLLM, LM Studio, llama.cpp, remote Ollama). Takes precedence over `OLLAMA_BASE_URL`.                                                                                  |
-| `OLLAMA_BASE_URL`                        | `http://localhost:11434`  | Legacy synonym for `LOCAL_LLM_BASE_URL`; honored when `LOCAL_LLM_BASE_URL` is unset.                                                                                                                  |
-| `LOCAL_LLM_API_FORMAT`                   | `ollama`                  | `ollama` (native `/api/chat`) or `openai` (`/v1/chat/completions`). Set to `openai` for vLLM / LM Studio / llama.cpp.                                                                                 |
-| `LOCAL_LLM_MODEL`                        | _unset_                   | Pins the model name when the remote server only loads one specific model.                                                                                                                             |
-| `LOCAL_LLM_STRUCTURED_OUTPUTS`           | `auto`                    | `auto` sends vLLM's `structured_outputs` schema and permits one prompt fallback on an unsupported-field response; `off` uses the prompt fallback directly.                                            |
+| Variable                                          | Default                   | Purpose                                                                                                                                                                                               |
+| ------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                        | `development`             | Set to `production` to mark cookies `Secure` and disable dev shortcuts.                                                                                                                               |
+| `PORT`                                            | `8484`                    | API server port.                                                                                                                                                                                      |
+| `PACKETAGENT_STORE`                               | `json`                    | `json`, `sqlite`, or `postgres`. A configured managed URL also selects managed mode unless SQLite is explicit.                                                                                        |
+| `PACKETAGENT_DB_PATH`                             | `data/packetagent.sqlite` | SQLite database path when store is `sqlite`.                                                                                                                                                          |
+| `PACKETAGENT_DATABASE_URL`                        | _unset_                   | Managed Postgres URL. `PACKETAGENT_MANAGED_DATABASE_URL` and `DATABASE_URL` are accepted aliases.                                                                                                     |
+| `PACKETAGENT_MANAGED_DATABASE_ADAPTER`            | _unset_                   | Set to `postgres` when enabling the managed adapter.                                                                                                                                                  |
+| `PACKETAGENT_TRUST_PROXY`                         | `false`                   | Trust `X-Forwarded-Host` / `X-Forwarded-For` from a known proxy.                                                                                                                                      |
+| `PACKETAGENT_RATE_LIMIT_KEY_SALT`                 | _unset_                   | Salt for hashed rate-limit bucket IDs. Set in production.                                                                                                                                             |
+| `PACKETAGENT_SANDBOX_DRIVER`                      | `auto`                    | `docker`, `native`, or `auto`.                                                                                                                                                                        |
+| `PACKETAGENT_SANDBOX_DEFAULT_RUNTIME`             | `node-20`                 | Default container image.                                                                                                                                                                              |
+| `PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS`          | `30000`                   | Per-exec timeout.                                                                                                                                                                                     |
+| `PACKETAGENT_SANDBOX_MEMORY_MB`                   | `512`                     | Container memory limit.                                                                                                                                                                               |
+| `PACKETAGENT_SANDBOX_CPUS`                        | `1`                       | Container CPU limit.                                                                                                                                                                                  |
+| `PACKETAGENT_SANDBOX_SMOKE_ENABLED`               | `0`                       | Route builder smoke checks through the sandbox. Also gates the file-tree validator's `tsc --noEmit` and `vite build` phases.                                                                          |
+| `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` | `4`                       | Maximum warm generated-app child processes per PacketAgent server. Values are clamped to `1-64`; an idle least-recently-used process is evicted at the limit.                                         |
+| `PACKETAGENT_ARTIFACT_SERVING_ENABLED`            | `false`                   | Opt in to artifact-file serving. Reads still require an authenticated viewer in the workspace that owns the exact run ID in the URL.                                                                  |
+| `PACKETAGENT_LEGACY_TEMPLATES`                    | _unset_                   | Set to `1` to force the legacy template path and skip the file-tree codegen orchestrator entirely. The previous opt-in flag `PACKETAGENT_FILETREE_CODEGEN=1` is preserved as a no-op for back-compat. |
+| `PACKETAGENT_PROVIDER_PRIORITY`                   | _unset_                   | Comma-separated provider override (e.g. `ollama,openrouter,anthropic`). Applied to every preset; first registered provider with a configured key wins.                                                |
+| `LOCAL_LLM_BASE_URL`                              | _unset_                   | Base URL of a local LLM server (vLLM, LM Studio, llama.cpp, remote Ollama). Takes precedence over `OLLAMA_BASE_URL`.                                                                                  |
+| `OLLAMA_BASE_URL`                                 | `http://localhost:11434`  | Legacy synonym for `LOCAL_LLM_BASE_URL`; honored when `LOCAL_LLM_BASE_URL` is unset.                                                                                                                  |
+| `LOCAL_LLM_API_FORMAT`                            | `ollama`                  | `ollama` (native `/api/chat`) or `openai` (`/v1/chat/completions`). Set to `openai` for vLLM / LM Studio / llama.cpp.                                                                                 |
+| `LOCAL_LLM_MODEL`                                 | _unset_                   | Pins the model name when the remote server only loads one specific model.                                                                                                                             |
+| `LOCAL_LLM_STRUCTURED_OUTPUTS`                    | `auto`                    | `auto` sends vLLM's `structured_outputs` schema and permits one prompt fallback on an unsupported-field response; `off` uses the prompt fallback directly.                                            |
 
 Anthropic, OpenAI, Gemini, OpenRouter, and MiniMax keys can be configured per workspace under **Admin -> Integrations** and stored in the encrypted vault. A production `MASTER_KEY` is required to unseal the vault.
 

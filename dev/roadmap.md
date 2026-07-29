@@ -46,7 +46,9 @@ responses, bounds vLLM compatibility fallback and malformed-tool correction,
 adds Gemini/OpenRouter workspace-vault parity, and exposes secret-free
 readiness. R3 now closes canonical file-tree repair, conversion, live progress,
 digest-backed review, targeted regeneration, plan-only package policy, and
-git-ready export. Resume at R4 in
+git-ready export. R4.1 adds authenticated aggregate/per-app runtime health,
+bounded crash visibility and operational counters, a Builder surface, and a
+documented 1-64-process supervised warm-pool limit. Resume at R4.2 in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r4---generated-app-runtime-and-self-host-publish).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

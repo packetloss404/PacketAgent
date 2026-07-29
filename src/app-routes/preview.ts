@@ -173,6 +173,41 @@ async function handleGeneratedAppRuntimeApi(c: Context) {
   }
 }
 
+async function generatedAppRuntimeWorkspaceHealth(c: Context) {
+  try {
+    const context = await requireAuthenticatedContextAsync(c);
+    await requireWorkspacePermission(context, "viewWorkspace");
+    c.header("Cache-Control", "private, no-store");
+    return c.json({
+      scope: { workspaceId: context.workspace.id },
+      health: getDefaultGeneratedAppRuntimeProcessPool().health({
+        workspaceId: context.workspace.id,
+      }),
+    });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+}
+
+async function generatedAppRuntimeAppHealth(c: Context) {
+  try {
+    const context = await requireAuthenticatedContextAsync(c);
+    await requireWorkspacePermission(context, "viewWorkspace");
+    const record = await findGeneratedAppRecord(context, c.req.param("appId"));
+    if (!record) throw httpRouteError(404, "generated app not found");
+    c.header("Cache-Control", "private, no-store");
+    return c.json({
+      scope: { workspaceId: context.workspace.id, appId: record.id },
+      health: getDefaultGeneratedAppRuntimeProcessPool().health({
+        workspaceId: context.workspace.id,
+        appId: record.id,
+      }),
+    });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+}
+
 function wantsGeneratedAppPreviewReadiness(c: Context) {
   const format = (c.req.query("format") ?? c.req.query("readiness") ?? "").toLowerCase();
   if (format === "json" || format === "1" || format === "true") return true;
@@ -420,6 +455,10 @@ function isGeneratedAppReadOnlyMethod(method: string): boolean {
 }
 
 export function registerPreviewRoutes(app: Hono): void {
+  app.get("/app/generated-app-runtime/health", async (c) => generatedAppRuntimeWorkspaceHealth(c));
+  app.get("/app/generated-apps/:appId/runtime/health", async (c) =>
+    generatedAppRuntimeAppHealth(c),
+  );
   app.get("/app/generated-apps/:appId/preview", async (c) => previewGeneratedApp(c));
   app.get("/app/generated-apps/:appId/preview/*", async (c) => previewGeneratedApp(c));
   app.post("/app/generated-apps/:appId/preview-token", async (c) =>

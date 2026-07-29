@@ -430,7 +430,18 @@ progress, full digest-backed review, scoped regeneration, a plan-only package
 policy, and checkpoint-bound git-ready export. The full closure gate passes
 typecheck, zero-warning lint, formatting, production web build, 32 web tests,
 and 1,569 API tests (1,565 passed with 4 intentional live Packet-product
-interoperability skips). Resume at R4.
+interoperability skips).
+
+R4.1 is complete. Authenticated workspace aggregate and owned-app health routes
+report warm-process state, active requests, request/outcome/retry/start/crash/
+schema-restart/eviction counters, and bounded recent crash metadata without
+starting an idle runtime or exposing raw errors. The supervised per-app Node
+pool defaults to four processes, clamps configuration to 1-64, and evicts the
+least-recently-used idle process. One failed request is retried, recent
+failures remain degraded for five minutes, and the Builder Sandbox tab exposes
+the per-app view. The focused gate passes typecheck, zero-warning lint, 48
+backend tests (47 passed with one intentional Windows sandbox skip), and the
+web gate. Resume at R4.2 artifact and static-asset integrity.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -581,8 +592,10 @@ without duplicate jobs, and compacted source evidence fails closed. Opt-in live
 PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
-The exact next slice is
-[`R4 - generated-app runtime and self-host publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish).
+The exact next slice is R4.2 under
+[`R4 - generated-app runtime and self-host publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish):
+add static-asset validation plus digest-verifiable artifact manifests and
+health metadata.
 After each gate passes, continue through R4-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and

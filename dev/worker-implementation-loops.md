@@ -1093,8 +1093,8 @@ implementation evidence live in
 
 Status: active.
 
-1. Add per-app runtime health, metrics, crash visibility, and documented
-   process-pool limits.
+1. [Complete 2026-07-29] Add per-app runtime health, metrics, crash visibility,
+   and documented process-pool limits.
 2. Add health endpoints, static-asset manifest validation, and signed/checksum
    artifact manifests.
 3. Turn publish handoff into a verified local Docker Compose run path.

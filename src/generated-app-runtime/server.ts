@@ -28,6 +28,48 @@ export interface GeneratedAppRuntimeProcessInfo {
   schemaSignature: string;
 }
 
+export interface GeneratedAppRuntimeMetrics {
+  requests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  retryAttempts: number;
+  workerStarts: number;
+  startupFailures: number;
+  crashes: number;
+  schemaRestarts: number;
+  evictions: number;
+}
+
+export interface GeneratedAppRuntimeCrashRecord {
+  appId: string;
+  workspaceId: string;
+  at: string;
+  reason: "unexpected-exit" | "request-failed" | "startup-failed";
+  code?: number;
+  signal?: NodeJS.Signals;
+}
+
+export interface GeneratedAppRuntimePoolHealth {
+  status: "idle" | "healthy" | "degraded";
+  observedAt: string;
+  maxProcesses: number;
+  processCount: number;
+  activeRequests: number;
+  metrics: GeneratedAppRuntimeMetrics;
+  processes: Array<{
+    appId: string;
+    workspaceId: string;
+    schemaSignature: string;
+    pid?: number;
+    state: "starting" | "ready";
+    startedAt: string;
+    lastUsedAt: string;
+    activeRequests: number;
+    restarts: number;
+  }>;
+  recentCrashes: GeneratedAppRuntimeCrashRecord[];
+}
+
 export interface GeneratedAppRuntimeWorkerStartConfig {
   appId: string;
   workspaceId: string;
@@ -68,10 +110,13 @@ interface RuntimeEntry {
   worker?: GeneratedAppRuntimeWorkerHandle;
 }
 
-const DEFAULT_MAX_PROCESSES = 4;
+export const DEFAULT_GENERATED_APP_RUNTIME_MAX_PROCESSES = 4;
+export const MAX_GENERATED_APP_RUNTIME_MAX_PROCESSES = 64;
 const STARTUP_TIMEOUT_MS = 5_000;
 const STOP_TIMEOUT_MS = 2_000;
 const OUTPUT_BUFFER_LIMIT = 4_000;
+const CRASH_DEGRADED_WINDOW_MS = 5 * 60_000;
+const MAX_TRACKED_RUNTIME_KEYS = 500;
 
 let defaultPool: GeneratedAppRuntimeProcessPool | null = null;
 
@@ -81,9 +126,11 @@ export class GeneratedAppRuntimeProcessPool {
   private readonly now: () => Date;
   private readonly entries = new Map<string, RuntimeEntry>();
   private readonly restartCounts = new Map<string, number>();
+  private readonly metrics = new Map<string, GeneratedAppRuntimeMetrics>();
+  private readonly recentCrashes = new Map<string, GeneratedAppRuntimeCrashRecord>();
 
   constructor(options: GeneratedAppRuntimeProcessPoolOptions = {}) {
-    this.maxProcesses = Math.max(1, Math.floor(options.maxProcesses ?? defaultMaxProcesses()));
+    this.maxProcesses = clampMaxProcesses(options.maxProcesses ?? defaultMaxProcesses());
     this.workerFactory = options.workerFactory ?? spawnGeneratedAppRuntimeWorker;
     this.now = options.now ?? (() => new Date());
   }
@@ -91,7 +138,16 @@ export class GeneratedAppRuntimeProcessPool {
   async request(
     input: GeneratedAppRuntimeProcessRequest,
   ): Promise<GeneratedAppRuntimeProcessResponse> {
-    return this.requestWithRetry(input, false);
+    const key = runtimePoolKey(input.workspaceId, input.appId);
+    this.metricForKey(key).requests += 1;
+    try {
+      const result = await this.requestWithRetry(input, false);
+      this.metricForKey(key).successfulRequests += 1;
+      return result;
+    } catch (error) {
+      this.metricForKey(key).failedRequests += 1;
+      throw error;
+    }
   }
 
   async shutdown(): Promise<void> {
@@ -114,6 +170,49 @@ export class GeneratedAppRuntimeProcessPool {
       pid: entry.worker?.pid,
       activeRequests: entry.activeRequests,
     }));
+  }
+
+  health(filter: { workspaceId: string; appId?: string }): GeneratedAppRuntimePoolHealth {
+    const observedAt = this.now();
+    const matches = (workspaceId: string, appId: string) =>
+      workspaceId === filter.workspaceId && (!filter.appId || appId === filter.appId);
+    const processes = [...this.entries.values()]
+      .filter((entry) => matches(entry.workspaceId, entry.appId))
+      .map((entry) => ({
+        appId: entry.appId,
+        workspaceId: entry.workspaceId,
+        schemaSignature: entry.schemaSignature,
+        pid: entry.worker?.pid,
+        state: entry.worker ? ("ready" as const) : ("starting" as const),
+        startedAt: entry.startedAt,
+        lastUsedAt: new Date(entry.lastUsedAt).toISOString(),
+        activeRequests: entry.activeRequests,
+        restarts: entry.restarts,
+      }))
+      .sort((left, right) => left.appId.localeCompare(right.appId));
+    const recentCrashes = [...this.recentCrashes.values()]
+      .filter((crash) => matches(crash.workspaceId, crash.appId))
+      .sort((left, right) => right.at.localeCompare(left.at));
+    const metrics = emptyRuntimeMetrics();
+    for (const [key, value] of this.metrics.entries()) {
+      const identity = runtimePoolIdentity(key);
+      if (!matches(identity.workspaceId, identity.appId)) continue;
+      addRuntimeMetrics(metrics, value);
+    }
+    const hasRecentCrash = recentCrashes.some(
+      (crash) => observedAt.getTime() - Date.parse(crash.at) <= CRASH_DEGRADED_WINDOW_MS,
+    );
+
+    return {
+      status: hasRecentCrash ? "degraded" : processes.length > 0 ? "healthy" : "idle",
+      observedAt: observedAt.toISOString(),
+      maxProcesses: this.maxProcesses,
+      processCount: processes.length,
+      activeRequests: processes.reduce((total, process) => total + process.activeRequests, 0),
+      metrics,
+      processes,
+      recentCrashes,
+    };
   }
 
   private async requestWithRetry(
@@ -142,7 +241,10 @@ export class GeneratedAppRuntimeProcessPool {
       };
     } catch (error) {
       await this.markEntryCrashed(entry);
-      if (!retried) return this.requestWithRetry(input, true);
+      if (!retried) {
+        this.metricForKey(entry.key).retryAttempts += 1;
+        return this.requestWithRetry(input, true);
+      }
       throw error;
     } finally {
       entry.activeRequests = Math.max(0, entry.activeRequests - 1);
@@ -160,6 +262,7 @@ export class GeneratedAppRuntimeProcessPool {
     }
 
     if (existing) {
+      this.metricForKey(key).schemaRestarts += 1;
       await this.stopEntry(existing, "schema-changed");
       this.entries.delete(key);
     }
@@ -194,18 +297,26 @@ export class GeneratedAppRuntimeProcessPool {
         model: input.model,
         runtimeRoot: input.runtimeRoot,
         schemaSignature: entry.schemaSignature,
-        onExit: () => {
+        onExit: (details) => {
           if (this.entries.get(entry.key) !== entry) return;
           entry.stopped = true;
           this.entries.delete(entry.key);
           this.restartCounts.set(entry.key, entry.restarts + 1);
+          this.metricForKey(entry.key).crashes += 1;
+          this.recordCrash(entry, "unexpected-exit", {
+            ...(details.code !== null ? { code: details.code } : {}),
+            ...(details.signal ? { signal: details.signal } : {}),
+          });
         },
       });
+      this.metricForKey(entry.key).workerStarts += 1;
       entry.worker = worker;
       entry.startedAt = worker.startedAt;
       return entry;
     } catch (error) {
       if (this.entries.get(entry.key) === entry) this.entries.delete(entry.key);
+      this.metricForKey(entry.key).startupFailures += 1;
+      this.recordCrash(entry, "startup-failed");
       throw error;
     }
   }
@@ -214,6 +325,8 @@ export class GeneratedAppRuntimeProcessPool {
     if (this.entries.get(entry.key) === entry) this.entries.delete(entry.key);
     entry.stopped = true;
     this.restartCounts.set(entry.key, entry.restarts + 1);
+    this.metricForKey(entry.key).crashes += 1;
+    this.recordCrash(entry, "request-failed");
     await this.stopEntry(entry, "request-failed");
   }
 
@@ -224,6 +337,7 @@ export class GeneratedAppRuntimeProcessPool {
         .sort((left, right) => left.lastUsedAt - right.lastUsedAt)[0];
       if (!candidate) return;
       this.entries.delete(candidate.key);
+      this.metricForKey(candidate.key).evictions += 1;
       await this.stopEntry(candidate, "lru-eviction");
     }
   }
@@ -236,6 +350,46 @@ export class GeneratedAppRuntimeProcessPool {
       await worker?.stop(reason);
     } catch {
       // A dead worker is already past the useful cleanup boundary.
+    }
+  }
+
+  private metricForKey(key: string): GeneratedAppRuntimeMetrics {
+    const current = this.metrics.get(key);
+    if (current) return current;
+    const created = emptyRuntimeMetrics();
+    this.metrics.set(key, created);
+    this.trimTrackedKeys();
+    return created;
+  }
+
+  private recordCrash(
+    entry: Pick<RuntimeEntry, "key" | "appId" | "workspaceId">,
+    reason: GeneratedAppRuntimeCrashRecord["reason"],
+    details: { code?: number; signal?: NodeJS.Signals } = {},
+  ): void {
+    this.recentCrashes.set(entry.key, {
+      appId: entry.appId,
+      workspaceId: entry.workspaceId,
+      at: this.now().toISOString(),
+      reason,
+      ...details,
+    });
+    this.trimTrackedKeys();
+  }
+
+  private trimTrackedKeys(): void {
+    while (this.metrics.size > MAX_TRACKED_RUNTIME_KEYS) {
+      const oldestKey = this.metrics.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      if (this.entries.has(oldestKey)) {
+        const value = this.metrics.get(oldestKey);
+        this.metrics.delete(oldestKey);
+        if (value) this.metrics.set(oldestKey, value);
+        continue;
+      }
+      this.metrics.delete(oldestKey);
+      this.recentCrashes.delete(oldestKey);
+      this.restartCounts.delete(oldestKey);
     }
   }
 }
@@ -322,12 +476,49 @@ function runtimePoolKey(workspaceId: string, appId: string): string {
   return `${workspaceId}\0${appId}`;
 }
 
+function runtimePoolIdentity(key: string): { workspaceId: string; appId: string } {
+  const separator = key.indexOf("\0");
+  return {
+    workspaceId: separator >= 0 ? key.slice(0, separator) : "",
+    appId: separator >= 0 ? key.slice(separator + 1) : key,
+  };
+}
+
 function defaultMaxProcesses(): number {
   const parsed = Number.parseInt(
     process.env.PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES ?? "",
     10,
   );
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_PROCESSES;
+  return Number.isFinite(parsed) && parsed > 0
+    ? clampMaxProcesses(parsed)
+    : DEFAULT_GENERATED_APP_RUNTIME_MAX_PROCESSES;
+}
+
+function clampMaxProcesses(value: number): number {
+  return Math.min(MAX_GENERATED_APP_RUNTIME_MAX_PROCESSES, Math.max(1, Math.floor(value)));
+}
+
+function emptyRuntimeMetrics(): GeneratedAppRuntimeMetrics {
+  return {
+    requests: 0,
+    successfulRequests: 0,
+    failedRequests: 0,
+    retryAttempts: 0,
+    workerStarts: 0,
+    startupFailures: 0,
+    crashes: 0,
+    schemaRestarts: 0,
+    evictions: 0,
+  };
+}
+
+function addRuntimeMetrics(
+  target: GeneratedAppRuntimeMetrics,
+  source: GeneratedAppRuntimeMetrics,
+): void {
+  for (const key of Object.keys(target) as Array<keyof GeneratedAppRuntimeMetrics>) {
+    target[key] += source[key];
+  }
 }
 
 function waitForWorkerReady(

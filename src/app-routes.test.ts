@@ -1012,6 +1012,19 @@ test("generated app runtime API persists records through per-app SQLite", async 
     });
     const applied = (await applyResponse.json()) as { app: { id: string } };
 
+    const idleHealthResponse = await app.request(
+      `/api/app/generated-apps/${applied.app.id}/runtime/health`,
+      { headers },
+    );
+    const idleHealth = (await idleHealthResponse.json()) as {
+      health?: { status?: string; processCount?: number; metrics?: { requests?: number } };
+    };
+    assert.equal(idleHealthResponse.status, 200);
+    assert.equal(idleHealthResponse.headers.get("cache-control"), "private, no-store");
+    assert.equal(idleHealth.health?.status, "idle");
+    assert.equal(idleHealth.health?.processCount, 0);
+    assert.equal(idleHealth.health?.metrics?.requests, 0);
+
     const firstListResponse = await app.request(
       `/api/app/generated-apps/${applied.app.id}/api/account`,
       { headers },
@@ -1050,6 +1063,47 @@ test("generated app runtime API persists records through per-app SQLite", async 
     assert.equal(secondListResponse.status, 200);
     assert.ok(
       secondList.some((record) => record.id === created.id && record.name === "Shared Farm Co"),
+    );
+
+    const healthResponse = await app.request(
+      `/api/app/generated-apps/${applied.app.id}/runtime/health`,
+      { headers },
+    );
+    const health = (await healthResponse.json()) as {
+      scope?: { workspaceId?: string; appId?: string };
+      health?: {
+        status?: string;
+        processCount?: number;
+        maxProcesses?: number;
+        metrics?: { requests?: number; successfulRequests?: number; workerStarts?: number };
+        processes?: Array<{ appId?: string; state?: string; pid?: number }>;
+        recentCrashes?: unknown[];
+      };
+    };
+    assert.equal(healthResponse.status, 200);
+    assert.equal(health.scope?.workspaceId, "alpha");
+    assert.equal(health.scope?.appId, applied.app.id);
+    assert.equal(health.health?.status, "healthy");
+    assert.equal(health.health?.processCount, 1);
+    assert.ok((health.health?.maxProcesses ?? 0) >= 1);
+    assert.equal(health.health?.metrics?.requests, 3);
+    assert.equal(health.health?.metrics?.successfulRequests, 3);
+    assert.equal(health.health?.metrics?.workerStarts, 1);
+    assert.equal(health.health?.processes?.[0]?.state, "ready");
+    assert.ok(health.health?.processes?.[0]?.pid);
+    assert.deepEqual(health.health?.recentCrashes, []);
+
+    const workspaceHealthResponse = await app.request("/api/app/generated-app-runtime/health", {
+      headers,
+    });
+    const workspaceHealth = (await workspaceHealthResponse.json()) as {
+      health?: { metrics?: { requests?: number }; processes?: Array<{ appId?: string }> };
+    };
+    assert.equal(workspaceHealthResponse.status, 200);
+    assert.equal(workspaceHealth.health?.metrics?.requests, 3);
+    assert.deepEqual(
+      workspaceHealth.health?.processes?.map((process) => process.appId),
+      [applied.app.id],
     );
   } finally {
     await shutdownDefaultGeneratedAppRuntimeProcessPool();

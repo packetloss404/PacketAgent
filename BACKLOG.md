@@ -299,7 +299,7 @@ Status: complete as of 2026-07-29. Resume at R4.
 
 Status: active.
 
-- [ ] Add runtime health, metrics, crash visibility, and documented pool
+- [x] Add runtime health, metrics, crash visibility, and documented pool
       limits.
 - [ ] Add health endpoints, static-asset manifest validation, and
       signed/checksummed artifact manifests.
@@ -428,7 +428,13 @@ planning plus zip/git-ready export.
 ### Generated-app persistence and runtime
 
 - Shipped: generated app templates emit same-origin `fetch('/api/...')` calls, the server owns a per-app `node:sqlite` file with `__schema_version`, schema changes drop and reseed app data, and each app runtime is isolated in a Node child process started on first request and kept warm with an LRU pool.
-- Remaining: add runtime health/metrics surfaces, document `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES`, and carry the separate-origin preview/CSRF hardening item from the security backlog.
+- Shipped: authenticated aggregate/per-app health endpoints and Builder
+  visibility report process state plus bounded request, retry, crash, restart,
+  and eviction metrics without starting idle runtimes. The documented warm
+  pool defaults to four supervised child processes, clamps configuration to
+  1-64, and evicts the least-recently-used idle process.
+- Remaining: carry the separate-origin preview/CSRF hardening item from the
+  security backlog.
 
 ### Existing agent path
 

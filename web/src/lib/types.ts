@@ -1847,6 +1847,44 @@ export interface SandboxStatus {
   note?: string;
 }
 
+export interface GeneratedAppRuntimeHealth {
+  status: "idle" | "healthy" | "degraded";
+  observedAt: string;
+  maxProcesses: number;
+  processCount: number;
+  activeRequests: number;
+  metrics: {
+    requests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    retryAttempts: number;
+    workerStarts: number;
+    startupFailures: number;
+    crashes: number;
+    schemaRestarts: number;
+    evictions: number;
+  };
+  processes: Array<{
+    appId: string;
+    workspaceId: string;
+    schemaSignature: string;
+    pid?: number;
+    state: "starting" | "ready";
+    startedAt: string;
+    lastUsedAt: string;
+    activeRequests: number;
+    restarts: number;
+  }>;
+  recentCrashes: Array<{
+    appId: string;
+    workspaceId: string;
+    at: string;
+    reason: "unexpected-exit" | "request-failed" | "startup-failed";
+    code?: number;
+    signal?: string;
+  }>;
+}
+
 export interface SandboxExecRecord {
   id: string;
   workspaceId: string;
