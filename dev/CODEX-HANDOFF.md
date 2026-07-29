@@ -301,9 +301,9 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R3 - file-tree generation depth** in
-[`../BACKLOG.md#r3---file-tree-generation-depth`](../BACKLOG.md#r3---file-tree-generation-depth).
-`BACKLOG.md` is the single ledger for every remaining R3-R8 task.
+Continue **R4 - generated-app runtime and self-host publish** in
+[`../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish).
+`BACKLOG.md` is the single ledger for every remaining R4-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
 active work absent from the backlog.
 
@@ -372,16 +372,14 @@ one correction turn. Gemini/OpenRouter keys now use the same encrypted
 workspace-vault flow as the other hosted providers, including JSON, SQLite, and
 managed-Postgres boundaries. The full closure gate passes typecheck, formatting,
 lint, production build, 30 web tests, and 1,552 API tests (1,548 passed with 4
-intentional live-probe skips). Resume at R3's file-tree repair, iteration,
-progress, review, and export slice.
+intentional live-probe skips).
 
 R3.1 is complete. Generated-app validation failures are classified into
 deterministic module-graph, type-contract, JSX, entry/config, styling, runtime
 API, or generic families. Repair prompts prioritize the files with the most
 diagnostics, cap diagnostic and source bytes, strip terminal control
 sequences, give family-specific instructions, and retain the existing
-two-repair/repeated-signature stop bounds. Resume at R3's deterministic
-legacy-draft conversion and canonical file-tree iteration slice.
+two-repair/repeated-signature stop bounds.
 
 R3.2 is complete. Legacy template, structured-draft, and historical
 source-less checkpoints reuse their persisted deterministic source bundle
@@ -409,8 +407,7 @@ mutation outside that boundary is restored from the current tree and the
 resulting scoped tree is validated before review. Selected preview elements
 now travel as component targets with both their page route and CSS selector.
 The focused R3.4 gate passes typecheck, lint, 24 backend tests, and the two
-progress reducer tests. Resume at R3's sandboxed package planning and
-zip/git-ready export slice.
+progress reducer tests.
 
 R3.5 is complete. Generated `package.json` dependencies are parsed into a
 versioned allow/block plan. Only the React/Vite/TypeScript/Tailwind toolchain
@@ -424,8 +421,16 @@ with git ignores, human instructions, source, package plan, and a digest-bound
 export manifest. The Builder Source view exposes plan status and download.
 The focused gate passes typecheck, zero-warning lint, five package/export
 tests, and 43 HTTP route tests (42 passed, one intentional Windows sandbox
-skip). Run the full repository R3 gate next, then close R3 and resume R4 from
-`BACKLOG.md`.
+skip).
+
+R3 is complete. [`r3-filetree-depth.md`](r3-filetree-depth.md) records the
+research and decisions. New and converted legacy drafts now share one
+reviewable file-tree source of truth with targeted bounded repair, typed live
+progress, full digest-backed review, scoped regeneration, a plan-only package
+policy, and checkpoint-bound git-ready export. The full closure gate passes
+typecheck, zero-warning lint, formatting, production web build, 32 web tests,
+and 1,569 API tests (1,565 passed with 4 intentional live Packet-product
+interoperability skips). Resume at R4.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -577,8 +582,8 @@ PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
 The exact next slice is
-[`R3 - file-tree generation depth`](../BACKLOG.md#r3---file-tree-generation-depth).
-After each gate passes, continue through R3-R8 using that backlog's unchecked
+[`R4 - generated-app runtime and self-host publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish).
+After each gate passes, continue through R4-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
 must not be resumed independently.

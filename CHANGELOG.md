@@ -6,6 +6,30 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R3 file-tree generation depth
+
+- Added deterministic TypeScript/Vite failure clustering and diagnostic/file
+  budgets to the existing bounded validation repair loop.
+- Converted persisted legacy template, structured-draft, and historical
+  source bundles to the path-safe canonical file-tree iteration contract.
+- Streamed typed, repair-attempt-aware plan/write/validate progress through
+  Builder SSE routes and the Source view without treating skipped validation
+  as success.
+- Added full added/modified/deleted/unchanged file review with SHA-256 and size
+  evidence while keeping apply payloads changes-only.
+- Scoped page, API-route, data-entity, and selected-component regeneration;
+  unrelated model mutations are restored before candidate validation.
+- Added an allowlisted, semver-only package-install plan that never executes
+  and records required Docker, registry-only, no-lifecycle-script bounds.
+- Added authenticated checkpoint-bound git-ready ZIP export with unsafe-path,
+  duplicate, 500-file, and 10-MiB source limits plus package and digest
+  provenance.
+- Recorded implementation and ZIP-library research in
+  `dev/r3-filetree-depth.md`.
+- Closed R3 with clean typecheck, zero-warning lint, formatting, production
+  web build, 32 web tests, and the 1,569-test API gate (1,565 passed, 4
+  intentional live Packet-product probes skipped).
+
 ### 2026-07-29 - R2 provider policy and key parity
 
 - Added one canonical catalog for provider identity, model presets,

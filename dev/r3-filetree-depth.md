@@ -52,6 +52,7 @@ explicit rather than library-default current time.
 - R3.5 package/export: `src/codegen/package-plan.ts` and
   `src/codegen/workspace-export.ts`
 
-The final repository-wide typecheck, lint, format, production web build, API,
-and web tests are recorded in `BACKLOG.md` and `dev/CODEX-HANDOFF.md` when the
-R3 gate closes.
+The final repository-wide gate passed typecheck, zero-warning lint, formatting,
+the production web build, 32 web tests, and 1,569 API tests (1,565 passed with
+4 intentional live interoperability skips). `BACKLOG.md` remains the canonical
+closure record.

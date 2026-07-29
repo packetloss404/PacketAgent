@@ -261,7 +261,7 @@ while recording the single unreachable React Router RSC exception.
 
 ### R2 - Provider policy and key parity
 
-Status: complete as of 2026-07-29. Resume at R3.
+Status: complete as of 2026-07-29.
 
 - [x] Add per-provider generation policy and capability metadata.
 - [x] Add vLLM structured decoding/XGrammar with tested fallback.
@@ -277,7 +277,7 @@ Status: complete as of 2026-07-29. Resume at R3.
 
 ### R3 - File-tree generation depth
 
-Status: active.
+Status: complete as of 2026-07-29. Resume at R4.
 
 - [x] Add targeted bounded repair prompts from real failure clusters.
 - [x] Move legacy-template iteration to the file-tree path or a deterministic
@@ -287,10 +287,17 @@ Status: active.
       regeneration.
 - [x] Add sandboxed package planning and workspace export as zip or git-ready
       files.
-- Gate: new and legacy drafts use one reviewable, repairable, exportable
-  file-tree source of truth.
+- Gate result: passed. New and converted legacy drafts use the canonical
+  file-tree path; repairs and progress are bounded and reviewable; targeted
+  regeneration restores unrelated mutations; and workspace-scoped checkpoint
+  exports include a never-executed package plan plus digest provenance.
+  Typecheck, zero-warning lint, formatting, production build, 32 web tests,
+  and the 1,569-test API suite are green (1,565 passed with 4 intentional live
+  interoperability skips).
 
 ### R4 - Generated-app runtime and self-host publish
+
+Status: active.
 
 - [ ] Add runtime health, metrics, crash visibility, and documented pool
       limits.

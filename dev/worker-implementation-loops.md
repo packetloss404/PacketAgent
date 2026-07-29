@@ -1037,7 +1037,7 @@ to a named later loop; CI/test/build truth and migration recovery are green.
 
 ### R2 - Provider policy and key parity
 
-Status: complete as of 2026-07-29. Resume at R3.
+Status: complete as of 2026-07-29.
 
 1. Add per-provider generation policy and capability metadata.
 2. Add vLLM structured decoding/XGrammar with tested fallback.
@@ -1058,7 +1058,7 @@ focused and repository-wide gates. Design and research evidence live in
 
 ### R3 - File-tree generation depth
 
-Status: active.
+Status: complete as of 2026-07-29. Resume at R4.
 
 1. [Complete 2026-07-29] Classify concrete TypeScript/Vite failure clusters
    and add targeted, diagnostic- and file-budget-bounded repair prompts.
@@ -1080,7 +1080,18 @@ Status: active.
 Gate: both new and legacy drafts use one file-tree source of truth and users can
 review, repair, target, and export changes without hidden mutation.
 
+Gate result: passed. The canonical file tree now spans new and converted legacy
+drafts, targeted bounded repair, typed per-file progress, digest-backed full
+review, scoped page/route/entity/component regeneration, plan-only package
+policy, and checkpoint-bound git-ready ZIP export. Typecheck, zero-warning
+lint, formatting, production build, 32 web tests, and 1,569 API tests pass
+(1,565 passed with 4 intentional live interoperability skips). Research and
+implementation evidence live in
+[`r3-filetree-depth.md`](r3-filetree-depth.md).
+
 ### R4 - Generated-app runtime and self-host publish
+
+Status: active.
 
 1. Add per-app runtime health, metrics, crash visibility, and documented
    process-pool limits.
