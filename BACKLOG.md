@@ -304,7 +304,7 @@ Status: active.
 - [x] Add health endpoints, static-asset manifest validation, and
       signed/checksummed artifact manifests.
 - [x] Turn publish handoff into a verified local Docker Compose run path.
-- [ ] Add reverse-proxy/VPN examples and public-URL reachability verification.
+- [x] Add reverse-proxy/VPN examples and public-URL reachability verification.
 - [ ] Preserve accurate schema/data migration claims.
 - Gate: an exported app can be integrity-checked, started, health-checked, and
   reached through the documented self-host path.
@@ -316,6 +316,13 @@ Status: active.
   examples and public reachability verification. Typecheck, zero-warning lint,
   formatting, production web build, 32 web tests, and 1,577 API tests pass
   (1,573 passed with four intentional live interoperability skips).
+- R4.4 result: generated packages bind to loopback by default and seal current
+  Caddy, nginx, and Tailscale examples. The reachability CLI requires HTTPS
+  outside loopback, bounds DNS/TCP/TLS/HTTP work, refuses redirects, validates
+  content types and certificates, and binds readiness to exact app/checkpoint
+  identity. Typecheck, zero-warning lint, formatting, production web build,
+  32 web tests, and 1,581 API tests pass (1,577 passed with four intentional
+  live interoperability skips). Resume at migration-truth reconciliation.
 
 ### R5 - Sandbox, egress, and preview isolation
 
@@ -497,9 +504,10 @@ planning plus zip/git-ready export.
   and authenticated package re-verification.
 - Shipped: generated-app publish directories now include the standalone image,
   Compose service, runtime/model/runbook, and bounded Docker verification CLI.
-- Remaining: document reverse-proxy examples for local network / VPN
-  deployment and verify that a configured public URL reaches the intended
-  published app.
+- Shipped: loopback-by-default publish networking, sealed Caddy/nginx/Tailscale
+  examples, and exact-identity public URL reachability verification.
+- Remaining: reconcile schema/data migration claims with the current
+  schema-signature reset/reseed behavior.
 
 ### Quality bar
 

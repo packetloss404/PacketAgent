@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import { basename, resolve } from "node:path";
 import type { GeneratedAppRuntimeModel, RuntimeSchemaEntity } from "./generated-app-runtime.js";
 import { GENERATED_APP_PUBLISH_COMPOSE_FILE } from "./generated-app-publish-package.js";
+import { verifyGeneratedAppReachability } from "./generated-app-publish-reachability.js";
 
 export interface GeneratedAppPublishVerificationStep {
   id: string;
@@ -90,6 +91,16 @@ export async function verifyGeneratedAppPublishPackage(
     }
 
     const baseUrl = `http://127.0.0.1:${port}`;
+    await probeStep(steps, "reachability-contract", async () => {
+      const reachability = await verifyGeneratedAppReachability(publishRoot, baseUrl);
+      if (reachability.status !== "pass") {
+        const failure = reachability.steps.find((step) => step.status === "fail");
+        throw new Error(
+          `reachability ${failure?.code ?? "failed"}: ${failure?.detail ?? "unknown failure"}`,
+        );
+      }
+      return "DNS, TCP, health, package identity, and app-root reachability passed.";
+    });
     await probeStep(steps, "health-live", async () => {
       const body = await fetchJson(`${baseUrl}/health/live`);
       if (body.status !== "live") throw new Error("liveness status was not live");

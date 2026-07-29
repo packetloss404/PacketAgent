@@ -476,6 +476,22 @@ API tests pass (1,573 passed with four intentional live interoperability
 skips). Resume at R4.4 reverse-proxy/VPN examples and public-URL reachability
 verification.
 
+R4.4 is complete. Generated Compose packages bind to `127.0.0.1` by default
+and seal current Caddy automatic-HTTPS, nginx TLS, and Tailscale
+Serve/private-plus-Funnel/public guidance. The standalone runtime does not
+trust or use forwarded headers for authorization, identity, or URL generation.
+`npm run verify:generated-app-reachability -- <publish-directory> <origin>`
+requires HTTPS outside loopback and separately bounds/reports URL policy, DNS,
+TCP or certificate-validating TLS, liveness, exact app/checkpoint readiness,
+and HTML root verification. Redirects, oversized/wrong-content responses, and
+identity substitution fail closed. The Docker verifier exercises the same
+reachability contract locally. PacketAgent does not claim to provision DNS,
+TLS, VPN policy, or continuous monitoring. Resume at R4.5 schema/data
+migration-truth reconciliation. Typecheck, zero-warning lint, formatting,
+production web build, 32 web tests, 18 focused backend checks, real Docker
+certification, and 1,581 API tests pass (1,577 passed with four intentional
+live interoperability skips).
+
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
@@ -625,10 +641,11 @@ without duplicate jobs, and compacted source evidence fails closed. Opt-in live
 PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
-The exact next slice is R4.4 under
+The exact next slice is R4.5 under
 [`R4 - generated-app runtime and self-host publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish):
-add reverse-proxy/VPN examples and a bounded public-URL reachability check
-without claiming that PacketAgent provisions DNS or TLS.
+reconcile every persistence/schema-migration claim with the current
+schema-signature reset/reseed behavior, add supporting characterization or
+backup/restore evidence, and close the R4 gate.
 After each gate passes, continue through R4-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and

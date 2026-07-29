@@ -278,8 +278,10 @@ docker compose -f docker-compose.publish.yml up --build --wait
 ```
 
 Open `http://localhost:8787`. Set `PACKETAGENT_GENERATED_APP_PORT` before
-starting Compose to select another host port. Stop without deleting app data
-with:
+starting Compose to select another host port. The mapping binds to
+`127.0.0.1` by default; set
+`PACKETAGENT_GENERATED_APP_BIND_ADDRESS=0.0.0.0` only for intentional,
+firewall-protected direct LAN exposure. Stop without deleting app data with:
 
 ```bash
 docker compose -f docker-compose.publish.yml down --remove-orphans
@@ -334,9 +336,39 @@ can:
   published app/checkpoint.
 
 DNS, TLS, reverse-proxy, VPN, and public URL configuration are your
-responsibility. PacketAgent does not provision a domain or certificate. R4.4
-tracks tested proxy/VPN examples and public reachability verification; until
-that gate passes, treat custom public routing as operator-managed.
+responsibility. PacketAgent does not provision a domain, certificate, or
+tailnet policy. The sealed `deploy/` directory contains:
+
+- `Caddyfile.example` - set `PACKETAGENT_GENERATED_APP_HOSTNAME`; Caddy can
+  obtain/renew public certificates and proxies to the loopback app port.
+- `nginx.generated-app.conf.example` - replace the hostname and certificate
+  paths, validate with `nginx -t`, then reload nginx.
+- `TAILSCALE.md` - `tailscale serve --bg http://127.0.0.1:8787` for private
+  tailnet HTTPS, with the distinct opt-in Funnel command documented for public
+  exposure.
+
+Caddy sets/augments the standard forwarded headers by default; the nginx
+example sets Host, X-Real-IP, X-Forwarded-For, and X-Forwarded-Proto
+explicitly. The standalone generated-app runtime does not currently use
+forwarded headers for authorization, identity, or URL generation, so spoofed
+forwarded values cannot broaden access. TLS policy remains at the terminating
+proxy.
+
+Use the final HTTPS origin printed/configured by the proxy or VPN:
+
+```bash
+npm run verify:generated-app-reachability -- \
+  data/published-apps/<workspace>/<app> \
+  https://app.example.com
+```
+
+The command reads expected app/checkpoint identity from the local package,
+then separately reports URL-policy, DNS, TCP/TLS, liveness, readiness identity,
+and app-root results. Every network step is bounded to five seconds, response
+reads stop at 64 KiB, TLS certificates must validate, and redirects fail rather
+than silently verifying another service. HTTP is accepted only for loopback
+testing. A passing check proves reachability at that moment; it does not
+configure or continuously monitor DNS/TLS.
 
 ### Standalone runtime and migration truth
 

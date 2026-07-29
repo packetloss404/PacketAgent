@@ -53,8 +53,10 @@ artifact manifest v2 sealing, per-file and canonical checksums, optional HMAC
 signing, bounded HTML/CSS static-asset validation, tamper/substitution checks,
 and authenticated re-verification. R4.3 adds the actual standalone
 Node/Vite/SQLite publish image, hardened single-service Compose contract, and
-bounded Docker build/health/CRUD/restart-persistence verifier. Resume at R4.4
-proxy/VPN examples and public reachability verification in
+bounded Docker build/health/CRUD/restart-persistence verifier. R4.4 adds
+loopback-by-default port binding, sealed Caddy/nginx/Tailscale examples, and
+bounded DNS/TCP/TLS/HTTP reachability bound to exact package identity. Resume
+at R4.5 migration-truth reconciliation in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r4---generated-app-runtime-and-self-host-publish).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

@@ -6,6 +6,25 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R4.4 generated-app proxy and reachability
+
+- Bound standalone generated-app Compose ports to `127.0.0.1` by default;
+  direct all-interface LAN exposure now requires an explicit bind-address
+  override.
+- Added sealed Caddy automatic-HTTPS, nginx TLS, and Tailscale Serve/private
+  plus Funnel/public deployment examples to every publish package.
+- Added `verify:generated-app-reachability` with bounded URL-policy, DNS,
+  TCP/TLS, liveness, readiness-identity, and HTML-root checks. Public targets
+  require HTTPS and valid certificates; redirects, oversized responses, wrong
+  content types, and app/checkpoint substitution fail closed.
+- Reused the reachability contract in Docker publish certification and
+  documented that PacketAgent does not provision DNS, TLS, VPN policy, or
+  continuous public monitoring.
+- Closed the loop with typecheck, zero-warning lint, formatting, production
+  web build, 32 web tests, 18 focused backend checks, real Docker
+  certification, and 1,581 API tests (1,577 passed, four intentional live
+  skips).
+
 ### 2026-07-29 - R4.3 verified generated-app Compose runtime
 
 - Replaced inherited compose guidance that started the full PacketAgent server

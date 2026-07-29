@@ -52,6 +52,9 @@ test("generated app publish package contains a single hardened standalone servic
       "runtime/server.mjs",
       "runtime/runtime-model.json",
       "RUNBOOK.md",
+      "deploy/Caddyfile.example",
+      "deploy/nginx.generated-app.conf.example",
+      "deploy/TAILSCALE.md",
     ],
   );
   assert.match(compose, /^services:\n  generated-app:/);
@@ -61,10 +64,20 @@ test("generated app publish package contains a single hardened standalone servic
   assert.match(compose, /cap_drop:\n      - ALL/);
   assert.match(compose, /no-new-privileges:true/);
   assert.match(compose, /generated-app-data:\/app\/data/);
+  assert.match(
+    compose,
+    /\$\{PACKETAGENT_GENERATED_APP_BIND_ADDRESS:-127\.0\.0\.1\}:\$\{PACKETAGENT_GENERATED_APP_PORT:-8787\}:8080/,
+  );
   assert.match(byPath.get("Dockerfile.publish") ?? "", /RUN --network=none/);
   assert.match(byPath.get("Dockerfile.publish") ?? "", /USER node/);
   assert.match(byPath.get("runtime/server.mjs") ?? "", /node:sqlite/);
   assert.match(byPath.get("RUNBOOK.md") ?? "", /schema-signature change currently clears/);
+  assert.match(byPath.get("deploy/Caddyfile.example") ?? "", /reverse_proxy 127\.0\.0\.1/);
+  assert.match(
+    byPath.get("deploy/nginx.generated-app.conf.example") ?? "",
+    /proxy_set_header X-Forwarded-For/,
+  );
+  assert.match(byPath.get("deploy/TAILSCALE.md") ?? "", /tailscale serve --bg/);
   assert.deepEqual(JSON.parse(byPath.get("runtime/runtime-model.json") ?? "{}"), model);
 });
 

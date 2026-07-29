@@ -309,7 +309,13 @@ export function buildAppPublishReadiness(
     agentSlug,
   );
   const healthChecks = buildHealthChecks(privateUrl);
-  const smokeChecks = buildSmokeChecks(privateUrl, publicUrl, bundleKind, agentSlug);
+  const smokeChecks = buildSmokeChecks(
+    privateUrl,
+    publicUrl,
+    localPublishPath,
+    bundleKind,
+    agentSlug,
+  );
   const dockerComposeExport = buildDockerComposeExport(
     workspaceSlug,
     draftSlug,
@@ -534,6 +540,24 @@ function buildArtifactManifest(
         required: true,
         description: "Local start, health, persistence, stop, and migration instructions.",
       },
+      {
+        path: `${localPublishPath}/deploy/Caddyfile.example`,
+        kind: "config",
+        required: true,
+        description: "Caddy automatic-HTTPS reverse-proxy example.",
+      },
+      {
+        path: `${localPublishPath}/deploy/nginx.generated-app.conf.example`,
+        kind: "config",
+        required: true,
+        description: "nginx TLS reverse-proxy example.",
+      },
+      {
+        path: `${localPublishPath}/deploy/TAILSCALE.md`,
+        kind: "config",
+        required: true,
+        description: "Private Tailscale Serve and optional public Funnel guidance.",
+      },
     ],
   };
 }
@@ -568,6 +592,7 @@ function buildHealthChecks(privateUrl: string): AppPublishGeneratedCheck[] {
 function buildSmokeChecks(
   privateUrl: string,
   publicUrl: string,
+  localPublishPath: string,
   bundleKind: AppPublishBundleKind,
   agentSlug: string | null,
 ): AppPublishGeneratedCheck[] {
@@ -590,9 +615,11 @@ function buildSmokeChecks(
       kind: "smoke",
       label: "Public URL preflight",
       path: "/",
-      command: `curl -fsS ${publicUrl}`,
+      command: `npm run verify:generated-app-reachability -- ${localPublishPath} ${publicUrl}`,
       expectedStatus: 200,
-      expected: ["The public URL resolves after publish when visibility is public."],
+      expected: [
+        "The public URL passes DNS, TLS, health identity, and app-root verification after routing is configured.",
+      ],
       failureAction: "Keep the URL private and verify DNS or reverse-proxy routing before sharing.",
     },
     ...(includesAgent(bundleKind)
@@ -627,7 +654,9 @@ function buildDockerComposeExport(
         name: "generated-app",
         imageHint: "packetagent-generated-app:local",
         buildContext: ".",
-        ports: ["${PACKETAGENT_GENERATED_APP_PORT:-8787}:8080"],
+        ports: [
+          "${PACKETAGENT_GENERATED_APP_BIND_ADDRESS:-127.0.0.1}:${PACKETAGENT_GENERATED_APP_PORT:-8787}:8080",
+        ],
         environment: {
           NODE_ENV: "production",
           PORT: "8080",

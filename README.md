@@ -287,6 +287,21 @@ For ordinary use, follow the generated `RUNBOOK.md`; the default app URL is
 `http://localhost:8787`, configurable with
 `PACKETAGENT_GENERATED_APP_PORT`.
 
+The host port binds to `127.0.0.1` by default. Each sealed package includes
+`deploy/Caddyfile.example`, `deploy/nginx.generated-app.conf.example`, and
+`deploy/TAILSCALE.md` for automatic-HTTPS reverse proxying, explicit nginx TLS,
+or private tailnet access. PacketAgent does not provision DNS, certificates,
+or VPN policy. After configuring the final origin, prove that it reaches the
+exact app and checkpoint:
+
+```bash
+npm run verify:generated-app-reachability -- data/published-apps/<workspace>/<app> https://app.example.com
+```
+
+The verifier requires HTTPS away from loopback, bounds DNS/TCP/TLS/HTTP work,
+validates the certificate, refuses redirects, and requires health identity plus
+an HTML app root.
+
 ## Configuration
 
 Common environment variables:
@@ -308,6 +323,8 @@ Common environment variables:
 | `PACKETAGENT_SANDBOX_CPUS`                        | `1`                       | Container CPU limit.                                                                                                                                                                                  |
 | `PACKETAGENT_SANDBOX_SMOKE_ENABLED`               | `0`                       | Route builder smoke checks through the sandbox. Also gates the file-tree validator's `tsc --noEmit` and `vite build` phases.                                                                          |
 | `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` | `4`                       | Maximum warm generated-app child processes per PacketAgent server. Values are clamped to `1-64`; an idle least-recently-used process is evicted at the limit.                                         |
+| `PACKETAGENT_GENERATED_APP_BIND_ADDRESS`          | `127.0.0.1`               | Host address used by a generated publish package's Compose port mapping. Set `0.0.0.0` only for deliberate, protected direct LAN exposure.                                                            |
+| `PACKETAGENT_GENERATED_APP_PORT`                  | `8787`                    | Host port used by a generated publish package. The container always listens on `8080`.                                                                                                                |
 | `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY`        | _unset_                   | Optional HMAC-SHA256 key for generated-app manifest authenticity; must be at least 32 bytes. Per-file and canonical-manifest SHA-256 verification is always enabled.                                  |
 | `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID`     | `packetagent-local`       | Non-secret label recorded with an optional publish-manifest signature.                                                                                                                                |
 | `PACKETAGENT_ARTIFACT_SERVING_ENABLED`            | `false`                   | Opt in to artifact-file serving. Reads still require an authenticated viewer in the workspace that owns the exact run ID in the URL.                                                                  |

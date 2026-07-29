@@ -122,11 +122,59 @@ passes typecheck, zero-warning lint, formatting, production web build, 32 web
 tests, and 1,577 API tests (1,573 passed with four intentional live
 interoperability skips).
 
-## R4.4 handoff
+## R4.4 proxy, VPN, and reachability contract
 
-The standalone service deliberately exposes a host port on Compose's default
-bridge network. R4.4 must add tested reverse-proxy and private-VPN examples,
-define trusted-forwarded-header/TLS behavior without weakening direct local
-use, and add a bounded reachability command that distinguishes DNS, TCP/TLS,
-HTTP health, identity mismatch, and unexpected redirects. Do not claim that
-public DNS or TLS is provisioned by PacketAgent.
+R4.4 is complete. Compose now binds to `127.0.0.1` by default; operators must
+explicitly set `PACKETAGENT_GENERATED_APP_BIND_ADDRESS=0.0.0.0` for direct LAN
+exposure. Every sealed package contains:
+
+- a Caddy automatic-HTTPS reverse-proxy example with active readiness checks;
+- an nginx TLS example with explicit Host and X-Forwarded headers; and
+- current Tailscale Serve instructions for private tailnet HTTPS plus a
+  separately labeled public Funnel option.
+
+The examples follow current primary documentation:
+
+- [Docker Compose services](https://docs.docker.com/reference/compose-file/services/)
+  warns that omitting a host IP binds all interfaces and can bypass firewall
+  rules.
+- [Caddy reverse_proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
+  documents upstream health checks and its default X-Forwarded header behavior;
+  [Caddy global options](https://caddyserver.com/docs/caddyfile/options)
+  documents automatic certificate management and HTTP-to-HTTPS redirects.
+- [nginx proxy module](https://nginx.org/en/docs/http/ngx_http_proxy_module.html)
+  documents `proxy_set_header` and `$proxy_add_x_forwarded_for`.
+- [Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve)
+  is tailnet-private, while
+  [Tailscale Funnel](https://tailscale.com/docs/reference/tailscale-cli/funnel)
+  is public and has separate approval/policy implications.
+
+`npm run verify:generated-app-reachability -- <publish-directory> <origin>`
+requires an origin root without credentials/query/fragment and requires HTTPS
+outside loopback. It performs bounded DNS resolution and TCP or
+certificate-validating TLS connection checks; fetches liveness, readiness, and
+the app root with redirects disabled and a 64 KiB response cap; requires JSON
+and HTML content types; and binds readiness to the package's exact app and
+checkpoint. Failures distinguish invalid/insecure URL, DNS, TCP, TLS,
+unexpected redirect, HTTP status, response size/shape, and identity
+substitution. The Docker certification path invokes the same contract against
+the loopback package.
+
+The standalone runtime does not use forwarded headers for access decisions,
+identity, or URL generation. The examples send conventional headers for proxy
+observability, but no `trust proxy` mode is needed or exposed. TLS terminates at
+the operator-managed proxy/VPN. PacketAgent neither provisions nor claims DNS,
+certificates, VPN policy, or continuous availability.
+
+The closure gate passes typecheck, zero-warning lint, formatting, production
+web build, 32 web tests, 18 focused package/reachability/readiness/history
+checks, a real 15-step Docker certification with complete cleanup, and 1,581
+API tests (1,577 passed with four intentional live interoperability skips).
+
+## R4.5 handoff
+
+Reconcile every remaining generated-app persistence and migration claim with
+the actual schema-signature reset/reseed behavior. Add characterization and
+data-volume backup/restore evidence where useful, decide whether this gate
+ships only honest destructive-change warnings or a bounded additive migration,
+and then run the full R4 closure gate.

@@ -1101,7 +1101,10 @@ Status: active.
    Compose run path with one standalone generated-app service, emitted Vite
    manifest validation, bounded health/CRUD/restart-persistence probes, and
    complete verification cleanup.
-4. Add reverse-proxy/VPN examples and a public-URL reachability check.
+4. [Complete 2026-07-29] Add loopback-by-default networking, sealed
+   Caddy/nginx/Tailscale reverse-proxy and VPN examples, and a bounded
+   certificate-validating, redirect-denying public-URL reachability check bound
+   to exact app/checkpoint identity.
 5. Preserve schema/data migration truth; do not imply automatic migration when
    a schema reset is still the behavior.
 

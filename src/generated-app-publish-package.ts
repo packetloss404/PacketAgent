@@ -7,6 +7,9 @@ export const GENERATED_APP_PUBLISH_DOCKERFILE = "Dockerfile.publish";
 export const GENERATED_APP_PUBLISH_SERVER_FILE = "runtime/server.mjs";
 export const GENERATED_APP_PUBLISH_MODEL_FILE = "runtime/runtime-model.json";
 export const GENERATED_APP_PUBLISH_RUNBOOK_FILE = "RUNBOOK.md";
+export const GENERATED_APP_PUBLISH_CADDY_EXAMPLE_FILE = "deploy/Caddyfile.example";
+export const GENERATED_APP_PUBLISH_NGINX_EXAMPLE_FILE = "deploy/nginx.generated-app.conf.example";
+export const GENERATED_APP_PUBLISH_TAILSCALE_GUIDE_FILE = "deploy/TAILSCALE.md";
 
 export interface GeneratedAppPublishPackageInput {
   workspaceId: string;
@@ -62,6 +65,27 @@ export function buildGeneratedAppPublishPackageFiles(
       description: "Bounded local start, probe, stop, persistence, and migration runbook.",
       mediaType: "text/markdown; charset=utf-8",
     },
+    {
+      path: GENERATED_APP_PUBLISH_CADDY_EXAMPLE_FILE,
+      content: caddyExampleContent(),
+      kind: "config",
+      description: "Caddy automatic-HTTPS reverse-proxy example.",
+      mediaType: "text/plain; charset=utf-8",
+    },
+    {
+      path: GENERATED_APP_PUBLISH_NGINX_EXAMPLE_FILE,
+      content: nginxExampleContent(),
+      kind: "config",
+      description: "nginx TLS reverse-proxy example.",
+      mediaType: "text/plain; charset=utf-8",
+    },
+    {
+      path: GENERATED_APP_PUBLISH_TAILSCALE_GUIDE_FILE,
+      content: tailscaleGuideContent(),
+      kind: "config",
+      description: "Private Tailscale Serve and optional public Funnel instructions.",
+      mediaType: "text/markdown; charset=utf-8",
+    },
   ];
 }
 
@@ -75,7 +99,7 @@ export function generatedAppDockerComposeYaml(): string {
       NODE_ENV: production
       PORT: "8080"
     ports:
-      - "\${PACKETAGENT_GENERATED_APP_PORT:-8787}:8080"
+      - "\${PACKETAGENT_GENERATED_APP_BIND_ADDRESS:-127.0.0.1}:\${PACKETAGENT_GENERATED_APP_PORT:-8787}:8080"
     volumes:
       - generated-app-data:/app/data
     read_only: true
@@ -180,7 +204,29 @@ curl -fsS http://127.0.0.1:8787/
 \`\`\`
 
 Set \`PACKETAGENT_GENERATED_APP_PORT\` before \`up\` to choose another loopback
-host port. The container listens on port 8080.
+host port. The container listens on port 8080. Compose binds the host port to
+\`127.0.0.1\` by default so a firewall cannot be accidentally bypassed. Set
+\`PACKETAGENT_GENERATED_APP_BIND_ADDRESS=0.0.0.0\` only when direct LAN exposure
+is deliberate and protected.
+
+## Reverse proxy, VPN, and reachability
+
+- \`deploy/Caddyfile.example\` terminates public TLS with Caddy.
+- \`deploy/nginx.generated-app.conf.example\` shows an nginx TLS proxy with
+  explicit certificate placeholders.
+- \`deploy/TAILSCALE.md\` keeps the app private to a tailnet with Tailscale
+  Serve and separately explains the public Funnel option.
+
+After DNS/TLS or VPN routing is configured, verify the exact app and checkpoint
+from the PacketAgent repository:
+
+\`\`\`bash
+npm run verify:generated-app-reachability -- <publish-directory> https://app.example.com
+\`\`\`
+
+Use the final HTTPS origin. The verifier refuses redirects, insecure non-local
+HTTP, wrong app/checkpoint identity, non-HTML roots, and bounded DNS, TCP/TLS,
+or HTTP failures. PacketAgent does not create DNS records or certificates.
 
 ## Stop
 
@@ -212,4 +258,90 @@ Add \`--volumes\` only when you intentionally want to erase that local data.
 
 function jsonContent(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function caddyExampleContent(): string {
+  return `# Set PACKETAGENT_GENERATED_APP_HOSTNAME to a DNS name that resolves
+# to this host. Caddy obtains and renews public certificates when the host is
+# reachable on ports 80 and 443.
+{$PACKETAGENT_GENERATED_APP_HOSTNAME} {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:{$PACKETAGENT_GENERATED_APP_PORT:8787} {
+    health_uri /health/ready
+    health_interval 30s
+    health_timeout 5s
+  }
+}
+`;
+}
+
+function nginxExampleContent(): string {
+  return `# Replace app.example.com and both certificate paths. Keep the
+# generated-app Compose port bound to 127.0.0.1.
+server {
+  listen 80;
+  listen [::]:80;
+  server_name app.example.com;
+  return 308 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  server_name app.example.com;
+
+  ssl_certificate /etc/letsencrypt/live/app.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/app.example.com/privkey.pem;
+
+  location / {
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://127.0.0.1:8787;
+    proxy_redirect off;
+  }
+}
+`;
+}
+
+function tailscaleGuideContent(): string {
+  return `# Tailscale access
+
+The generated app binds to \`127.0.0.1:8787\` by default. Keep that loopback
+binding and let Tailscale terminate HTTPS.
+
+## Private tailnet access
+
+\`\`\`bash
+tailscale serve --bg http://127.0.0.1:8787
+tailscale serve status
+\`\`\`
+
+Tailscale prints the private \`https://<device>.<tailnet>.ts.net\` origin.
+Verify that final origin with \`verify:generated-app-reachability\`. Remove the
+Serve configuration with:
+
+\`\`\`bash
+tailscale serve reset
+\`\`\`
+
+## Optional public Funnel
+
+Funnel is public internet exposure, not private VPN access. It requires
+tailnet-policy approval and supported Tailscale configuration:
+
+\`\`\`bash
+tailscale funnel --bg http://127.0.0.1:8787
+tailscale funnel status
+\`\`\`
+
+Review the printed public HTTPS origin and run the same reachability verifier.
+Disable it with \`tailscale funnel reset\`. PacketAgent does not enable Serve
+or Funnel automatically.
+
+Current command reference:
+https://tailscale.com/docs/reference/tailscale-cli/serve
+`;
 }

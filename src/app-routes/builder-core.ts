@@ -2790,6 +2790,30 @@ function publishArtifactObservations(
         "Standalone generated-app operator runbook.",
       ),
     },
+    {
+      ...diskArtifactObservation(
+        `${localPublishPath}/deploy/Caddyfile.example`,
+        "config",
+        "publish_manifest",
+        "Caddy automatic-HTTPS reverse-proxy example.",
+      ),
+    },
+    {
+      ...diskArtifactObservation(
+        `${localPublishPath}/deploy/nginx.generated-app.conf.example`,
+        "config",
+        "publish_manifest",
+        "nginx TLS reverse-proxy example.",
+      ),
+    },
+    {
+      ...diskArtifactObservation(
+        `${localPublishPath}/deploy/TAILSCALE.md`,
+        "config",
+        "publish_manifest",
+        "Tailscale private VPN and optional public Funnel guidance.",
+      ),
+    },
     ...snapshotPaths.map((path) => ({
       path,
       kind: "generated_bundle" as const,
