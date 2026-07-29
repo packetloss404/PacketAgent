@@ -13,6 +13,7 @@ const STATUS_FILTERS: Array<"all" | SandboxExecStatus> = [
   "timeout",
   "canceled",
 ];
+const EMPTY_EXECS: SandboxExecRecord[] = [];
 
 function statusPillClass(status: SandboxExecStatus): string {
   switch (status) {
@@ -66,15 +67,11 @@ export function SandboxView() {
   const [command, setCommand] = useState("");
   const [runtime, setRuntime] = useState<string>("");
   const [workingDir, setWorkingDir] = useState("/workspace");
+  const [currentTime] = useState(Date.now);
 
-  useEffect(() => {
-    if (!runtime && runtimes.data && runtimes.data.length > 0) {
-      const ready = runtimes.data.find((r) => r.ready) ?? runtimes.data[0]!;
-      setRuntime(ready.id);
-    }
-  }, [runtimes.data, runtime]);
-
-  const list = execs.data ?? [];
+  const defaultRuntime = runtimes.data?.find((candidate) => candidate.ready) ?? runtimes.data?.[0];
+  const selectedRuntime = runtime || defaultRuntime?.id || "";
+  const list = execs.data ?? EMPTY_EXECS;
   const filtered = filter === "all" ? list : list.filter((e) => e.status === filter);
 
   const selectedExec = useMemo(
@@ -84,9 +81,9 @@ export function SandboxView() {
 
   // Stats (24h window)
   const last24h = useMemo(() => {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const cutoff = currentTime - 24 * 60 * 60 * 1000;
     return list.filter((e) => new Date(e.createdAt).getTime() >= cutoff);
-  }, [list]);
+  }, [currentTime, list]);
   const running = list.filter((e) => e.status === "running" || e.status === "queued").length;
   const failed24h = last24h.filter((e) => e.status === "failed" || e.status === "timeout").length;
   const durations = last24h
@@ -102,7 +99,7 @@ export function SandboxView() {
     try {
       const exec = await api.startSandboxExec({
         command: command.trim(),
-        runtime: runtime || undefined,
+        runtime: selectedRuntime || undefined,
         workingDir: workingDir || undefined,
       });
       setCommand("");
@@ -167,7 +164,7 @@ export function SandboxView() {
       <Composer
         command={command}
         setCommand={setCommand}
-        runtime={runtime}
+        runtime={selectedRuntime}
         setRuntime={setRuntime}
         workingDir={workingDir}
         setWorkingDir={setWorkingDir}
@@ -229,6 +226,7 @@ export function SandboxView() {
       {selectedExec && (
         <div style={{ marginTop: 18 }}>
           <SelectedExecPanel
+            key={selectedExec.id}
             exec={selectedExec}
             onCancel={() => {
               void cancelSelected();
@@ -590,14 +588,6 @@ export function SelectedExecPanel({
   const [streamErr, setStreamErr] = useState<string | null>(null);
   const stdoutRef = useRef<HTMLPreElement | null>(null);
   const stderrRef = useRef<HTMLPreElement | null>(null);
-
-  // Reset state when switching to a different exec
-  useEffect(() => {
-    setStdout(exec.stdoutPreview ?? "");
-    setStderr(exec.stderrPreview ?? "");
-    setLiveExec(exec);
-    setStreamErr(null);
-  }, [exec.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stream while exec is live
   useEffect(() => {

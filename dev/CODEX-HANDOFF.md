@@ -529,7 +529,7 @@ handoff, the roadmap, or the backlog.
 ## Last verified gates
 
 - `npm run typecheck` - passed
-- `npm run lint` - passed with 0 errors and 24 frontend-only inherited
+- `npm run lint` - passed with 0 errors and 11 frontend-only inherited
   warnings; backend warnings are closed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
 - `npm run test:api` - 1,521 passed, 4 intentionally skipped live probes, 0
@@ -634,10 +634,10 @@ handoff, the roadmap, or the backlog.
 
 Known inherited quality debt:
 
-- repo-wide `npm run format:check` flags 274 inherited files;
+- repo-wide `npm run format:check` flags 272 inherited files;
 - full and production dependency audits each report two high package entries
   for the same accepted, unreachable React Router RSC advisory; and
-- ESLint reports zero errors and 24 frontend-only inherited warnings; backend
+- ESLint reports zero errors and 11 frontend-only inherited warnings; backend
   warnings are closed.
 
 Do not use `npm audit fix --force` or format the entire repository as an

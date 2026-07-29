@@ -46,6 +46,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Split command-palette, active-view, Builder starter/tour state, and preview
   copy from component-only modules; palette-open now remounts fresh local state
   instead of synchronously resetting it from effects.
+- Replaced public-share, sandbox runtime/output, and reporting-window state
+  resets with request-identity derivation, keyed execution panels, stable empty
+  collections, and one render epoch for time-window summaries.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

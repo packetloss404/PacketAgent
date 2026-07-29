@@ -7,24 +7,34 @@ import { brand } from "@/config/brand";
 
 export default function PublicSharePage() {
   const { token } = useParams();
-  const [shared, setShared] = useState<PublicSharePayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState<{
+    token: string;
+    shared?: PublicSharePayload;
+    error?: string;
+  } | null>(null);
 
   useEffect(() => {
-    if (!token) {
-      setError("Share token is missing.");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
+    if (!token) return;
+    let mounted = true;
     api
       .getPublicShare(token)
-      .then(setShared)
-      .catch((shareError) => setError((shareError as Error).message))
-      .finally(() => setLoading(false));
+      .then((shared) => {
+        if (mounted) setResult({ token, shared });
+      })
+      .catch((shareError) => {
+        if (mounted) {
+          setResult({ token, error: (shareError as Error).message });
+        }
+      });
+    return () => {
+      mounted = false;
+    };
   }, [token]);
+
+  const currentResult = result?.token === token ? result : null;
+  const loading = Boolean(token) && currentResult === null;
+  const error = token ? currentResult?.error : "Share token is missing.";
+  const shared = currentResult?.shared;
 
   return (
     <div className="wb-root wb-root wb-root" style={{ height: "100vh", overflow: "auto" }}>

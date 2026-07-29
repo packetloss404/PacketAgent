@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { I } from "../icons";
 import { Topbar, Stat, PanelHeader } from "../Shell";
@@ -16,12 +17,13 @@ export function DashboardView() {
   const runs = useApiData(() => api.listAgentRuns(), []);
   const usage = useApiData(() => api.getUsageSummary(), []);
   const activity = useApiData(() => api.listActivity(), []);
+  const [currentTime] = useState(Date.now);
 
   const activeAgents = (agents.data ?? []).filter((a) => a.status === "active").length;
   const totalAgents = (agents.data ?? []).length;
   const runs24h = (runs.data ?? []).filter((r) => {
     if (!r.startedAt) return false;
-    return Date.now() - new Date(r.startedAt).getTime() < 24 * 60 * 60 * 1000;
+    return currentTime - new Date(r.startedAt).getTime() < 24 * 60 * 60 * 1000;
   });
   const successRuns = runs24h.filter((r) => r.status === "success").length;
   const failedRuns = runs24h.filter((r) => r.status === "failed").length;

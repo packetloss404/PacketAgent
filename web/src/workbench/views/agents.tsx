@@ -6,6 +6,9 @@ import { useApiData } from "../useApiData";
 import { api } from "@/lib/api";
 import type { AgentRecord, GeneratedAppSummary } from "@/lib/types";
 
+const EMPTY_AGENTS: AgentRecord[] = [];
+const EMPTY_APPS: GeneratedAppSummary[] = [];
+
 export function AgentsView() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<"projects" | "templates">("projects");
@@ -62,9 +65,10 @@ function ProjectsCatalog({ onOpenAgent }: { onOpenAgent: (a: AgentRecord) => voi
   const agents = useApiData(() => api.listAgents(), []);
   const apps = useApiData(() => api.listGeneratedApps(), []);
   const runs = useApiData(() => api.listAgentRuns(), []);
+  const [currentTime] = useState(Date.now);
 
-  const agentList = agents.data ?? [];
-  const appList = apps.data ?? [];
+  const agentList = agents.data ?? EMPTY_AGENTS;
+  const appList = apps.data ?? EMPTY_APPS;
   const q = query.trim().toLowerCase();
   const filteredApps = useMemo(
     () =>
@@ -92,7 +96,7 @@ function ProjectsCatalog({ onOpenAgent }: { onOpenAgent: (a: AgentRecord) => voi
   const runs7dByAgent: Record<string, { total: number; success: number }> = {};
   for (const r of runs.data ?? []) {
     if (!r.agentId || !r.startedAt) continue;
-    if (Date.now() - new Date(r.startedAt).getTime() > 7 * 24 * 60 * 60 * 1000) continue;
+    if (currentTime - new Date(r.startedAt).getTime() > 7 * 24 * 60 * 60 * 1000) continue;
     const cur = runs7dByAgent[r.agentId] ?? { total: 0, success: 0 };
     cur.total += 1;
     if (r.status === "success") cur.success += 1;
