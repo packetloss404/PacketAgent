@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { I, type IconKey } from "../icons";
 import { Topbar } from "../Shell";
@@ -110,8 +110,15 @@ const ADVANCED_GROUPS: Array<{ title: string; note: string; entries: AdvancedEnt
 
 export function SettingsView() {
   const [tab, setTab] = useState<Tab>("members");
-  const role = useWorkbench().session.workspace.role;
+  const workspace = useWorkbench().session.workspace;
+  const role = workspace.role;
   const canManageWorkspace = canManageWorkspaceRole(role);
+  const workspaceFormKey = [
+    workspace.id,
+    workspace.name,
+    workspace.website,
+    workspace.automationGoal,
+  ].join("\u0000");
   const members = useApiData(() => api.listWorkspaceMembers(), []);
   const apiKeys = useApiData(() => api.listApiKeys(), []);
   const shares = useApiData(() => api.listShareTokens(), []);
@@ -186,7 +193,7 @@ export function SettingsView() {
             canManageWorkspace={canManageWorkspace}
           />
         )}
-        {tab === "workspace" && <WorkspaceTab />}
+        {tab === "workspace" && <WorkspaceTab key={workspaceFormKey} />}
         {tab === "audit" && <AuditTab data={activity.data} loading={activity.loading} />}
         {tab === "advanced" && <AdvancedTab canManageWorkspace={canManageWorkspace} />}
       </div>
@@ -613,16 +620,6 @@ function WorkspaceTab() {
     name !== savedWorkspace.name ||
     website !== savedWorkspace.website ||
     goal !== savedWorkspace.automationGoal;
-
-  useEffect(() => {
-    const next = workspaceValues(ws);
-    setSavedWorkspace(next);
-    setName(next.name);
-    setWebsite(next.website);
-    setGoal(next.automationGoal);
-    setSavedAt(null);
-    setError(null);
-  }, [ws.id, ws.name, ws.website, ws.automationGoal]);
 
   const save = async () => {
     if (!canManageWorkspace || !dirty) return;

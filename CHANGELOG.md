@@ -49,6 +49,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Replaced public-share, sandbox runtime/output, and reporting-window state
   resets with request-identity derivation, keyed execution panels, stable empty
   collections, and one render epoch for time-window summaries.
+- Closed the inherited 145-warning ESLint baseline. The shared API loader now
+  suppresses stale responses, and Builder tours, agent generation, run detail,
+  iteration targets, and workspace forms reset by explicit identity or
+  scheduled effects instead of synchronous effect-driven state writes.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

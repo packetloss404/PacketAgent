@@ -3,10 +3,21 @@ import { useNavigate, useParams } from "react-router-dom";
 import { I } from "../icons";
 import { Topbar } from "../Shell";
 import { api } from "@/lib/api";
-import type { AgentRunDetailPayload, AgentRunLogEntry, AgentRunRecord, AgentRunTrace, AgentRunTraceSpan } from "@/lib/types";
+import type {
+  AgentRunDetailPayload,
+  AgentRunLogEntry,
+  AgentRunRecord,
+  AgentRunTrace,
+  AgentRunTraceSpan,
+} from "@/lib/types";
 import { triggerLabel, formatDuration } from "@/lib/agent-runtime";
 import { RunTranscript, ToolCallTimeline } from "./agent-editor";
-import { flattenTraceSpans, getTraceState, summarizeTrace, traceStatusTone } from "./run-trace-utils";
+import {
+  flattenTraceSpans,
+  getTraceState,
+  summarizeTrace,
+  traceStatusTone,
+} from "./run-trace-utils";
 
 type RunAction = "cancel" | "retry" | "diagnose";
 
@@ -17,6 +28,10 @@ interface LoadedRunDetail extends AgentRunDetailPayload {
 
 export function RunDeepView() {
   const { id = "" } = useParams();
+  return <RunDeepContent key={id} id={id} />;
+}
+
+function RunDeepContent({ id }: { id: string }) {
   const navigate = useNavigate();
   const [run, setRun] = useState<AgentRunRecord | null>(null);
   const [trace, setTrace] = useState<AgentRunTrace | null>(null);
@@ -30,14 +45,6 @@ export function RunDeepView() {
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    setLoadError(null);
-    setActionError(null);
-    setRun(null);
-    setTrace(null);
-    setAgentName("");
-    setLegacyFallback(false);
-    setDiagnostic(null);
     void (async () => {
       try {
         const detail = await loadAgentRunDetail(id);
@@ -52,7 +59,9 @@ export function RunDeepView() {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [id]);
 
   const traceSummary = useMemo(() => summarizeTrace(trace), [trace]);
@@ -106,18 +115,24 @@ export function RunDeepView() {
   if (loading) {
     return (
       <>
-        <Topbar crumbs={["__WS__", "Runs", id]}/>
-        <div className="muted" style={{ padding: 26 }}>Loading run...</div>
+        <Topbar crumbs={["__WS__", "Runs", id]} />
+        <div className="muted" style={{ padding: 26 }}>
+          Loading run...
+        </div>
       </>
     );
   }
   if (loadError || !run) {
     return (
       <>
-        <Topbar crumbs={["__WS__", "Runs", id]}/>
+        <Topbar crumbs={["__WS__", "Runs", id]} />
         <div style={{ padding: "26px 28px" }}>
-          <button className="btn btn-sm" onClick={() => navigate("/runs")}><I.arrow size={11} style={{ transform: "scaleX(-1)" }}/> All runs</button>
-          <div className="card" style={{ padding: 22, marginTop: 18, color: "var(--danger)" }}>{loadError ?? "Run not found."}</div>
+          <button className="btn btn-sm" onClick={() => navigate("/runs")}>
+            <I.arrow size={11} style={{ transform: "scaleX(-1)" }} /> All runs
+          </button>
+          <div className="card" style={{ padding: 22, marginTop: 18, color: "var(--danger)" }}>
+            {loadError ?? "Run not found."}
+          </div>
         </div>
       </>
     );
@@ -132,99 +147,217 @@ export function RunDeepView() {
         crumbs={["__WS__", "Runs", agentName || run.title]}
         actions={
           <>
-            <button className="top-btn" onClick={() => navigate("/runs")}><I.activity size={13}/> All runs</button>
+            <button className="top-btn" onClick={() => navigate("/runs")}>
+              <I.activity size={13} /> All runs
+            </button>
             {run.canCancel && (
-              <button className="top-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleCancel(); }}>
-                {actionBusy === "cancel" ? <span className="spin"><I.refresh size={13}/></span> : <I.pause size={13}/>} Cancel
+              <button
+                className="top-btn"
+                disabled={Boolean(actionBusy)}
+                onClick={() => {
+                  void handleCancel();
+                }}
+              >
+                {actionBusy === "cancel" ? (
+                  <span className="spin">
+                    <I.refresh size={13} />
+                  </span>
+                ) : (
+                  <I.pause size={13} />
+                )}{" "}
+                Cancel
               </button>
             )}
             {run.canRetry && (
-              <button className="top-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleRetry(); }}>
-                {actionBusy === "retry" ? <span className="spin"><I.refresh size={13}/></span> : <I.refresh size={13}/>} Retry
+              <button
+                className="top-btn"
+                disabled={Boolean(actionBusy)}
+                onClick={() => {
+                  void handleRetry();
+                }}
+              >
+                {actionBusy === "retry" ? (
+                  <span className="spin">
+                    <I.refresh size={13} />
+                  </span>
+                ) : (
+                  <I.refresh size={13} />
+                )}{" "}
+                Retry
               </button>
             )}
-            <button className="top-btn" disabled={Boolean(actionBusy)} onClick={() => { void handleDiagnose(); }}>
-              {actionBusy === "diagnose" ? <span className="spin"><I.refresh size={13}/></span> : <I.sparkle size={13}/>} Diagnose
+            <button
+              className="top-btn"
+              disabled={Boolean(actionBusy)}
+              onClick={() => {
+                void handleDiagnose();
+              }}
+            >
+              {actionBusy === "diagnose" ? (
+                <span className="spin">
+                  <I.refresh size={13} />
+                </span>
+              ) : (
+                <I.sparkle size={13} />
+              )}{" "}
+              Diagnose
             </button>
           </>
         }
       />
       <div style={{ padding: "26px 28px 60px", maxWidth: 1240 }}>
         <div className="kicker">RUN - {run.id}</div>
-        <h1 className="h1" style={{ fontSize: 28, marginTop: 4, marginBottom: 6 }}>{run.title}</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+        <h1 className="h1" style={{ fontSize: 28, marginTop: 4, marginBottom: 6 }}>
+          {run.title}
+        </h1>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 18,
+            flexWrap: "wrap",
+          }}
+        >
           <span className={`pill ${statusTone}`}>
-            <span className="dot"></span>{status}
+            <span className="dot"></span>
+            {status}
           </span>
-          {agentName && <span className="mono muted" style={{ fontSize: 11.5 }}>agent: {agentName}</span>}
-          <span className="mono muted" style={{ fontSize: 11.5 }}>{triggerLabel(run.triggerKind)}</span>
-          {run.modelUsed && <span className="mono muted" style={{ fontSize: 11.5 }}>{run.modelUsed}</span>}
-          {typeof run.costUsd === "number" && <span className="mono muted" style={{ fontSize: 11.5 }}>{formatMoney(run.costUsd)}</span>}
-          {formatRunDuration(run) !== "n/a" && <span className="mono muted" style={{ fontSize: 11.5 }}>{formatRunDuration(run)}</span>}
+          {agentName && (
+            <span className="mono muted" style={{ fontSize: 11.5 }}>
+              agent: {agentName}
+            </span>
+          )}
+          <span className="mono muted" style={{ fontSize: 11.5 }}>
+            {triggerLabel(run.triggerKind)}
+          </span>
+          {run.modelUsed && (
+            <span className="mono muted" style={{ fontSize: 11.5 }}>
+              {run.modelUsed}
+            </span>
+          )}
+          {typeof run.costUsd === "number" && (
+            <span className="mono muted" style={{ fontSize: 11.5 }}>
+              {formatMoney(run.costUsd)}
+            </span>
+          )}
+          {formatRunDuration(run) !== "n/a" && (
+            <span className="mono muted" style={{ fontSize: 11.5 }}>
+              {formatRunDuration(run)}
+            </span>
+          )}
           {legacyFallback && <span className="pill muted">legacy detail</span>}
         </div>
 
         {actionError && (
-          <Notice tone="danger" label="Action error">{actionError}</Notice>
+          <Notice tone="danger" label="Action error">
+            {actionError}
+          </Notice>
         )}
 
         {run.error && (
-          <Notice tone="danger" label="Run error">{run.error}</Notice>
+          <Notice tone="danger" label="Run error">
+            {run.error}
+          </Notice>
         )}
 
         {diagnostic && (
-          <Notice tone="good" label="Diagnostic">{diagnostic}</Notice>
+          <Notice tone="good" label="Diagnostic">
+            {diagnostic}
+          </Notice>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 16 }}>
-          <SummaryCard label="Status" value={status} detail={statusDetail(run)} tone={statusTone}/>
-          <SummaryCard label="Duration" value={formatRunDuration(run)} detail={formatDateRange(run.startedAt, run.completedAt)}/>
-          <SummaryCard label="Model" value={run.modelUsed ?? "n/a"} detail={triggerLabel(run.triggerKind)}/>
-          <SummaryCard label="Cost" value={typeof run.costUsd === "number" ? formatMoney(run.costUsd) : "n/a"} detail={traceSummary.costUsd !== null ? `trace ${formatMoney(traceSummary.costUsd)}` : undefined}/>
-          <SummaryCard label="Trace" value={String(traceSummary.spans)} detail={`${traceSummary.modelCalls} model, ${traceSummary.toolCalls} tool`}/>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 10,
+            marginBottom: 16,
+          }}
+        >
+          <SummaryCard label="Status" value={status} detail={statusDetail(run)} tone={statusTone} />
+          <SummaryCard
+            label="Duration"
+            value={formatRunDuration(run)}
+            detail={formatDateRange(run.startedAt, run.completedAt)}
+          />
+          <SummaryCard
+            label="Model"
+            value={run.modelUsed ?? "n/a"}
+            detail={triggerLabel(run.triggerKind)}
+          />
+          <SummaryCard
+            label="Cost"
+            value={typeof run.costUsd === "number" ? formatMoney(run.costUsd) : "n/a"}
+            detail={
+              traceSummary.costUsd !== null
+                ? `trace ${formatMoney(traceSummary.costUsd)}`
+                : undefined
+            }
+          />
+          <SummaryCard
+            label="Trace"
+            value={String(traceSummary.spans)}
+            detail={`${traceSummary.modelCalls} model, ${traceSummary.toolCalls} tool`}
+          />
         </div>
 
         <Section
           title="Trace spans"
-          meta={trace ? `${traceSummary.spans} span${traceSummary.spans === 1 ? "" : "s"}` : "legacy"}
+          meta={
+            trace ? `${traceSummary.spans} span${traceSummary.spans === 1 ? "" : "s"}` : "legacy"
+          }
         >
-          <TraceSpans trace={trace} run={run}/>
+          <TraceSpans trace={trace} run={run} />
         </Section>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: 16, marginTop: 16 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+            gap: 16,
+            marginTop: 16,
+          }}
+        >
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Section title="Inputs" meta={`${Object.keys(run.inputs ?? {}).length} field${Object.keys(run.inputs ?? {}).length === 1 ? "" : "s"}`}>
-              <InputsPanel inputs={run.inputs}/>
+            <Section
+              title="Inputs"
+              meta={`${Object.keys(run.inputs ?? {}).length} field${Object.keys(run.inputs ?? {}).length === 1 ? "" : "s"}`}
+            >
+              <InputsPanel inputs={run.inputs} />
             </Section>
 
             <Section title="Output" meta={run.output ? `${run.output.length} chars` : "empty"}>
               {run.output ? (
-                <CodeBlock value={run.output}/>
+                <CodeBlock value={run.output} />
               ) : (
                 <EmptyState>This run has no output payload.</EmptyState>
               )}
             </Section>
 
-            <Section title="Transcript" meta={`${run.transcript?.length ?? 0} step${run.transcript?.length === 1 ? "" : "s"}`}>
-              <RunTranscript steps={run.transcript}/>
+            <Section
+              title="Transcript"
+              meta={`${run.transcript?.length ?? 0} step${run.transcript?.length === 1 ? "" : "s"}`}
+            >
+              <RunTranscript steps={run.transcript} />
             </Section>
           </div>
 
           <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Section title="Tool calls" meta={`${run.toolCalls?.length ?? 0}`}>
               {run.toolCalls && run.toolCalls.length > 0 ? (
-                <ToolCallTimeline calls={run.toolCalls}/>
+                <ToolCallTimeline calls={run.toolCalls} />
               ) : (
                 <EmptyState>No tool calls were captured for this run.</EmptyState>
               )}
             </Section>
 
             <Section title="Logs" meta={`${run.logs?.length ?? 0}`}>
-              <RunLogs logs={run.logs}/>
+              <RunLogs logs={run.logs} />
             </Section>
 
             <Section title="Metadata">
-              <MetadataPanel run={run} trace={trace}/>
+              <MetadataPanel run={run} trace={trace} />
             </Section>
           </aside>
         </div>
@@ -256,12 +389,39 @@ async function loadAgentRunDetail(runId: string): Promise<LoadedRunDetail> {
   }
 }
 
-function SummaryCard({ label, value, detail, tone = "muted" }: { label: string; value: string; detail?: string; tone?: "good" | "warn" | "danger" | "info" | "muted" }) {
+function SummaryCard({
+  label,
+  value,
+  detail,
+  tone = "muted",
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  tone?: "good" | "warn" | "danger" | "info" | "muted";
+}) {
   return (
     <div className="card" style={{ padding: 14, minWidth: 0 }}>
       <div className="kicker">{label}</div>
-      <div style={{ fontSize: 21, fontWeight: 500, marginTop: 5, color: toneColor(tone), wordBreak: "break-word" }}>{value}</div>
-      {detail && <div className="mono muted" style={{ fontSize: 10.5, marginTop: 2, wordBreak: "break-word" }}>{detail}</div>}
+      <div
+        style={{
+          fontSize: 21,
+          fontWeight: 500,
+          marginTop: 5,
+          color: toneColor(tone),
+          wordBreak: "break-word",
+        }}
+      >
+        {value}
+      </div>
+      {detail && (
+        <div
+          className="mono muted"
+          style={{ fontSize: 10.5, marginTop: 2, wordBreak: "break-word" }}
+        >
+          {detail}
+        </div>
+      )}
     </div>
   );
 }
@@ -271,21 +431,47 @@ function Section({ title, meta, children }: { title: string; meta?: string; chil
     <div className="card" style={{ padding: 18, minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
         <div className="kicker">{title}</div>
-        {meta && <div className="mono muted" style={{ fontSize: 10.5, marginLeft: "auto" }}>{meta}</div>}
+        {meta && (
+          <div className="mono muted" style={{ fontSize: 10.5, marginLeft: "auto" }}>
+            {meta}
+          </div>
+        )}
       </div>
       {children}
     </div>
   );
 }
 
-function Notice({ tone, label, children }: { tone: "good" | "danger"; label: string; children: ReactNode }) {
+function Notice({
+  tone,
+  label,
+  children,
+}: {
+  tone: "good" | "danger";
+  label: string;
+  children: ReactNode;
+}) {
   const color = tone === "good" ? "var(--green)" : "var(--danger)";
   const bg = tone === "good" ? "rgba(184,242,92,0.06)" : "rgba(242,107,92,0.06)";
   const border = tone === "good" ? "rgba(184,242,92,0.3)" : "rgba(242,107,92,0.3)";
   return (
-    <div className="card" style={{ padding: "12px 14px", marginBottom: 14, borderColor: border, background: bg }}>
-      <div className="kicker" style={{ marginBottom: 4, color }}>{label}</div>
-      <div style={{ fontSize: 12.5, color: "var(--silver-200)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{children}</div>
+    <div
+      className="card"
+      style={{ padding: "12px 14px", marginBottom: 14, borderColor: border, background: bg }}
+    >
+      <div className="kicker" style={{ marginBottom: 4, color }}>
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 12.5,
+          color: "var(--silver-200)",
+          lineHeight: 1.6,
+          whiteSpace: "pre-wrap",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -295,15 +481,14 @@ function TraceSpans({ trace, run }: { trace: AgentRunTrace | null; run: AgentRun
   if (state === "legacy") {
     return (
       <EmptyState>
-        This run does not include a trace envelope. Transcript, tool calls, and logs below are the available legacy record.
+        This run does not include a trace envelope. Transcript, tool calls, and logs below are the
+        available legacy record.
       </EmptyState>
     );
   }
   if (state === "empty") {
     return (
-      <EmptyState>
-        Trace metadata was returned, but no spans were captured for this run.
-      </EmptyState>
+      <EmptyState>Trace metadata was returned, but no spans were captured for this run.</EmptyState>
     );
   }
 
@@ -347,44 +532,125 @@ function TraceSpanRow({
   const relativeStart = relativeSpanStart(span.startedAt, runStartedAt);
   const width = durationMs ? Math.max(4, Math.min(100, (durationMs / totalDurationMs) * 100)) : 0;
   const kind = span.kind ?? span.type ?? "span";
-  const hasDetails = span.input !== undefined || span.output !== undefined || span.data || span.attributes || span.events?.length || span.error;
+  const hasDetails =
+    span.input !== undefined ||
+    span.output !== undefined ||
+    span.data ||
+    span.attributes ||
+    span.events?.length ||
+    span.error;
 
   return (
     <div style={{ padding: "10px 0", borderTop: first ? "none" : "1px solid var(--line)" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: 10, alignItems: "start" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) auto auto",
+          gap: 10,
+          alignItems: "start",
+        }}
+      >
         <div style={{ minWidth: 0, paddingLeft: Math.min(depth, 6) * 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, flexWrap: "wrap" }}>
-            <span className={`pill ${tone}`}><span className="dot"></span>{span.status ?? "unknown"}</span>
-            <span className="mono" style={{ color: "var(--silver-50)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, flexWrap: "wrap" }}
+          >
+            <span className={`pill ${tone}`}>
+              <span className="dot"></span>
+              {span.status ?? "unknown"}
+            </span>
+            <span
+              className="mono"
+              style={{
+                color: "var(--silver-50)",
+                fontSize: 12,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: "100%",
+              }}
+            >
               {spanTitle(span)}
             </span>
             <span className="pill muted">{kind}</span>
           </div>
-          {span.summary && <div className="muted" style={{ marginTop: 5, fontSize: 11.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{span.summary}</div>}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-            <div style={{ height: 5, flex: 1, minWidth: 80, background: "var(--ink)", border: "1px solid var(--line)", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${width}%`, background: tone === "danger" ? "var(--danger)" : tone === "warn" ? "var(--warn)" : tone === "good" ? "var(--green-deep)" : "var(--info)" }}/>
+          {span.summary && (
+            <div
+              className="muted"
+              style={{ marginTop: 5, fontSize: 11.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}
+            >
+              {span.summary}
             </div>
-            {relativeStart && <span className="mono muted" style={{ fontSize: 10.5 }}>{relativeStart}</span>}
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <div
+              style={{
+                height: 5,
+                flex: 1,
+                minWidth: 80,
+                background: "var(--ink)",
+                border: "1px solid var(--line)",
+                borderRadius: 4,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${width}%`,
+                  background:
+                    tone === "danger"
+                      ? "var(--danger)"
+                      : tone === "warn"
+                        ? "var(--warn)"
+                        : tone === "good"
+                          ? "var(--green-deep)"
+                          : "var(--info)",
+                }}
+              />
+            </div>
+            {relativeStart && (
+              <span className="mono muted" style={{ fontSize: 10.5 }}>
+                {relativeStart}
+              </span>
+            )}
           </div>
           {span.error && (
-            <div className="mono" style={{ marginTop: 6, fontSize: 11, color: "var(--danger)", whiteSpace: "pre-wrap" }}>{span.error}</div>
+            <div
+              className="mono"
+              style={{ marginTop: 6, fontSize: 11, color: "var(--danger)", whiteSpace: "pre-wrap" }}
+            >
+              {span.error}
+            </div>
           )}
           {hasDetails && (
             <details style={{ marginTop: 8 }}>
-              <summary className="mono muted" style={{ cursor: "pointer", fontSize: 10.5 }}>details</summary>
+              <summary className="mono muted" style={{ cursor: "pointer", fontSize: 10.5 }}>
+                details
+              </summary>
               <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
-                {span.input !== undefined && <TraceDetail label="Input" value={span.input}/>}
-                {span.output !== undefined && <TraceDetail label="Output" value={span.output}/>}
-                {span.data && <TraceDetail label="Data" value={span.data}/>}
-                {span.attributes && <TraceDetail label="Attributes" value={span.attributes}/>}
-                {span.events && span.events.length > 0 && <TraceDetail label="Events" value={span.events}/>}
+                {span.input !== undefined && <TraceDetail label="Input" value={span.input} />}
+                {span.output !== undefined && <TraceDetail label="Output" value={span.output} />}
+                {span.data && <TraceDetail label="Data" value={span.data} />}
+                {span.attributes && <TraceDetail label="Attributes" value={span.attributes} />}
+                {span.events && span.events.length > 0 && (
+                  <TraceDetail label="Events" value={span.events} />
+                )}
               </div>
             </details>
           )}
         </div>
-        <span className="mono muted" style={{ fontSize: 10.5, textAlign: "right", whiteSpace: "nowrap" }}>{formatMaybeDuration(durationMs)}</span>
-        <span className="mono muted" style={{ fontSize: 10.5, textAlign: "right", whiteSpace: "nowrap" }}>{spanCost(span)}</span>
+        <span
+          className="mono muted"
+          style={{ fontSize: 10.5, textAlign: "right", whiteSpace: "nowrap" }}
+        >
+          {formatMaybeDuration(durationMs)}
+        </span>
+        <span
+          className="mono muted"
+          style={{ fontSize: 10.5, textAlign: "right", whiteSpace: "nowrap" }}
+        >
+          {spanCost(span)}
+        </span>
       </div>
     </div>
   );
@@ -393,21 +659,38 @@ function TraceSpanRow({
 function TraceDetail({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
-      <div className="kicker" style={{ marginBottom: 4 }}>{label}</div>
-      <CodeBlock value={stringifyValue(value)}/>
+      <div className="kicker" style={{ marginBottom: 4 }}>
+        {label}
+      </div>
+      <CodeBlock value={stringifyValue(value)} />
     </div>
   );
 }
 
 function InputsPanel({ inputs }: { inputs: AgentRunRecord["inputs"] }) {
   const entries = Object.entries(inputs ?? {});
-  if (entries.length === 0) return <EmptyState>No input fields were recorded for this run.</EmptyState>;
+  if (entries.length === 0)
+    return <EmptyState>No input fields were recorded for this run.</EmptyState>;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(100px, auto) minmax(0, 1fr)", gap: "7px 12px", fontSize: 11.5 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(100px, auto) minmax(0, 1fr)",
+        gap: "7px 12px",
+        fontSize: 11.5,
+      }}
+    >
       {entries.map(([key, value]) => (
         <div key={key} style={{ display: "contents" }}>
-          <span className="mono muted" style={{ wordBreak: "break-word" }}>{key}</span>
-          <span className="mono" style={{ color: "var(--silver-200)", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>{renderInlineValue(value)}</span>
+          <span className="mono muted" style={{ wordBreak: "break-word" }}>
+            {key}
+          </span>
+          <span
+            className="mono"
+            style={{ color: "var(--silver-200)", wordBreak: "break-word", whiteSpace: "pre-wrap" }}
+          >
+            {renderInlineValue(value)}
+          </span>
         </div>
       ))}
     </div>
@@ -415,14 +698,47 @@ function InputsPanel({ inputs }: { inputs: AgentRunRecord["inputs"] }) {
 }
 
 function RunLogs({ logs }: { logs: AgentRunLogEntry[] | undefined }) {
-  if (!logs || logs.length === 0) return <EmptyState>No logs were captured for this run.</EmptyState>;
+  if (!logs || logs.length === 0)
+    return <EmptyState>No logs were captured for this run.</EmptyState>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {logs.map((entry, i) => (
-        <div key={`${entry.at}-${i}`} className="mono" style={{ fontSize: 11.5, display: "grid", gridTemplateColumns: "50px minmax(0, 1fr) auto", gap: 10, alignItems: "baseline" }}>
-          <span style={{ color: entry.level === "error" ? "var(--danger)" : entry.level === "warn" ? "var(--warn)" : "var(--silver-500)" }}>{entry.level.toUpperCase()}</span>
-          <span style={{ color: entry.level === "error" ? "var(--silver-100)" : "var(--silver-300)", minWidth: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{entry.message}</span>
-          <span className="muted" style={{ fontSize: 10.5, whiteSpace: "nowrap" }}>{formatTime(entry.at)}</span>
+        <div
+          key={`${entry.at}-${i}`}
+          className="mono"
+          style={{
+            fontSize: 11.5,
+            display: "grid",
+            gridTemplateColumns: "50px minmax(0, 1fr) auto",
+            gap: 10,
+            alignItems: "baseline",
+          }}
+        >
+          <span
+            style={{
+              color:
+                entry.level === "error"
+                  ? "var(--danger)"
+                  : entry.level === "warn"
+                    ? "var(--warn)"
+                    : "var(--silver-500)",
+            }}
+          >
+            {entry.level.toUpperCase()}
+          </span>
+          <span
+            style={{
+              color: entry.level === "error" ? "var(--silver-100)" : "var(--silver-300)",
+              minWidth: 0,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {entry.message}
+          </span>
+          <span className="muted" style={{ fontSize: 10.5, whiteSpace: "nowrap" }}>
+            {formatTime(entry.at)}
+          </span>
         </div>
       ))}
     </div>
@@ -445,11 +761,20 @@ function MetadataPanel({ run, trace }: { run: AgentRunRecord; trace: AgentRunTra
     ["Trace generated", formatDate(trace?.generatedAt)],
   ];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "110px minmax(0, 1fr)", gap: "8px 10px", fontSize: 12 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "110px minmax(0, 1fr)",
+        gap: "8px 10px",
+        fontSize: 12,
+      }}
+    >
       {rows.map(([label, value]) => (
         <div key={label} style={{ display: "contents" }}>
           <div className="muted">{label}</div>
-          <div className="mono" style={{ wordBreak: "break-word", color: "var(--silver-200)" }}>{value}</div>
+          <div className="mono" style={{ wordBreak: "break-word", color: "var(--silver-200)" }}>
+            {value}
+          </div>
         </div>
       ))}
     </div>
@@ -458,19 +783,46 @@ function MetadataPanel({ run, trace }: { run: AgentRunRecord; trace: AgentRunTra
 
 function CodeBlock({ value }: { value: string }) {
   return (
-    <pre className="mono" style={{ margin: 0, padding: 12, background: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 11.5, lineHeight: 1.6, color: "var(--silver-200)", whiteSpace: "pre-wrap", overflow: "auto", maxHeight: 420 }}>{value}</pre>
+    <pre
+      className="mono"
+      style={{
+        margin: 0,
+        padding: 12,
+        background: "var(--ink)",
+        border: "1px solid var(--line)",
+        borderRadius: 6,
+        fontSize: 11.5,
+        lineHeight: 1.6,
+        color: "var(--silver-200)",
+        whiteSpace: "pre-wrap",
+        overflow: "auto",
+        maxHeight: 420,
+      }}
+    >
+      {value}
+    </pre>
   );
 }
 
 function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="mono muted" style={{ fontSize: 11.5, padding: "10px 12px", border: "1px dashed var(--line-2)", borderRadius: 6 }}>
+    <div
+      className="mono muted"
+      style={{
+        fontSize: 11.5,
+        padding: "10px 12px",
+        border: "1px dashed var(--line-2)",
+        borderRadius: 6,
+      }}
+    >
       {children}
     </div>
   );
 }
 
-function runStatusTone(status: AgentRunRecord["status"]): "good" | "warn" | "danger" | "info" | "muted" {
+function runStatusTone(
+  status: AgentRunRecord["status"],
+): "good" | "warn" | "danger" | "info" | "muted" {
   switch (status) {
     case "success":
       return "good";
@@ -508,11 +860,13 @@ function statusDetail(run: AgentRunRecord): string {
 }
 
 function formatRunDuration(run: AgentRunRecord): string {
-  if (typeof run.durationMs === "number" && run.durationMs > 0) return formatDuration(run.durationMs);
+  if (typeof run.durationMs === "number" && run.durationMs > 0)
+    return formatDuration(run.durationMs);
   if (run.startedAt && run.completedAt) {
     const start = new Date(run.startedAt).getTime();
     const end = new Date(run.completedAt).getTime();
-    if (Number.isFinite(start) && Number.isFinite(end) && end >= start) return formatDuration(end - start);
+    if (Number.isFinite(start) && Number.isFinite(end) && end >= start)
+      return formatDuration(end - start);
   }
   return "n/a";
 }
@@ -545,7 +899,10 @@ function formatDateRange(start: string | undefined, end: string | undefined): st
   return start ? `started ${formatTime(start)}` : `completed ${formatTime(end!)}`;
 }
 
-function relativeSpanStart(startedAt: string | undefined, runStartedAt: number | null): string | null {
+function relativeSpanStart(
+  startedAt: string | undefined,
+  runStartedAt: number | null,
+): string | null {
   if (!startedAt || runStartedAt === null) return null;
   const spanStart = new Date(startedAt).getTime();
   if (!Number.isFinite(spanStart) || spanStart < runStartedAt) return null;
@@ -565,7 +922,8 @@ function spanCost(span: AgentRunTraceSpan): string {
 }
 
 function stringifyValue(value: unknown, max = 5000): string {
-  if (typeof value === "string") return value.length > max ? `${value.slice(0, max)}\n[truncated]` : value;
+  if (typeof value === "string")
+    return value.length > max ? `${value.slice(0, max)}\n[truncated]` : value;
   try {
     const s = JSON.stringify(value, null, 2);
     return s.length > max ? `${s.slice(0, max)}\n[truncated]` : s;

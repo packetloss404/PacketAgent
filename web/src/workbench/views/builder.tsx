@@ -105,12 +105,6 @@ export function BuilderView() {
     }
   }, [messages]);
 
-  useEffect(() => {
-    if (!iterationTargetOptions.some((target) => target.id === iterTargetId)) {
-      setIterTargetId(iterationTargetOptions[0]!.id);
-    }
-  }, [iterationTargetOptions, iterTargetId]);
-
   // Re-seed the appropriate composer when a FriendlyErrorCard fires its
   // "Try again" event. We restore the prompt text rather than auto-submit so
   // the user can edit before retrying (and so a stuck failure mode doesn't

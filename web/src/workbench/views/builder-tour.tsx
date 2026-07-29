@@ -166,16 +166,19 @@ export function BuilderTour(): ReactElement | null {
   // Preview tab.
   useEffect(() => {
     if (!active) return;
-    setStepIndex((prev) => {
-      for (let i = prev; i < visibleSteps.length; i++) {
-        const step = visibleSteps[i]!;
-        if (findAnchor(step.anchor)) return i;
-      }
-      // Nothing to point at right now — bail out gracefully without setting
-      // the seen flag, so the user gets another chance on a later visit.
-      setActive(false);
-      return prev;
+    const frame = window.requestAnimationFrame(() => {
+      setStepIndex((prev) => {
+        for (let i = prev; i < visibleSteps.length; i++) {
+          const step = visibleSteps[i]!;
+          if (findAnchor(step.anchor)) return i;
+        }
+        // Nothing to point at right now — bail out gracefully without setting
+        // the seen flag, so the user gets another chance on a later visit.
+        setActive(false);
+        return prev;
+      });
     });
+    return () => window.cancelAnimationFrame(frame);
   }, [active, visibleSteps]);
 
   // Recompute callout position when the step or window changes.
@@ -186,8 +189,8 @@ export function BuilderTour(): ReactElement | null {
     const anchor = findAnchor(step.anchor);
     if (!anchor) {
       // Anchor disappeared between renders — advance.
-      advance();
-      return;
+      const advanceFrame = window.requestAnimationFrame(advance);
+      return () => window.cancelAnimationFrame(advanceFrame);
     }
     const measure = () => {
       const rect = anchor.getBoundingClientRect();

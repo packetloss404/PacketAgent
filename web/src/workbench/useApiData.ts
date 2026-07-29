@@ -7,31 +7,47 @@ export interface ApiState<T> {
   refresh: () => Promise<void>;
 }
 
-export function useApiData<T>(fn: () => Promise<T>, deps: ReadonlyArray<unknown> = []): ApiState<T> {
+export function useApiData<T>(
+  fn: () => Promise<T>,
+  deps: ReadonlyArray<unknown> = [],
+): ApiState<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const fnRef = useRef(fn);
-  fnRef.current = fn;
+  const requestIdRef = useRef(0);
+  const dependencyKey = JSON.stringify(deps);
+
+  useEffect(() => {
+    fnRef.current = fn;
+  }, [fn]);
 
   const refresh = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const result = await fnRef.current();
+      if (requestId !== requestIdRef.current) return;
       setData(result);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       setError(err instanceof Error ? err.message : String(err));
       setData(null);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    const loadTimer = window.setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => {
+      window.clearTimeout(loadTimer);
+      requestIdRef.current += 1;
+    };
+  }, [dependencyKey, refresh]);
 
   return { data, loading, error, refresh };
 }
