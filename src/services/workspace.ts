@@ -9,14 +9,9 @@ import {
   upsertWorkspaceInvitation,
   upsertWorkspaceMembership,
   type JobRecord,
+  type OnboardingStepKey,
 } from "../packetagent-store";
-import {
-  generateId,
-  normalizeEmail,
-  now,
-  SESSION_TTL_MS,
-  slugify,
-} from "../auth-utils";
+import { generateId, normalizeEmail, now, SESSION_TTL_MS, slugify } from "../auth-utils";
 import {
   applyOnboardingStepToFacts,
   assertCanManageRole,
@@ -39,7 +34,8 @@ export async function updateWorkspace(
   context: AuthenticatedContext,
   input: { name: string; website: string; automationGoal: string },
 ) {
-  if (input.name.trim().length < 2) throw httpError(400, "workspace name must be at least 2 characters");
+  if (input.name.trim().length < 2)
+    throw httpError(400, "workspace name must be at least 2 characters");
   if (input.website.trim()) {
     try {
       const url = new URL(input.website.trim());
@@ -66,11 +62,25 @@ export async function updateWorkspace(
     }
     data.activationFacts[workspace.id] = facts;
 
-    recordActivity(data, makeActivity(workspace.id, "workspace", "workspace.updated", { type: "user", id: context.user.id, displayName: context.user.displayName }, { title: "Workspace settings updated" }, workspace.updatedAt));
+    recordActivity(
+      data,
+      makeActivity(
+        workspace.id,
+        "workspace",
+        "workspace.updated",
+        { type: "user", id: context.user.id, displayName: context.user.displayName },
+        { title: "Workspace settings updated" },
+        workspace.updatedAt,
+      ),
+    );
     return workspace;
   });
 
-  await syncWorkspaceActivation(context.workspace.id, true, { type: "user", id: context.user.id, displayName: context.user.displayName });
+  await syncWorkspaceActivation(context.workspace.id, true, {
+    type: "user",
+    id: context.user.id,
+    displayName: context.user.displayName,
+  });
   return result;
 }
 
@@ -88,7 +98,10 @@ export async function listWorkspaceMembers(context: AuthenticatedContext) {
   };
 }
 
-export async function createWorkspaceInvitation(context: AuthenticatedContext, input: { email: string; role: string }) {
+export async function createWorkspaceInvitation(
+  context: AuthenticatedContext,
+  input: { email: string; role: string },
+) {
   const email = normalizeEmail(input.email);
   const role = parseWorkspaceRole(input.role);
   if (!email.includes("@")) throw httpError(400, "valid email is required");
@@ -101,13 +114,16 @@ export async function createWorkspaceInvitation(context: AuthenticatedContext, i
     }
 
     const existingInvitation = data.workspaceInvitations.find((entry) => {
-      return entry.workspaceId === context.workspace.id
-        && normalizeEmail(entry.email) === email
-        && !entry.acceptedAt
-        && !entry.revokedAt
-        && new Date(entry.expiresAt).getTime() > Date.now();
+      return (
+        entry.workspaceId === context.workspace.id &&
+        normalizeEmail(entry.email) === email &&
+        !entry.acceptedAt &&
+        !entry.revokedAt &&
+        new Date(entry.expiresAt).getTime() > Date.now()
+      );
     });
-    if (existingInvitation) throw httpError(409, "an active invitation already exists for that email");
+    if (existingInvitation)
+      throw httpError(409, "an active invitation already exists for that email");
 
     const timestamp = now();
     const invitation = upsertWorkspaceInvitation(data, {
@@ -121,16 +137,33 @@ export async function createWorkspaceInvitation(context: AuthenticatedContext, i
       createdAt: timestamp,
     });
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "workspace.invitation_created", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Invitation created for ${email}`, email, role }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "workspace.invitation_created",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Invitation created for ${email}`, email, role },
+        timestamp,
+      ),
+    );
 
-    return { invitation: summarizeWorkspaceInvitation(invitation, { includeToken: true }), invitationRecord: { ...invitation } };
+    return {
+      invitation: summarizeWorkspaceInvitation(invitation, { includeToken: true }),
+      invitationRecord: { ...invitation },
+    };
   });
 
-  const emailDelivery = await recordWorkspaceInvitationEmailDelivery(context, result.invitationRecord, "create");
+  const emailDelivery = await recordWorkspaceInvitationEmailDelivery(
+    context,
+    result.invitationRecord,
+    "create",
+  );
   return { invitation: result.invitation, emailDelivery };
 }
 
@@ -142,7 +175,8 @@ export async function acceptWorkspaceInvitation(context: AuthenticatedContext, t
     if (!invitation) throw httpError(404, "invitation not found");
     if (invitation.revokedAt) throw httpError(400, "invitation has been revoked");
     if (invitation.acceptedAt) throw httpError(400, "invitation has already been accepted");
-    if (new Date(invitation.expiresAt).getTime() <= Date.now()) throw httpError(400, "invitation has expired");
+    if (new Date(invitation.expiresAt).getTime() <= Date.now())
+      throw httpError(400, "invitation has expired");
     if (normalizeEmail(context.user.email) !== normalizeEmail(invitation.email)) {
       throw httpError(403, "invitation does not match the authenticated user");
     }
@@ -157,11 +191,25 @@ export async function acceptWorkspaceInvitation(context: AuthenticatedContext, t
     invitation.acceptedAt = timestamp;
     invitation.acceptedByUserId = context.user.id;
 
-    recordActivity(data, makeActivity(invitation.workspaceId, "workspace", "workspace.invitation_accepted", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `${context.user.displayName} joined the workspace`, email: context.user.email, role: invitation.role }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        invitation.workspaceId,
+        "workspace",
+        "workspace.invitation_accepted",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        {
+          title: `${context.user.displayName} joined the workspace`,
+          email: context.user.email,
+          role: invitation.role,
+        },
+        timestamp,
+      ),
+    );
 
     return {
       membership: summarizeWorkspaceMember(data, membership),
@@ -170,7 +218,10 @@ export async function acceptWorkspaceInvitation(context: AuthenticatedContext, t
   });
 }
 
-export async function resendWorkspaceInvitation(context: AuthenticatedContext, invitationId: string) {
+export async function resendWorkspaceInvitation(
+  context: AuthenticatedContext,
+  invitationId: string,
+) {
   if (!invitationId.trim()) throw httpError(400, "invitation id is required");
 
   const result = await mutateStoreAsync((data) => {
@@ -187,20 +238,44 @@ export async function resendWorkspaceInvitation(context: AuthenticatedContext, i
     invitation.expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
     invitation.invitedByUserId = context.user.id;
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "workspace.invitation_resent", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Invitation resent for ${invitation.email}`, email: invitation.email, role: invitation.role }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "workspace.invitation_resent",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        {
+          title: `Invitation resent for ${invitation.email}`,
+          email: invitation.email,
+          role: invitation.role,
+        },
+        timestamp,
+      ),
+    );
 
-    return { invitation: summarizeWorkspaceInvitation(invitation, { includeToken: true }), invitationRecord: { ...invitation } };
+    return {
+      invitation: summarizeWorkspaceInvitation(invitation, { includeToken: true }),
+      invitationRecord: { ...invitation },
+    };
   });
 
-  const emailDelivery = await recordWorkspaceInvitationEmailDelivery(context, result.invitationRecord, "resend");
+  const emailDelivery = await recordWorkspaceInvitationEmailDelivery(
+    context,
+    result.invitationRecord,
+    "resend",
+  );
   return { invitation: result.invitation, emailDelivery };
 }
 
-export async function revokeWorkspaceInvitation(context: AuthenticatedContext, invitationId: string) {
+export async function revokeWorkspaceInvitation(
+  context: AuthenticatedContext,
+  invitationId: string,
+) {
   if (!invitationId.trim()) throw httpError(400, "invitation id is required");
 
   return mutateStoreAsync((data) => {
@@ -215,17 +290,35 @@ export async function revokeWorkspaceInvitation(context: AuthenticatedContext, i
     const timestamp = now();
     invitation.revokedAt = timestamp;
 
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "workspace.invitation_revoked", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: `Invitation revoked for ${invitation.email}`, email: invitation.email, role: invitation.role }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "workspace.invitation_revoked",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        {
+          title: `Invitation revoked for ${invitation.email}`,
+          email: invitation.email,
+          role: invitation.role,
+        },
+        timestamp,
+      ),
+    );
 
     return { invitation: summarizeWorkspaceInvitation(invitation) };
   });
 }
 
-export async function updateWorkspaceMemberRole(context: AuthenticatedContext, userId: string, input: { role: string }) {
+export async function updateWorkspaceMemberRole(
+  context: AuthenticatedContext,
+  userId: string,
+  input: { role: string },
+) {
   const role = parseWorkspaceRole(input.role);
   assertCanManageRole(context.role, role);
 
@@ -237,11 +330,21 @@ export async function updateWorkspaceMemberRole(context: AuthenticatedContext, u
 
     membership.role = role;
     const timestamp = now();
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "workspace.member_role_updated", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: "Workspace member role updated", userId, role }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "workspace.member_role_updated",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: "Workspace member role updated", userId, role },
+        timestamp,
+      ),
+    );
 
     return { member: summarizeWorkspaceMember(data, membership) };
   });
@@ -258,11 +361,21 @@ export async function removeWorkspaceMember(context: AuthenticatedContext, userI
       return !(entry.workspaceId === context.workspace.id && entry.userId === userId);
     });
     const timestamp = now();
-    recordActivity(data, makeActivity(context.workspace.id, "workspace", "workspace.member_removed", {
-      type: "user",
-      id: context.user.id,
-      displayName: context.user.displayName,
-    }, { title: "Workspace member removed", userId }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "workspace.member_removed",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: "Workspace member removed", userId },
+        timestamp,
+      ),
+    );
 
     return { ok: true };
   });
@@ -270,62 +383,105 @@ export async function removeWorkspaceMember(context: AuthenticatedContext, userI
 
 export async function getOnboarding(context: AuthenticatedContext) {
   const data = await loadStoreAsync();
-  const onboarding = data.onboardingStates.find((entry) => entry.workspaceId === context.workspace.id);
+  const onboarding = data.onboardingStates.find(
+    (entry) => entry.workspaceId === context.workspace.id,
+  );
   if (!onboarding) throw httpError(404, "onboarding state not found");
   return onboarding;
 }
 
 export async function completeOnboardingStep(context: AuthenticatedContext, stepKey: string) {
-  if (!ONBOARDING_STEPS.includes(stepKey as any)) {
+  const onboardingStep = ONBOARDING_STEPS.find(
+    (candidate): candidate is OnboardingStepKey => candidate === stepKey,
+  );
+  if (!onboardingStep) {
     throw httpError(400, "unknown onboarding step");
   }
 
   const onboarding = await mutateStoreAsync((data) => {
-    const record = data.onboardingStates.find((entry) => entry.workspaceId === context.workspace.id);
+    const record = data.onboardingStates.find(
+      (entry) => entry.workspaceId === context.workspace.id,
+    );
     if (!record) throw httpError(404, "onboarding state not found");
-    if (!record.completedSteps.includes(stepKey as any)) {
-      record.completedSteps.push(stepKey as any);
+    if (!record.completedSteps.includes(onboardingStep)) {
+      record.completedSteps.push(onboardingStep);
     }
 
     const timestamp = now();
     record.currentStep = nextIncompleteStep(record.completedSteps);
-    record.status = record.completedSteps.length === ONBOARDING_STEPS.length ? "completed" : "in_progress";
+    record.status =
+      record.completedSteps.length === ONBOARDING_STEPS.length ? "completed" : "in_progress";
     record.completedAt = record.status === "completed" ? timestamp : undefined;
     record.updatedAt = timestamp;
 
     const facts = data.activationFacts[context.workspace.id] ?? { now: timestamp };
-    applyOnboardingStepToFacts(facts, stepKey as any, timestamp);
+    applyOnboardingStepToFacts(facts, onboardingStep, timestamp);
     data.activationFacts[context.workspace.id] = facts;
 
-    recordActivity(data, makeActivity(context.workspace.id, "activation", "onboarding.step_completed", { type: "user", id: context.user.id, displayName: context.user.displayName }, { title: `Completed step: ${stepKey}`, stepKey }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        context.workspace.id,
+        "activation",
+        "onboarding.step_completed",
+        { type: "user", id: context.user.id, displayName: context.user.displayName },
+        { title: `Completed step: ${onboardingStep}`, stepKey: onboardingStep },
+        timestamp,
+      ),
+    );
     return record;
   });
 
-  await syncWorkspaceActivation(context.workspace.id, true, { type: "user", id: context.user.id, displayName: context.user.displayName });
+  await syncWorkspaceActivation(context.workspace.id, true, {
+    type: "user",
+    id: context.user.id,
+    displayName: context.user.displayName,
+  });
   return onboarding;
 }
 
 export async function handleInvitationEmailJob(job: JobRecord) {
-  if (job.type !== INVITATION_EMAIL_JOB_TYPE) throw new Error(`unsupported invitation email job type "${job.type}"`);
-  const payload = job.payload as { invitationId?: unknown; action?: unknown; requestedByUserId?: unknown };
-  if (typeof payload.invitationId !== "string" || !payload.invitationId.trim()) throw new Error("invitation.email job missing invitationId");
-  if (payload.action !== "create" && payload.action !== "resend") throw new Error("invitation.email job missing action");
+  if (job.type !== INVITATION_EMAIL_JOB_TYPE)
+    throw new Error(`unsupported invitation email job type "${job.type}"`);
+  const payload = job.payload as {
+    invitationId?: unknown;
+    action?: unknown;
+    requestedByUserId?: unknown;
+  };
+  if (typeof payload.invitationId !== "string" || !payload.invitationId.trim())
+    throw new Error("invitation.email job missing invitationId");
+  if (payload.action !== "create" && payload.action !== "resend")
+    throw new Error("invitation.email job missing action");
 
   const data = await loadStoreAsync();
-  const invitation = data.workspaceInvitations.find((entry) => entry.id === payload.invitationId && entry.workspaceId === job.workspaceId);
+  const invitation = data.workspaceInvitations.find(
+    (entry) => entry.id === payload.invitationId && entry.workspaceId === job.workspaceId,
+  );
   if (!invitation) throw new Error(`invitation ${payload.invitationId} not found`);
   const workspace = data.workspaces.find((entry) => entry.id === job.workspaceId);
   if (!workspace) throw new Error(`workspace ${job.workspaceId} not found`);
 
-  const actorUser = typeof payload.requestedByUserId === "string"
-    ? data.users.find((entry) => entry.id === payload.requestedByUserId)
-    : undefined;
+  const actorUser =
+    typeof payload.requestedByUserId === "string"
+      ? data.users.find((entry) => entry.id === payload.requestedByUserId)
+      : undefined;
   const actor = actorUser
     ? { type: "user" as const, id: actorUser.id, displayName: actorUser.displayName }
-    : { type: "system" as const, id: "invitation-email-retry", displayName: "Invitation email retry" };
+    : {
+        type: "system" as const,
+        id: "invitation-email-retry",
+        displayName: "Invitation email retry",
+      };
 
   const inactiveReason = inactiveInvitationRetryReason(invitation);
-  if (inactiveReason) return recordSkippedInvitationEmailRetry(workspace, actor, invitation, payload.action, inactiveReason);
+  if (inactiveReason)
+    return recordSkippedInvitationEmailRetry(
+      workspace,
+      actor,
+      invitation,
+      payload.action,
+      inactiveReason,
+    );
 
   const delivery = await recordInvitationEmailDeliveryForWorkspace({
     workspace,
@@ -335,6 +491,7 @@ export async function handleInvitationEmailJob(job: JobRecord) {
     action: payload.action,
     enqueueRetry: false,
   });
-  if (delivery.status === "failed") throw new Error(delivery.error ?? "invitation email delivery failed");
+  if (delivery.status === "failed")
+    throw new Error(delivery.error ?? "invitation email delivery failed");
   return delivery;
 }

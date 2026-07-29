@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { deleteCookie, setCookie } from "hono/cookie";
+import type { WorkspaceActivationFacts } from "../activation/adapters";
 import type { ActivationStatusDto, ActivationSubjectRef } from "../activation/domain";
 import { deriveActivationStatus } from "../activation/service";
 import { buildActivationSummaryCard } from "../activation/view-model";
@@ -18,12 +19,22 @@ import {
   type WorkspaceRecord,
   type WorkspaceRole,
   type JobRecord,
+  type OnboardingStepKey,
   type PacketAgentData,
   snapshotForWorkspace,
 } from "../packetagent-store";
 import { maskSecret as maskBearerSecret, redactSensitiveValue } from "../security/redaction.js";
-import { LOCAL_INVITATION_EMAIL_PROVIDER, invitationEmailSubject, resolveInvitationEmailMode, resolveInvitationEmailRetryMaxAttempts, resolveInvitationEmailWebhookConfig } from "../invitation-email.js";
-import { deliverInvitationEmail, type InvitationEmailDeliveryAction } from "../invitation-email-delivery.js";
+import {
+  LOCAL_INVITATION_EMAIL_PROVIDER,
+  invitationEmailSubject,
+  resolveInvitationEmailMode,
+  resolveInvitationEmailRetryMaxAttempts,
+  resolveInvitationEmailWebhookConfig,
+} from "../invitation-email.js";
+import {
+  deliverInvitationEmail,
+  type InvitationEmailDeliveryAction,
+} from "../invitation-email-delivery.js";
 import {
   buildSessionCookieValue,
   generateId,
@@ -46,7 +57,10 @@ export async function listPublicActivationSummaries() {
   const data = await loadStoreAsync();
   const summaries = [];
   for (const workspace of data.workspaces) {
-    const status = await syncWorkspaceActivation(workspace.id, false, { type: "system", id: "public-read" });
+    const status = await syncWorkspaceActivation(workspace.id, false, {
+      type: "system",
+      id: "public-read",
+    });
     summaries.push({
       subject: toSubject(workspace.id),
       status,
@@ -60,7 +74,10 @@ export async function getPublicActivationSummary(workspaceId: string) {
   const data = await loadStoreAsync();
   const workspace = data.workspaces.find((entry) => entry.id === workspaceId);
   if (!workspace) return null;
-  const status = await syncWorkspaceActivation(workspace.id, false, { type: "system", id: "public-read" });
+  const status = await syncWorkspaceActivation(workspace.id, false, {
+    type: "system",
+    id: "public-read",
+  });
   return {
     subject: toSubject(workspace.id),
     status,
@@ -89,13 +106,18 @@ export function createSessionRecord(userId: string, timestamp: string) {
   };
 }
 
-export function buildAuthenticatedContext(data: ReturnType<typeof loadStore>, userId: string): AuthenticatedContext {
+export function buildAuthenticatedContext(
+  data: ReturnType<typeof loadStore>,
+  userId: string,
+): AuthenticatedContext {
   const user = data.users.find((entry) => entry.id === userId);
   if (!user) throw httpError(404, "user not found");
   const workspaceId = defaultWorkspaceIdForUser(data, userId);
   const workspace = data.workspaces.find((entry) => entry.id === workspaceId);
   if (!workspace) throw httpError(404, "workspace not found");
-  const membership = data.memberships.find((entry) => entry.workspaceId === workspace.id && entry.userId === user.id);
+  const membership = data.memberships.find(
+    (entry) => entry.workspaceId === workspace.id && entry.userId === user.id,
+  );
   return { user, workspace, role: membership?.role ?? "viewer" };
 }
 
@@ -110,7 +132,8 @@ export async function syncWorkspaceActivation(
         loadSnapshot: async () => snapshotForWorkspace(await loadStoreAsync(), workspaceId),
       },
       milestones: {
-        listForSubject: async () => (await loadStoreAsync()).activationMilestones[workspaceId] ?? [],
+        listForSubject: async () =>
+          (await loadStoreAsync()).activationMilestones[workspaceId] ?? [],
       },
       derive: deriveActivationStatus,
       readModel: {
@@ -144,32 +167,74 @@ export function emitActivationActivities(
   const timestamp = now();
 
   if (!previous || previous.stage !== nextStatus.stage) {
-    recordActivity(data, makeActivity(workspaceId, "activation", "activation.stage_changed", actor, {
-      title: `Activation stage is now ${nextStatus.stage}`,
-      previousStage: previous?.stage,
-      stage: nextStatus.stage,
-    }, timestamp));
+    recordActivity(
+      data,
+      makeActivity(
+        workspaceId,
+        "activation",
+        "activation.stage_changed",
+        actor,
+        {
+          title: `Activation stage is now ${nextStatus.stage}`,
+          previousStage: previous?.stage,
+          stage: nextStatus.stage,
+        },
+        timestamp,
+      ),
+    );
   }
 
-  const previousMilestones = new Set((previous?.milestones ?? []).filter((entry) => entry.reached).map((entry) => entry.key));
-  for (const milestone of nextStatus.milestones.filter((entry) => entry.reached && !previousMilestones.has(entry.key))) {
-    recordActivity(data, makeActivity(workspaceId, "activation", "activation.milestone_reached", actor, {
-      title: `Reached milestone: ${milestone.key}`,
-      milestoneKey: milestone.key,
-      stage: nextStatus.stage,
-    }, milestone.reachedAt ?? timestamp));
+  const previousMilestones = new Set(
+    (previous?.milestones ?? []).filter((entry) => entry.reached).map((entry) => entry.key),
+  );
+  for (const milestone of nextStatus.milestones.filter(
+    (entry) => entry.reached && !previousMilestones.has(entry.key),
+  )) {
+    recordActivity(
+      data,
+      makeActivity(
+        workspaceId,
+        "activation",
+        "activation.milestone_reached",
+        actor,
+        {
+          title: `Reached milestone: ${milestone.key}`,
+          milestoneKey: milestone.key,
+          stage: nextStatus.stage,
+        },
+        milestone.reachedAt ?? timestamp,
+      ),
+    );
   }
 
-  const previousChecklist = new Set((previous?.checklist ?? []).filter((entry) => entry.completed).map((entry) => entry.key));
-  for (const item of nextStatus.checklist.filter((entry) => entry.completed && !previousChecklist.has(entry.key))) {
-    recordActivity(data, makeActivity(workspaceId, "activation", "activation.checklist_completed", actor, {
-      title: `Checklist completed: ${item.key}`,
-      checklistItemKey: item.key,
-    }, item.completedAt ?? timestamp));
+  const previousChecklist = new Set(
+    (previous?.checklist ?? []).filter((entry) => entry.completed).map((entry) => entry.key),
+  );
+  for (const item of nextStatus.checklist.filter(
+    (entry) => entry.completed && !previousChecklist.has(entry.key),
+  )) {
+    recordActivity(
+      data,
+      makeActivity(
+        workspaceId,
+        "activation",
+        "activation.checklist_completed",
+        actor,
+        {
+          title: `Checklist completed: ${item.key}`,
+          checklistItemKey: item.key,
+        },
+        item.completedAt ?? timestamp,
+      ),
+    );
   }
 }
 
-export function applyOnboardingStepToFacts(facts: any, stepKey: string, timestamp: string) {
+export function applyOnboardingStepToFacts(
+  facts: WorkspaceActivationFacts,
+  stepKey: OnboardingStepKey,
+  timestamp: string,
+) {
   switch (stepKey) {
     case "create_workspace_profile":
       facts.briefCapturedAt ??= timestamp;
@@ -199,7 +264,8 @@ export function applyOnboardingStepToFacts(facts: any, stepKey: string, timestam
 const workspaceRoles = new Set<WorkspaceRole>(["viewer", "member", "admin", "owner"]);
 
 export function parseWorkspaceRole(role: string): WorkspaceRole {
-  if (!workspaceRoles.has(role as WorkspaceRole)) throw httpError(400, "valid workspace role is required");
+  if (!workspaceRoles.has(role as WorkspaceRole))
+    throw httpError(400, "valid workspace role is required");
   return role as WorkspaceRole;
 }
 
@@ -216,11 +282,16 @@ export function assertNotLastOwner(
   nextRole: WorkspaceRole | null,
 ) {
   if (currentMembership.role !== "owner" || nextRole === "owner") return;
-  const ownerCount = data.memberships.filter((entry) => entry.workspaceId === workspaceId && entry.role === "owner").length;
+  const ownerCount = data.memberships.filter(
+    (entry) => entry.workspaceId === workspaceId && entry.role === "owner",
+  ).length;
   if (ownerCount <= 1) throw httpError(400, "workspace must keep at least one owner");
 }
 
-export function summarizeWorkspaceMember(data: ReturnType<typeof loadStore>, membership: WorkspaceMemberRecord) {
+export function summarizeWorkspaceMember(
+  data: ReturnType<typeof loadStore>,
+  membership: WorkspaceMemberRecord,
+) {
   const user = data.users.find((entry) => entry.id === membership.userId);
   return {
     userId: membership.userId,
@@ -249,7 +320,13 @@ export function summarizeWorkspaceInvitation(
     revokedAt: invitation.revokedAt ?? null,
     expiresAt: invitation.expiresAt,
     createdAt: invitation.createdAt,
-    status: invitation.acceptedAt ? "accepted" : invitation.revokedAt ? "revoked" : expired ? "expired" : "pending",
+    status: invitation.acceptedAt
+      ? "accepted"
+      : invitation.revokedAt
+        ? "revoked"
+        : expired
+          ? "expired"
+          : "pending",
   };
 }
 
@@ -296,22 +373,36 @@ export async function recordInvitationEmailDeliveryForWorkspace(input: {
     });
   });
 
-  const retryJob = input.enqueueRetry && delivery.status === "failed" && resolveInvitationEmailMode() === "webhook"
-    ? await enqueueInvitationEmailRetryJob(input)
-    : null;
+  const retryJob =
+    input.enqueueRetry && delivery.status === "failed" && resolveInvitationEmailMode() === "webhook"
+      ? await enqueueInvitationEmailRetryJob(input)
+      : null;
 
   await mutateStoreAsync((data) => {
-    recordActivity(data, makeActivity(input.invitation.workspaceId, "workspace", "workspace.invitation_email_delivery", input.actor, {
-      title: delivery.status === "sent" ? `Invitation email sent to ${input.invitation.email}` : `Invitation email ${delivery.status} for ${input.invitation.email}`,
-      invitationId: input.invitation.id,
-      email: input.invitation.email,
-      role: input.invitation.role,
-      action: input.action,
-      deliveryId: delivery.id,
-      status: delivery.status,
-      ...(delivery.error ? { error: delivery.error } : {}),
-      ...(retryJob ? { retryJobId: retryJob.id } : {}),
-    }, new Date().toISOString()));
+    recordActivity(
+      data,
+      makeActivity(
+        input.invitation.workspaceId,
+        "workspace",
+        "workspace.invitation_email_delivery",
+        input.actor,
+        {
+          title:
+            delivery.status === "sent"
+              ? `Invitation email sent to ${input.invitation.email}`
+              : `Invitation email ${delivery.status} for ${input.invitation.email}`,
+          invitationId: input.invitation.id,
+          email: input.invitation.email,
+          role: input.invitation.role,
+          action: input.action,
+          deliveryId: delivery.id,
+          status: delivery.status,
+          ...(delivery.error ? { error: delivery.error } : {}),
+          ...(retryJob ? { retryJobId: retryJob.id } : {}),
+        },
+        new Date().toISOString(),
+      ),
+    );
   });
 
   return {
@@ -323,10 +414,13 @@ export async function recordInvitationEmailDeliveryForWorkspace(input: {
   };
 }
 
-export function inactiveInvitationRetryReason(invitation: WorkspaceInvitationRecord): string | null {
+export function inactiveInvitationRetryReason(
+  invitation: WorkspaceInvitationRecord,
+): string | null {
   if (invitation.revokedAt) return "invitation was revoked before email retry";
   if (invitation.acceptedAt) return "invitation was accepted before email retry";
-  if (new Date(invitation.expiresAt).getTime() <= Date.now()) return "invitation expired before email retry";
+  if (new Date(invitation.expiresAt).getTime() <= Date.now())
+    return "invitation expired before email retry";
   return null;
 }
 
@@ -339,32 +433,55 @@ export async function recordSkippedInvitationEmailRetry(
 ) {
   const timestamp = now();
   const mode = resolveInvitationEmailMode();
-  const provider = mode === "webhook" ? resolveInvitationEmailWebhookConfig().provider : LOCAL_INVITATION_EMAIL_PROVIDER;
+  const provider =
+    mode === "webhook"
+      ? resolveInvitationEmailWebhookConfig().provider
+      : LOCAL_INVITATION_EMAIL_PROVIDER;
   const delivery = await mutateStoreAsync((data) => {
-    const record = createInvitationEmailDelivery(data, {
-      workspaceId: invitation.workspaceId,
-      invitationId: invitation.id,
-      recipientEmail: invitation.email,
-      subject: invitationEmailSubject(workspace.name),
-      status: "skipped",
-      provider,
-      mode,
-      error: reason,
-    }, timestamp);
-    recordActivity(data, makeActivity(invitation.workspaceId, "workspace", "workspace.invitation_email_delivery", actor, {
-      title: `Invitation email skipped for ${invitation.email}`,
-      invitationId: invitation.id,
-      email: invitation.email,
-      role: invitation.role,
-      action,
-      deliveryId: record.id,
-      status: record.status,
-      error: reason,
-    }, timestamp));
+    const record = createInvitationEmailDelivery(
+      data,
+      {
+        workspaceId: invitation.workspaceId,
+        invitationId: invitation.id,
+        recipientEmail: invitation.email,
+        subject: invitationEmailSubject(workspace.name),
+        status: "skipped",
+        provider,
+        mode,
+        error: reason,
+      },
+      timestamp,
+    );
+    recordActivity(
+      data,
+      makeActivity(
+        invitation.workspaceId,
+        "workspace",
+        "workspace.invitation_email_delivery",
+        actor,
+        {
+          title: `Invitation email skipped for ${invitation.email}`,
+          invitationId: invitation.id,
+          email: invitation.email,
+          role: invitation.role,
+          action,
+          deliveryId: record.id,
+          status: record.status,
+          error: reason,
+        },
+        timestamp,
+      ),
+    );
     return record;
   });
 
-  return { id: delivery.id, status: delivery.status, action, error: delivery.error ?? null, retryJobId: null };
+  return {
+    id: delivery.id,
+    status: delivery.status,
+    action,
+    error: delivery.error ?? null,
+    retryJobId: null,
+  };
 }
 
 export async function enqueueInvitationEmailRetryJob(input: {
@@ -430,7 +547,10 @@ export function stableIdPart(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]+/g, "_");
 }
 
-export function upsertActivationActivity(data: PacketAgentData, activity: ActivityRecord): ActivityRecord {
+export function upsertActivationActivity(
+  data: PacketAgentData,
+  activity: ActivityRecord,
+): ActivityRecord {
   return recordActivity(data, activity, { dedupe: true });
 }
 

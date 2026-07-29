@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { hashSessionSecret, SESSION_COOKIE_NAME, SESSION_TTL_MS } from "./auth-utils.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 
@@ -34,7 +35,8 @@ export function rejectCrossOriginPrivateMutationOrThrow(c: Context) {
 
   const host = originComparisonHost(c);
   try {
-    if (new URL(origin).host !== host) throw httpRouteError(403, "cross-origin requests are not allowed");
+    if (new URL(origin).host !== host)
+      throw httpRouteError(403, "cross-origin requests are not allowed");
   } catch {
     throw httpRouteError(403, "cross-origin requests are not allowed");
   }
@@ -72,12 +74,15 @@ function csrfTokenForSessionCookie(sessionCookie: string) {
 }
 
 function originComparisonHost(c: Context) {
-  if (trustedProxyEnabled()) return c.req.header("x-forwarded-host") ?? c.req.header("host") ?? new URL(c.req.url).host;
+  if (trustedProxyEnabled())
+    return c.req.header("x-forwarded-host") ?? c.req.header("host") ?? new URL(c.req.url).host;
   return c.req.header("host") ?? new URL(c.req.url).host;
 }
 
 function trustedProxyEnabled() {
-  return ["1", "true", "yes"].includes((process.env.PACKETAGENT_TRUST_PROXY ?? "").trim().toLowerCase());
+  return ["1", "true", "yes"].includes(
+    (process.env.PACKETAGENT_TRUST_PROXY ?? "").trim().toLowerCase(),
+  );
 }
 
 function httpRouteError(status: number, message: string) {
@@ -87,6 +92,6 @@ function httpRouteError(status: number, message: string) {
 }
 
 function errorResponse(c: Context, error: unknown) {
-  c.status(((error as Error & { status?: number }).status ?? 500) as any);
+  c.status(((error as Error & { status?: number }).status ?? 500) as ContentfulStatusCode);
   return c.json({ error: redactedErrorMessage(error) });
 }

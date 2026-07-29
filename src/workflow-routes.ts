@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { assertPermission, type WorkspacePermission } from "./rbac.js";
 import { requireAuthenticatedContext } from "./packetagent-services.js";
 import { findWorkspaceMembership, loadStoreAsync } from "./packetagent-store.js";
@@ -21,32 +22,125 @@ type WorkflowServiceModule = Record<string, unknown>;
 
 const workflowServiceFunctions = {
   getOverview: ["getWorkflowOverviewAsync", "getWorkflowOverview", "getOverview"],
-  getBrief: ["getWorkflowBriefAsync", "readWorkspaceBriefAsync", "getWorkflowBrief", "readWorkspaceBrief", "getBrief"],
-  saveBrief: ["saveWorkflowBriefAsync", "updateWorkspaceBriefAsync", "saveWorkflowBrief", "updateWorkspaceBrief", "updateWorkflowBrief", "upsertWorkflowBrief"],
-  listBriefVersions: ["listWorkspaceBriefHistoryAsync", "listWorkspaceBriefHistory", "listBriefVersions"],
-  restoreBriefVersion: ["restoreWorkspaceBriefVersionAsync", "restoreWorkspaceBriefVersion", "restoreBriefVersion"],
+  getBrief: [
+    "getWorkflowBriefAsync",
+    "readWorkspaceBriefAsync",
+    "getWorkflowBrief",
+    "readWorkspaceBrief",
+    "getBrief",
+  ],
+  saveBrief: [
+    "saveWorkflowBriefAsync",
+    "updateWorkspaceBriefAsync",
+    "saveWorkflowBrief",
+    "updateWorkspaceBrief",
+    "updateWorkflowBrief",
+    "upsertWorkflowBrief",
+  ],
+  listBriefVersions: [
+    "listWorkspaceBriefHistoryAsync",
+    "listWorkspaceBriefHistory",
+    "listBriefVersions",
+  ],
+  restoreBriefVersion: [
+    "restoreWorkspaceBriefVersionAsync",
+    "restoreWorkspaceBriefVersion",
+    "restoreBriefVersion",
+  ],
   listBriefTemplates: ["listWorkspaceBriefTemplates", "listBriefTemplates"],
-  applyBriefTemplate: ["applyWorkspaceBriefTemplateAsync", "applyWorkspaceBriefTemplate", "applyBriefTemplate"],
-  getRequirements: ["getWorkflowRequirementsAsync", "listRequirementsAsync", "getWorkflowRequirements", "listRequirements", "getRequirements"],
-  saveRequirements: ["saveWorkflowRequirementsAsync", "replaceRequirementsAsync", "saveWorkflowRequirements", "replaceRequirements", "updateWorkflowRequirements", "upsertWorkflowRequirements"],
-  listPlanItems: ["listWorkflowPlanItemsAsync", "listPlanItemsAsync", "listWorkflowPlanItems", "listPlanItems", "getWorkflowPlanItems"],
-  savePlanItems: ["saveWorkflowPlanItemsAsync", "replacePlanItemsAsync", "saveWorkflowPlanItems", "replacePlanItems", "updateWorkflowPlanItems"],
+  applyBriefTemplate: [
+    "applyWorkspaceBriefTemplateAsync",
+    "applyWorkspaceBriefTemplate",
+    "applyBriefTemplate",
+  ],
+  getRequirements: [
+    "getWorkflowRequirementsAsync",
+    "listRequirementsAsync",
+    "getWorkflowRequirements",
+    "listRequirements",
+    "getRequirements",
+  ],
+  saveRequirements: [
+    "saveWorkflowRequirementsAsync",
+    "replaceRequirementsAsync",
+    "saveWorkflowRequirements",
+    "replaceRequirements",
+    "updateWorkflowRequirements",
+    "upsertWorkflowRequirements",
+  ],
+  listPlanItems: [
+    "listWorkflowPlanItemsAsync",
+    "listPlanItemsAsync",
+    "listWorkflowPlanItems",
+    "listPlanItems",
+    "getWorkflowPlanItems",
+  ],
+  savePlanItems: [
+    "saveWorkflowPlanItemsAsync",
+    "replacePlanItemsAsync",
+    "saveWorkflowPlanItems",
+    "replacePlanItems",
+    "updateWorkflowPlanItems",
+  ],
   createPlanItem: ["createWorkflowPlanItemAsync", "createWorkflowPlanItem", "addWorkflowPlanItem"],
   updatePlanItem: ["updateWorkflowPlanItemAsync", "updateWorkflowPlanItem", "saveWorkflowPlanItem"],
-  getBlockersAndQuestions: ["getWorkflowBlockersAndQuestionsAsync", "listBlockersAndQuestionsAsync", "getWorkflowBlockersAndQuestions", "listBlockersAndQuestions"],
-  saveBlockersAndQuestions: ["saveWorkflowBlockersAndQuestionsAsync", "replaceBlockersAndQuestionsAsync", "saveWorkflowBlockersAndQuestions", "replaceBlockersAndQuestions"],
+  getBlockersAndQuestions: [
+    "getWorkflowBlockersAndQuestionsAsync",
+    "listBlockersAndQuestionsAsync",
+    "getWorkflowBlockersAndQuestions",
+    "listBlockersAndQuestions",
+  ],
+  saveBlockersAndQuestions: [
+    "saveWorkflowBlockersAndQuestionsAsync",
+    "replaceBlockersAndQuestionsAsync",
+    "saveWorkflowBlockersAndQuestions",
+    "replaceBlockersAndQuestions",
+  ],
   listBlockers: ["listWorkflowBlockersAsync", "listWorkflowBlockers", "getWorkflowBlockers"],
   createBlocker: ["createWorkflowBlockerAsync", "createWorkflowBlocker", "addWorkflowBlocker"],
   updateBlocker: ["updateWorkflowBlockerAsync", "updateWorkflowBlocker", "saveWorkflowBlocker"],
   listQuestions: ["listWorkflowQuestionsAsync", "listWorkflowQuestions", "getWorkflowQuestions"],
   createQuestion: ["createWorkflowQuestionAsync", "createWorkflowQuestion", "addWorkflowQuestion"],
   updateQuestion: ["updateWorkflowQuestionAsync", "updateWorkflowQuestion", "saveWorkflowQuestion"],
-  listValidationEvidence: ["listWorkflowValidationEvidenceAsync", "listValidationEvidenceAsync", "listWorkflowValidationEvidence", "listValidationEvidence", "getWorkflowValidationEvidence"],
-  saveValidationEvidence: ["saveWorkflowValidationEvidenceAsync", "replaceValidationEvidenceAsync", "saveWorkflowValidationEvidence", "replaceValidationEvidence", "updateWorkflowValidationEvidence"],
-  createValidationEvidence: ["createWorkflowValidationEvidenceAsync", "createWorkflowValidationEvidence", "addWorkflowValidationEvidence"],
-  updateValidationEvidence: ["updateWorkflowValidationEvidenceAsync", "updateWorkflowValidationEvidence", "saveWorkflowValidationEvidence"],
-  getReleaseConfirmation: ["getWorkflowReleaseConfirmationAsync", "readReleaseConfirmationAsync", "getWorkflowReleaseConfirmation", "readReleaseConfirmation", "getReleaseConfirmation"],
-  confirmRelease: ["confirmWorkflowReleaseAsync", "updateReleaseConfirmationAsync", "confirmWorkflowRelease", "updateReleaseConfirmation", "saveWorkflowReleaseConfirmation", "confirmRelease"],
+  listValidationEvidence: [
+    "listWorkflowValidationEvidenceAsync",
+    "listValidationEvidenceAsync",
+    "listWorkflowValidationEvidence",
+    "listValidationEvidence",
+    "getWorkflowValidationEvidence",
+  ],
+  saveValidationEvidence: [
+    "saveWorkflowValidationEvidenceAsync",
+    "replaceValidationEvidenceAsync",
+    "saveWorkflowValidationEvidence",
+    "replaceValidationEvidence",
+    "updateWorkflowValidationEvidence",
+  ],
+  createValidationEvidence: [
+    "createWorkflowValidationEvidenceAsync",
+    "createWorkflowValidationEvidence",
+    "addWorkflowValidationEvidence",
+  ],
+  updateValidationEvidence: [
+    "updateWorkflowValidationEvidenceAsync",
+    "updateWorkflowValidationEvidence",
+    "saveWorkflowValidationEvidence",
+  ],
+  getReleaseConfirmation: [
+    "getWorkflowReleaseConfirmationAsync",
+    "readReleaseConfirmationAsync",
+    "getWorkflowReleaseConfirmation",
+    "readReleaseConfirmation",
+    "getReleaseConfirmation",
+  ],
+  confirmRelease: [
+    "confirmWorkflowReleaseAsync",
+    "updateReleaseConfirmationAsync",
+    "confirmWorkflowRelease",
+    "updateReleaseConfirmation",
+    "saveWorkflowReleaseConfirmation",
+    "confirmRelease",
+  ],
 } as const;
 
 type WorkflowOperation = keyof typeof workflowServiceFunctions;
@@ -56,7 +150,9 @@ export const workflowRoutes = new Hono();
 workflowRoutes.get("/", (c) => runWorkflowOperation(c, "getOverview"));
 
 workflowRoutes.get("/brief", (c) => runWorkflowOperation(c, "getBrief"));
-workflowRoutes.put("/brief", (c) => runWorkflowOperation(c, "saveBrief", readJsonBody, [], "editWorkflow"));
+workflowRoutes.put("/brief", (c) =>
+  runWorkflowOperation(c, "saveBrief", readJsonBody, [], "editWorkflow"),
+);
 
 workflowRoutes.get("/brief/templates", (c) => runWorkflowOperation(c, "listBriefTemplates"));
 workflowRoutes.post("/brief/templates/:templateId/apply", (c) =>
@@ -69,33 +165,47 @@ workflowRoutes.post("/brief/versions/:versionId/restore", (c) =>
 );
 
 workflowRoutes.get("/requirements", (c) => runWorkflowOperation(c, "getRequirements"));
-workflowRoutes.put("/requirements", (c) => runWorkflowOperation(c, "saveRequirements", readJsonBody, [], "editWorkflow"));
+workflowRoutes.put("/requirements", (c) =>
+  runWorkflowOperation(c, "saveRequirements", readJsonBody, [], "editWorkflow"),
+);
 
 workflowRoutes.get("/plan-items", (c) => runWorkflowOperation(c, "listPlanItems"));
-workflowRoutes.put("/plan-items", (c) => runWorkflowOperation(c, "savePlanItems", readJsonBody, [], "editWorkflow"));
-workflowRoutes.post("/plan-items", (c) => runWorkflowOperation(c, "createPlanItem", readJsonBody, [], "editWorkflow"));
+workflowRoutes.put("/plan-items", (c) =>
+  runWorkflowOperation(c, "savePlanItems", readJsonBody, [], "editWorkflow"),
+);
+workflowRoutes.post("/plan-items", (c) =>
+  runWorkflowOperation(c, "createPlanItem", readJsonBody, [], "editWorkflow"),
+);
 workflowRoutes.patch("/plan-items/:itemId", (c) =>
   runWorkflowOperation(c, "updatePlanItem", readJsonBody, ["itemId"], "editWorkflow"),
 );
 
-workflowRoutes.get("/blockers-questions", (c) => runWorkflowOperation(c, "getBlockersAndQuestions"));
+workflowRoutes.get("/blockers-questions", (c) =>
+  runWorkflowOperation(c, "getBlockersAndQuestions"),
+);
 workflowRoutes.put("/blockers-questions", (c) =>
   runWorkflowOperation(c, "saveBlockersAndQuestions", readJsonBody, [], "editWorkflow"),
 );
 
 workflowRoutes.get("/blockers", (c) => runWorkflowOperation(c, "listBlockers"));
-workflowRoutes.post("/blockers", (c) => runWorkflowOperation(c, "createBlocker", readJsonBody, [], "editWorkflow"));
+workflowRoutes.post("/blockers", (c) =>
+  runWorkflowOperation(c, "createBlocker", readJsonBody, [], "editWorkflow"),
+);
 workflowRoutes.patch("/blockers/:blockerId", (c) =>
   runWorkflowOperation(c, "updateBlocker", readJsonBody, ["blockerId"], "editWorkflow"),
 );
 
 workflowRoutes.get("/questions", (c) => runWorkflowOperation(c, "listQuestions"));
-workflowRoutes.post("/questions", (c) => runWorkflowOperation(c, "createQuestion", readJsonBody, [], "editWorkflow"));
+workflowRoutes.post("/questions", (c) =>
+  runWorkflowOperation(c, "createQuestion", readJsonBody, [], "editWorkflow"),
+);
 workflowRoutes.patch("/questions/:questionId", (c) =>
   runWorkflowOperation(c, "updateQuestion", readJsonBody, ["questionId"], "editWorkflow"),
 );
 
-workflowRoutes.get("/validation-evidence", (c) => runWorkflowOperation(c, "listValidationEvidence"));
+workflowRoutes.get("/validation-evidence", (c) =>
+  runWorkflowOperation(c, "listValidationEvidence"),
+);
 workflowRoutes.put("/validation-evidence", (c) =>
   runWorkflowOperation(c, "saveValidationEvidence", readJsonBody, [], "editWorkflow"),
 );
@@ -106,7 +216,9 @@ workflowRoutes.patch("/validation-evidence/:evidenceId", (c) =>
   runWorkflowOperation(c, "updateValidationEvidence", readJsonBody, ["evidenceId"], "editWorkflow"),
 );
 
-workflowRoutes.get("/release-confirmation", (c) => runWorkflowOperation(c, "getReleaseConfirmation"));
+workflowRoutes.get("/release-confirmation", (c) =>
+  runWorkflowOperation(c, "getReleaseConfirmation"),
+);
 workflowRoutes.put("/release-confirmation", (c) =>
   runWorkflowOperation(c, "confirmRelease", readJsonBody, [], "editWorkflow"),
 );
@@ -144,9 +256,18 @@ workflowRoutes.post("/generate-from-prompt", async (c) => {
     const apply = Boolean(body?.apply);
     const llm = await llmDraftWorkflow({ workspaceId: context.workspace.id, prompt });
     if (!apply) {
-      return c.json({ draft: llm.draft, applied: false, modelUsed: llm.modelUsed, costUsd: llm.costUsd });
+      return c.json({
+        draft: llm.draft,
+        applied: false,
+        modelUsed: llm.modelUsed,
+        costUsd: llm.costUsd,
+      });
     }
-    return c.json({ ...await applyWorkflowDraftAsync(context, llm.draft), modelUsed: llm.modelUsed, costUsd: llm.costUsd });
+    return c.json({
+      ...(await applyWorkflowDraftAsync(context, llm.draft)),
+      modelUsed: llm.modelUsed,
+      costUsd: llm.costUsd,
+    });
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -167,13 +288,21 @@ workflowRoutes.post("/plan-mode/apply", async (c) => {
   try {
     const context = requireAuthenticatedContext(c);
     await requireWorkflowPermission(context, "editWorkflow");
-    const body = (await readJsonBody(c)) as { planItems?: { summary: string; status?: string }[] } | undefined;
-    const items = (body?.planItems ?? []).map((p) => {
-      const raw = String(p.status ?? "todo");
-      const status: "todo" | "in_progress" | "done" =
-        raw === "in_progress" || raw === "doing" ? "in_progress" : raw === "done" ? "done" : "todo";
-      return { title: p.summary, description: "", status };
-    }).filter((p) => p.title.length > 0);
+    const body = (await readJsonBody(c)) as
+      | { planItems?: { summary: string; status?: string }[] }
+      | undefined;
+    const items = (body?.planItems ?? [])
+      .map((p) => {
+        const raw = String(p.status ?? "todo");
+        const status: "todo" | "in_progress" | "done" =
+          raw === "in_progress" || raw === "doing"
+            ? "in_progress"
+            : raw === "done"
+              ? "done"
+              : "todo";
+        return { title: p.summary, description: "", status };
+      })
+      .filter((p) => p.title.length > 0);
     const planItems = await replacePlanItemsAsync(context, items);
     return c.json({ planItems });
   } catch (error) {
@@ -257,17 +386,27 @@ async function runWorkflowOperation(
 
     const body = readBody ? await readBody(c) : {};
     const params = Object.fromEntries(paramNames.map((name) => [name, c.req.param(name)]));
-    const input = paramNames.length > 0 ? { ...(isRecord(body) ? body : { value: body }), ...params } : body;
+    const input =
+      paramNames.length > 0 ? { ...(isRecord(body) ? body : { value: body }), ...params } : body;
 
     const result = await handler(context, input);
-    return c.json(result === undefined ? { ok: true } : (result as any));
+    return c.body(JSON.stringify(result === undefined ? { ok: true } : result), 200, {
+      "Content-Type": "application/json; charset=UTF-8",
+    });
   } catch (error) {
     return errorResponse(c, error);
   }
 }
 
-async function requireWorkflowPermission(context: AuthenticatedContext, permission: WorkspacePermission) {
-  const membership = findWorkspaceMembership(await loadStoreAsync(), context.workspace.id, context.user.id);
+async function requireWorkflowPermission(
+  context: AuthenticatedContext,
+  permission: WorkspacePermission,
+) {
+  const membership = findWorkspaceMembership(
+    await loadStoreAsync(),
+    context.workspace.id,
+    context.user.id,
+  );
   assertPermission(membership, permission);
 }
 
@@ -286,7 +425,10 @@ async function loadWorkflowService(): Promise<WorkflowServiceModule | null> {
   return workflowServicePromise;
 }
 
-function findServiceFunction(service: WorkflowServiceModule, names: readonly string[]): WorkflowServiceFunction | null {
+function findServiceFunction(
+  service: WorkflowServiceModule,
+  names: readonly string[],
+): WorkflowServiceFunction | null {
   for (const name of names) {
     const candidate = service[name];
     if (typeof candidate === "function") {
@@ -322,7 +464,7 @@ function isMissingWorkflowService(error: unknown): boolean {
 
 function errorResponse(c: Context, error: unknown) {
   const status = (error as Error & { status?: number }).status ?? 500;
-  c.status(status as any);
+  c.status(status as ContentfulStatusCode);
   return c.json({ error: redactedErrorMessage(error) });
 }
 

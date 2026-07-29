@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createHash } from "node:crypto";
 import { assertPermission, type WorkspacePermission } from "../rbac.js";
 import { findWorkspaceMembership, loadStoreAsync } from "../packetagent-store.js";
@@ -6,10 +7,19 @@ import { requireAuthenticatedContextAsync } from "../packetagent-services.js";
 import { redactedErrorMessage } from "../security/redaction.js";
 import type { ModelRoutingPresetId } from "../model-routing-presets.js";
 
-export type AuthenticatedRouteContext = Awaited<ReturnType<typeof requireAuthenticatedContextAsync>>;
+export type AuthenticatedRouteContext = Awaited<
+  ReturnType<typeof requireAuthenticatedContextAsync>
+>;
 
-export async function requireWorkspacePermission(context: AuthenticatedRouteContext, permission: WorkspacePermission) {
-  const membership = findWorkspaceMembership(await loadStoreAsync(), context.workspace.id, context.user.id);
+export async function requireWorkspacePermission(
+  context: AuthenticatedRouteContext,
+  permission: WorkspacePermission,
+) {
+  const membership = findWorkspaceMembership(
+    await loadStoreAsync(),
+    context.workspace.id,
+    context.user.id,
+  );
   assertPermission(membership, permission);
 }
 
@@ -20,12 +30,18 @@ export function httpRouteError(status: number, message: string) {
 }
 
 export function errorResponse(c: Context, error: unknown) {
-  c.status(((error as Error & { status?: number }).status ?? 500) as any);
+  c.status(((error as Error & { status?: number }).status ?? 500) as ContentfulStatusCode);
   return c.json({ error: redactedErrorMessage(error) });
 }
 
 export function stableAppId(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "generated-app";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "generated-app"
+  );
 }
 
 export function stableHash(value: string) {
@@ -44,7 +60,10 @@ export function configuredNonNegativeInteger(name: string, fallback: number) {
 
 const CHAT_STEP_DELAY_MS = Number(process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS ?? 120);
 
-export async function emitStep(sse: { writeSSE: (event: { event: string; data: string }) => Promise<void> }, text: string) {
+export async function emitStep(
+  sse: { writeSSE: (event: { event: string; data: string }) => Promise<void> },
+  text: string,
+) {
   await sse.writeSSE({ event: "step", data: JSON.stringify({ type: "step", text }) });
 }
 

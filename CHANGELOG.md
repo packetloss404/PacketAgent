@@ -30,6 +30,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   across alert, preview, rate-limit, invitation, metrics, template, and Worker
   observability modules; formatted the touched sources and passed 174 focused
   regressions.
+- Replaced ten backend `any` assertions with Hono status types, a serialized
+  dynamic workflow response boundary, and concrete activation/onboarding
+  contracts; 113 focused route/service tests passed with one intentional
+  Windows sandbox skip.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

@@ -1,4 +1,5 @@
 import { type Context, type Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { requireAuthenticatedContextAsync } from "../packetagent-services.js";
 import { loadStoreAsync } from "../packetagent-store.js";
@@ -94,14 +95,22 @@ async function previewGeneratedApp(c: Context) {
       });
       if ("file" in fallback) {
         c.header("X-PacketAgent-Generated-App-Fallback", "entrypoint");
-        const { content: fbContent, contentType: fbType } = await transformPreviewFile(fallback.file.path, fallback.file.content, fallback.file.contentType);
+        const { content: fbContent, contentType: fbType } = await transformPreviewFile(
+          fallback.file.path,
+          fallback.file.content,
+          fallback.file.contentType,
+        );
         c.header("Content-Type", fbType);
         return c.body(fbContent);
       }
     }
 
     if (!("file" in resolved)) throw httpRouteError(404, "preview file not found");
-    const { content: outContent, contentType: outType } = await transformPreviewFile(resolved.file.path, resolved.file.content, resolved.file.contentType);
+    const { content: outContent, contentType: outType } = await transformPreviewFile(
+      resolved.file.path,
+      resolved.file.content,
+      resolved.file.contentType,
+    );
     c.header("Content-Type", outType);
     return c.body(outContent);
   } catch (error) {
@@ -139,7 +148,9 @@ async function handleGeneratedAppRuntimeApi(c: Context) {
 
     const checkpoint = checkpointForPublish(record, c.req.query("checkpointId"));
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const model = buildGeneratedAppRuntimeModel(checkpoint.draft as unknown as AppBuilderDraftContract);
+    const model = buildGeneratedAppRuntimeModel(
+      checkpoint.draft as unknown as AppBuilderDraftContract,
+    );
     const result = await getDefaultGeneratedAppRuntimeProcessPool().request({
       appId: record.id,
       workspaceId,
@@ -149,12 +160,13 @@ async function handleGeneratedAppRuntimeApi(c: Context) {
       path: generatedAppRuntimeApiPathFromRequest(c, appIdParam) || model.primaryEntity,
       body: await readGeneratedAppRuntimeBody(c),
     });
-    c.status(result.status as any);
+    c.status(result.status as ContentfulStatusCode);
     c.header("Cache-Control", "no-store");
     c.header("X-PacketAgent-Generated-App-Id", record.id);
     c.header("X-PacketAgent-Generated-App-Checkpoint", checkpoint.id);
     c.header("X-PacketAgent-Generated-App-Runtime", "server-sqlite-process");
-    if (result.process.pid) c.header("X-PacketAgent-Generated-App-Runtime-Pid", String(result.process.pid));
+    if (result.process.pid)
+      c.header("X-PacketAgent-Generated-App-Runtime-Pid", String(result.process.pid));
     return c.json(result.body);
   } catch (error) {
     return errorResponse(c, error);
@@ -178,7 +190,8 @@ function wantsGeneratedAppPreviewReadiness(c: Context) {
 const PREVIEW_TOKEN_PREFIX = "tk_";
 const PREVIEW_TOKEN_DEFAULT_TTL_SECONDS = 60 * 60; // 1 hour
 const PREVIEW_TOKEN_MAX_TTL_SECONDS = 24 * 60 * 60; // 24 hours
-const PREVIEW_TOKEN_DEV_FALLBACK_SECRET = "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
+const PREVIEW_TOKEN_DEV_FALLBACK_SECRET =
+  "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
 let previewTokenFallbackWarned = false;
 
 function previewTokenSecret(): string {
@@ -221,7 +234,9 @@ function buildPreviewToken(appId: string, expirySec: number): string {
   return `${PREVIEW_TOKEN_PREFIX}${appId}.${expirySec}.${previewTokenHmac(appId, expirySec)}`;
 }
 
-function parsePreviewToken(token: string): { appId: string; expirySec: number; hmac: string } | null {
+function parsePreviewToken(
+  token: string,
+): { appId: string; expirySec: number; hmac: string } | null {
   if (!token.startsWith(PREVIEW_TOKEN_PREFIX)) return null;
   const remainder = token.slice(PREVIEW_TOKEN_PREFIX.length);
   const parts = remainder.split(".");
@@ -259,8 +274,9 @@ async function verifyPreviewToken(
   }
   if (!equal) return { ok: false };
   const data = await loadStoreAsync();
-  const record = ((data.generatedApps ?? []) as GeneratedAppRecordWithRuntime[])
-    .find((entry) => entry.id === parsed.appId);
+  const record = ((data.generatedApps ?? []) as GeneratedAppRecordWithRuntime[]).find(
+    (entry) => entry.id === parsed.appId,
+  );
   if (!record) return { ok: false };
   return { ok: true, record };
 }
@@ -274,13 +290,13 @@ async function createGeneratedAppPreviewToken(c: Context) {
     if (!record) throw httpRouteError(404, "generated app not found");
 
     const ttlRaw = Number.parseInt(c.req.query("ttl") ?? "", 10);
-    const ttlSeconds = Number.isFinite(ttlRaw) && ttlRaw > 0
-      ? Math.min(ttlRaw, PREVIEW_TOKEN_MAX_TTL_SECONDS)
-      : PREVIEW_TOKEN_DEFAULT_TTL_SECONDS;
+    const ttlSeconds =
+      Number.isFinite(ttlRaw) && ttlRaw > 0
+        ? Math.min(ttlRaw, PREVIEW_TOKEN_MAX_TTL_SECONDS)
+        : PREVIEW_TOKEN_DEFAULT_TTL_SECONDS;
     const expirySec = Math.floor(Date.now() / 1000) + ttlSeconds;
     const token = buildPreviewToken(record.id, expirySec);
-    const previewUrl =
-      `/api/app/generated-apps/${encodeURIComponent(record.id)}/preview/?token=${encodeURIComponent(token)}`;
+    const previewUrl = `/api/app/generated-apps/${encodeURIComponent(record.id)}/preview/?token=${encodeURIComponent(token)}`;
 
     return c.json({
       token,
@@ -327,7 +343,10 @@ async function transformPreviewFile(
     if (/<head\b[^>]*>/i.test(injected)) {
       injected = injected.replace(/<head\b[^>]*>/i, (m) => `${m}\n${PREVIEW_IMPORT_MAP}`);
     } else if (/<html\b[^>]*>/i.test(injected)) {
-      injected = injected.replace(/<html\b[^>]*>/i, (m) => `${m}\n<head>${PREVIEW_IMPORT_MAP}</head>`);
+      injected = injected.replace(
+        /<html\b[^>]*>/i,
+        (m) => `${m}\n<head>${PREVIEW_IMPORT_MAP}</head>`,
+      );
     } else {
       injected = `${PREVIEW_IMPORT_MAP}\n${injected}`;
     }
@@ -384,13 +403,15 @@ function generatedAppRuntimeApiPathFromRequest(c: Context, appId: string): strin
   return decodeURIComponent(path.slice(path.indexOf(marker) + marker.length)).replace(/^\/+/, "");
 }
 
-async function readGeneratedAppRuntimeBody(c: Context): Promise<Record<string, unknown> | undefined> {
+async function readGeneratedAppRuntimeBody(
+  c: Context,
+): Promise<Record<string, unknown> | undefined> {
   if (isGeneratedAppReadOnlyMethod(c.req.method)) return undefined;
   const contentType = c.req.header("content-type") ?? "";
   if (!contentType.toLowerCase().includes("application/json")) return undefined;
-  const parsed = await c.req.json().catch(() => undefined) as unknown;
+  const parsed = (await c.req.json().catch(() => undefined)) as unknown;
   return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
+    ? (parsed as Record<string, unknown>)
     : undefined;
 }
 
@@ -401,7 +422,9 @@ function isGeneratedAppReadOnlyMethod(method: string): boolean {
 export function registerPreviewRoutes(app: Hono): void {
   app.get("/app/generated-apps/:appId/preview", async (c) => previewGeneratedApp(c));
   app.get("/app/generated-apps/:appId/preview/*", async (c) => previewGeneratedApp(c));
-  app.post("/app/generated-apps/:appId/preview-token", async (c) => createGeneratedAppPreviewToken(c));
+  app.post("/app/generated-apps/:appId/preview-token", async (c) =>
+    createGeneratedAppPreviewToken(c),
+  );
   app.get("/app/generated-apps/:appId/api", async (c) => handleGeneratedAppRuntimeApi(c));
   app.get("/app/generated-apps/:appId/api/*", async (c) => handleGeneratedAppRuntimeApi(c));
   app.post("/app/generated-apps/:appId/api/*", async (c) => handleGeneratedAppRuntimeApi(c));
