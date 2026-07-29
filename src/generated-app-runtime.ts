@@ -112,7 +112,9 @@ export interface GeneratedAppSourceFileSummary {
   role: GeneratedAppSourceFileRecord["role"];
 }
 
-export function buildGeneratedAppRuntimeArtifact(input: GeneratedAppRuntimeInput): GeneratedAppRuntimeArtifactRecord {
+export function buildGeneratedAppRuntimeArtifact(
+  input: GeneratedAppRuntimeInput,
+): GeneratedAppRuntimeArtifactRecord {
   const renderedAt = input.renderedAt ?? new Date().toISOString();
   const model = buildGeneratedAppRuntimeModel(input.draft);
   const previewData = {
@@ -139,7 +141,11 @@ export function buildGeneratedAppRuntimeArtifact(input: GeneratedAppRuntimeInput
     sourceFile("src/db/migrations/0001_initial.sql", renderMigrationSql(model), "config"),
     sourceFile("src/db/seed.ts", renderSeedTs(model), "source"),
     sourceFile("src/generated-app.json", JSON.stringify(previewData, null, 2), "manifest"),
-    sourceFile("README.md", renderReadme(input.draft, input.appId, input.checkpointId, model), "docs"),
+    sourceFile(
+      "README.md",
+      renderReadme(input.draft, input.appId, input.checkpointId, model),
+      "docs",
+    ),
   ];
 
   return {
@@ -160,10 +166,10 @@ export function buildGeneratedAppRuntimeArtifactFromFiles(
   }
   const records = [...byPath.values()];
   const entrypoint =
-    records.find((file) => file.path === "index.html")?.path
-    ?? records.find((file) => file.role === "entrypoint")?.path
-    ?? records[0]?.path
-    ?? "index.html";
+    records.find((file) => file.path === "index.html")?.path ??
+    records.find((file) => file.role === "entrypoint")?.path ??
+    records[0]?.path ??
+    "index.html";
   return { entrypoint, files: records, renderedAt };
 }
 
@@ -173,13 +179,27 @@ export function generatedAppSourceFileFromContent(
 ): GeneratedAppSourceFileRecord {
   const validated = validateWorkspacePath(rawPath);
   if (!validated.ok || !validated.normalized) {
-    throw new Error(`invalid generated app source path ${JSON.stringify(rawPath)}: ${validated.reason ?? "unknown reason"}`);
+    throw new Error(
+      `invalid generated app source path ${JSON.stringify(rawPath)}: ${validated.reason ?? "unknown reason"}`,
+    );
   }
-  return sourceFile(validated.normalized, content, roleForGeneratedSourcePath(validated.normalized));
+  return sourceFile(
+    validated.normalized,
+    content,
+    roleForGeneratedSourcePath(validated.normalized),
+  );
 }
 
-export function summarizeGeneratedAppSourceFiles(files: GeneratedAppSourceFileRecord[]): GeneratedAppSourceFileSummary[] {
-  return files.map(({ path, contentType, size, sha256, role }) => ({ path, contentType, size, sha256, role }));
+export function summarizeGeneratedAppSourceFiles(
+  files: GeneratedAppSourceFileRecord[],
+): GeneratedAppSourceFileSummary[] {
+  return files.map(({ path, contentType, size, sha256, role }) => ({
+    path,
+    contentType,
+    size,
+    sha256,
+    role,
+  }));
 }
 
 export function findGeneratedAppSourceFile(
@@ -199,25 +219,28 @@ export function getGeneratedAppPreviewHtml(artifact: GeneratedAppRuntimeArtifact
 export async function writeGeneratedAppRuntimeWorkspace(
   input: GeneratedAppRuntimeWorkspaceInput,
 ): Promise<GeneratedAppWorkspaceWriteResult> {
-  return writeGeneratedAppWorkspace({
-    workspaceSlug: input.workspaceSlug,
-    appSlug: input.appSlug,
-    appId: input.appId,
-    workspaceId: input.workspaceId,
-    checkpointId: input.checkpointId,
-    checkpointLabel: input.checkpointLabel,
-    checkpointCreatedAt: input.checkpointCreatedAt,
-    writtenAt: input.writtenAt ?? input.artifact.renderedAt,
-    files: input.artifact.files.map((file) => ({
-      path: file.path,
-      content: file.content,
-      contentType: file.contentType,
-      role: file.role,
-    })),
-  }, {
-    rootDir: input.rootDir,
-    generatedAppsRoot: input.generatedAppsRoot,
-  });
+  return writeGeneratedAppWorkspace(
+    {
+      workspaceSlug: input.workspaceSlug,
+      appSlug: input.appSlug,
+      appId: input.appId,
+      workspaceId: input.workspaceId,
+      checkpointId: input.checkpointId,
+      checkpointLabel: input.checkpointLabel,
+      checkpointCreatedAt: input.checkpointCreatedAt,
+      writtenAt: input.writtenAt ?? input.artifact.renderedAt,
+      files: input.artifact.files.map((file) => ({
+        path: file.path,
+        content: file.content,
+        contentType: file.contentType,
+        role: file.role,
+      })),
+    },
+    {
+      rootDir: input.rootDir,
+      generatedAppsRoot: input.generatedAppsRoot,
+    },
+  );
 }
 
 function sourceFile(
@@ -240,25 +263,25 @@ function roleForGeneratedSourcePath(path: string): GeneratedAppSourceFileRecord[
   if (lower === "index.html") return "entrypoint";
   if (lower === "readme.md" || lower.startsWith("docs/")) return "docs";
   if (
-    lower.endsWith(".config.ts")
-    || lower.endsWith(".config.js")
-    || lower.endsWith(".config.mjs")
-    || lower.endsWith(".config.cjs")
-    || lower === "tsconfig.json"
-    || lower === "vite.config.ts"
-    || lower === "postcss.config.js"
-    || lower === "tailwind.config.js"
-    || lower === "tailwind.config.ts"
-    || lower.startsWith(".")
+    lower.endsWith(".config.ts") ||
+    lower.endsWith(".config.js") ||
+    lower.endsWith(".config.mjs") ||
+    lower.endsWith(".config.cjs") ||
+    lower === "tsconfig.json" ||
+    lower === "vite.config.ts" ||
+    lower === "postcss.config.js" ||
+    lower === "tailwind.config.js" ||
+    lower === "tailwind.config.ts" ||
+    lower.startsWith(".")
   ) {
     return "config";
   }
   if (
-    lower === "package.json"
-    || lower.endsWith("/package.json")
-    || lower.endsWith(".json")
-    || lower.includes("/data/")
-    || lower.includes("/seed")
+    lower === "package.json" ||
+    lower.endsWith("/package.json") ||
+    lower.endsWith(".json") ||
+    lower.includes("/data/") ||
+    lower.includes("/seed")
   ) {
     return "manifest";
   }
@@ -766,44 +789,52 @@ function recordSummary(record: GeneratedRecord): string {
 }
 
 function renderPackageJson(draft: GeneratedAppRuntimeDraft) {
-  return JSON.stringify({
-    name: draft.app.slug,
-    private: true,
-    version: "0.1.0",
-    type: "module",
-    scripts: {
-      dev: "vite",
-      build: "vite build",
-      preview: "vite preview",
+  return JSON.stringify(
+    {
+      name: draft.app.slug,
+      private: true,
+      version: "0.1.0",
+      type: "module",
+      scripts: {
+        dev: "vite",
+        build: "vite build",
+        preview: "vite preview",
+      },
+      dependencies: {
+        "@vitejs/plugin-react": "^5.0.0",
+        vite: "^7.0.0",
+        typescript: "^5.0.0",
+        react: "^19.0.0",
+        "react-dom": "^19.0.0",
+      },
     },
-    dependencies: {
-      "@vitejs/plugin-react": "^5.0.0",
-      vite: "^7.0.0",
-      typescript: "^5.0.0",
-      react: "^19.0.0",
-      "react-dom": "^19.0.0",
-    },
-  }, null, 2);
+    null,
+    2,
+  );
 }
 
 function renderTsConfig() {
-  return JSON.stringify({
-    compilerOptions: {
-      target: "ES2022",
-      lib: ["DOM", "DOM.Iterable", "ES2022"],
-      module: "ESNext",
-      moduleResolution: "Bundler",
-      strict: true,
-      jsx: "react-jsx",
-      resolveJsonModule: true,
-      esModuleInterop: true,
-      allowSyntheticDefaultImports: true,
-      skipLibCheck: true,
-      isolatedModules: true,
-      noEmit: true,
+  return JSON.stringify(
+    {
+      compilerOptions: {
+        target: "ES2022",
+        lib: ["DOM", "DOM.Iterable", "ES2022"],
+        module: "ESNext",
+        moduleResolution: "Bundler",
+        strict: true,
+        jsx: "react-jsx",
+        resolveJsonModule: true,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        skipLibCheck: true,
+        isolatedModules: true,
+        noEmit: true,
+      },
+      include: ["src"],
     },
-    include: ["src"],
-  }, null, 2);
+    null,
+    2,
+  );
 }
 
 function renderViteConfig() {
@@ -1133,16 +1164,21 @@ export type GeneratedSchemaEntity = typeof schema[number];
 }
 
 function renderMigrationSql(model: GeneratedAppRuntimeModel) {
-  return model.schema.map((entity) => {
-    const fieldNames = new Set(entity.fields.map((field) => snakeCase(field.name)));
-    const columns = entity.fields.map((field) => `  ${snakeCase(field.name)} ${sqlType(field.type)}${field.name === "id" ? " PRIMARY KEY" : field.required ? " NOT NULL" : ""}`);
-    if (!fieldNames.has("id")) columns.unshift("  id TEXT PRIMARY KEY");
-    columns.push("  archived BOOLEAN NOT NULL DEFAULT FALSE");
-    columns.push("  archived_at TIMESTAMPTZ");
-    return `CREATE TABLE IF NOT EXISTS ${snakeCase(entity.name)} (
+  return model.schema
+    .map((entity) => {
+      const fieldNames = new Set(entity.fields.map((field) => snakeCase(field.name)));
+      const columns = entity.fields.map(
+        (field) =>
+          `  ${snakeCase(field.name)} ${sqlType(field.type)}${field.name === "id" ? " PRIMARY KEY" : field.required ? " NOT NULL" : ""}`,
+      );
+      if (!fieldNames.has("id")) columns.unshift("  id TEXT PRIMARY KEY");
+      columns.push("  archived BOOLEAN NOT NULL DEFAULT FALSE");
+      columns.push("  archived_at TIMESTAMPTZ");
+      return `CREATE TABLE IF NOT EXISTS ${snakeCase(entity.name)} (
 ${columns.join(",\n")}
 );`;
-  }).join("\n\n");
+    })
+    .join("\n\n");
 }
 
 function renderSeedTs(model: GeneratedAppRuntimeModel) {
@@ -1157,7 +1193,12 @@ export function loadGeneratedSeedData() {
 `;
 }
 
-function renderReadme(draft: GeneratedAppRuntimeDraft, appId: string, checkpointId: string, model?: GeneratedAppRuntimeModel) {
+function renderReadme(
+  draft: GeneratedAppRuntimeDraft,
+  appId: string,
+  checkpointId: string,
+  model?: GeneratedAppRuntimeModel,
+) {
   return `# ${draft.app.name}
 
 Generated app artifact for \`${appId}\` at checkpoint \`${checkpointId}\`.
@@ -1189,39 +1230,48 @@ ${draft.app.apiRoutes.map((route) => `- \`${route.method} ${route.path}\` - ${ro
 `;
 }
 
-export function buildGeneratedAppRuntimeModel(draft: GeneratedAppRuntimeDraft): GeneratedAppRuntimeModel {
-  const primaryEntity = draft.app.crudFlows[0]?.entity
-    ?? draft.app.dataSchema[0]?.name
-    ?? "record";
-  const sourceEntities = draft.app.dataSchema.length > 0
-    ? draft.app.dataSchema
-    : [{
-      name: primaryEntity,
-      fields: [
-        { name: "id", type: "string", required: true },
-        { name: "name", type: "string", required: true },
-        { name: "status", type: "string", required: true },
-      ],
-      relationships: [],
-    }];
+export function buildGeneratedAppRuntimeModel(
+  draft: GeneratedAppRuntimeDraft,
+): GeneratedAppRuntimeModel {
+  const primaryEntity = draft.app.crudFlows[0]?.entity ?? draft.app.dataSchema[0]?.name ?? "record";
+  const sourceEntities =
+    draft.app.dataSchema.length > 0
+      ? draft.app.dataSchema
+      : [
+          {
+            name: primaryEntity,
+            fields: [
+              { name: "id", type: "string", required: true },
+              { name: "name", type: "string", required: true },
+              { name: "status", type: "string", required: true },
+            ],
+            relationships: [],
+          },
+        ];
   const schema = sourceEntities.map((entity) => {
     const fields = ensureIdField(entity.fields).map((field) => ({ ...field }));
     const editableFields = fields
-      .filter((field) => field.name !== "id" && !field.name.endsWith("At") && field.name !== "archivedAt")
+      .filter(
+        (field) => field.name !== "id" && !field.name.endsWith("At") && field.name !== "archivedAt",
+      )
       .map((field) => field.name);
     return {
       name: entity.name,
       label: titleCase(humanLabel(entity.name)),
       fields,
-      requiredFields: fields.filter((field) => field.required && field.name !== "id").map((field) => field.name),
+      requiredFields: fields
+        .filter((field) => field.required && field.name !== "id")
+        .map((field) => field.name),
       editableFields: editableFields.length > 0 ? editableFields : ["name", "status"],
       relationships: [...entity.relationships],
     };
   });
-  const seedData = Object.fromEntries(schema.map((entity) => [
-    entity.name,
-    [1, 2].map((index) => seedRecordForEntity(entity, index)),
-  ]));
+  const seedData = Object.fromEntries(
+    schema.map((entity) => [
+      entity.name,
+      [1, 2].map((index) => seedRecordForEntity(entity, index)),
+    ]),
+  );
   return { primaryEntity, schema, seedData };
 }
 
@@ -1232,10 +1282,12 @@ function ensureIdField(fields: RuntimeSchemaEntity["fields"]): RuntimeSchemaEnti
 }
 
 function seedRecordForEntity(entity: RuntimeSchemaEntity, index: number): RuntimeSeedRecord {
-  return Object.fromEntries(entity.fields.map((field) => [
-    field.name,
-    seedValueForField(entity.name, field.name, field.type, index),
-  ]));
+  return Object.fromEntries(
+    entity.fields.map((field) => [
+      field.name,
+      seedValueForField(entity.name, field.name, field.type, index),
+    ]),
+  );
 }
 
 function contentTypeForPath(path: string) {
@@ -1255,10 +1307,16 @@ function humanLabel(value: string) {
     .toLowerCase();
 }
 
-function seedValueForField(entityName: string, fieldName: string, fieldType: string, index: number): RuntimeRecordValue {
+function seedValueForField(
+  entityName: string,
+  fieldName: string,
+  fieldType: string,
+  index: number,
+): RuntimeRecordValue {
   if (fieldName === "id") return `${entityName}_${String(index).padStart(3, "0")}`;
   if (/email/i.test(fieldName)) return `${entityName}${index}@example.com`;
-  if (/Id$/.test(fieldName)) return `${fieldName.replace(/Id$/, "").toLowerCase()}_${String(index).padStart(3, "0")}`;
+  if (/Id$/.test(fieldName))
+    return `${fieldName.replace(/Id$/, "").toLowerCase()}_${String(index).padStart(3, "0")}`;
   if (/title|name|label/i.test(fieldName)) return `${titleCase(humanLabel(entityName))} ${index}`;
   if (/status/i.test(fieldName)) return index === 1 ? "active" : "pending";
   if (/priority/i.test(fieldName)) return index === 1 ? "high" : "medium";
@@ -1289,12 +1347,18 @@ function snakeCase(value: string) {
 
 function sqlType(value: string) {
   switch (value) {
-    case "uuid": return "TEXT";
-    case "number": return "NUMERIC";
-    case "boolean": return "BOOLEAN";
-    case "date": return "DATE";
-    case "datetime": return "TIMESTAMPTZ";
-    default: return "TEXT";
+    case "uuid":
+      return "TEXT";
+    case "number":
+      return "NUMERIC";
+    case "boolean":
+      return "BOOLEAN";
+    case "date":
+      return "DATE";
+    case "datetime":
+      return "TIMESTAMPTZ";
+    default:
+      return "TEXT";
   }
 }
 
@@ -1313,22 +1377,16 @@ function safeJson(value: unknown) {
 function escapeHtml(value: unknown) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => {
     switch (char) {
-      case "&": return "&amp;";
-      case "<": return "&lt;";
-      case ">": return "&gt;";
-      case '"': return "&quot;";
-      default: return "&#39;";
-    }
-  });
-}
-
-function escapeJsxText(value: unknown) {
-  return String(value ?? "").replace(/[{}<>]/g, (char) => {
-    switch (char) {
-      case "{": return "&#123;";
-      case "}": return "&#125;";
-      case "<": return "&lt;";
-      default: return "&gt;";
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
     }
   });
 }

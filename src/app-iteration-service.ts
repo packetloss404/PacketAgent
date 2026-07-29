@@ -8,7 +8,6 @@ import {
   type AuthorAppOptions,
   type AuthorAppResult,
   type GeneratedFile,
-  type ResolvedPrompts,
 } from "./codegen/llm-author.js";
 import { validateFileTree, type ValidationResult } from "./codegen/validate.js";
 

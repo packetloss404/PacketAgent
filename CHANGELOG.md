@@ -37,6 +37,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Replaced the Anthropic and OpenAI factories' CommonJS `require` calls with
   native ESM imports and aligned the Anthropic stream interface with the SDK's
   synchronous async-iterable return.
+- Closed the backend ESLint-warning baseline by removing dead builder publish
+  helpers and unused iteration/runtime/workflow imports; 92 focused builder,
+  runtime, and workflow tests passed with one intentional Windows sandbox skip.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

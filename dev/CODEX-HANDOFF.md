@@ -632,10 +632,11 @@ handoff, the roadmap, or the backlog.
 
 Known inherited quality debt:
 
-- repo-wide `npm run format:check` flags 292 inherited files;
+- repo-wide `npm run format:check` flags 289 inherited files;
 - full and production dependency audits each report two high package entries
   for the same accepted, unreachable React Router RSC advisory; and
-- ESLint reports zero errors and 56 inherited warnings.
+- ESLint reports zero errors and 50 frontend-only inherited warnings; backend
+  warnings are closed.
 
 Do not use `npm audit fix --force` or format the entire repository as an
 incidental part of the Worker loops. Track those cleanups separately in the

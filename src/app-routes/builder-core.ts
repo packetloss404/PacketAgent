@@ -1,7 +1,7 @@
 import { type Context, type Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import {
   generateAppDraftFromPrompt,
   generateAppDraftWithLLM,
@@ -51,7 +51,10 @@ import {
 import type { ModelRoutingPresetId } from "../model-routing-presets.js";
 import { buildAppPublishReadiness } from "../app-publish-readiness.js";
 import { inspectAppPublishIntegrations } from "../app-publish-integrations.js";
-import { buildAppPublishValidation, type PublishArtifactObservation } from "../app-publish-service.js";
+import {
+  buildAppPublishValidation,
+  type PublishArtifactObservation,
+} from "../app-publish-service.js";
 import {
   buildGeneratedAppRuntimeArtifact,
   buildGeneratedAppRuntimeArtifactFromFiles,
@@ -133,7 +136,17 @@ interface GeneratedAppWorkspaceSummary {
     checkpointId: string;
   };
 }
-type AppBuilderIterationTargetKind = "app" | "page" | "data_entity" | "api_route" | "auth" | "smoke" | "config" | "file" | "agent" | "tool";
+type AppBuilderIterationTargetKind =
+  | "app"
+  | "page"
+  | "data_entity"
+  | "api_route"
+  | "auth"
+  | "smoke"
+  | "config"
+  | "file"
+  | "agent"
+  | "tool";
 type AppBuilderIterationDiffStatus = "generated" | "pending" | "applied" | "blocked";
 
 interface AppBuilderIterationTarget {
@@ -264,12 +277,17 @@ function templateNarrationLines(draft: AppDraft): string[] {
 
   const entities = Array.isArray(draft.dataSchema?.entities) ? draft.dataSchema.entities : [];
   const routes = Array.isArray(draft.apiRouteStubs) ? draft.apiRouteStubs : [];
-  const label = (draft.templateId && TEMPLATE_NARRATION_LABELS[draft.templateId]) || draft.templateId;
+  const label =
+    (draft.templateId && TEMPLATE_NARRATION_LABELS[draft.templateId]) || draft.templateId;
   if (label) {
-    lines.push(`I think the **${label}** shape fits this best — it has ${entities.length} entities and ${routes.length} routes ready to go.\n\nLet me put the plan together…\n\n`);
+    lines.push(
+      `I think the **${label}** shape fits this best — it has ${entities.length} entities and ${routes.length} routes ready to go.\n\nLet me put the plan together…\n\n`,
+    );
   }
 
-  const entityNames = entities.map((entity) => entity?.name).filter((name): name is string => typeof name === "string" && name.length > 0);
+  const entityNames = entities
+    .map((entity) => entity?.name)
+    .filter((name): name is string => typeof name === "string" && name.length > 0);
   if (entityNames.length > 0) {
     lines.push(`I'm sketching out the data model: ${entityNames.join(", ")}.\n\n`);
   }
@@ -322,11 +340,17 @@ async function applyAppBuilderDraft(c: Context) {
       runSmoke?: boolean;
       targetStatus?: GeneratedAppStatus;
     };
-    const draft = body.draft ?? buildAppBuilderDraft(generateAppDraftFromPrompt(promptFromBody(body.prompt)), context);
-    const fileTreeFiles = body.source === "llm-filetree" ? generatedFilesFromUnknown(body.files) : undefined;
+    const draft =
+      body.draft ??
+      buildAppBuilderDraft(generateAppDraftFromPrompt(promptFromBody(body.prompt)), context);
+    const fileTreeFiles =
+      body.source === "llm-filetree" ? generatedFilesFromUnknown(body.files) : undefined;
     const runSmoke = Boolean(body.runSmoke || body.runBuild);
     const smokeBuild = await runAppSmokeViaSandbox(draft, context, runSmoke);
-    const previewUrl = smokeBuild.status === "pass" ? previewUrlForDraft(draft, context, stableGeneratedAppId(draft, context)) : undefined;
+    const previewUrl =
+      smokeBuild.status === "pass"
+        ? previewUrlForDraft(draft, context, stableGeneratedAppId(draft, context))
+        : undefined;
     const record = await persistGeneratedAppDraft(context, draft, {
       status: body.targetStatus ?? (runSmoke ? "built" : "saved"),
       previewUrl,
@@ -336,52 +360,64 @@ async function applyAppBuilderDraft(c: Context) {
       fileTreeFiles,
     });
     const checkpoint = checkpointForPublish(record, record.checkpointId);
-    if (!checkpoint || !record.runtimeArtifact) throw httpRouteError(500, "generated app runtime artifact missing");
-    const workspace = await writeGeneratedAppWorkspace(context, record, checkpoint, record.runtimeArtifact);
+    if (!checkpoint || !record.runtimeArtifact)
+      throw httpRouteError(500, "generated app runtime artifact missing");
+    const workspace = await writeGeneratedAppWorkspace(
+      context,
+      record,
+      checkpoint,
+      record.runtimeArtifact,
+    );
 
-    return c.json({
-      draft: {
-        ...draft,
-        smokeBuildStatus: smokeBuild,
-      },
-      draftSource: fileTreeFiles ? "llm-filetree" : body.source,
-      fileTree: fileTreeFiles,
-      created: true,
-      applied: true,
-      app: {
-        id: record.id,
-        slug: record.slug,
-        name: record.name,
-        status: record.status,
+    return c.json(
+      {
+        draft: {
+          ...draft,
+          smokeBuildStatus: smokeBuild,
+        },
+        draftSource: fileTreeFiles ? "llm-filetree" : body.source,
+        fileTree: fileTreeFiles,
+        created: true,
+        applied: true,
+        app: {
+          id: record.id,
+          slug: record.slug,
+          name: record.name,
+          status: record.status,
+          previewUrl: record.previewUrl,
+          createdAt: record.createdAt,
+        },
+        checkpoint: {
+          id: record.checkpointId,
+          appId: record.id,
+          savedAt: record.updatedAt,
+        },
+        artifact: {
+          entrypoint: record.runtimeArtifact?.entrypoint,
+          renderedAt: record.runtimeArtifact?.renderedAt,
+          files: summarizeGeneratedAppSourceFiles(record.sourceFiles ?? []),
+        },
+        sourceFiles: summarizeGeneratedAppSourceFiles(record.sourceFiles ?? []),
+        workspace,
+        build: {
+          status: record.buildStatus ?? "not_run",
+          checks: smokeBuild.checks,
+        },
+        smoke: smokeBuild,
         previewUrl: record.previewUrl,
-        createdAt: record.createdAt,
+        smokeBuild,
       },
-      checkpoint: {
-        id: record.checkpointId,
-        appId: record.id,
-        savedAt: record.updatedAt,
-      },
-      artifact: {
-        entrypoint: record.runtimeArtifact?.entrypoint,
-        renderedAt: record.runtimeArtifact?.renderedAt,
-        files: summarizeGeneratedAppSourceFiles(record.sourceFiles ?? []),
-      },
-      sourceFiles: summarizeGeneratedAppSourceFiles(record.sourceFiles ?? []),
-      workspace,
-      build: {
-        status: record.buildStatus ?? "not_run",
-        checks: smokeBuild.checks,
-      },
-      smoke: smokeBuild,
-      previewUrl: record.previewUrl,
-      smokeBuild,
-    }, 201);
+      201,
+    );
   } catch (error) {
     return errorResponse(c, error);
   }
 }
 
-async function generateAppIteration(c: Context, responseShape: "iteration" | "changeSet" = "iteration") {
+async function generateAppIteration(
+  c: Context,
+  responseShape: "iteration" | "changeSet" = "iteration",
+) {
   try {
     const context = await requireAuthenticatedContextAsync(c);
     await requireWorkspacePermission(context, "manageWorkspace");
@@ -409,7 +445,9 @@ async function runAppIterationCore(
   const targetKind = body.target?.kind ?? "app";
   await onStep?.(`Scoping change to ${targetKind}`);
   const targetForService = appIterationTargetForService(body.target);
-  const changeText = body.sourceError?.prompt ? `${prompt}\n\nSource error: ${body.sourceError.message}` : prompt;
+  const changeText = body.sourceError?.prompt
+    ? `${prompt}\n\nSource error: ${body.sourceError.message}`
+    : prompt;
 
   const request: AppIterationChangeRequest = {
     draftId: body.checkpointId ?? record?.checkpointId ?? body.appId,
@@ -421,15 +459,18 @@ async function runAppIterationCore(
   const plan = buildAppIterationPlan(iterationDraft, request);
   const previousSnapshot = latestPreviewSnapshot(record);
   const sourceAppId = record?.id ?? body.appId ?? stableGeneratedAppId(draft, context);
-  const previousCheckpoint = record ? checkpointForPublish(record, body.checkpointId ?? record.checkpointId) : null;
-  const previousArtifact = previousCheckpoint && record
-    ? generatedAppRuntimeArtifact(record, previousCheckpoint)
-    : buildGeneratedAppRuntimeArtifact({
-      appId: sourceAppId,
-      workspaceId: context.workspace.id,
-      checkpointId: body.checkpointId ?? "draft",
-      draft,
-    });
+  const previousCheckpoint = record
+    ? checkpointForPublish(record, body.checkpointId ?? record.checkpointId)
+    : null;
+  const previousArtifact =
+    previousCheckpoint && record
+      ? generatedAppRuntimeArtifact(record, previousCheckpoint)
+      : buildGeneratedAppRuntimeArtifact({
+          appId: sourceAppId,
+          workspaceId: context.workspace.id,
+          checkpointId: body.checkpointId ?? "draft",
+          draft,
+        });
 
   await onStep?.("Checking integrations");
   const integrationReadiness = await getIntegrationReadinessAsync(context);
@@ -447,8 +488,12 @@ async function runAppIterationCore(
     connectedConnectors: integrationReadiness.tools.names,
     providers: {
       configured: integrationReadiness.providers.readyCount > 0,
-      openai: integrationReadiness.providers.missingApiKeys.every((entry) => entry.provider !== "openai"),
-      anthropic: integrationReadiness.providers.missingApiKeys.every((entry) => entry.provider !== "anthropic"),
+      openai: integrationReadiness.providers.missingApiKeys.every(
+        (entry) => entry.provider !== "openai",
+      ),
+      anthropic: integrationReadiness.providers.missingApiKeys.every(
+        (entry) => entry.provider !== "anthropic",
+      ),
     },
     database: {
       configured: true,
@@ -458,11 +503,13 @@ async function runAppIterationCore(
   });
 
   const fileTreeInput = fileTreeForIteration(body, record, previousCheckpoint);
-  if (shouldUseFileTreeIteration({
-    flagOn: process.env.PACKETAGENT_LEGACY_TEMPLATES !== "1",
-    draftSource: fileTreeInput.source,
-    files: fileTreeInput.files,
-  })) {
+  if (
+    shouldUseFileTreeIteration({
+      flagOn: process.env.PACKETAGENT_LEGACY_TEMPLATES !== "1",
+      draftSource: fileTreeInput.source,
+      files: fileTreeInput.files,
+    })
+  ) {
     await onStep?.("Updating generated file tree");
     let fileTreeResult: Awaited<ReturnType<typeof applyAppIterationViaFileTree>> | null = null;
     try {
@@ -473,14 +520,22 @@ async function runAppIterationCore(
           workspaceId: context.workspace.id,
           preset: body.preset as AppIterationPresetId | undefined,
         },
-        onProse ? async (chunk) => { await onProse(chunk); } : undefined,
+        onProse
+          ? async (chunk) => {
+              await onProse(chunk);
+            }
+          : undefined,
       );
     } catch {
       fileTreeResult = null;
     }
 
     if (fileTreeResult) {
-      const appDraft = deriveDraftFromFiles(fileTreeResult.newFiles, draft.prompt, fileTreeResult.changedSummary);
+      const appDraft = deriveDraftFromFiles(
+        fileTreeResult.newFiles,
+        draft.prompt,
+        fileTreeResult.changedSummary,
+      );
       const candidateDraft = buildAppBuilderDraft(appDraft, context);
       const smoke = buildAppSmokeStatusFromDraft(candidateDraft, context, false);
       const candidateArtifact = buildGeneratedAppRuntimeArtifactFromFiles(fileTreeResult.newFiles);
@@ -510,11 +565,21 @@ async function runAppIterationCore(
         smoke,
         logs: [
           ...plan.warnings.map((warning) => routeLog("warn", warning)),
-          ...plan.risks.map((risk) => routeLog(risk.severity === "high" ? "warn" : "info", risk.message)),
-          ...tools.requests.map((request) => routeLog(request.ready ? "info" : "warn", request.rationale)),
-          routeLog("info", `Generated ${sourceDiffFiles.length} source file diff${sourceDiffFiles.length === 1 ? "" : "s"} from the file tree.`),
+          ...plan.risks.map((risk) =>
+            routeLog(risk.severity === "high" ? "warn" : "info", risk.message),
+          ),
+          ...tools.requests.map((request) =>
+            routeLog(request.ready ? "info" : "warn", request.rationale),
+          ),
+          routeLog(
+            "info",
+            `Generated ${sourceDiffFiles.length} source file diff${sourceDiffFiles.length === 1 ? "" : "s"} from the file tree.`,
+          ),
           routeLog("info", comparison.summary),
-          routeLog("info", `File-tree iteration via ${fileTreeResult.model}: ${fileTreeResult.changedSummary}`),
+          routeLog(
+            "info",
+            `File-tree iteration via ${fileTreeResult.model}: ${fileTreeResult.changedSummary}`,
+          ),
         ],
         snapshot,
         tools,
@@ -540,7 +605,11 @@ async function runAppIterationCore(
         workspaceId: context.workspace.id,
         preset: body.preset as AppIterationPresetId | undefined,
       },
-      onProse ? async (chunk) => { await onProse(chunk); } : undefined,
+      onProse
+        ? async (chunk) => {
+            await onProse(chunk);
+          }
+        : undefined,
     );
   } catch {
     llmResult = null;
@@ -582,11 +651,20 @@ async function runAppIterationCore(
     smoke,
     logs: [
       ...plan.warnings.map((warning) => routeLog("warn", warning)),
-      ...plan.risks.map((risk) => routeLog(risk.severity === "high" ? "warn" : "info", risk.message)),
-      ...tools.requests.map((request) => routeLog(request.ready ? "info" : "warn", request.rationale)),
-      routeLog("info", `Generated ${sourceDiffFiles.length} source file diff${sourceDiffFiles.length === 1 ? "" : "s"} for the candidate runtime artifact.`),
+      ...plan.risks.map((risk) =>
+        routeLog(risk.severity === "high" ? "warn" : "info", risk.message),
+      ),
+      ...tools.requests.map((request) =>
+        routeLog(request.ready ? "info" : "warn", request.rationale),
+      ),
+      routeLog(
+        "info",
+        `Generated ${sourceDiffFiles.length} source file diff${sourceDiffFiles.length === 1 ? "" : "s"} for the candidate runtime artifact.`,
+      ),
       routeLog("info", comparison.summary),
-      ...(llmResult ? [routeLog("info", `LLM iteration via ${llmResult.model}: ${llmResult.changedSummary}`)] : []),
+      ...(llmResult
+        ? [routeLog("info", `LLM iteration via ${llmResult.model}: ${llmResult.changedSummary}`)]
+        : []),
     ],
     snapshot,
     tools,
@@ -597,32 +675,50 @@ async function runAppIterationCore(
   });
 }
 
-async function applyAppIteration(c: Context, responseShape: "iteration" | "changeSet" = "iteration") {
+async function applyAppIteration(
+  c: Context,
+  responseShape: "iteration" | "changeSet" = "iteration",
+) {
   try {
     const context = await requireAuthenticatedContextAsync(c);
     await requireWorkspacePermission(context, "manageWorkspace");
     const body = (await c.req.json()) as AppIterationApplyRouteRequest;
     const diff = body.diff ?? body.changeSet;
-    if (!diff) throw httpRouteError(400, "reviewed diff or changeSet is required to apply an app iteration");
+    if (!diff)
+      throw httpRouteError(400, "reviewed diff or changeSet is required to apply an app iteration");
     const draft = diff.draft ?? body.draft;
     const targetAppId = body.appId ?? diff?.appId;
     const targetCheckpointId = body.checkpointId ?? diff?.checkpointId;
-    if (!targetAppId && !targetCheckpointId) throw httpRouteError(400, "appId or checkpointId is required to apply an app iteration");
+    if (!targetAppId && !targetCheckpointId)
+      throw httpRouteError(400, "appId or checkpointId is required to apply an app iteration");
     if (!draft) throw httpRouteError(400, "diff.draft is required to apply an app iteration");
     const targetRecord = await findGeneratedAppRecord(context, targetAppId, targetCheckpointId);
     if (!targetRecord) throw httpRouteError(404, "generated app not found");
     validateIterationApplyTarget(targetRecord, draft, diff, targetCheckpointId);
     if (diff.status !== "generated" || diff.tools?.canProceed === false) {
-      throw httpRouteError(409, "blocked change set cannot be applied until setup blockers are resolved");
+      throw httpRouteError(
+        409,
+        "blocked change set cannot be applied until setup blockers are resolved",
+      );
     }
-    const previousCheckpoint = checkpointForPublish(targetRecord, targetCheckpointId ?? targetRecord.checkpointId);
+    const previousCheckpoint = checkpointForPublish(
+      targetRecord,
+      targetCheckpointId ?? targetRecord.checkpointId,
+    );
     if (!previousCheckpoint) throw httpRouteError(404, "checkpoint not found");
     const previousArtifact = generatedAppRuntimeArtifact(targetRecord, previousCheckpoint);
-    const fileTreeFiles = diff.draftSource === "llm-filetree" ? generatedFilesFromUnknown(diff.fileTree) : undefined;
+    const fileTreeFiles =
+      diff.draftSource === "llm-filetree" ? generatedFilesFromUnknown(diff.fileTree) : undefined;
 
     const runSmoke = body.runSmoke ?? body.runBuild ?? true;
-    const smoke = await runAppSmokeViaSandbox(draft, context, runSmoke, { appId: targetAppId, checkpointId: targetCheckpointId });
-    const previewUrl = smoke.status === "pass" ? previewUrlForDraft(draft, context, targetRecord.id) : body.previewUrl ?? diff?.preview?.url;
+    const smoke = await runAppSmokeViaSandbox(draft, context, runSmoke, {
+      appId: targetAppId,
+      checkpointId: targetCheckpointId,
+    });
+    const previewUrl =
+      smoke.status === "pass"
+        ? previewUrlForDraft(draft, context, targetRecord.id)
+        : (body.previewUrl ?? diff?.preview?.url);
     const record = await persistGeneratedAppDraft(context, draft, {
       status: runSmoke ? "built" : "saved",
       previewUrl,
@@ -634,8 +730,12 @@ async function applyAppIteration(c: Context, responseShape: "iteration" | "chang
       fileTreeFiles,
     });
     const newCheckpoint = checkpointForPublish(record, record.checkpointId);
-    const newArtifact = newCheckpoint ? generatedAppRuntimeArtifact(record, newCheckpoint) : record.runtimeArtifact;
-    const sourceDiffFiles = newArtifact ? diffGeneratedAppSourceFiles(previousArtifact, newArtifact) : [];
+    const newArtifact = newCheckpoint
+      ? generatedAppRuntimeArtifact(record, newCheckpoint)
+      : record.runtimeArtifact;
+    const sourceDiffFiles = newArtifact
+      ? diffGeneratedAppSourceFiles(previousArtifact, newArtifact)
+      : [];
     const mergedFiles = mergeIterationDiffFiles(diff?.files ?? body.files ?? [], sourceDiffFiles);
     const snapshot = buildAppPreviewSnapshotMetadata({
       workspaceId: context.workspace.id,
@@ -702,9 +802,10 @@ async function applyAppIteration(c: Context, responseShape: "iteration" | "chang
           ],
         }
       : undefined;
-    const workspace = newCheckpoint && newArtifact
-      ? await writeGeneratedAppWorkspace(context, record, newCheckpoint, newArtifact)
-      : undefined;
+    const workspace =
+      newCheckpoint && newArtifact
+        ? await writeGeneratedAppWorkspace(context, record, newCheckpoint, newArtifact)
+        : undefined;
 
     const payload = {
       applied: true,
@@ -739,10 +840,13 @@ async function applyAppIteration(c: Context, responseShape: "iteration" | "chang
     };
 
     if (responseShape === "changeSet") {
-      return c.json({
-        ...payload,
-        changeSet: appliedDiff,
-      }, 201);
+      return c.json(
+        {
+          ...payload,
+          changeSet: appliedDiff,
+        },
+        201,
+      );
     }
     return c.json(payload, 201);
   } catch (error) {
@@ -754,13 +858,24 @@ async function refreshBuilderPreview(c: Context) {
   try {
     const context = await requireAuthenticatedContextAsync(c);
     await requireWorkspacePermission(context, "manageWorkspace");
-    const body = (await c.req.json()) as { appId?: string; checkpointId?: string; runBuild?: boolean; runSmoke?: boolean };
+    const body = (await c.req.json()) as {
+      appId?: string;
+      checkpointId?: string;
+      runBuild?: boolean;
+      runSmoke?: boolean;
+    };
     const record = await findGeneratedAppRecord(context, body.appId, body.checkpointId);
     if (!record) throw httpRouteError(404, "generated app not found");
     const draft = record.draft as unknown as AppBuilderDraftContract;
     const runSmoke = Boolean(body.runSmoke || body.runBuild);
-    const smoke = await runAppSmokeViaSandbox(draft, context, runSmoke, { appId: record.id, checkpointId: record.checkpointId });
-    const previewUrl = runSmoke && smoke.status === "pass" ? previewUrlForDraft(draft, context, record.id) : record.previewUrl;
+    const smoke = await runAppSmokeViaSandbox(draft, context, runSmoke, {
+      appId: record.id,
+      checkpointId: record.checkpointId,
+    });
+    const previewUrl =
+      runSmoke && smoke.status === "pass"
+        ? previewUrlForDraft(draft, context, record.id)
+        : record.previewUrl;
     const snapshot = buildAppPreviewSnapshotMetadata({
       workspaceId: context.workspace.id,
       appId: record.id,
@@ -786,12 +901,14 @@ async function refreshBuilderPreview(c: Context) {
         buildId: snapshot.build.id,
         revision: record.checkpointId,
       },
-      lastRendered: previewUrl ? {
-        buildId: snapshot.build.id,
-        revision: record.checkpointId,
-        refreshedAt: new Date().toISOString(),
-        previewUrl,
-      } : undefined,
+      lastRendered: previewUrl
+        ? {
+            buildId: snapshot.build.id,
+            revision: record.checkpointId,
+            refreshedAt: new Date().toISOString(),
+            previewUrl,
+          }
+        : undefined,
     });
     const checkpoint = checkpointForPublish(record, body.checkpointId ?? record.checkpointId);
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
@@ -800,7 +917,10 @@ async function refreshBuilderPreview(c: Context) {
 
     return c.json({
       preview,
-      build: { status: runSmoke ? "passed" : record.buildStatus ?? "queued", checks: smoke.checks },
+      build: {
+        status: runSmoke ? "passed" : (record.buildStatus ?? "queued"),
+        checks: smoke.checks,
+      },
       smoke,
       checkpoint: { id: record.checkpointId, appId: record.id, savedAt: record.updatedAt },
       snapshot,
@@ -823,13 +943,21 @@ async function buildBuilderFixPrompt(c: Context) {
     await requireWorkspacePermission(context, "manageWorkspace");
     const body = (await c.req.json()) as AppIterationRouteRequest;
     const error = body.errorContext ?? body.sourceError;
-    const targetLabel = body.target?.label ?? body.target?.path ?? body.appId ?? body.agentId ?? "selected builder target";
+    const targetLabel =
+      body.target?.label ??
+      body.target?.path ??
+      body.appId ??
+      body.agentId ??
+      "selected builder target";
     const prompt = [
-      body.prompt?.trim() || `Fix the captured ${error?.source ?? "runtime"} issue for ${targetLabel}.`,
+      body.prompt?.trim() ||
+        `Fix the captured ${error?.source ?? "runtime"} issue for ${targetLabel}.`,
       error?.message ? `Error: ${error.message}` : undefined,
       body.checkpointId ? `Checkpoint: ${body.checkpointId}` : undefined,
       "Return a minimal scoped change set and preserve unrelated generated behavior.",
-    ].filter(Boolean).join("\n\n");
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     return c.json({ prompt });
   } catch (error) {
@@ -846,19 +974,23 @@ async function listAppCheckpoints(c: Context) {
     if (!appId && !agentId) throw httpRouteError(400, "appId or agentId is required");
     if (agentId) {
       const data = await loadStoreAsync();
-      const agent = data.agents.find((entry) => entry.workspaceId === context.workspace.id && entry.id === agentId);
+      const agent = data.agents.find(
+        (entry) => entry.workspaceId === context.workspace.id && entry.id === agentId,
+      );
       if (!agent) throw httpRouteError(404, "agent not found");
       const checkpointId = `agent_ckpt_${agent.id}_${stableHash(agent.updatedAt)}`;
       return c.json({
-        checkpoints: [{
-          id: checkpointId,
-          agentId: agent.id,
-          label: `${agent.name} current agent`,
-          source: "agent",
-          buildStatus: agent.status,
-          smokeStatus: "not_run",
-          createdAt: agent.updatedAt,
-        }],
+        checkpoints: [
+          {
+            id: checkpointId,
+            agentId: agent.id,
+            label: `${agent.name} current agent`,
+            source: "agent",
+            buildStatus: agent.status,
+            smokeStatus: "not_run",
+            createdAt: agent.updatedAt,
+          },
+        ],
         currentCheckpointId: checkpointId,
       });
     }
@@ -866,17 +998,19 @@ async function listAppCheckpoints(c: Context) {
     if (!record) throw httpRouteError(404, "generated app not found");
 
     return c.json({
-      checkpoints: (record.checkpoints ?? []).map((checkpoint) => ({
-        id: checkpoint.id,
-        appId: checkpoint.appId,
-        label: checkpoint.label,
-        source: checkpoint.source,
-        previewUrl: checkpoint.previewUrl,
-        buildStatus: checkpoint.buildStatus,
-        smokeStatus: checkpoint.smokeStatus,
-        previousCheckpointId: checkpoint.previousCheckpointId,
-        createdAt: checkpoint.createdAt,
-      })).sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+      checkpoints: (record.checkpoints ?? [])
+        .map((checkpoint) => ({
+          id: checkpoint.id,
+          appId: checkpoint.appId,
+          label: checkpoint.label,
+          source: checkpoint.source,
+          previewUrl: checkpoint.previewUrl,
+          buildStatus: checkpoint.buildStatus,
+          smokeStatus: checkpoint.smokeStatus,
+          previousCheckpointId: checkpoint.previousCheckpointId,
+          createdAt: checkpoint.createdAt,
+        }))
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
       currentCheckpointId: record.checkpointId,
     });
   } catch (error) {
@@ -894,7 +1028,9 @@ async function rollbackAppCheckpoint(c: Context) {
     if (!record) throw httpRouteError(404, "generated app not found");
     const target = (record.checkpoints ?? []).find((checkpoint) => checkpoint.id === checkpointId);
     if (!target) throw httpRouteError(404, "checkpoint not found");
-    const targetSourceArtifact = cloneGeneratedAppRuntimeArtifact(generatedAppRuntimeArtifact(record, target));
+    const targetSourceArtifact = cloneGeneratedAppRuntimeArtifact(
+      generatedAppRuntimeArtifact(record, target),
+    );
     const currentSnapshot = buildAppPreviewSnapshotMetadata({
       workspaceId: context.workspace.id,
       appId: record.id,
@@ -927,7 +1063,9 @@ async function rollbackAppCheckpoint(c: Context) {
 
     const rolledBack = await mutateStoreAsync((data) => {
       data.generatedApps ??= [];
-      const app = data.generatedApps?.find((entry) => entry.workspaceId === context.workspace.id && entry.id === record.id) as GeneratedAppRecordWithRuntime | undefined;
+      const app = data.generatedApps?.find(
+        (entry) => entry.workspaceId === context.workspace.id && entry.id === record.id,
+      ) as GeneratedAppRecordWithRuntime | undefined;
       if (!app) return null;
       const timestamp = new Date().toISOString();
       const restoredCheckpointId = `gapp_ckpt_${stableHash(`${context.workspace.id}:${app.slug}:rollback:${target.id}:${timestamp}`)}`;
@@ -995,7 +1133,10 @@ async function rollbackAppCheckpoint(c: Context) {
       smoke: (rolledBack.draft as AppBuilderDraftContract).smokeBuildStatus,
       draft: rolledBack.draft,
       draftSource: rolledBack.codegenSource,
-      fileTree: rolledBack.codegenSource === "llm-filetree" ? generatedFilesFromSourceRecords(rolledBack.sourceFiles) : undefined,
+      fileTree:
+        rolledBack.codegenSource === "llm-filetree"
+          ? generatedFilesFromSourceRecords(rolledBack.sourceFiles)
+          : undefined,
       artifact: {
         entrypoint: rolledBack.runtimeArtifact?.entrypoint,
         renderedAt: rolledBack.runtimeArtifact?.renderedAt,
@@ -1017,24 +1158,25 @@ async function branchAppCheckpoint(c: Context) {
     const body = (await c.req.json().catch(() => ({}))) as { appId?: string };
     const sourceRecord = await findGeneratedAppRecord(context, body.appId, checkpointId);
     if (!sourceRecord) throw httpRouteError(404, "generated app not found");
-    const sourceCheckpoint = (sourceRecord.checkpoints ?? []).find((checkpoint) => checkpoint.id === checkpointId)
-      ?? (sourceRecord.checkpointId === checkpointId
+    const sourceCheckpoint =
+      (sourceRecord.checkpoints ?? []).find((checkpoint) => checkpoint.id === checkpointId) ??
+      (sourceRecord.checkpointId === checkpointId
         ? {
-          id: sourceRecord.checkpointId,
-          appId: sourceRecord.id,
-          workspaceId: sourceRecord.workspaceId,
-          label: sourceRecord.name,
-          draft: sourceRecord.draft,
-          runtimeArtifact: sourceRecord.runtimeArtifact,
-          sourceFiles: sourceRecord.sourceFiles,
-          codegenSource: sourceRecord.codegenSource,
-          previewUrl: sourceRecord.previewUrl,
-          buildStatus: sourceRecord.buildStatus,
-          smokeStatus: sourceRecord.smokeStatus,
-          source: "initial" as const,
-          createdByUserId: sourceRecord.createdByUserId,
-          createdAt: sourceRecord.createdAt,
-        }
+            id: sourceRecord.checkpointId,
+            appId: sourceRecord.id,
+            workspaceId: sourceRecord.workspaceId,
+            label: sourceRecord.name,
+            draft: sourceRecord.draft,
+            runtimeArtifact: sourceRecord.runtimeArtifact,
+            sourceFiles: sourceRecord.sourceFiles,
+            codegenSource: sourceRecord.codegenSource,
+            previewUrl: sourceRecord.previewUrl,
+            buildStatus: sourceRecord.buildStatus,
+            smokeStatus: sourceRecord.smokeStatus,
+            source: "initial" as const,
+            createdByUserId: sourceRecord.createdByUserId,
+            createdAt: sourceRecord.createdAt,
+          }
         : undefined);
     if (!sourceCheckpoint) throw httpRouteError(404, "checkpoint not found");
 
@@ -1045,13 +1187,22 @@ async function branchAppCheckpoint(c: Context) {
       const newAppId = `gapp_${stableHash(branchSeed)}`;
       const newCheckpointId = `gapp_ckpt_${stableHash(`${branchSeed}:checkpoint`)}`;
       const branchSlug = `${sourceRecord.slug}-branch-${stableHash(branchSeed).slice(0, 6)}`;
-      const branchName = sourceRecord.name.endsWith(" (branch)") ? sourceRecord.name : `${sourceRecord.name} (branch)`;
-      const branchDraft = branchDraftForGeneratedApp(sourceCheckpoint.draft, branchSlug, branchName);
+      const branchName = sourceRecord.name.endsWith(" (branch)")
+        ? sourceRecord.name
+        : `${sourceRecord.name} (branch)`;
+      const branchDraft = branchDraftForGeneratedApp(
+        sourceCheckpoint.draft,
+        branchSlug,
+        branchName,
+      );
       const sourceFiles = sourceCheckpoint.runtimeArtifact?.files?.length
         ? sourceCheckpoint.runtimeArtifact.files
         : sourceCheckpoint.sourceFiles;
       const runtimeArtifact = sourceFiles?.length
-        ? runtimeArtifactFromSourceFiles(sourceFiles.map((file) => ({ ...file })), timestamp)
+        ? runtimeArtifactFromSourceFiles(
+            sourceFiles.map((file) => ({ ...file })),
+            timestamp,
+          )
         : buildGeneratedAppRuntimeArtifact({
             appId: newAppId,
             workspaceId: context.workspace.id,
@@ -1068,7 +1219,11 @@ async function branchAppCheckpoint(c: Context) {
         runtimeArtifact,
         sourceFiles: runtimeArtifact.files,
         codegenSource: sourceCheckpoint.codegenSource,
-        previewUrl: previewUrlForDraft(branchDraft as unknown as AppBuilderDraftContract, context, newAppId),
+        previewUrl: previewUrlForDraft(
+          branchDraft as unknown as AppBuilderDraftContract,
+          context,
+          newAppId,
+        ),
         buildStatus: sourceCheckpoint.buildStatus,
         smokeStatus: sourceCheckpoint.smokeStatus,
         source: "branch",
@@ -1117,25 +1272,28 @@ async function branchAppCheckpoint(c: Context) {
     });
     if (!branched) throw httpRouteError(500, "failed to branch generated app");
 
-    return c.json({
-      branched: true,
-      app: {
-        id: branched.id,
-        slug: branched.slug,
-        name: branched.name,
-        status: branched.status,
-        previewUrl: branched.previewUrl,
+    return c.json(
+      {
+        branched: true,
+        app: {
+          id: branched.id,
+          slug: branched.slug,
+          name: branched.name,
+          status: branched.status,
+          previewUrl: branched.previewUrl,
+        },
+        checkpoint: {
+          id: branched.checkpointId,
+          appId: branched.id,
+          savedAt: branched.updatedAt,
+        },
+        sourceAppId: sourceRecord.id,
+        sourceCheckpointId: sourceCheckpoint.id,
+        draft: branched.draft,
+        smoke: (branched.draft as AppBuilderDraftContract).smokeBuildStatus,
       },
-      checkpoint: {
-        id: branched.checkpointId,
-        appId: branched.id,
-        savedAt: branched.updatedAt,
-      },
-      sourceAppId: sourceRecord.id,
-      sourceCheckpointId: sourceCheckpoint.id,
-      draft: branched.draft,
-      smoke: (branched.draft as AppBuilderDraftContract).smokeBuildStatus,
-    }, 201);
+      201,
+    );
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -1151,7 +1309,13 @@ async function prepareGeneratedAppPublish(c: Context) {
     if (!record) throw httpRouteError(404, "generated app not found");
     const checkpoint = checkpointForPublish(record, body.checkpointId);
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const { validation, integrations } = await buildPublishPreflight(context, record, checkpoint, body, { materializeWorkspace: true });
+    const { validation, integrations } = await buildPublishPreflight(
+      context,
+      record,
+      checkpoint,
+      body,
+      { materializeWorkspace: true },
+    );
     const previousPublish = currentPublishedRecord(record);
     const readiness = buildGeneratedAppPublishRecord({
       workspaceId: context.workspace.id,
@@ -1179,7 +1343,13 @@ async function prepareGeneratedAppPublish(c: Context) {
       validation,
       integrations,
       history: orderGeneratedAppPublishHistory(record.publishHistory ?? []),
-      state: builderPublishState(record, context.workspace.slug, readiness, validation, integrations),
+      state: builderPublishState(
+        record,
+        context.workspace.slug,
+        readiness,
+        validation,
+        integrations,
+      ),
     });
   } catch (error) {
     return errorResponse(c, error);
@@ -1196,12 +1366,18 @@ async function getGeneratedAppPublishState(c: Context) {
       checkpointId: c.req.query("checkpointId"),
       visibility: c.req.query("visibility") === "public" ? "public" : "private",
     };
-    if (body.agentId && !body.appId) return c.json((await buildAgentPublishPayload(context, body)).state);
+    if (body.agentId && !body.appId)
+      return c.json((await buildAgentPublishPayload(context, body)).state);
     const record = await findGeneratedAppRecord(context, body.appId, body.checkpointId);
     if (!record) throw httpRouteError(404, "generated app not found");
     const checkpoint = checkpointForPublish(record, body.checkpointId);
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const { validation, integrations } = await buildPublishPreflight(context, record, checkpoint, body);
+    const { validation, integrations } = await buildPublishPreflight(
+      context,
+      record,
+      checkpoint,
+      body,
+    );
     const readiness = buildGeneratedAppPublishRecord({
       workspaceId: context.workspace.id,
       workspaceSlug: context.workspace.slug,
@@ -1218,7 +1394,9 @@ async function getGeneratedAppPublishState(c: Context) {
       createdByUserId: context.user.id,
     });
 
-    return c.json(builderPublishState(record, context.workspace.slug, readiness, validation, integrations));
+    return c.json(
+      builderPublishState(record, context.workspace.slug, readiness, validation, integrations),
+    );
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -1253,11 +1431,19 @@ async function publishGeneratedApp(c: Context) {
     const body = (await c.req.json().catch(() => ({}))) as AppPublishRouteRequest;
     if (body.agentId && !body.appId) {
       const payload = await buildAgentPublishPayload(context, body, true);
-      if (!payload.validation.canPublish) return c.json({ error: "publish validation failed", ...payload }, 409);
+      if (!payload.validation.canPublish)
+        return c.json({ error: "publish validation failed", ...payload }, 409);
       await mutateStoreAsync((data) => {
-        const agent = data.agents.find((entry) => entry.workspaceId === context.workspace.id && entry.id === body.agentId);
+        const agent = data.agents.find(
+          (entry) => entry.workspaceId === context.workspace.id && entry.id === body.agentId,
+        );
         if (!agent) return;
-        agent.publishHistory = [payload.publish, ...(agent.publishHistory ?? []).filter((entry) => (entry as { id?: string }).id !== payload.publish.id)].slice(0, 20);
+        agent.publishHistory = [
+          payload.publish,
+          ...(agent.publishHistory ?? []).filter(
+            (entry) => (entry as { id?: string }).id !== payload.publish.id,
+          ),
+        ].slice(0, 20);
         agent.currentPublishId = payload.publish.id;
         agent.publishStatus = payload.publish.status;
         agent.publishedUrl = payload.state.publishedUrl;
@@ -1283,7 +1469,13 @@ async function publishGeneratedApp(c: Context) {
     if (!record) throw httpRouteError(404, "generated app not found");
     const checkpoint = checkpointForPublish(record, body.checkpointId);
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const { validation, integrations } = await buildPublishPreflight(context, record, checkpoint, body, { materializeWorkspace: true });
+    const { validation, integrations } = await buildPublishPreflight(
+      context,
+      record,
+      checkpoint,
+      body,
+      { materializeWorkspace: true },
+    );
     if (!validation.canPublish || !integrationsReadyForPublish(integrations)) {
       return c.json({ error: "publish validation failed", validation, integrations }, 409);
     }
@@ -1310,7 +1502,9 @@ async function publishGeneratedApp(c: Context) {
     });
     const saved = await mutateStoreAsync((data) => {
       data.generatedApps ??= [];
-      const app = data.generatedApps.find((entry) => entry.workspaceId === context.workspace.id && entry.id === record.id);
+      const app = data.generatedApps.find(
+        (entry) => entry.workspaceId === context.workspace.id && entry.id === record.id,
+      );
       if (!app) return null;
       app.publishHistory = orderGeneratedAppPublishHistory([
         publish,
@@ -1340,18 +1534,27 @@ async function publishGeneratedApp(c: Context) {
     });
     if (!saved) throw httpRouteError(404, "generated app not found");
 
-    return c.json({
-      published: true,
-      app: publishedAppSummary(saved),
-      publish,
-      publishId: publish.id,
-      validation,
-      integrations,
-      history: orderGeneratedAppPublishHistory(saved.publishHistory ?? []),
-      dockerComposeExport: publish.dockerComposeExport,
-      rollbackToPrevious: publish.rollbackCommand,
-      state: builderPublishState(saved, context.workspace.slug, publish, validation, integrations),
-    }, 201);
+    return c.json(
+      {
+        published: true,
+        app: publishedAppSummary(saved),
+        publish,
+        publishId: publish.id,
+        validation,
+        integrations,
+        history: orderGeneratedAppPublishHistory(saved.publishHistory ?? []),
+        dockerComposeExport: publish.dockerComposeExport,
+        rollbackToPrevious: publish.rollbackCommand,
+        state: builderPublishState(
+          saved,
+          context.workspace.slug,
+          publish,
+          validation,
+          integrations,
+        ),
+      },
+      201,
+    );
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -1385,7 +1588,9 @@ async function rollbackGeneratedAppPublish(c: Context) {
     });
     const saved = await mutateStoreAsync((data) => {
       data.generatedApps ??= [];
-      const app = data.generatedApps.find((entry) => entry.workspaceId === context.workspace.id && entry.id === record.id);
+      const app = data.generatedApps.find(
+        (entry) => entry.workspaceId === context.workspace.id && entry.id === record.id,
+      );
       if (!app) return null;
       const history = app.publishHistory ?? [];
       const mutableCurrent = history.find((entry) => entry.id === current.id);
@@ -1397,7 +1602,8 @@ async function rollbackGeneratedAppPublish(c: Context) {
       mutableTarget.status = "published";
       app.currentPublishId = mutableTarget.id;
       app.publishStatus = mutableTarget.status;
-      app.publishedUrl = mutableTarget.visibility === "public" ? mutableTarget.publicUrl : mutableTarget.privateUrl;
+      app.publishedUrl =
+        mutableTarget.visibility === "public" ? mutableTarget.publicUrl : mutableTarget.privateUrl;
       app.updatedAt = result.completedAt;
       recordActivity(data, {
         id: `activity_generated_app_publish_rollback_${app.id}_${stableHash(command.commandId)}`,
@@ -1462,7 +1668,11 @@ async function exportGeneratedAppDockerCompose(c: Context) {
       createdByUserId: context.user.id,
     });
     const compose = publish?.dockerComposeExport ?? fallback.dockerComposeExport;
-    return c.json({ fileName: compose.fileName, contents: compose.yaml, dockerComposeExport: compose });
+    return c.json({
+      fileName: compose.fileName,
+      contents: compose.yaml,
+      dockerComposeExport: compose,
+    });
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -1472,7 +1682,10 @@ async function draftForIteration(
   context: AuthenticatedRouteContext,
   body: Pick<AppIterationRouteRequest, "appId" | "checkpointId" | "draft">,
 ) {
-  const record = body.appId || body.checkpointId ? await findGeneratedAppRecord(context, body.appId, body.checkpointId) : undefined;
+  const record =
+    body.appId || body.checkpointId
+      ? await findGeneratedAppRecord(context, body.appId, body.checkpointId)
+      : undefined;
   const draft = body.draft ?? (record?.draft as unknown as AppBuilderDraftContract | undefined);
   if (!draft) throw httpRouteError(400, "draft or appId is required");
   return { draft, record };
@@ -1487,7 +1700,12 @@ export async function findGeneratedAppRecord(
   return ((data.generatedApps ?? []) as GeneratedAppRecordWithRuntime[]).find((entry) => {
     if (entry.workspaceId !== context.workspace.id) return false;
     if (appId && entry.id !== appId && entry.slug !== appId) return false;
-    if (checkpointId && entry.checkpointId !== checkpointId && !(entry.checkpoints ?? []).some((checkpoint) => checkpoint.id === checkpointId)) return false;
+    if (
+      checkpointId &&
+      entry.checkpointId !== checkpointId &&
+      !(entry.checkpoints ?? []).some((checkpoint) => checkpoint.id === checkpointId)
+    )
+      return false;
     return Boolean(appId || checkpointId);
   });
 }
@@ -1512,7 +1730,11 @@ async function listGeneratedApps(c: Context) {
     const data = await loadStoreAsync();
     const generatedApps = (data.generatedApps ?? [])
       .filter((entry) => entry.workspaceId === context.workspace.id)
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.createdAt.localeCompare(left.createdAt))
+      .sort(
+        (left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt) ||
+          right.createdAt.localeCompare(left.createdAt),
+      )
       .map(generatedAppSummary);
 
     return c.json({ generatedApps });
@@ -1525,7 +1747,11 @@ async function getGeneratedAppSourceFiles(c: Context) {
   try {
     const context = await requireAuthenticatedContextAsync(c);
     await requireWorkspacePermission(context, "viewWorkspace");
-    const record = await findGeneratedAppRecord(context, c.req.param("appId"), c.req.query("checkpointId"));
+    const record = await findGeneratedAppRecord(
+      context,
+      c.req.param("appId"),
+      c.req.query("checkpointId"),
+    );
     if (!record) throw httpRouteError(404, "generated app not found");
     const checkpoint = checkpointForPublish(record, c.req.query("checkpointId"));
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
@@ -1554,45 +1780,59 @@ async function getGeneratedAppSourceFiles(c: Context) {
         files: summarizeGeneratedAppSourceFiles(artifact.files),
       },
       workspace,
-      files: (file ? [file] : artifact.files).map((entry) => includeContent ? entry : {
-        path: entry.path,
-        contentType: entry.contentType,
-        size: entry.size,
-        sha256: entry.sha256,
-        role: entry.role,
-      }),
+      files: (file ? [file] : artifact.files).map((entry) =>
+        includeContent
+          ? entry
+          : {
+              path: entry.path,
+              contentType: entry.contentType,
+              size: entry.size,
+              sha256: entry.sha256,
+              role: entry.role,
+            },
+      ),
     });
   } catch (error) {
     return errorResponse(c, error);
   }
 }
 
-export function checkpointForPublish(record: GeneratedAppRecordWithRuntime, checkpointId: string | undefined): GeneratedAppCheckpointWithRuntime | null {
+export function checkpointForPublish(
+  record: GeneratedAppRecordWithRuntime,
+  checkpointId: string | undefined,
+): GeneratedAppCheckpointWithRuntime | null {
   if (!checkpointId || checkpointId === record.checkpointId) {
-    return (record.checkpoints ?? []).find((checkpoint) => checkpoint.id === record.checkpointId) ?? {
-      id: record.checkpointId,
-      appId: record.id,
-      workspaceId: record.workspaceId,
-      label: `${record.name} current checkpoint`,
-      draft: record.draft,
-      previewUrl: record.previewUrl,
-      buildStatus: record.buildStatus,
-      smokeStatus: record.smokeStatus,
-      source: "initial",
-      codegenSource: record.codegenSource,
-      createdByUserId: record.createdByUserId,
-      createdAt: record.updatedAt,
-    };
+    return (
+      (record.checkpoints ?? []).find((checkpoint) => checkpoint.id === record.checkpointId) ?? {
+        id: record.checkpointId,
+        appId: record.id,
+        workspaceId: record.workspaceId,
+        label: `${record.name} current checkpoint`,
+        draft: record.draft,
+        previewUrl: record.previewUrl,
+        buildStatus: record.buildStatus,
+        smokeStatus: record.smokeStatus,
+        source: "initial",
+        codegenSource: record.codegenSource,
+        createdByUserId: record.createdByUserId,
+        createdAt: record.updatedAt,
+      }
+    );
   }
   return (record.checkpoints ?? []).find((checkpoint) => checkpoint.id === checkpointId) ?? null;
 }
 
-export function generatedAppRuntimeArtifact(record: GeneratedAppRecordWithRuntime, checkpoint: GeneratedAppCheckpointWithRuntime) {
+export function generatedAppRuntimeArtifact(
+  record: GeneratedAppRecordWithRuntime,
+  checkpoint: GeneratedAppCheckpointWithRuntime,
+) {
   if (checkpoint.runtimeArtifact) return checkpoint.runtimeArtifact;
-  if (checkpoint.sourceFiles?.length) return runtimeArtifactFromSourceFiles(checkpoint.sourceFiles, checkpoint.createdAt);
+  if (checkpoint.sourceFiles?.length)
+    return runtimeArtifactFromSourceFiles(checkpoint.sourceFiles, checkpoint.createdAt);
   if (checkpoint.id === record.checkpointId) {
     if (record.runtimeArtifact) return record.runtimeArtifact;
-    if (record.sourceFiles?.length) return runtimeArtifactFromSourceFiles(record.sourceFiles, record.updatedAt);
+    if (record.sourceFiles?.length)
+      return runtimeArtifactFromSourceFiles(record.sourceFiles, record.updatedAt);
   }
   return buildGeneratedAppRuntimeArtifact({
     appId: record.id,
@@ -1637,20 +1877,28 @@ function generatedFilesFromUnknown(value: unknown): GeneratedFile[] | undefined 
   return files.length > 0 ? files : undefined;
 }
 
-function generatedFilesFromSourceRecords(records: GeneratedAppSourceFileRecord[] | undefined): GeneratedFile[] | undefined {
+function generatedFilesFromSourceRecords(
+  records: GeneratedAppSourceFileRecord[] | undefined,
+): GeneratedFile[] | undefined {
   if (!records?.length) return undefined;
   return records.map((file) => ({ path: file.path, content: file.content }));
 }
 
-function runtimeArtifactFromSourceFiles(files: GeneratedAppSourceFileRecord[], renderedAt: string): GeneratedAppRuntimeArtifactRecord {
+function runtimeArtifactFromSourceFiles(
+  files: GeneratedAppSourceFileRecord[],
+  renderedAt: string,
+): GeneratedAppRuntimeArtifactRecord {
   return {
-    entrypoint: files.find((file) => file.role === "entrypoint")?.path ?? files[0]?.path ?? "index.html",
+    entrypoint:
+      files.find((file) => file.role === "entrypoint")?.path ?? files[0]?.path ?? "index.html",
     files,
     renderedAt,
   };
 }
 
-function cloneGeneratedAppRuntimeArtifact(artifact: GeneratedAppRuntimeArtifactRecord): GeneratedAppRuntimeArtifactRecord {
+function cloneGeneratedAppRuntimeArtifact(
+  artifact: GeneratedAppRuntimeArtifactRecord,
+): GeneratedAppRuntimeArtifactRecord {
   return {
     entrypoint: artifact.entrypoint,
     renderedAt: artifact.renderedAt,
@@ -1658,26 +1906,34 @@ function cloneGeneratedAppRuntimeArtifact(artifact: GeneratedAppRuntimeArtifactR
   };
 }
 
-function branchDraftForGeneratedApp(draft: Record<string, unknown>, slug: string, name: string): Record<string, unknown> {
-  const app = draft.app && typeof draft.app === "object" && !Array.isArray(draft.app)
-    ? draft.app as Record<string, unknown>
-    : {};
+function branchDraftForGeneratedApp(
+  draft: Record<string, unknown>,
+  slug: string,
+  name: string,
+): Record<string, unknown> {
+  const app =
+    draft.app && typeof draft.app === "object" && !Array.isArray(draft.app)
+      ? (draft.app as Record<string, unknown>)
+      : {};
   return {
     ...draft,
     app: {
       ...app,
       slug,
       name,
-      description: typeof app.description === "string" ? app.description : `${name} generated app branch.`,
+      description:
+        typeof app.description === "string" ? app.description : `${name} generated app branch.`,
     },
   };
 }
 
 function currentPublishedRecord(record: GeneratedAppRecord): GeneratedAppPublishRecord | null {
   const history = record.publishHistory ?? [];
-  return history.find((entry) => entry.id === record.currentPublishId)
-    ?? orderGeneratedAppPublishHistory(history).find((entry) => entry.status === "published")
-    ?? null;
+  return (
+    history.find((entry) => entry.id === record.currentPublishId) ??
+    orderGeneratedAppPublishHistory(history).find((entry) => entry.status === "published") ??
+    null
+  );
 }
 
 function latestPublishRollbackCommand(record: GeneratedAppRecord) {
@@ -1706,7 +1962,13 @@ function generatedAppSummary(record: GeneratedAppRecord) {
     status: record.status,
     previewUrl: record.previewUrl,
     publishStatus: record.publishStatus ?? current?.status,
-    publishedUrl: record.publishedUrl ?? (current ? current.visibility === "public" ? current.publicUrl : current.privateUrl : undefined),
+    publishedUrl:
+      record.publishedUrl ??
+      (current
+        ? current.visibility === "public"
+          ? current.publicUrl
+          : current.privateUrl
+        : undefined),
     checkpointId: record.checkpointId,
     updatedAt: record.updatedAt,
     createdAt: record.createdAt,
@@ -1719,10 +1981,17 @@ async function buildAgentPublishPayload(
   published = false,
 ) {
   const data = await loadStoreAsync();
-  const agent = data.agents.find((entry) => entry.workspaceId === context.workspace.id && entry.id === body.agentId);
+  const agent = data.agents.find(
+    (entry) => entry.workspaceId === context.workspace.id && entry.id === body.agentId,
+  );
   if (!agent) throw httpRouteError(404, "agent not found");
-  const provider = agent.providerId ? data.providers.find((entry) => entry.workspaceId === context.workspace.id && entry.id === agent.providerId) : undefined;
-  const providerReady = !agent.providerId || provider?.apiKeyConfigured === true || provider?.status === "connected";
+  const provider = agent.providerId
+    ? data.providers.find(
+        (entry) => entry.workspaceId === context.workspace.id && entry.id === agent.providerId,
+      )
+    : undefined;
+  const providerReady =
+    !agent.providerId || provider?.apiKeyConfigured === true || provider?.status === "connected";
   const webhookReady = agent.triggerKind !== "webhook" || Boolean(agent.webhookToken);
   const health = await localPublishHealthObservation();
   const readiness = buildAppPublishReadiness({
@@ -1751,7 +2020,10 @@ async function buildAgentPublishPayload(
         path: entry.path,
         kind: entry.kind,
         present: agent.status !== "archived",
-        source: entry.kind === "generated_bundle" || entry.path.includes("/agent/") ? "generated_draft" : "publish_manifest",
+        source:
+          entry.kind === "generated_bundle" || entry.path.includes("/agent/")
+            ? "generated_draft"
+            : "publish_manifest",
         description: entry.description,
       })),
     },
@@ -1760,19 +2032,34 @@ async function buildAgentPublishPayload(
       requiredCheckCount: 3,
       checks: [
         { id: "agent-manifest", label: "Agent manifest", status: "pass" },
-        { id: "agent-provider", label: "Provider readiness", status: providerReady ? "pass" : "fail", message: providerReady ? undefined : "Provider API key is not configured." },
-        { id: "agent-trigger", label: "Trigger readiness", status: webhookReady ? "pass" : "fail", message: webhookReady ? undefined : "Webhook token is not configured." },
+        {
+          id: "agent-provider",
+          label: "Provider readiness",
+          status: providerReady ? "pass" : "fail",
+          message: providerReady ? undefined : "Provider API key is not configured.",
+        },
+        {
+          id: "agent-trigger",
+          label: "Trigger readiness",
+          status: webhookReady ? "pass" : "fail",
+          message: webhookReady ? undefined : "Webhook token is not configured.",
+        },
       ],
     },
     url: {
-      baseUrl: body.visibility === "public" ? body.publicBaseUrl ?? "https://apps.packetagent.example" : body.privateBaseUrl ?? "http://localhost:8484",
+      baseUrl:
+        body.visibility === "public"
+          ? (body.publicBaseUrl ?? "https://apps.packetagent.example")
+          : (body.privateBaseUrl ?? "http://localhost:8484"),
       path: `/agent/${context.workspace.slug}/${agent.id}`,
       visibility: body.visibility ?? "private",
     },
   });
   const timestamp = new Date().toISOString();
   const history = (agent.publishHistory ?? []) as Array<Record<string, unknown>>;
-  const previous = history.find((entry) => entry.id === agent.currentPublishId) ?? history.find((entry) => entry.status === "published");
+  const previous =
+    history.find((entry) => entry.id === agent.currentPublishId) ??
+    history.find((entry) => entry.status === "published");
   const publish = {
     id: `agent_publish_${stableHash(`${context.workspace.id}:${agent.id}:${agent.updatedAt}`)}`,
     agentId: agent.id,
@@ -1785,44 +2072,71 @@ async function buildAgentPublishPayload(
     publicUrl: readiness.urlHandoff.publicUrl,
     privateUrl: readiness.urlHandoff.privateUrl,
     dockerComposeExport: readiness.dockerComposeExport,
-    logs: [{
-      at: timestamp,
-      level: validation.canPublish ? "info" : "error",
-      message: validation.canPublish
-        ? "Generated agent bundle publish metadata is ready for self-hosted handoff."
-        : validation.actionableFailures.map((failure) => `${failure.stage}: ${failure.message}`).join("; "),
-    }],
+    logs: [
+      {
+        at: timestamp,
+        level: validation.canPublish ? "info" : "error",
+        message: validation.canPublish
+          ? "Generated agent bundle publish metadata is ready for self-hosted handoff."
+          : validation.actionableFailures
+              .map((failure) => `${failure.stage}: ${failure.message}`)
+              .join("; "),
+      },
+    ],
     previousPublishId: typeof previous?.id === "string" ? previous.id : undefined,
     createdByUserId: context.user.id,
     createdAt: timestamp,
     completedAt: published ? timestamp : undefined,
   };
-  const nextHistory = published ? [publish, ...history.filter((entry) => entry.id !== publish.id)] : history;
-  const persistedCurrent = history.find((entry) => entry.id === agent.currentPublishId) ?? history.find((entry) => entry.status === "published");
+  const nextHistory = published
+    ? [publish, ...history.filter((entry) => entry.id !== publish.id)]
+    : history;
+  const persistedCurrent =
+    history.find((entry) => entry.id === agent.currentPublishId) ??
+    history.find((entry) => entry.status === "published");
   const activePublish = published ? publish : persistedCurrent;
   const activeVisibility = String(activePublish?.visibility ?? publish.visibility);
   const activeUrl = activePublish
     ? activeVisibility === "public"
-      ? typeof activePublish.publicUrl === "string" ? activePublish.publicUrl : undefined
-      : typeof activePublish.privateUrl === "string" ? activePublish.privateUrl : undefined
+      ? typeof activePublish.publicUrl === "string"
+        ? activePublish.publicUrl
+        : undefined
+      : typeof activePublish.privateUrl === "string"
+        ? activePublish.privateUrl
+        : undefined
     : undefined;
-  const persistedUrl = typeof agent.publishedUrl === "string" && agent.publishedUrl ? agent.publishedUrl : activeUrl;
-  const persistedStatus = typeof agent.publishStatus === "string" && agent.publishStatus
-    ? agent.publishStatus
-    : activePublish ? String(activePublish.status) : publish.status;
+  const persistedUrl =
+    typeof agent.publishedUrl === "string" && agent.publishedUrl ? agent.publishedUrl : activeUrl;
+  const persistedStatus =
+    typeof agent.publishStatus === "string" && agent.publishStatus
+      ? agent.publishStatus
+      : activePublish
+        ? String(activePublish.status)
+        : publish.status;
   const state = {
     agentId: agent.id,
-    checkpointId: typeof activePublish?.checkpointId === "string" ? activePublish.checkpointId : publish.checkpointId,
+    checkpointId:
+      typeof activePublish?.checkpointId === "string"
+        ? activePublish.checkpointId
+        : publish.checkpointId,
     status: published ? publish.status : persistedStatus,
-    currentPublishId: typeof activePublish?.id === "string" ? activePublish.id : agent.currentPublishId,
-    publishedUrl: published ? publish.visibility === "public" ? publish.publicUrl : publish.privateUrl : persistedUrl,
+    currentPublishId:
+      typeof activePublish?.id === "string" ? activePublish.id : agent.currentPublishId,
+    publishedUrl: published
+      ? publish.visibility === "public"
+        ? publish.publicUrl
+        : publish.privateUrl
+      : persistedUrl,
     readiness,
     validation,
     logs: Array.isArray(activePublish?.logs) ? activePublish.logs : publish.logs,
     history: nextHistory.map((entry) => ({
       id: String(entry.id),
       status: String(entry.status),
-      url: String(entry.visibility) === "public" ? String(entry.publicUrl ?? "") : String(entry.privateUrl ?? ""),
+      url:
+        String(entry.visibility) === "public"
+          ? String(entry.publicUrl ?? "")
+          : String(entry.privateUrl ?? ""),
       checkpointId: String(entry.checkpointId ?? ""),
       publishedAt: String(entry.completedAt ?? entry.createdAt ?? timestamp),
       actor: String(entry.createdByUserId ?? context.user.id),
@@ -1830,10 +2144,10 @@ async function buildAgentPublishPayload(
     })),
     nextActions: validation.canPublish
       ? [
-        "Export docker-compose.publish.yml for the generated agent bundle.",
-        "Run the generated agent smoke input before public handoff.",
-        "Keep the current agent configuration available as rollback reference.",
-      ]
+          "Export docker-compose.publish.yml for the generated agent bundle.",
+          "Run the generated agent smoke input before public handoff.",
+          "Keep the current agent configuration available as rollback reference.",
+        ]
       : validation.actionableFailures.map((failure) => failure.action),
     canPublish: validation.canPublish,
     rollbackActions: history
@@ -1868,26 +2182,34 @@ async function rollbackAgentPublish(
   body: AppPublishRollbackRouteRequest,
 ) {
   const result = await mutateStoreAsync((data) => {
-    const agent = data.agents.find((entry) => entry.workspaceId === context.workspace.id && entry.id === body.agentId);
+    const agent = data.agents.find(
+      (entry) => entry.workspaceId === context.workspace.id && entry.id === body.agentId,
+    );
     if (!agent) return null;
     const history = (agent.publishHistory ?? []) as Array<Record<string, unknown>>;
     const current = history.find((entry) => entry.id === publishId);
     if (!current) return null;
     const target = body.targetPublishId
       ? history.find((entry) => entry.id === body.targetPublishId)
-      : history.find((entry) => entry.id === current.previousPublishId)
-        ?? history.find((entry) => entry.id !== publishId && entry.status === "published");
+      : (history.find((entry) => entry.id === current.previousPublishId) ??
+        history.find((entry) => entry.id !== publishId && entry.status === "published"));
     if (!target) throw httpRouteError(404, "previous publish not found");
     current.status = "rolled_back";
     target.status = "published";
     agent.currentPublishId = String(target.id);
     agent.publishStatus = "published";
-    agent.publishedUrl = String(target.visibility) === "public" ? String(target.publicUrl ?? "") : String(target.privateUrl ?? "");
+    agent.publishedUrl =
+      String(target.visibility) === "public"
+        ? String(target.publicUrl ?? "")
+        : String(target.privateUrl ?? "");
     agent.updatedAt = new Date().toISOString();
     return { agent, target, current };
   });
   if (!result) throw httpRouteError(404, "agent publish not found");
-  const payload = await buildAgentPublishPayload(context, { agentId: body.agentId, visibility: result.target.visibility === "public" ? "public" : "private" });
+  const payload = await buildAgentPublishPayload(context, {
+    agentId: body.agentId,
+    visibility: result.target.visibility === "public" ? "public" : "private",
+  });
 
   return c.json({
     rolledBack: true,
@@ -1917,7 +2239,11 @@ function validateIterationApplyTarget(
   if (slug !== record.slug) {
     throw httpRouteError(409, "change set draft slug does not match the selected generated app");
   }
-  if (checkpointId && record.checkpointId !== checkpointId && !(record.checkpoints ?? []).some((checkpoint) => checkpoint.id === checkpointId)) {
+  if (
+    checkpointId &&
+    record.checkpointId !== checkpointId &&
+    !(record.checkpoints ?? []).some((checkpoint) => checkpoint.id === checkpointId)
+  ) {
     throw httpRouteError(404, "checkpoint not found");
   }
 }
@@ -1929,9 +2255,14 @@ async function attachPreviewSnapshot(
 ) {
   await mutateStoreAsync((data) => {
     data.generatedApps ??= [];
-    const app = data.generatedApps.find((entry) => entry.workspaceId === context.workspace.id && entry.id === appId);
+    const app = data.generatedApps.find(
+      (entry) => entry.workspaceId === context.workspace.id && entry.id === appId,
+    );
     if (app) {
-      app.previewSnapshots = [...(app.previewSnapshots ?? []), snapshot as unknown as Record<string, unknown>].slice(-20);
+      app.previewSnapshots = [
+        ...(app.previewSnapshots ?? []),
+        snapshot as unknown as Record<string, unknown>,
+      ].slice(-20);
     }
   });
 }
@@ -1964,7 +2295,12 @@ async function buildPublishPreflight(
     runtimeEnv: env,
   });
   if (options.materializeWorkspace) {
-    materializeGeneratedAppPublishWorkspace(record, checkpoint, readiness.localPublishPath, readiness.publishArtifactManifest);
+    materializeGeneratedAppPublishWorkspace(
+      record,
+      checkpoint,
+      readiness.localPublishPath,
+      readiness.publishArtifactManifest,
+    );
   }
   const privateUrl = generatedAppPublishUrlForBase(readiness.urlHandoff.privateUrl, {
     appId: record.id,
@@ -1986,16 +2322,28 @@ async function buildPublishPreflight(
     artifacts: {
       expectedArtifacts,
       manifestPath: `${readiness.localPublishPath}/${readiness.publishArtifactManifest.fileName}`,
-      artifacts: publishArtifactObservations(record, checkpoint, readiness.localPublishPath, buildStatus),
+      artifacts: publishArtifactObservations(
+        record,
+        checkpoint,
+        readiness.localPublishPath,
+        buildStatus,
+      ),
     },
     health,
     smoke: {
       requiredCheckCount: Math.max(1, draft.smokeBuildStatus?.checks?.length ?? 1),
-      checks: (draft.smokeBuildStatus?.checks ?? [{ name: "Generated app URL", status: "pending", detail: "Generated app URL" }]).map((check, index) => ({
+      checks: (
+        draft.smokeBuildStatus?.checks ?? [
+          { name: "Generated app URL", status: "pending", detail: "Generated app URL" },
+        ]
+      ).map((check, index) => ({
         id: `smoke-${index + 1}`,
         label: check.name ?? `Smoke ${index + 1}`,
         status: smokeStatus === "pass" ? "pass" : smokeStatus === "failed" ? "fail" : "pending",
-        message: smokeStatus === "failed" ? `Generated app smoke check failed before publish: ${check.detail}` : undefined,
+        message:
+          smokeStatus === "failed"
+            ? `Generated app smoke check failed before publish: ${check.detail}`
+            : undefined,
       })),
     },
     url: {
@@ -2079,7 +2427,8 @@ function publishArtifactObservations(
 ): PublishArtifactObservation[] {
   const artifact = checkpoint.runtimeArtifact ?? record.runtimeArtifact;
   const snapshot = latestPreviewSnapshot(record);
-  const snapshotPaths = snapshot?.checkpoint.id === checkpoint.id ? snapshot.build.artifactPaths : [];
+  const snapshotPaths =
+    snapshot?.checkpoint.id === checkpoint.id ? snapshot.build.artifactPaths : [];
   const generatedBundlePresent = Boolean(artifact?.files.length);
   const buildPassed = buildStatus === "passed";
   const bundleObservation = diskArtifactObservation(
@@ -2123,9 +2472,18 @@ function publishArtifactObservations(
       description: "Built Vite app shell for the generated app runtime.",
     },
     { ...bundleObservation, present: bundleObservation.present && generatedBundlePresent },
-    { ...appManifestObservation, present: appManifestObservation.present && generatedBundlePresent },
-    { ...runtimeConfigObservation, present: runtimeConfigObservation.present && generatedBundlePresent },
-    { ...publishManifestObservation, present: publishManifestObservation.present && generatedBundlePresent },
+    {
+      ...appManifestObservation,
+      present: appManifestObservation.present && generatedBundlePresent,
+    },
+    {
+      ...runtimeConfigObservation,
+      present: runtimeConfigObservation.present && generatedBundlePresent,
+    },
+    {
+      ...publishManifestObservation,
+      present: publishManifestObservation.present && generatedBundlePresent,
+    },
     {
       path: "docker-compose.publish.yml",
       kind: "config",
@@ -2156,7 +2514,9 @@ function diskArtifactObservation(
     present: stats.present,
     bytes: stats.bytes,
     source,
-    description: stats.present ? `${description} Observed on disk.` : `${description} Missing on disk.`,
+    description: stats.present
+      ? `${description} Observed on disk.`
+      : `${description} Missing on disk.`,
   };
 }
 
@@ -2227,7 +2587,9 @@ function builderPublishState(
     runtimeEnv: publishRuntimeEnv(),
   });
   const blockers = [
-    ...(validation?.actionableFailures ?? []).map((failure) => `${failure.stage}: ${failure.message}`),
+    ...(validation?.actionableFailures ?? []).map(
+      (failure) => `${failure.stage}: ${failure.message}`,
+    ),
     ...(integrations?.blockers ?? []),
     ...(integrations?.featureBlockers ?? []),
   ];
@@ -2236,7 +2598,13 @@ function builderPublishState(
     appId: record.id,
     checkpointId: current?.checkpointId ?? record.checkpointId,
     status: current?.status ?? (blockers.length > 0 ? "failed" : "ready"),
-    publishedUrl: record.publishedUrl ?? (current ? current.visibility === "public" ? current.publicUrl : current.privateUrl : undefined),
+    publishedUrl:
+      record.publishedUrl ??
+      (current
+        ? current.visibility === "public"
+          ? current.publicUrl
+          : current.privateUrl
+        : undefined),
     readiness,
     validation,
     integrations,
@@ -2252,14 +2620,17 @@ function builderPublishState(
       actor: entry.createdByUserId,
       summary: `${entry.versionLabel} ${entry.status}`,
     })),
-    nextActions: blockers.length > 0
-      ? blockers
-      : [
-        "Share the private URL with workspace reviewers.",
-        "Export docker-compose.publish.yml for self-hosted handoff.",
-        "Keep the previous publish available until the new URL is verified.",
-      ],
-    canPublish: validation ? validation.canPublish && (integrations ? integrationsReadyForPublish(integrations) : true) : true,
+    nextActions:
+      blockers.length > 0
+        ? blockers
+        : [
+            "Share the private URL with workspace reviewers.",
+            "Export docker-compose.publish.yml for self-hosted handoff.",
+            "Keep the previous publish available until the new URL is verified.",
+          ],
+    canPublish: validation
+      ? validation.canPublish && (integrations ? integrationsReadyForPublish(integrations) : true)
+      : true,
     rollbackActions: history
       .filter((entry) => entry.id !== record.currentPublishId)
       .map((entry) => ({
@@ -2272,7 +2643,9 @@ function builderPublishState(
   };
 }
 
-function integrationsReadyForPublish(integrations: ReturnType<typeof inspectAppPublishIntegrations>) {
+function integrationsReadyForPublish(
+  integrations: ReturnType<typeof inspectAppPublishIntegrations>,
+) {
   return integrations.canPublish && integrations.canUseAllRequestedIntegrations;
 }
 
@@ -2307,25 +2680,10 @@ function publishRuntimeEnv() {
     "GH_TOKEN",
   ];
 
-  return Object.fromEntries(keys.map((key) => [key, process.env[key] ?? defaults[key]])) as Record<string, string | undefined>;
-}
-
-function latestPublishedRecord(history: GeneratedAppPublishRecord[] | undefined) {
-  return orderGeneratedAppPublishHistory(history ?? []).find((entry) => entry.status === "published") ?? null;
-}
-
-function generatedAppPublishSummary(record: GeneratedAppRecord) {
-  return {
-    id: record.id,
-    slug: record.slug,
-    name: record.name,
-    status: record.status,
-    checkpointId: record.checkpointId,
-    previewUrl: record.previewUrl,
-    currentPublishId: record.currentPublishId,
-    publishStatus: record.publishStatus,
-    publishedUrl: record.publishedUrl,
-  };
+  return Object.fromEntries(keys.map((key) => [key, process.env[key] ?? defaults[key]])) as Record<
+    string,
+    string | undefined
+  >;
 }
 
 function appIterationResponse(input: {
@@ -2346,7 +2704,11 @@ function appIterationResponse(input: {
   validationErrors?: string[];
   fileTree?: GeneratedFile[];
   draftSource?: AppDraftSource;
-}): AppIterationRouteResult & { rollback: AppIterationPlan["rollbackCheckpoint"]; snapshot: unknown; tools: unknown } {
+}): AppIterationRouteResult & {
+  rollback: AppIterationPlan["rollbackCheckpoint"];
+  snapshot: unknown;
+  tools: unknown;
+} {
   const preview = derivePreviewRefreshState({
     appId: input.body.appId ?? stableGeneratedAppId(input.draft, input.context),
     workspaceId: input.context.workspace.id,
@@ -2359,10 +2721,12 @@ function appIterationResponse(input: {
       buildId: input.snapshot.build.id,
       revision: input.plan.rollbackCheckpoint.checkpointId,
     },
-    lastRendered: input.previewUrl ? {
-      previewUrl: input.previewUrl,
-      revision: input.body.checkpointId,
-    } : undefined,
+    lastRendered: input.previewUrl
+      ? {
+          previewUrl: input.previewUrl,
+          revision: input.body.checkpointId,
+        }
+      : undefined,
     refreshRequest: {
       requestId: `preview-refresh:${input.plan.rollbackCheckpoint.checkpointId}`,
       buildId: input.snapshot.build.id,
@@ -2377,8 +2741,9 @@ function appIterationResponse(input: {
     summary: file.summary,
     diff: file.diff,
   }));
-  const baseSummary = input.plan.diffHunks.map((hunk) => hunk.summary).join(" ")
-    || "No generated app changes available for this prompt.";
+  const baseSummary =
+    input.plan.diffHunks.map((hunk) => hunk.summary).join(" ") ||
+    "No generated app changes available for this prompt.";
   return {
     id: `change_${stableHash(`${input.plan.rollbackCheckpoint.checkpointId}:${input.plan.request.requestedChange}`)}`,
     appId: input.body.appId,
@@ -2422,15 +2787,22 @@ function appIterationResponse(input: {
   };
 }
 
-function appIterationTargetForService(target: AppBuilderIterationTarget | undefined): AppIterationTargetInput {
+function appIterationTargetForService(
+  target: AppBuilderIterationTarget | undefined,
+): AppIterationTargetInput {
   if (!target) return { kind: "page" };
-  const kind = target.kind === "api_route"
-    ? "api"
-    : target.kind === "data_entity"
-      ? "data"
-      : target.kind === "app" || target.kind === "smoke" || target.kind === "file" || target.kind === "agent" || target.kind === "tool"
-        ? "config"
-        : target.kind;
+  const kind =
+    target.kind === "api_route"
+      ? "api"
+      : target.kind === "data_entity"
+        ? "data"
+        : target.kind === "app" ||
+            target.kind === "smoke" ||
+            target.kind === "file" ||
+            target.kind === "agent" ||
+            target.kind === "tool"
+          ? "config"
+          : target.kind;
   return {
     kind: kind as AppIterationTargetInput["kind"],
     key: target.id,
@@ -2443,7 +2815,8 @@ function routeTargetFromPlan(plan: AppIterationPlan): AppBuilderIterationTarget 
   const target = plan.request.target;
   return {
     id: target.key,
-    kind: target.kind === "api" ? "api_route" : target.kind === "data" ? "data_entity" : target.kind,
+    kind:
+      target.kind === "api" ? "api_route" : target.kind === "data" ? "data_entity" : target.kind,
     label: target.label,
     path: target.path,
   };
@@ -2483,12 +2856,22 @@ function toGeneratedAppDraftLike(draft: AppBuilderDraftContract): GeneratedAppDr
     },
     auth: {
       defaultPolicy: "authenticated-by-default",
-      publicRoutes: draft.app.pages.filter((page) => page.access === "public").map((page) => page.route),
-      privateRoutes: draft.app.pages.filter((page) => page.access === "private").map((page) => page.route),
+      publicRoutes: draft.app.pages
+        .filter((page) => page.access === "public")
+        .map((page) => page.route),
+      privateRoutes: draft.app.pages
+        .filter((page) => page.access === "private")
+        .map((page) => page.route),
       roleRoutes: draft.app.pages
         .filter((page) => page.access === "admin")
-        .map((page) => ({ role: "admin", routes: [page.route], reason: `Admin access for ${page.name}` })),
-      decisions: draft.app.authDecisions.map((decision) => `${decision.area}: ${decision.decision}. ${decision.rationale}`),
+        .map((page) => ({
+          role: "admin",
+          routes: [page.route],
+          reason: `Admin access for ${page.name}`,
+        })),
+      decisions: draft.app.authDecisions.map(
+        (decision) => `${decision.area}: ${decision.decision}. ${decision.rationale}`,
+      ),
     },
     acceptanceChecks: draft.plan.acceptanceChecks,
     config: {
@@ -2507,7 +2890,10 @@ function fromGeneratedAppDraftLike(
     access: appRouteAccess(page.access),
     purpose: String(page.purpose ?? `Generated page for ${page.path}`),
     actions: stringList(page.actions),
-    components: stringList(page.components).length > 0 ? stringList(page.components) : base.app.pages.find((entry) => entry.route === page.path)?.components ?? ["PageShell"],
+    components:
+      stringList(page.components).length > 0
+        ? stringList(page.components)
+        : (base.app.pages.find((entry) => entry.route === page.path)?.components ?? ["PageShell"]),
   }));
   const dataSchema = (generated.dataSchema?.entities ?? []).map((entity) => ({
     name: entity.name,
@@ -2517,26 +2903,37 @@ function fromGeneratedAppDraftLike(
       required: Boolean(field.required),
       notes: field.references ? `References ${field.references}` : undefined,
     })),
-    relationships: [...stringList(entity.relations), ...stringList(entity.indexes).map((index) => `Indexed by ${index}`)],
+    relationships: [
+      ...stringList(entity.relations),
+      ...stringList(entity.indexes).map((index) => `Indexed by ${index}`),
+    ],
   }));
   const apiRoutes = (generated.apiRouteStubs ?? []).map((route) => ({
     method: appRouteMethod(route.method),
     path: route.path,
     access: appRouteAccess(route.access),
     purpose: String(route.purpose ?? `Generated route for ${route.path}`),
-    handler: typeof route.handler === "string" ? route.handler : routeHandlerName(appRouteMethod(route.method), route.path),
+    handler:
+      typeof route.handler === "string"
+        ? route.handler
+        : routeHandlerName(appRouteMethod(route.method), route.path),
     authRequired: route.access !== "public",
-    requiredRole: appRouteAccess(route.access) === "admin" ? "admin" as const : undefined,
+    requiredRole: appRouteAccess(route.access) === "admin" ? ("admin" as const) : undefined,
   }));
   const nextDraft = {
     ...base,
-    summary: appendUniqueSentence(base.summary, `Latest iteration: ${generated.config?.notes?.at(-1) ?? base.summary}`),
+    summary: appendUniqueSentence(
+      base.summary,
+      `Latest iteration: ${generated.config?.notes?.at(-1) ?? base.summary}`,
+    ),
     app: {
       ...base.app,
       pages,
       dataSchema,
       apiRoutes,
-      crudFlows: base.app.crudFlows.filter((flow) => dataSchema.some((entity) => entity.name === flow.entity)),
+      crudFlows: base.app.crudFlows.filter((flow) =>
+        dataSchema.some((entity) => entity.name === flow.entity),
+      ),
       authDecisions: authDecisionsFromGenerated(generated, pages),
     },
     smokeBuildStatus: {
@@ -2548,20 +2945,44 @@ function fromGeneratedAppDraftLike(
   return nextDraft;
 }
 
-function authDecisionsFromGenerated(generated: GeneratedAppDraftLike, pages: AppBuilderDraftContract["app"]["pages"]) {
+function authDecisionsFromGenerated(
+  generated: GeneratedAppDraftLike,
+  pages: AppBuilderDraftContract["app"]["pages"],
+) {
   const auth = generated.auth;
   if (!auth) {
     return pages.map((page) => ({
       area: page.route,
-      decision: page.access === "public" ? "Public" : page.access === "admin" ? "admin role" : "Authenticated",
+      decision:
+        page.access === "public"
+          ? "Public"
+          : page.access === "admin"
+            ? "admin role"
+            : "Authenticated",
       rationale: "Derived from generated route access.",
     }));
   }
   return [
-    ...(auth.publicRoutes ?? []).map((route) => ({ area: route, decision: "Public", rationale: "Iteration marked this route public." })),
-    ...(auth.privateRoutes ?? []).map((route) => ({ area: route, decision: "Authenticated", rationale: "Iteration marked this route authenticated." })),
-    ...(auth.roleRoutes ?? []).map((route) => ({ area: route.routes.join(", "), decision: `${route.role} role`, rationale: route.reason ?? "Iteration requires a role gate." })),
-    ...(auth.decisions ?? []).map((decision) => ({ area: "Global policy", decision: auth.defaultPolicy ?? "authenticated-by-default", rationale: decision })),
+    ...(auth.publicRoutes ?? []).map((route) => ({
+      area: route,
+      decision: "Public",
+      rationale: "Iteration marked this route public.",
+    })),
+    ...(auth.privateRoutes ?? []).map((route) => ({
+      area: route,
+      decision: "Authenticated",
+      rationale: "Iteration marked this route authenticated.",
+    })),
+    ...(auth.roleRoutes ?? []).map((route) => ({
+      area: route.routes.join(", "),
+      decision: `${route.role} role`,
+      rationale: route.reason ?? "Iteration requires a role gate.",
+    })),
+    ...(auth.decisions ?? []).map((decision) => ({
+      area: "Global policy",
+      decision: auth.defaultPolicy ?? "authenticated-by-default",
+      rationale: decision,
+    })),
   ];
 }
 
@@ -2583,8 +3004,12 @@ function diffGeneratedAppSourceFiles(
   previous: GeneratedAppRuntimeArtifactRecord,
   next: GeneratedAppRuntimeArtifactRecord,
 ): AppIterationDiffFile[] {
-  const previousFiles = new Map(previous.files.map((file) => [normalizeGeneratedSourcePath(file.path), file]));
-  const nextFiles = new Map(next.files.map((file) => [normalizeGeneratedSourcePath(file.path), file]));
+  const previousFiles = new Map(
+    previous.files.map((file) => [normalizeGeneratedSourcePath(file.path), file]),
+  );
+  const nextFiles = new Map(
+    next.files.map((file) => [normalizeGeneratedSourcePath(file.path), file]),
+  );
   const paths = sortedUniqueStrings([...previousFiles.keys(), ...nextFiles.keys()]);
 
   return paths.flatMap((path) => {
@@ -2593,25 +3018,36 @@ function diffGeneratedAppSourceFiles(
     if (before?.sha256 && after?.sha256 && before.sha256 === after.sha256) return [];
     const changeType = before && after ? "modified" : before ? "deleted" : "added";
     const role = after?.role ?? before?.role;
-    return [{
-      path: after?.path ?? before?.path ?? path,
-      changeType,
-      summary: sourceDiffSummary(changeType, after?.path ?? before?.path ?? path, before, after),
-      diff: renderSourceFileDiff(before, after),
-      source: "runtime" as const,
-      beforeSha256: before?.sha256,
-      afterSha256: after?.sha256,
-      beforeSize: before?.size,
-      afterSize: after?.size,
-      role,
-    }];
+    return [
+      {
+        path: after?.path ?? before?.path ?? path,
+        changeType,
+        summary: sourceDiffSummary(changeType, after?.path ?? before?.path ?? path, before, after),
+        diff: renderSourceFileDiff(before, after),
+        source: "runtime" as const,
+        beforeSha256: before?.sha256,
+        afterSha256: after?.sha256,
+        beforeSize: before?.size,
+        afterSize: after?.size,
+        role,
+      },
+    ];
   });
 }
 
-function mergeIterationDiffFiles(draftFiles: AppIterationDiffFile[], sourceFiles: AppIterationDiffFile[]): AppIterationDiffFile[] {
-  const runtimePaths = new Set(sourceFiles.map((file) => `runtime:${normalizeGeneratedSourcePath(file.path)}`));
+function mergeIterationDiffFiles(
+  draftFiles: AppIterationDiffFile[],
+  sourceFiles: AppIterationDiffFile[],
+): AppIterationDiffFile[] {
+  const runtimePaths = new Set(
+    sourceFiles.map((file) => `runtime:${normalizeGeneratedSourcePath(file.path)}`),
+  );
   return [
-    ...draftFiles.filter((file) => file.source !== "runtime" || !runtimePaths.has(`runtime:${normalizeGeneratedSourcePath(file.path)}`)),
+    ...draftFiles.filter(
+      (file) =>
+        file.source !== "runtime" ||
+        !runtimePaths.has(`runtime:${normalizeGeneratedSourcePath(file.path)}`),
+    ),
     ...sourceFiles,
   ];
 }
@@ -2622,12 +3058,16 @@ function sourceDiffSummary(
   before: GeneratedAppSourceFileRecord | undefined,
   after: GeneratedAppSourceFileRecord | undefined,
 ) {
-  const checksum = before && after ? ` (${before.sha256.slice(0, 8)} -> ${after.sha256.slice(0, 8)})` : "";
+  const checksum =
+    before && after ? ` (${before.sha256.slice(0, 8)} -> ${after.sha256.slice(0, 8)})` : "";
   const size = before && after ? `, ${before.size} -> ${after.size} bytes` : "";
   return `${changeType[0].toUpperCase()}${changeType.slice(1)} generated source file ${path}${checksum}${size}.`;
 }
 
-function renderSourceFileDiff(before: GeneratedAppSourceFileRecord | undefined, after: GeneratedAppSourceFileRecord | undefined) {
+function renderSourceFileDiff(
+  before: GeneratedAppSourceFileRecord | undefined,
+  after: GeneratedAppSourceFileRecord | undefined,
+) {
   const beforeLines = before?.content.split(/\r?\n/) ?? [];
   const afterLines = after?.content.split(/\r?\n/) ?? [];
   const max = Math.max(beforeLines.length, afterLines.length);
@@ -2641,7 +3081,8 @@ function renderSourceFileDiff(before: GeneratedAppSourceFileRecord | undefined, 
     const left = beforeLines[index];
     const right = afterLines[index];
     if (left === right) {
-      if (left !== undefined && shouldKeepSourceContext(index, beforeLines, afterLines)) lines.push(`  ${left}`);
+      if (left !== undefined && shouldKeepSourceContext(index, beforeLines, afterLines))
+        lines.push(`  ${left}`);
       continue;
     }
     if (left !== undefined) lines.push(`- ${left}`);
@@ -2652,8 +3093,10 @@ function renderSourceFileDiff(before: GeneratedAppSourceFileRecord | undefined, 
 }
 
 function shouldKeepSourceContext(index: number, beforeLines: string[], afterLines: string[]) {
-  return beforeLines[index - 1] !== afterLines[index - 1]
-    || beforeLines[index + 1] !== afterLines[index + 1];
+  return (
+    beforeLines[index - 1] !== afterLines[index - 1] ||
+    beforeLines[index + 1] !== afterLines[index + 1]
+  );
 }
 
 function normalizeGeneratedSourcePath(path: string) {
@@ -2665,11 +3108,12 @@ function sortedUniqueStrings(values: string[]) {
 }
 
 function diffFilePath(hunk: Pick<AppIterationDiffHunk, "target" | "action">) {
-  const suffix = hunk.target.kind === "api"
-    ? `${hunk.target.path ?? hunk.target.key}.ts`
-    : hunk.target.kind === "page"
-      ? `${hunk.target.path ?? hunk.target.key}.tsx`
-      : `${hunk.target.key}.json`;
+  const suffix =
+    hunk.target.kind === "api"
+      ? `${hunk.target.path ?? hunk.target.key}.ts`
+      : hunk.target.kind === "page"
+        ? `${hunk.target.path ?? hunk.target.key}.tsx`
+        : `${hunk.target.key}.json`;
   return `generated/${hunk.target.kind}/${suffix.replace(/^\/+/, "")}`;
 }
 
@@ -2686,7 +3130,13 @@ function routeHandlerName(method: "GET" | "POST" | "PATCH" | "DELETE", path: str
     .replace(/[:{}]/g, " ")
     .split(/[^a-zA-Z0-9]+/)
     .filter(Boolean);
-  return words.map((word, index) => index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1)).join("") || "handleGeneratedRoute";
+  return (
+    words
+      .map((word, index) =>
+        index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1),
+      )
+      .join("") || "handleGeneratedRoute"
+  );
 }
 
 function appRouteMethod(value: string): "GET" | "POST" | "PATCH" | "DELETE" {
@@ -2697,18 +3147,33 @@ function appRouteAccess(value: unknown): "public" | "private" | "admin" {
   return value === "public" || value === "admin" ? value : "private";
 }
 
-function appFieldType(value: unknown): "string" | "number" | "boolean" | "date" | "enum" | "json" | "relation" {
-  if (value === "number" || value === "boolean" || value === "date" || value === "enum" || value === "json" || value === "relation") return value;
+function appFieldType(
+  value: unknown,
+): "string" | "number" | "boolean" | "date" | "enum" | "json" | "relation" {
+  if (
+    value === "number" ||
+    value === "boolean" ||
+    value === "date" ||
+    value === "enum" ||
+    value === "json" ||
+    value === "relation"
+  )
+    return value;
   return "string";
 }
 
 function stringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 function titleFromPath(path: string) {
   const segment = path.split("/").filter(Boolean).at(-1) ?? "page";
-  return segment.split(/[-_]+/).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+  return segment
+    .split(/[-_]+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function appendUniqueSentence(value: string, sentence: string) {
@@ -2737,7 +3202,10 @@ function buildAppBuilderDraft(draft: AppDraft, context: AuthenticatedRouteContex
       dataSchema: draft.dataSchema.entities.map((entity) => ({
         name: entity.name,
         fields: entity.fields.map(mapDataField),
-        relationships: [...entity.relations, ...entity.indexes.map((index) => `Indexed by ${index}`)],
+        relationships: [
+          ...entity.relations,
+          ...entity.indexes.map((index) => `Indexed by ${index}`),
+        ],
       })),
       apiRoutes: draft.apiRouteStubs.map(mapApiRoute),
       crudFlows: draft.crudFlows.map((flow) => ({
@@ -2774,10 +3242,22 @@ function buildAppBuilderDraft(draft: AppDraft, context: AuthenticatedRouteContex
     plan: {
       title: `${draft.appName} build plan`,
       steps: [
-        planStep("Generate pages", `Create ${draft.pageMap.length} routed screens and shared navigation from the page map.`),
-        planStep("Create data layer", `Provision ${draft.dataSchema.database} tables for ${draft.dataSchema.entities.map((entry) => entry.name).join(", ")}.`),
-        planStep("Review API contracts", `Review ${draft.apiRouteStubs.length} generated route contracts with validation and auth expectations before runtime execution.`),
-        planStep("Run smoke build", "Render the generated preview and run page plus API contract smoke checks."),
+        planStep(
+          "Generate pages",
+          `Create ${draft.pageMap.length} routed screens and shared navigation from the page map.`,
+        ),
+        planStep(
+          "Create data layer",
+          `Provision ${draft.dataSchema.database} tables for ${draft.dataSchema.entities.map((entry) => entry.name).join(", ")}.`,
+        ),
+        planStep(
+          "Review API contracts",
+          `Review ${draft.apiRouteStubs.length} generated route contracts with validation and auth expectations before runtime execution.`,
+        ),
+        planStep(
+          "Run smoke build",
+          "Render the generated preview and run page plus API contract smoke checks.",
+        ),
       ],
       acceptanceChecks: draft.acceptanceChecks,
       openQuestions: [],
@@ -2807,7 +3287,9 @@ async function persistGeneratedAppDraft(
 
   const record = await mutateStoreAsync((data) => {
     data.generatedApps ??= [];
-    const existing = data.generatedApps.find((entry) => entry.workspaceId === context.workspace.id && entry.slug === slug);
+    const existing = data.generatedApps.find(
+      (entry) => entry.workspaceId === context.workspace.id && entry.slug === slug,
+    );
     const previousCheckpointId = existing?.checkpointId;
     const appId = existing?.id ?? stableGeneratedAppId(draft, context);
     const runtimeArtifact = input.fileTreeFiles?.length
@@ -2953,7 +3435,9 @@ function mapDataField(field: FieldSchemaDraft) {
   const notes = [
     field.enumValues?.length ? `Allowed values: ${field.enumValues.join(", ")}` : "",
     field.references ? `References ${field.references}` : "",
-  ].filter(Boolean).join(". ");
+  ]
+    .filter(Boolean)
+    .join(". ");
 
   return {
     name: field.name,
@@ -2965,7 +3449,13 @@ function mapDataField(field: FieldSchemaDraft) {
 
 function mapFieldType(field: FieldSchemaDraft) {
   if (field.references) return "relation";
-  if (field.type === "number" || field.type === "boolean" || field.type === "date" || field.type === "enum") return field.type;
+  if (
+    field.type === "number" ||
+    field.type === "boolean" ||
+    field.type === "date" ||
+    field.type === "enum"
+  )
+    return field.type;
   if (field.type === "datetime") return "date";
   return "string";
 }
@@ -2978,7 +3468,7 @@ function mapApiRoute(route: ApiRouteStub) {
     purpose: route.purpose,
     handler: handlerName(route),
     authRequired: route.access !== "public",
-    requiredRole: route.access === "admin" ? "admin" as const : undefined,
+    requiredRole: route.access === "admin" ? ("admin" as const) : undefined,
   };
 }
 
@@ -2987,20 +3477,32 @@ function handlerName(route: ApiRouteStub) {
     .replace(/[:{}]/g, " ")
     .split(/[^a-zA-Z0-9]+/)
     .filter(Boolean);
-  return words.map((word, index) => index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1)).join("") || "handleGeneratedRoute";
+  return (
+    words
+      .map((word, index) =>
+        index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1),
+      )
+      .join("") || "handleGeneratedRoute"
+  );
 }
 
 function validationForCrudFlow(draft: AppDraft, flow: CrudFlowDraft) {
   const entity = draft.dataSchema.entities.find((entry) => entry.name === flow.entity);
   if (!entity) return draft.acceptanceChecks;
-  const required = entity.fields.filter((field) => field.required && field.name !== entity.primaryKey).map((field) => field.name);
+  const required = entity.fields
+    .filter((field) => field.required && field.name !== entity.primaryKey)
+    .map((field) => field.name);
   return [
     required.length ? `Required fields: ${required.join(", ")}` : "No non-id fields are required.",
     ...entity.relations,
   ];
 }
 
-function buildAppSmokeStatus(draft: AppDraft, context: AuthenticatedRouteContext, runSmoke: boolean) {
+function buildAppSmokeStatus(
+  draft: AppDraft,
+  context: AuthenticatedRouteContext,
+  runSmoke: boolean,
+) {
   const readiness = buildAppPreviewReadiness({
     appId: stableAppId(draft.appName),
     workspaceId: context.workspace.id,
@@ -3009,10 +3511,24 @@ function buildAppSmokeStatus(draft: AppDraft, context: AuthenticatedRouteContext
     apiRoutes: previewApiRoutes(draft.apiRouteStubs),
     crudFlows: previewCrudFlows(draft),
     build: runSmoke
-      ? { phase: "passed", checkCount: previewSmokeCheckCount(draft), passedChecks: previewSmokeCheckCount(draft) }
-      : { phase: "not-started", checkCount: previewSmokeCheckCount(draft), passedChecks: 0, message: "Smoke checks are ready to run after approval." },
+      ? {
+          phase: "passed",
+          checkCount: previewSmokeCheckCount(draft),
+          passedChecks: previewSmokeCheckCount(draft),
+        }
+      : {
+          phase: "not-started",
+          checkCount: previewSmokeCheckCount(draft),
+          passedChecks: 0,
+          message: "Smoke checks are ready to run after approval.",
+        },
   });
-  return smokeStatusFromChecks(readiness.smokeChecks, runSmoke ? "pass" : "pending", readiness.buildStatus.summary, []);
+  return smokeStatusFromChecks(
+    readiness.smokeChecks,
+    runSmoke ? "pass" : "pending",
+    readiness.buildStatus.summary,
+    [],
+  );
 }
 
 /**
@@ -3051,10 +3567,22 @@ async function runAppSmokeViaSandbox(
   try {
     status = await sandboxService.getStatus();
   } catch {
-    return { ...synthetic, blockers: [...synthetic.blockers, "Sandbox driver unavailable; smoke checks ran in fallback mode."] };
+    return {
+      ...synthetic,
+      blockers: [
+        ...synthetic.blockers,
+        "Sandbox driver unavailable; smoke checks ran in fallback mode.",
+      ],
+    };
   }
   if (!status.available) {
-    return { ...synthetic, blockers: [...synthetic.blockers, `Sandbox driver "${status.driver}" reports unavailable; smoke ran in fallback mode.`] };
+    return {
+      ...synthetic,
+      blockers: [
+        ...synthetic.blockers,
+        `Sandbox driver "${status.driver}" reports unavailable; smoke ran in fallback mode.`,
+      ],
+    };
   }
 
   const items = synthetic.checks.map((check, index) => ({
@@ -3070,20 +3598,28 @@ async function runAppSmokeViaSandbox(
     batch = await sandboxService.runSmokeBatch(context.workspace.id, items);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { ...synthetic, blockers: [...synthetic.blockers, `Sandbox smoke batch failed: ${message}; reverted to fallback.`] };
+    return {
+      ...synthetic,
+      blockers: [
+        ...synthetic.blockers,
+        `Sandbox smoke batch failed: ${message}; reverted to fallback.`,
+      ],
+    };
   }
 
   const checks = synthetic.checks.map((check, index) => {
     const result = batch.items[index];
     if (!result) return check;
-    const realStatus: AppBuilderCheckStatus = result.status === "pass" ? "pass" : result.status === "timeout" ? "warn" : "fail";
+    const realStatus: AppBuilderCheckStatus =
+      result.status === "pass" ? "pass" : result.status === "timeout" ? "warn" : "fail";
     const sandboxNote = result.errorMessage
       ? `sandbox: ${result.errorMessage}`
       : `sandbox: exit ${result.exitCode ?? "?"}${result.durationMs !== undefined ? ` · ${result.durationMs}ms` : ""}`;
     return { ...check, status: realStatus, detail: `${check.detail} · ${sandboxNote}` };
   });
 
-  const aggregateStatus: AppBuilderCheckStatus = batch.status === "pass" ? "pass" : batch.status === "warn" ? "warn" : "fail";
+  const aggregateStatus: AppBuilderCheckStatus =
+    batch.status === "pass" ? "pass" : batch.status === "warn" ? "warn" : "fail";
   const newBlockers = [...synthetic.blockers];
   for (const item of batch.items) {
     if (item.status !== "pass") {
@@ -3100,7 +3636,11 @@ async function runAppSmokeViaSandbox(
   };
 }
 
-function buildAppSmokeStatusFromDraft(draft: AppBuilderDraftContract, context: AuthenticatedRouteContext, runSmoke: boolean) {
+function buildAppSmokeStatusFromDraft(
+  draft: AppBuilderDraftContract,
+  context: AuthenticatedRouteContext,
+  runSmoke: boolean,
+) {
   const readiness = buildAppPreviewReadiness({
     appId: stableAppId(draft.app.name),
     workspaceId: context.workspace.id,
@@ -3110,7 +3650,8 @@ function buildAppSmokeStatusFromDraft(draft: AppBuilderDraftContract, context: A
       title: page.name,
       path: page.route,
       visibility: page.access === "public" ? "public" : "private",
-      supportsMobilePreview: page.access === "public" || page.route === "/" || page.route === "/book",
+      supportsMobilePreview:
+        page.access === "public" || page.route === "/" || page.route === "/book",
     })),
     apiRoutes: draft.app.apiRoutes.map((route) => ({
       key: `${route.method} ${route.path}`,
@@ -3127,10 +3668,24 @@ function buildAppSmokeStatusFromDraft(draft: AppBuilderDraftContract, context: A
       authRequired: true,
     })),
     build: runSmoke
-      ? { phase: "passed", checkCount: draft.smokeBuildStatus.checks.length, passedChecks: draft.smokeBuildStatus.checks.length }
-      : { phase: "not-started", checkCount: draft.smokeBuildStatus.checks.length, passedChecks: 0, message: "Smoke checks are ready to run after approval." },
+      ? {
+          phase: "passed",
+          checkCount: draft.smokeBuildStatus.checks.length,
+          passedChecks: draft.smokeBuildStatus.checks.length,
+        }
+      : {
+          phase: "not-started",
+          checkCount: draft.smokeBuildStatus.checks.length,
+          passedChecks: 0,
+          message: "Smoke checks are ready to run after approval.",
+        },
   });
-  return smokeStatusFromChecks(readiness.smokeChecks, runSmoke ? "pass" : "pending", readiness.buildStatus.summary, []);
+  return smokeStatusFromChecks(
+    readiness.smokeChecks,
+    runSmoke ? "pass" : "pending",
+    readiness.buildStatus.summary,
+    [],
+  );
 }
 
 function previewPages(pages: PageDraft[]): GeneratedAppPageMapEntry[] {
@@ -3173,7 +3728,12 @@ function previewSmokeCheckCount(draft: AppDraft) {
   }).smokeChecks.length;
 }
 
-function smokeStatusFromChecks(checks: AppSmokeCheck[], status: AppBuilderCheckStatus, message: string, blockers: string[]) {
+function smokeStatusFromChecks(
+  checks: AppSmokeCheck[],
+  status: AppBuilderCheckStatus,
+  message: string,
+  blockers: string[],
+) {
   return {
     status,
     message,
@@ -3187,17 +3747,26 @@ function smokeStatusFromChecks(checks: AppSmokeCheck[], status: AppBuilderCheckS
 }
 
 function collectionPathForEntity(draft: AppDraft, entityName: string) {
-  return draft.apiRouteStubs.find((route) => route.method === "GET" && route.path.endsWith(`/${stableAppId(entityName)}s`))?.path
-    ?? `/api/app/generated/${stableAppId(draft.appName)}/${stableAppId(entityName)}s`;
+  return (
+    draft.apiRouteStubs.find(
+      (route) => route.method === "GET" && route.path.endsWith(`/${stableAppId(entityName)}s`),
+    )?.path ?? `/api/app/generated/${stableAppId(draft.appName)}/${stableAppId(entityName)}s`
+  );
 }
 
 function apiBasePathForDraftEntity(draft: AppBuilderDraftContract, entity: string) {
   const plural = `${stableAppId(entity)}s`;
-  return draft.app.apiRoutes.find((route) => route.method === "GET" && route.path.endsWith(`/${plural}`))?.path
-    ?? `/api/app/generated/${draft.app.slug}/${plural}`;
+  return (
+    draft.app.apiRoutes.find((route) => route.method === "GET" && route.path.endsWith(`/${plural}`))
+      ?.path ?? `/api/app/generated/${draft.app.slug}/${plural}`
+  );
 }
 
-function previewUrlForDraft(draft: AppBuilderDraftContract, context: AuthenticatedRouteContext, appId = draft.app.slug || stableAppId(draft.app.name)) {
+function previewUrlForDraft(
+  draft: AppBuilderDraftContract,
+  context: AuthenticatedRouteContext,
+  appId = draft.app.slug || stableAppId(draft.app.name),
+) {
   const readiness = buildAppPreviewReadiness({
     appId,
     workspaceId: context.workspace.id,
@@ -3207,7 +3776,8 @@ function previewUrlForDraft(draft: AppBuilderDraftContract, context: Authenticat
       title: page.name,
       path: page.route,
       visibility: page.access === "public" ? "public" : "private",
-      supportsMobilePreview: page.access === "public" || page.route === "/" || page.route === "/book",
+      supportsMobilePreview:
+        page.access === "public" || page.route === "/" || page.route === "/book",
     })),
     build: { phase: "passed" },
   });
@@ -3220,7 +3790,12 @@ export function registerBuilderRoutes(app: Hono): void {
       const context = await requireAuthenticatedContextAsync(c);
       await requireWorkspacePermission(context, "manageWorkspace");
       const body = (await c.req.json()) as { prompt?: string; preset?: ModelRoutingPresetId };
-      return c.json({ draft: await generateAgentBuilderDraftAsync(context, { prompt: body.prompt, preset: body.preset }) });
+      return c.json({
+        draft: await generateAgentBuilderDraftAsync(context, {
+          prompt: body.prompt,
+          preset: body.preset,
+        }),
+      });
     } catch (error) {
       return errorResponse(c, error);
     }
@@ -3237,13 +3812,16 @@ export function registerBuilderRoutes(app: Hono): void {
         sampleInputs?: Record<string, unknown>;
         status?: "active" | "paused" | "archived";
       };
-      return c.json(await approveAgentBuilderDraftAsync(context, {
-        prompt: body.prompt,
-        draft: body.draft,
-        runPreview: Boolean(body.runPreview),
-        sampleInputs: body.sampleInputs,
-        status: body.status,
-      }), 201);
+      return c.json(
+        await approveAgentBuilderDraftAsync(context, {
+          prompt: body.prompt,
+          draft: body.draft,
+          runPreview: Boolean(body.runPreview),
+          sampleInputs: body.sampleInputs,
+          status: body.status,
+        }),
+        201,
+      );
     } catch (error) {
       return errorResponse(c, error);
     }
@@ -3292,11 +3870,14 @@ export function registerBuilderRoutes(app: Hono): void {
             await sse.writeSSE({ event: "prose", data: JSON.stringify({ type: "prose", text }) });
           },
         );
-        await emitStep(sse, source === "llm-filetree"
-          ? `Authored ${files?.length ?? 0} generated files`
-          : source === "llm"
-            ? `Drafted with AI (${draft.templateId} shape)`
-            : `Selected the ${draft.templateId} template`);
+        await emitStep(
+          sse,
+          source === "llm-filetree"
+            ? `Authored ${files?.length ?? 0} generated files`
+            : source === "llm"
+              ? `Drafted with AI (${draft.templateId} shape)`
+              : `Selected the ${draft.templateId} template`,
+        );
         await chatStreamDelay();
         await emitStep(sse, "Building data schema and API routes");
         await chatStreamDelay();
@@ -3307,7 +3888,9 @@ export function registerBuilderRoutes(app: Hono): void {
         if (source === "template") {
           await streamTemplateNarration(sse, draft);
         }
-        const sourceArtifact = files?.length ? buildGeneratedAppRuntimeArtifactFromFiles(files) : undefined;
+        const sourceArtifact = files?.length
+          ? buildGeneratedAppRuntimeArtifactFromFiles(files)
+          : undefined;
         await sse.writeSSE({
           event: "draft",
           data: JSON.stringify({
@@ -3315,13 +3898,18 @@ export function registerBuilderRoutes(app: Hono): void {
             draft: built,
             source,
             files,
-            sourceFiles: sourceArtifact ? summarizeGeneratedAppSourceFiles(sourceArtifact.files) : undefined,
+            sourceFiles: sourceArtifact
+              ? summarizeGeneratedAppSourceFiles(sourceArtifact.files)
+              : undefined,
             validationErrors,
           }),
         });
         await sse.writeSSE({ event: "done", data: JSON.stringify({ type: "done" }) });
       } catch (error) {
-        await sse.writeSSE({ event: "error", data: JSON.stringify({ type: "error", error: redactedErrorMessage(error) }) });
+        await sse.writeSSE({
+          event: "error",
+          data: JSON.stringify({ type: "error", error: redactedErrorMessage(error) }),
+        });
       }
     });
   });
@@ -3352,18 +3940,36 @@ export function registerBuilderRoutes(app: Hono): void {
           await chatStreamDelay();
         }
         const useLLM = llmIsAvailable();
-        const result = await runAppIterationCore(context, body, async (text) => {
-          if (useLLM) return; // suppress synthetic steps when prose stream is active
-          await emitStep(sse, text);
-          await chatStreamDelay();
-        }, useLLM ? async (chunk) => { await emitProse(sse, chunk); } : undefined);
-        await sse.writeSSE({ event: "diff", data: JSON.stringify({ type: "diff", iteration: result }) });
+        const result = await runAppIterationCore(
+          context,
+          body,
+          async (text) => {
+            if (useLLM) return; // suppress synthetic steps when prose stream is active
+            await emitStep(sse, text);
+            await chatStreamDelay();
+          },
+          useLLM
+            ? async (chunk) => {
+                await emitProse(sse, chunk);
+              }
+            : undefined,
+        );
+        await sse.writeSSE({
+          event: "diff",
+          data: JSON.stringify({ type: "diff", iteration: result }),
+        });
         if (result.validationErrors?.length) {
-          await sse.writeSSE({ event: "validation", data: JSON.stringify({ type: "validation", errors: result.validationErrors }) });
+          await sse.writeSSE({
+            event: "validation",
+            data: JSON.stringify({ type: "validation", errors: result.validationErrors }),
+          });
         }
         await sse.writeSSE({ event: "done", data: JSON.stringify({ type: "done" }) });
       } catch (error) {
-        await sse.writeSSE({ event: "error", data: JSON.stringify({ type: "error", error: redactedErrorMessage(error) }) });
+        await sse.writeSSE({
+          event: "error",
+          data: JSON.stringify({ type: "error", error: redactedErrorMessage(error) }),
+        });
       }
     });
   });
@@ -3373,7 +3979,9 @@ export function registerBuilderRoutes(app: Hono): void {
   app.post("/app/builder/preview/refresh", async (c) => refreshBuilderPreview(c));
   app.post("/app/builder/fix-prompt", async (c) => buildBuilderFixPrompt(c));
   app.get("/app/builder/checkpoints", async (c) => listAppCheckpoints(c));
-  app.post("/app/builder/checkpoints/:checkpointId/rollback", async (c) => rollbackAppCheckpoint(c));
+  app.post("/app/builder/checkpoints/:checkpointId/rollback", async (c) =>
+    rollbackAppCheckpoint(c),
+  );
   app.post("/app/builder/checkpoints/:checkpointId/branch", async (c) => branchAppCheckpoint(c));
   app.post("/app/builder/publish/prepare", async (c) => prepareGeneratedAppPublish(c));
   app.post("/app/builder/publish/readiness", async (c) => prepareGeneratedAppPublish(c));
@@ -3387,5 +3995,7 @@ export function registerBuilderRoutes(app: Hono): void {
   app.post("/app/builder/publish", async (c) => publishGeneratedApp(c));
   app.post("/app/builder/publishes", async (c) => publishGeneratedApp(c));
   app.post("/app/builder/publish/:publishId/rollback", async (c) => rollbackGeneratedAppPublish(c));
-  app.post("/app/builder/publishes/:publishId/rollback", async (c) => rollbackGeneratedAppPublish(c));
+  app.post("/app/builder/publishes/:publishId/rollback", async (c) =>
+    rollbackGeneratedAppPublish(c),
+  );
 }
