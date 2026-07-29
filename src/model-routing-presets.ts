@@ -149,18 +149,23 @@ const STUB_CHOICE: ModelRoutingChoice = {
   source: "fallback",
   ready: true,
   blockers: [],
-  reason: "No ready workspace or env-backed provider was available, so PacketAgent can use deterministic stub output.",
+  reason:
+    "No ready workspace or env-backed provider was available, so PacketAgent can use deterministic stub output.",
   envHints: [],
 };
 
-export function buildModelRoutingPresets(input: ModelRoutingPresetInput): ModelRoutingPresetSurface {
+export function buildModelRoutingPresets(
+  input: ModelRoutingPresetInput,
+): ModelRoutingPresetSurface {
   const env = input.env ?? {};
   const candidates = buildCandidates(input, env);
   const presets = Object.fromEntries(
     PRESETS.map((preset) => [preset.id, buildPreset(preset, candidates, env)]),
   ) as Record<ModelRoutingPresetId, ModelRoutingPreset>;
 
-  const ready = Object.values(presets).filter((preset) => preset.primary.ready && preset.primary.provider !== "stub").length;
+  const ready = Object.values(presets).filter(
+    (preset) => preset.primary.ready && preset.primary.provider !== "stub",
+  ).length;
   return {
     version: "phase-72-lane-4",
     presets,
@@ -190,28 +195,49 @@ function buildPreset(
 }
 
 function choosePrimary(preference: ProviderKind[], candidates: Candidate[]): ModelRoutingChoice {
-  return firstByPreference(preference, candidates, true)
-    ?? firstByPreference(preference, candidates, false)
-    ?? STUB_CHOICE;
+  return (
+    firstByPreference(preference, candidates, true) ??
+    firstByPreference(preference, candidates, false) ??
+    STUB_CHOICE
+  );
 }
 
-function fallbackChoices(preference: ProviderKind[], candidates: Candidate[], primary: ModelRoutingChoice): ModelRoutingChoice[] {
+function fallbackChoices(
+  preference: ProviderKind[],
+  candidates: Candidate[],
+  primary: ModelRoutingChoice,
+): ModelRoutingChoice[] {
   const ready = byPreference(preference, candidates, true)
     .filter((candidate) => !sameChoice(candidate, primary))
     .slice(0, 3);
   return ready.length > 0 ? ready : primary.provider === "stub" ? [] : [STUB_CHOICE];
 }
 
-function firstByPreference(preference: ProviderKind[], candidates: Candidate[], ready: boolean): Candidate | null {
+function firstByPreference(
+  preference: ProviderKind[],
+  candidates: Candidate[],
+  ready: boolean,
+): Candidate | null {
   return byPreference(preference, candidates, ready)[0] ?? null;
 }
 
-function byPreference(preference: ProviderKind[], candidates: Candidate[], ready: boolean): Candidate[] {
-  return preference.flatMap((kind) => candidates.filter((candidate) => candidate.provider === kind && candidate.ready === ready));
+function byPreference(
+  preference: ProviderKind[],
+  candidates: Candidate[],
+  ready: boolean,
+): Candidate[] {
+  return preference.flatMap((kind) =>
+    candidates.filter((candidate) => candidate.provider === kind && candidate.ready === ready),
+  );
 }
 
 function sameChoice(left: ModelRoutingChoice, right: ModelRoutingChoice): boolean {
-  return left.provider === right.provider && left.providerId === right.providerId && left.model === right.model && left.source === right.source;
+  return (
+    left.provider === right.provider &&
+    left.providerId === right.providerId &&
+    left.model === right.model &&
+    left.source === right.source
+  );
 }
 
 function resolvePresetOverride(
@@ -222,8 +248,9 @@ function resolvePresetOverride(
   for (const envName of preset.envHints) {
     const parsed = parsePresetHint(env[envName], preset.preference[0]);
     if (!parsed) continue;
-    const candidate = candidates.find((entry) => entry.provider === parsed.provider && entry.ready)
-      ?? candidates.find((entry) => entry.provider === parsed.provider);
+    const candidate =
+      candidates.find((entry) => entry.provider === parsed.provider && entry.ready) ??
+      candidates.find((entry) => entry.provider === parsed.provider);
     if (!candidate) continue;
     return {
       ...candidate,
@@ -235,7 +262,10 @@ function resolvePresetOverride(
   return null;
 }
 
-function parsePresetHint(value: string | undefined, fallbackProvider: ProviderKind): { provider: ProviderKind; model: string } | null {
+function parsePresetHint(
+  value: string | undefined,
+  fallbackProvider: ProviderKind,
+): { provider: ProviderKind; model: string } | null {
   const trimmed = safeModelName(value);
   if (!trimmed) return null;
   const [maybeProvider, ...modelParts] = trimmed.split(":");
@@ -245,12 +275,17 @@ function parsePresetHint(value: string | undefined, fallbackProvider: ProviderKi
   return model ? { provider: maybeProvider, model } : null;
 }
 
-function buildCandidates(input: ModelRoutingPresetInput, env: Record<string, string | undefined>): Candidate[] {
+function buildCandidates(
+  input: ModelRoutingPresetInput,
+  env: Record<string, string | undefined>,
+): Candidate[] {
   const providers = input.providers
     .filter((provider) => provider.workspaceId === input.workspaceId)
     .filter((provider) => isProviderKind(provider.kind))
     .sort((left, right) => left.name.localeCompare(right.name));
-  const candidates = providers.map((provider) => candidateFromProvider(provider, input.readiness, env));
+  const candidates = providers.map((provider) =>
+    candidateFromProvider(provider, input.readiness, env),
+  );
   const candidateKinds = new Set(candidates.map((candidate) => candidate.provider));
 
   for (const definition of Object.values(PROVIDERS)) {
@@ -291,14 +326,19 @@ function candidateFromEnv(
   env: Record<string, string | undefined>,
   readiness: IntegrationReadinessSummary | undefined,
 ): Candidate | null {
-  const hasAnyEnvHint = [...definition.requiredEnv, ...definition.keyEnv, ...definition.modelEnv].some((name) => hasValue(env[name]));
+  const hasAnyEnvHint = [
+    ...definition.requiredEnv,
+    ...definition.keyEnv,
+    ...definition.modelEnv,
+  ].some((name) => hasValue(env[name]));
   if (!hasAnyEnvHint) return null;
 
   const hasRequired = definition.requiredEnv.every((name) => hasValue(env[name]));
-  const hasKey = definition.keyEnv.length === 0 || definition.keyEnv.some((name) => hasValue(env[name]));
+  const hasKey =
+    definition.keyEnv.length === 0 || definition.keyEnv.some((name) => hasValue(env[name]));
   const hasUsableEnv = hasRequired && hasKey;
   const missingProvider = isApiKeyProvider(definition.provider)
-    ? readiness?.providers.missingProviderKinds.includes(definition.provider) ?? false
+    ? (readiness?.providers.missingProviderKinds.includes(definition.provider) ?? false)
     : false;
   if (!hasUsableEnv && missingProvider) return null;
 
@@ -308,7 +348,11 @@ function candidateFromEnv(
     model: model.value ?? definition.defaultModel,
     source: "env_hint",
     ready: hasUsableEnv,
-    blockers: hasUsableEnv ? [] : definition.requiredEnv.filter((name) => !hasValue(env[name])).map((name) => `Set ${name} or add a workspace provider.`),
+    blockers: hasUsableEnv
+      ? []
+      : definition.requiredEnv
+          .filter((name) => !hasValue(env[name]))
+          .map((name) => `Set ${name} or add a workspace provider.`),
     reason: hasUsableEnv
       ? `${definition.provider} can be inferred from configured environment hints.`
       : `${definition.provider} has model hints but still needs runtime configuration.`,
@@ -326,11 +370,28 @@ function providerReady(
   env: Record<string, string | undefined>,
 ): boolean {
   if (provider.status === "disabled") return false;
-  if (provider.kind === "ollama") return provider.status === "connected" || Boolean(provider.baseUrl) || hasValue(env.OLLAMA_BASE_URL);
-  if (provider.kind === "custom") return provider.status === "connected" && (Boolean(provider.baseUrl) || hasValue(env.CUSTOM_PROVIDER_BASE_URL));
-  if (provider.kind === "azure_openai") return provider.status === "connected" && (provider.apiKeyConfigured || hasValue(env.AZURE_OPENAI_API_KEY));
-  const missingApiKey = readiness?.providers.missingApiKeys.some((entry) => entry.provider === provider.kind) ?? false;
-  return provider.status === "connected" && (provider.apiKeyConfigured || !missingApiKey || PROVIDERS[provider.kind].keyEnv.some((name) => hasValue(env[name])));
+  if (provider.kind === "ollama")
+    return (
+      provider.status === "connected" || Boolean(provider.baseUrl) || hasValue(env.OLLAMA_BASE_URL)
+    );
+  if (provider.kind === "custom")
+    return (
+      provider.status === "connected" &&
+      (Boolean(provider.baseUrl) || hasValue(env.CUSTOM_PROVIDER_BASE_URL))
+    );
+  if (provider.kind === "azure_openai")
+    return (
+      provider.status === "connected" &&
+      (provider.apiKeyConfigured || hasValue(env.AZURE_OPENAI_API_KEY))
+    );
+  const missingApiKey =
+    readiness?.providers.missingApiKeys.some((entry) => entry.provider === provider.kind) ?? false;
+  return (
+    provider.status === "connected" &&
+    (provider.apiKeyConfigured ||
+      !missingApiKey ||
+      PROVIDERS[provider.kind].keyEnv.some((name) => hasValue(env[name])))
+  );
 }
 
 function providerBlockers(
@@ -339,16 +400,27 @@ function providerBlockers(
   env: Record<string, string | undefined>,
 ): string[] {
   if (provider.status === "disabled") return [`Enable ${provider.name}.`];
-  if (provider.kind === "ollama") return hasValue(env.OLLAMA_BASE_URL) || provider.baseUrl ? [] : ["Set OLLAMA_BASE_URL or add an Ollama base URL."];
-  if (provider.kind === "custom") return hasValue(env.CUSTOM_PROVIDER_BASE_URL) || provider.baseUrl ? [] : ["Set CUSTOM_PROVIDER_BASE_URL or add a custom provider base URL."];
+  if (provider.kind === "ollama")
+    return hasValue(env.OLLAMA_BASE_URL) || provider.baseUrl
+      ? []
+      : ["Set OLLAMA_BASE_URL or add an Ollama base URL."];
+  if (provider.kind === "custom")
+    return hasValue(env.CUSTOM_PROVIDER_BASE_URL) || provider.baseUrl
+      ? []
+      : ["Set CUSTOM_PROVIDER_BASE_URL or add a custom provider base URL."];
   const keyEnv = PROVIDERS[provider.kind].keyEnv;
-  const missingApiKey = readiness?.providers.missingApiKeys.some((entry) => entry.provider === provider.kind) ?? !provider.apiKeyConfigured;
+  const missingApiKey =
+    readiness?.providers.missingApiKeys.some((entry) => entry.provider === provider.kind) ??
+    !provider.apiKeyConfigured;
   return missingApiKey && !keyEnv.some((name) => hasValue(env[name]))
     ? [`Store or confirm the ${provider.name} API key.`]
     : [`Mark ${provider.name} connected when credentials are ready.`];
 }
 
-function firstEnvValue(env: Record<string, string | undefined>, names: string[]): { name?: string; value?: string } {
+function firstEnvValue(
+  env: Record<string, string | undefined>,
+  names: string[],
+): { name?: string; value?: string } {
   for (const name of names) {
     const value = safeModelName(env[name]);
     if (value) return { name, value };
@@ -367,12 +439,26 @@ function hasValue(value: string | undefined): boolean {
 }
 
 function isProviderKind(value: string): value is ProviderKind {
-  return value === "openai" || value === "anthropic" || value === "minimax" || value === "azure_openai" || value === "ollama" || value === "gemini" || value === "custom";
+  return (
+    value === "openai" ||
+    value === "anthropic" ||
+    value === "minimax" ||
+    value === "azure_openai" ||
+    value === "ollama" ||
+    value === "gemini" ||
+    value === "custom"
+  );
 }
 
 function isApiKeyProvider(value: ProviderKind): value is ProviderKind & ApiKeyProvider {
   // Narrows to ApiKeyProvider values that are also valid ProviderKinds. Note
   // "openrouter" is an ApiKeyProvider but not a ProviderKind (no workspace
   // provider record kind yet), so it's intentionally excluded here.
-  return value === "openai" || value === "anthropic" || value === "minimax" || value === "ollama" || value === "gemini";
+  return (
+    value === "openai" ||
+    value === "anthropic" ||
+    value === "minimax" ||
+    value === "ollama" ||
+    value === "gemini"
+  );
 }

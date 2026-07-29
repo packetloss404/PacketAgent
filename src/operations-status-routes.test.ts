@@ -56,7 +56,7 @@ test("operations status route returns the report shape for an admin-equivalent o
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as Record<string, unknown>;
+  const body = (await response.json()) as Record<string, unknown>;
   assert.ok(typeof body.generatedAt === "string");
   assert.ok(body.store && typeof body.store === "object");
   assert.ok(body.scheduler && typeof body.scheduler === "object");
@@ -73,4 +73,3 @@ test("operations status route returns the report shape for an admin-equivalent o
   const runtime = body.runtime as { nodeVersion?: unknown };
   assert.equal(runtime.nodeVersion, process.versions.node);
 });
-

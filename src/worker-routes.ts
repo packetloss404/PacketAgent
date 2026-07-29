@@ -42,8 +42,7 @@ export interface WorkerRoutesDependencies {
 export function createWorkerRoutes(dependencies: WorkerRoutesDependencies = {}): Hono {
   const routes = new Hono();
   const service = dependencies.service ?? createWorkerLifecycleService();
-  const activationService =
-    dependencies.activationService ?? createWorkerActivationService();
+  const activationService = dependencies.activationService ?? createWorkerActivationService();
   const credentialService = dependencies.credentialService ?? createWorkerCredentialService();
   const authorize = dependencies.authorize ?? authorizeWorkerRoute;
 
@@ -250,13 +249,8 @@ export function createWorkerRoutes(dependencies: WorkerRoutesDependencies = {}):
         occurredAt: optionalTimestamp(body.occurredAt, "occurredAt"),
         actor: auth.actor,
         payload:
-          body.input === undefined
-            ? {}
-            : (requiredObject(body.input, "input") as JsonObject),
-        trace: workerTraceFromTraceparent(
-          c.req.header("traceparent"),
-          c.req.header("tracestate"),
-        ),
+          body.input === undefined ? {} : (requiredObject(body.input, "input") as JsonObject),
+        trace: workerTraceFromTraceparent(c.req.header("traceparent"), c.req.header("tracestate")),
       });
       return c.json(result, 202);
     } catch (error) {
@@ -504,10 +498,7 @@ function optionalCapabilityGrants(
       throw invalidRequest(`capabilityGrants[${index}].approval must be never or always.`);
     }
     return {
-      capabilityId: requiredString(
-        grant.capabilityId,
-        `capabilityGrants[${index}].capabilityId`,
-      ),
+      capabilityId: requiredString(grant.capabilityId, `capabilityGrants[${index}].capabilityId`),
       verbs: grant.verbs,
       resources: grant.resources,
       approval: grant.approval,

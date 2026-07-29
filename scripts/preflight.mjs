@@ -68,21 +68,15 @@ const detected = PROVIDERS.filter((p) => {
 
 if (detected.length === 0) {
   errLine(`${YELLOW}${BOLD}No AI provider configured.${RESET}`);
-  errLine(
-    "PacketAgent needs at least one to generate apps. Three easy options:",
-  );
+  errLine("PacketAgent needs at least one to generate apps. Three easy options:");
   errLine("");
   errLine(`  ${BOLD}(a) Anthropic${RESET} ${DIM}— recommended${RESET}`);
-  errLine(
-    `      Copy this line into a file named ${CYAN}.env${RESET} in this folder:`,
-  );
+  errLine(`      Copy this line into a file named ${CYAN}.env${RESET} in this folder:`);
   errLine(`        ${GREEN}ANTHROPIC_API_KEY=sk-ant-...${RESET}`);
   errLine(`      Get a key at ${CYAN}https://console.anthropic.com/${RESET}`);
   errLine("");
   errLine(`  ${BOLD}(b) OpenAI${RESET}`);
-  errLine(
-    `      Copy this line into a file named ${CYAN}.env${RESET} in this folder:`,
-  );
+  errLine(`      Copy this line into a file named ${CYAN}.env${RESET} in this folder:`);
   errLine(`        ${GREEN}OPENAI_API_KEY=sk-...${RESET}`);
   errLine(`      Get a key at ${CYAN}https://platform.openai.com/${RESET}`);
   errLine("");
@@ -100,7 +94,10 @@ if (detected.length === 0) {
 }
 
 const primary = detected[0];
-const extras = detected.slice(1).map((p) => p.name).join(", ");
+const extras = detected
+  .slice(1)
+  .map((p) => p.name)
+  .join(", ");
 
 // ---------------------------------------------------------------------------
 // 3. Probe the primary provider to validate the key / reachability.
@@ -246,17 +243,13 @@ function printAuthFailure(provider) {
 function printLocalUnreachable(provider, base) {
   const where = base || (process.env[provider.env] ?? "").trim();
   if (provider.kind === "ollama") {
-    errLine(
-      `${RED}${BOLD}Local LLM at ${where} isn't responding — is Ollama running?${RESET}`,
-    );
+    errLine(`${RED}${BOLD}Local LLM at ${where} isn't responding — is Ollama running?${RESET}`);
     errLine(`Try:  ${GREEN}ollama serve${RESET}`);
     errLine(
       `Then re-run this command. (Or unset ${BOLD}${provider.env}${RESET} in ${CYAN}.env${RESET} to use a cloud provider instead.)`,
     );
   } else {
-    errLine(
-      `${RED}${BOLD}Local LLM at ${where} isn't responding.${RESET}`,
-    );
+    errLine(`${RED}${BOLD}Local LLM at ${where} isn't responding.${RESET}`);
     errLine(
       `Make sure your server is running and serving the OpenAI-compatible ${CYAN}/v1/models${RESET} endpoint.`,
     );
@@ -270,9 +263,7 @@ function printNetworkSkip(provider) {
   line(
     `${YELLOW}Couldn't reach ${provider.name} to verify the key. Skipping probe and continuing.${RESET}`,
   );
-  line(
-    `${DIM}(If generation fails later with a 401, check ${provider.env} in .env.)${RESET}`,
-  );
+  line(`${DIM}(If generation fails later with a 401, check ${provider.env} in .env.)${RESET}`);
   if (extras) {
     line(`${DIM}(also configured: ${extras})${RESET}`);
   }
@@ -289,12 +280,8 @@ const result = await probe(primary);
 
 if (result.ok === "skip") {
   // MiniMax has no cheap list-models GET; defer validation to first use.
-  line(
-    `${GREEN}Detected provider: ${BOLD}${primary.name}${RESET}${GREEN}.${RESET}`,
-  );
-  line(
-    `${DIM}MiniMax key detected (validity will be checked on first use).${RESET}`,
-  );
+  line(`${GREEN}Detected provider: ${BOLD}${primary.name}${RESET}${GREEN}.${RESET}`);
+  line(`${DIM}MiniMax key detected (validity will be checked on first use).${RESET}`);
   if (extras) {
     line(`${DIM}(also configured: ${extras})${RESET}`);
   }

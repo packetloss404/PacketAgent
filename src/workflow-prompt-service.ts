@@ -50,20 +50,111 @@ export type WorkflowDraftResult = {
 };
 
 const STOP_WORDS = new Set([
-  "the", "a", "an", "and", "or", "but", "so", "for", "to", "of", "in", "on", "at",
-  "by", "with", "about", "as", "from", "is", "are", "was", "were", "be", "been",
-  "being", "this", "that", "these", "those", "it", "its", "we", "our", "us", "they",
-  "them", "their", "i", "you", "your", "my", "me", "have", "has", "had", "will",
-  "would", "should", "could", "can", "do", "does", "did", "than", "then", "into",
-  "out", "over", "under", "any", "some", "all", "each", "every", "no", "not",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "so",
+  "for",
+  "to",
+  "of",
+  "in",
+  "on",
+  "at",
+  "by",
+  "with",
+  "about",
+  "as",
+  "from",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "this",
+  "that",
+  "these",
+  "those",
+  "it",
+  "its",
+  "we",
+  "our",
+  "us",
+  "they",
+  "them",
+  "their",
+  "i",
+  "you",
+  "your",
+  "my",
+  "me",
+  "have",
+  "has",
+  "had",
+  "will",
+  "would",
+  "should",
+  "could",
+  "can",
+  "do",
+  "does",
+  "did",
+  "than",
+  "then",
+  "into",
+  "out",
+  "over",
+  "under",
+  "any",
+  "some",
+  "all",
+  "each",
+  "every",
+  "no",
+  "not",
 ]);
 
 const ACTION_VERBS = [
-  "build", "ship", "launch", "track", "monitor", "automate", "send", "notify",
-  "summarize", "draft", "review", "approve", "collect", "capture", "validate",
-  "publish", "deploy", "schedule", "sync", "integrate", "manage", "onboard",
-  "activate", "convert", "qualify", "tag", "route", "escalate", "respond",
-  "process", "ingest", "score", "rank", "filter", "report", "analyze",
+  "build",
+  "ship",
+  "launch",
+  "track",
+  "monitor",
+  "automate",
+  "send",
+  "notify",
+  "summarize",
+  "draft",
+  "review",
+  "approve",
+  "collect",
+  "capture",
+  "validate",
+  "publish",
+  "deploy",
+  "schedule",
+  "sync",
+  "integrate",
+  "manage",
+  "onboard",
+  "activate",
+  "convert",
+  "qualify",
+  "tag",
+  "route",
+  "escalate",
+  "respond",
+  "process",
+  "ingest",
+  "score",
+  "rank",
+  "filter",
+  "report",
+  "analyze",
 ];
 
 export function generateWorkflowDraftFromPrompt(prompt: string): WorkflowDraft {
@@ -145,9 +236,13 @@ function buildSummary(sentences: string[]): string {
 
 function extractCustomers(text: string): string[] {
   const set = new Set<string>();
-  const forMatches = text.matchAll(/\bfor\s+([A-Za-z][\w\s/&-]{2,40}?)(?:[.,;]|$|\bso\b|\bto\b|\bwhen\b)/gi);
+  const forMatches = text.matchAll(
+    /\bfor\s+([A-Za-z][\w\s/&-]{2,40}?)(?:[.,;]|$|\bso\b|\bto\b|\bwhen\b)/gi,
+  );
   for (const match of forMatches) addPhrase(set, match[1]);
-  const targetMatches = text.matchAll(/\b(?:customer|client|user|team|owner|operator|lead|manager|admin|partner|vendor)s?\b/gi);
+  const targetMatches = text.matchAll(
+    /\b(?:customer|client|user|team|owner|operator|lead|manager|admin|partner|vendor)s?\b/gi,
+  );
   for (const match of targetMatches) addPhrase(set, match[0]);
   return Array.from(set).slice(0, 4);
 }
@@ -155,10 +250,17 @@ function extractCustomers(text: string): string[] {
 function extractMetrics(sentences: string[]): string[] {
   const metrics: string[] = [];
   for (const sentence of sentences) {
-    if (/\b(?:reduce|increase|cut|grow|track|measure|hit|reach|under|within|less than|more than)\b/i.test(sentence)) {
+    if (
+      /\b(?:reduce|increase|cut|grow|track|measure|hit|reach|under|within|less than|more than)\b/i.test(
+        sentence,
+      )
+    ) {
       metrics.push(capitalize(sentence));
     }
-    if (/\b\d+\s*(?:%|percent|hour|hours|day|days|minute|minutes|sec|seconds|x)\b/i.test(sentence) && !metrics.includes(capitalize(sentence))) {
+    if (
+      /\b\d+\s*(?:%|percent|hour|hours|day|days|minute|minutes|sec|seconds|x)\b/i.test(sentence) &&
+      !metrics.includes(capitalize(sentence))
+    ) {
       metrics.push(capitalize(sentence));
     }
   }
@@ -166,7 +268,9 @@ function extractMetrics(sentences: string[]): string[] {
 }
 
 function extractConstraints(text: string): string {
-  const match = text.match(/\b(?:without|except|but not|cannot|must not|avoid|excluding)\s+([^.;\n]{3,180})/i);
+  const match = text.match(
+    /\b(?:without|except|but not|cannot|must not|avoid|excluding)\s+([^.;\n]{3,180})/i,
+  );
   return match ? capitalize(match[0]).trim() : "";
 }
 
@@ -202,17 +306,15 @@ function extractActions(sentences: string[]): string[] {
   return actions.slice(0, 6);
 }
 
-function buildRequirements(
-  sentences: string[],
-  actions: string[],
-): WorkflowDraft["requirements"] {
+function buildRequirements(sentences: string[], actions: string[]): WorkflowDraft["requirements"] {
   const requirements: WorkflowDraft["requirements"] = [];
   const seen = new Set<string>();
   for (const action of actions) {
     const title = capitalize(action);
     if (seen.has(title.toLowerCase())) continue;
     seen.add(title.toLowerCase());
-    const detail = sentences.find((sentence) => sentence.toLowerCase().includes(action.split(" ")[0])) ?? "";
+    const detail =
+      sentences.find((sentence) => sentence.toLowerCase().includes(action.split(" ")[0])) ?? "";
     const priority = pickPriority(action, detail);
     requirements.push({ title, detail, priority, status: "accepted" });
   }
@@ -227,10 +329,7 @@ function buildRequirements(
   return requirements.slice(0, 6);
 }
 
-function buildPlanItems(
-  sentences: string[],
-  actions: string[],
-): WorkflowDraft["planItems"] {
+function buildPlanItems(sentences: string[], actions: string[]): WorkflowDraft["planItems"] {
   const items: WorkflowDraft["planItems"] = [];
   const seen = new Set<string>();
   const seedTitles = [
@@ -242,7 +341,10 @@ function buildPlanItems(
     const key = title.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    const description = sentences.find((sentence) => sentence.toLowerCase().includes(title.toLowerCase().split(" ").slice(-1)[0] ?? "")) ?? "";
+    const description =
+      sentences.find((sentence) =>
+        sentence.toLowerCase().includes(title.toLowerCase().split(" ").slice(-1)[0] ?? ""),
+      ) ?? "";
     items.push({ title, description, status: "todo" });
   }
   return items.slice(0, 6);
@@ -250,7 +352,8 @@ function buildPlanItems(
 
 function pickPriority(action: string, detail: string): "must" | "should" | "could" {
   const text = `${action} ${detail}`.toLowerCase();
-  if (/\b(must|need|require|critical|urgent|always|never|safety|compliance|legal)\b/.test(text)) return "must";
+  if (/\b(must|need|require|critical|urgent|always|never|safety|compliance|legal)\b/.test(text))
+    return "must";
   if (/\b(maybe|nice|optional|later|consider|future|could)\b/.test(text)) return "could";
   return "should";
 }
@@ -314,11 +417,15 @@ const TEMPLATES: WorkflowTemplate[] = [
     id: "customer_onboarding_portal",
     name: "Customer onboarding portal",
     category: "Customer success",
-    description: "Stand up a self-serve onboarding flow for new customers with checklist tracking and a kickoff handoff.",
+    description:
+      "Stand up a self-serve onboarding flow for new customers with checklist tracking and a kickoff handoff.",
     brief: {
-      summary: "Launch a self-serve customer onboarding portal that tracks checklist completion through to kickoff.",
-      problemStatement: "New customers stall during onboarding because steps live in scattered email threads and spreadsheets.",
-      desiredOutcome: "Every new customer reaches kickoff within seven days with a verifiable activation checklist.",
+      summary:
+        "Launch a self-serve customer onboarding portal that tracks checklist completion through to kickoff.",
+      problemStatement:
+        "New customers stall during onboarding because steps live in scattered email threads and spreadsheets.",
+      desiredOutcome:
+        "Every new customer reaches kickoff within seven days with a verifiable activation checklist.",
       audience: "Customer success managers and new customer admins",
       constraints: "Reuse existing identity provider; no new logins for customers.",
       targetCustomers: ["Customer success manager", "New customer admin"],
@@ -326,30 +433,66 @@ const TEMPLATES: WorkflowTemplate[] = [
         "Time to kickoff under seven days",
         "At least 80 percent of checklist items completed before kickoff",
       ],
-      goals: ["Visualize onboarding checklist", "Capture kickoff handoff", "Surface stalled customers"],
+      goals: [
+        "Visualize onboarding checklist",
+        "Capture kickoff handoff",
+        "Surface stalled customers",
+      ],
     },
     requirements: [
-      { title: "Render onboarding checklist per customer", detail: "Each customer sees their tailored steps with completion state.", priority: "must" },
-      { title: "Capture kickoff handoff confirmation", detail: "Owner confirms kickoff with notes and date.", priority: "must" },
-      { title: "Flag stalled onboardings after 72 hours of inactivity", detail: "Surface stalled customers to the customer success manager.", priority: "should" },
-      { title: "Allow customer admins to invite teammates", detail: "Invitation flow with role assignment.", priority: "could" },
+      {
+        title: "Render onboarding checklist per customer",
+        detail: "Each customer sees their tailored steps with completion state.",
+        priority: "must",
+      },
+      {
+        title: "Capture kickoff handoff confirmation",
+        detail: "Owner confirms kickoff with notes and date.",
+        priority: "must",
+      },
+      {
+        title: "Flag stalled onboardings after 72 hours of inactivity",
+        detail: "Surface stalled customers to the customer success manager.",
+        priority: "should",
+      },
+      {
+        title: "Allow customer admins to invite teammates",
+        detail: "Invitation flow with role assignment.",
+        priority: "could",
+      },
     ],
     planItems: [
-      { title: "Define onboarding checklist schema", description: "Steps, owners, due dates, completion proof." },
-      { title: "Build checklist UI for customer admin", description: "Self-serve view with inline completion." },
-      { title: "Add stalled-onboarding alert job", description: "Daily check that surfaces inactive accounts." },
-      { title: "Capture kickoff confirmation", description: "Form that records handoff notes and confirmation owner." },
+      {
+        title: "Define onboarding checklist schema",
+        description: "Steps, owners, due dates, completion proof.",
+      },
+      {
+        title: "Build checklist UI for customer admin",
+        description: "Self-serve view with inline completion.",
+      },
+      {
+        title: "Add stalled-onboarding alert job",
+        description: "Daily check that surfaces inactive accounts.",
+      },
+      {
+        title: "Capture kickoff confirmation",
+        description: "Form that records handoff notes and confirmation owner.",
+      },
     ],
   },
   {
     id: "internal_support_triage",
     name: "Internal support triage",
     category: "Operations",
-    description: "Classify incoming support requests, route to owners, and track resolution evidence.",
+    description:
+      "Classify incoming support requests, route to owners, and track resolution evidence.",
     brief: {
-      summary: "Triage internal support requests with classification, ownership, and resolution evidence.",
-      problemStatement: "Support requests arrive across email, chat, and tickets without a single owner or audit trail.",
-      desiredOutcome: "Every request has an owner within one hour and a resolution note within the SLA.",
+      summary:
+        "Triage internal support requests with classification, ownership, and resolution evidence.",
+      problemStatement:
+        "Support requests arrive across email, chat, and tickets without a single owner or audit trail.",
+      desiredOutcome:
+        "Every request has an owner within one hour and a resolution note within the SLA.",
       audience: "Support team lead and on-call operators",
       constraints: "Cannot store customer PII outside existing ticket system.",
       targetCustomers: ["Support lead", "On-call operator"],
@@ -360,27 +503,56 @@ const TEMPLATES: WorkflowTemplate[] = [
       goals: ["Classify requests", "Assign owners automatically", "Track resolution evidence"],
     },
     requirements: [
-      { title: "Classify each incoming request by topic and urgency", detail: "Use rule-based classifier with manual override.", priority: "must" },
-      { title: "Assign an owner within one hour", detail: "Round-robin within on-call rotation.", priority: "must" },
-      { title: "Capture resolution note before closing", detail: "Closure requires a non-empty note.", priority: "must" },
-      { title: "Notify on-call when SLA risk is high", detail: "Send alerts at 50 percent and 80 percent of SLA window.", priority: "should" },
+      {
+        title: "Classify each incoming request by topic and urgency",
+        detail: "Use rule-based classifier with manual override.",
+        priority: "must",
+      },
+      {
+        title: "Assign an owner within one hour",
+        detail: "Round-robin within on-call rotation.",
+        priority: "must",
+      },
+      {
+        title: "Capture resolution note before closing",
+        detail: "Closure requires a non-empty note.",
+        priority: "must",
+      },
+      {
+        title: "Notify on-call when SLA risk is high",
+        detail: "Send alerts at 50 percent and 80 percent of SLA window.",
+        priority: "should",
+      },
     ],
     planItems: [
-      { title: "Define request schema with topic and urgency", description: "Source, channel, urgency, requester, owner." },
-      { title: "Implement classifier and routing rules", description: "Rule-based classifier with weighted defaults." },
+      {
+        title: "Define request schema with topic and urgency",
+        description: "Source, channel, urgency, requester, owner.",
+      },
+      {
+        title: "Implement classifier and routing rules",
+        description: "Rule-based classifier with weighted defaults.",
+      },
       { title: "Add SLA alerting job", description: "Surface at-risk requests to on-call." },
-      { title: "Capture resolution note on close", description: "Block closure without a resolution note." },
+      {
+        title: "Capture resolution note on close",
+        description: "Block closure without a resolution note.",
+      },
     ],
   },
   {
     id: "vendor_activation_tracker",
     name: "Vendor activation tracker",
     category: "Procurement",
-    description: "Activate new vendors with structured intake, contract validation, and release confirmation.",
+    description:
+      "Activate new vendors with structured intake, contract validation, and release confirmation.",
     brief: {
-      summary: "Activate new vendors with structured intake, contract validation, and release confirmation.",
-      problemStatement: "Vendor onboarding is informal, leaving missing documents and unclear go-live status.",
-      desiredOutcome: "Every vendor reaches go-live with confirmed contract, security review, and release record.",
+      summary:
+        "Activate new vendors with structured intake, contract validation, and release confirmation.",
+      problemStatement:
+        "Vendor onboarding is informal, leaving missing documents and unclear go-live status.",
+      desiredOutcome:
+        "Every vendor reaches go-live with confirmed contract, security review, and release record.",
       audience: "Procurement lead and security reviewer",
       constraints: "Security review must precede release confirmation.",
       targetCustomers: ["Procurement lead", "Security reviewer", "Vendor primary contact"],
@@ -391,16 +563,44 @@ const TEMPLATES: WorkflowTemplate[] = [
       goals: ["Capture intake", "Validate contract", "Record security review", "Confirm release"],
     },
     requirements: [
-      { title: "Capture vendor intake details", detail: "Company, primary contact, scope, target go-live.", priority: "must" },
-      { title: "Validate contract document", detail: "Reviewer attaches signed contract and confirmation note.", priority: "must" },
-      { title: "Record security review outcome", detail: "Pass, fail, or conditional with follow-up actions.", priority: "must" },
-      { title: "Confirm release before go-live", detail: "Release requires contract and passing security review.", priority: "must" },
+      {
+        title: "Capture vendor intake details",
+        detail: "Company, primary contact, scope, target go-live.",
+        priority: "must",
+      },
+      {
+        title: "Validate contract document",
+        detail: "Reviewer attaches signed contract and confirmation note.",
+        priority: "must",
+      },
+      {
+        title: "Record security review outcome",
+        detail: "Pass, fail, or conditional with follow-up actions.",
+        priority: "must",
+      },
+      {
+        title: "Confirm release before go-live",
+        detail: "Release requires contract and passing security review.",
+        priority: "must",
+      },
     ],
     planItems: [
-      { title: "Build vendor intake form", description: "Capture vendor metadata and target go-live." },
-      { title: "Add contract validation step", description: "Document upload with reviewer confirmation." },
-      { title: "Add security review checklist", description: "Reviewer captures outcome and follow-ups." },
-      { title: "Wire release confirmation", description: "Block release if prerequisites are missing." },
+      {
+        title: "Build vendor intake form",
+        description: "Capture vendor metadata and target go-live.",
+      },
+      {
+        title: "Add contract validation step",
+        description: "Document upload with reviewer confirmation.",
+      },
+      {
+        title: "Add security review checklist",
+        description: "Reviewer captures outcome and follow-ups.",
+      },
+      {
+        title: "Wire release confirmation",
+        description: "Block release if prerequisites are missing.",
+      },
     ],
   },
 ];

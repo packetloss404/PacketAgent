@@ -27,7 +27,9 @@ test("share token list returns previews while create returns the one-time token"
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ scope: "overview" }),
   });
-  const createdBody = await created.json() as { token: { id: string; token?: string; tokenPreview?: string; scope: string } };
+  const createdBody = (await created.json()) as {
+    token: { id: string; token?: string; tokenPreview?: string; scope: string };
+  };
 
   assert.equal(created.status, 201);
   assert.equal(createdBody.token.scope, "overview");
@@ -35,7 +37,9 @@ test("share token list returns previews while create returns the one-time token"
   assert.ok(createdBody.token.tokenPreview);
 
   const listed = await app.request("/api/app/share", { headers: authHeaders(alpha.cookieValue) });
-  const listedBody = await listed.json() as { tokens: Array<{ id: string; token?: string; tokenPreview?: string }> };
+  const listedBody = (await listed.json()) as {
+    tokens: Array<{ id: string; token?: string; tokenPreview?: string }>;
+  };
   const listedToken = listedBody.tokens.find((entry) => entry.id === createdBody.token.id);
 
   assert.equal(listed.status, 200);

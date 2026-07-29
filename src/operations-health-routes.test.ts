@@ -63,7 +63,7 @@ test("operations health route returns the report shape for an admin-equivalent o
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as Record<string, unknown>;
+  const body = (await response.json()) as Record<string, unknown>;
   assert.ok(typeof body.generatedAt === "string");
   assert.ok(typeof body.overall === "string");
   assert.ok(Array.isArray(body.subsystems));

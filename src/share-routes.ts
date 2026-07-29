@@ -63,7 +63,12 @@ shareRoutes.post("/", async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { scope?: string; expiresAt?: string };
     const scope = (body.scope ?? "overview") as ShareTokenScope;
     if (!VALID_SCOPES.includes(scope)) {
-      return errorResponse(c, Object.assign(new Error(`scope must be one of ${VALID_SCOPES.join(", ")}`), { status: 400 }));
+      return errorResponse(
+        c,
+        Object.assign(new Error(`scope must be one of ${VALID_SCOPES.join(", ")}`), {
+          status: 400,
+        }),
+      );
     }
     const record: ShareTokenRecord = {
       id: randomUUID(),
@@ -75,7 +80,9 @@ shareRoutes.post("/", async (c) => {
       readCount: 0,
       createdAt: nowIso(),
     };
-    await mutateStoreAsync((data) => { data.shareTokens.push(record); });
+    await mutateStoreAsync((data) => {
+      data.shareTokens.push(record);
+    });
     return c.json({ token: summarizeShareToken(record, { includeToken: true }) }, 201);
   } catch (error) {
     return errorResponse(c, error);
@@ -87,12 +94,15 @@ shareRoutes.delete("/:id", async (c) => {
     const ctx = requirePrivateWorkspaceRole(c, "admin");
     const id = c.req.param("id");
     const ok = await mutateStoreAsync((data) => {
-      const t = data.shareTokens.find((entry) => entry.id === id && entry.workspaceId === ctx.workspace.id);
+      const t = data.shareTokens.find(
+        (entry) => entry.id === id && entry.workspaceId === ctx.workspace.id,
+      );
       if (!t) return false;
       t.revokedAt = nowIso();
       return true;
     });
-    if (!ok) return errorResponse(c, Object.assign(new Error("share token not found"), { status: 404 }));
+    if (!ok)
+      return errorResponse(c, Object.assign(new Error("share token not found"), { status: 404 }));
     return c.json({ ok: true });
   } catch (error) {
     return errorResponse(c, error);
@@ -106,7 +116,8 @@ publicShareRoutes.get("/:token", async (c) => {
     const tokenParam = c.req.param("token");
     const data = await loadStoreAsync();
     const record = data.shareTokens.find((entry) => entry.token === tokenParam) ?? null;
-    if (!record || record.revokedAt) return errorResponse(c, Object.assign(new Error("not found"), { status: 404 }));
+    if (!record || record.revokedAt)
+      return errorResponse(c, Object.assign(new Error("not found"), { status: 404 }));
     if (record.expiresAt && Date.parse(record.expiresAt) < Date.now()) {
       return errorResponse(c, Object.assign(new Error("share token expired"), { status: 410 }));
     }
@@ -118,13 +129,18 @@ publicShareRoutes.get("/:token", async (c) => {
       }
     });
     const workspace = data.workspaces.find((w) => w.id === record.workspaceId);
-    if (!workspace) return errorResponse(c, Object.assign(new Error("workspace not found"), { status: 404 }));
+    if (!workspace)
+      return errorResponse(c, Object.assign(new Error("workspace not found"), { status: 404 }));
     const brief = findWorkspaceBrief(data, record.workspaceId);
     const requirements = listRequirementsForWorkspace(data, record.workspaceId);
     const planItems = listImplementationPlanItemsForWorkspace(data, record.workspaceId);
     const payload: Record<string, unknown> = {
       scope: record.scope,
-      workspace: { id: workspace.id, name: workspace.name, automationGoal: workspace.automationGoal },
+      workspace: {
+        id: workspace.id,
+        name: workspace.name,
+        automationGoal: workspace.automationGoal,
+      },
     };
     if (record.scope === "brief" || record.scope === "overview") payload.brief = brief;
     if (record.scope === "plan" || record.scope === "overview") {

@@ -1014,7 +1014,7 @@ pulled forward only after the backlog records that change.
 
 ### R1 - Repository health and historical finding re-audit
 
-Status: active.
+Status: complete as of 2026-07-29. Resume at R2.
 
 1. Re-run every still-relevant finding from `REPO_REVIEW.md` against current
    code; close stale items with evidence instead of copying old line numbers.
@@ -1036,6 +1036,8 @@ Gate: every historical P0/P1 finding is either fixed, proven stale, or linked
 to a named later loop; CI/test/build truth and migration recovery are green.
 
 ### R2 - Provider policy and key parity
+
+Status: active.
 
 1. Add per-provider generation policy and capability metadata.
 2. Add vLLM structured decoding/XGrammar with tested fallback.
@@ -1207,5 +1209,5 @@ npm run test:web
 git diff --check
 ```
 
-Repo-wide `npm run format:check` becomes mandatory after R1 closes its inherited
-baseline. Until then, all authored and touched files must pass Prettier.
+Repo-wide `npm run format:check` is mandatory now that R1 has closed the
+inherited baseline.

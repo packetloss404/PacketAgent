@@ -34,7 +34,8 @@ test("generateAndApplyWorkflowDraft writes records and bumps activation facts wh
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const result = await generateAndApplyWorkflowDraft(auth.context, {
-    prompt: "Activate new vendors with structured intake, contract validation, and release confirmation for procurement leads.",
+    prompt:
+      "Activate new vendors with structured intake, contract validation, and release confirmation for procurement leads.",
     apply: true,
   });
 
@@ -60,7 +61,8 @@ test("generateAndApplyWorkflowDraft returns draft only when apply=false", async 
   const before = getWorkflowOverview(auth.context);
 
   const result = await generateAndApplyWorkflowDraft(auth.context, {
-    prompt: "Triage support requests for the operations team and capture resolution evidence within one hour.",
+    prompt:
+      "Triage support requests for the operations team and capture resolution evidence within one hour.",
     apply: false,
   });
 

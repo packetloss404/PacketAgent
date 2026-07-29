@@ -104,24 +104,47 @@ function withTempSqlite<T>(fn: (dbPath: string) => T): T {
 }
 
 function createRepository(dbPath: string): ProviderCallsRepository {
-  return (createProviderCallsRepository as (deps?: { dbPath?: string }) => ProviderCallsRepository)({ dbPath });
+  return (createProviderCallsRepository as (deps?: { dbPath?: string }) => ProviderCallsRepository)(
+    { dbPath },
+  );
 }
 
 function upsertProviderCall(repository: ProviderCallsRepository, record: ProviderCallRecord): void {
   const writable = repository as unknown as { upsert?: (entry: ProviderCallRecord) => void };
   const upsert = writable.upsert;
-  if (typeof upsert !== "function") assert.fail("expected provider calls repository to expose upsert");
+  if (typeof upsert !== "function")
+    assert.fail("expected provider calls repository to expose upsert");
   upsert(record);
 }
 
 test("listProviderCallsForWorkspaceViaRepository delegates JSON-mode filters and limit to the repository", () => {
   withStoreMode(undefined, () => {
     const repository = memoryProviderCallsRepository([
-      makeRecord({ id: "call_old", workspaceId: "ws_target", completedAt: "2026-04-26T01:00:00.000Z" }),
-      makeRecord({ id: "call_tie_a", workspaceId: "ws_target", completedAt: "2026-04-26T02:00:00.000Z" }),
-      makeRecord({ id: "call_new", workspaceId: "ws_target", completedAt: "2026-04-26T03:00:00.000Z" }),
-      makeRecord({ id: "call_tie_b", workspaceId: "ws_target", completedAt: "2026-04-26T02:00:00.000Z" }),
-      makeRecord({ id: "call_other", workspaceId: "ws_other", completedAt: "2026-04-26T04:00:00.000Z" }),
+      makeRecord({
+        id: "call_old",
+        workspaceId: "ws_target",
+        completedAt: "2026-04-26T01:00:00.000Z",
+      }),
+      makeRecord({
+        id: "call_tie_a",
+        workspaceId: "ws_target",
+        completedAt: "2026-04-26T02:00:00.000Z",
+      }),
+      makeRecord({
+        id: "call_new",
+        workspaceId: "ws_target",
+        completedAt: "2026-04-26T03:00:00.000Z",
+      }),
+      makeRecord({
+        id: "call_tie_b",
+        workspaceId: "ws_target",
+        completedAt: "2026-04-26T02:00:00.000Z",
+      }),
+      makeRecord({
+        id: "call_other",
+        workspaceId: "ws_other",
+        completedAt: "2026-04-26T04:00:00.000Z",
+      }),
     ]);
 
     const result = listProviderCallsForWorkspaceViaRepository(
@@ -130,7 +153,10 @@ test("listProviderCallsForWorkspaceViaRepository delegates JSON-mode filters and
       { repository },
     );
 
-    assert.deepEqual(result.map((entry) => entry.id), ["call_new", "call_tie_b"]);
+    assert.deepEqual(
+      result.map((entry) => entry.id),
+      ["call_new", "call_tie_b"],
+    );
   });
 });
 
@@ -138,10 +164,26 @@ test("listProviderCallsForWorkspaceIndexed reads provider calls from the SQLite 
   withTempSqlite((dbPath) => {
     const repository = createRepository(dbPath);
     const seedRecords = [
-      makeRecord({ id: "sqlite_a", workspaceId: "ws_sqlite", completedAt: "2026-04-26T01:00:00.000Z" }),
-      makeRecord({ id: "sqlite_b", workspaceId: "ws_sqlite", completedAt: "2026-04-26T02:00:00.000Z" }),
-      makeRecord({ id: "sqlite_c", workspaceId: "ws_sqlite", completedAt: "2026-04-26T03:00:00.000Z" }),
-      makeRecord({ id: "sqlite_other", workspaceId: "ws_other", completedAt: "2026-04-26T04:00:00.000Z" }),
+      makeRecord({
+        id: "sqlite_a",
+        workspaceId: "ws_sqlite",
+        completedAt: "2026-04-26T01:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_b",
+        workspaceId: "ws_sqlite",
+        completedAt: "2026-04-26T02:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_c",
+        workspaceId: "ws_sqlite",
+        completedAt: "2026-04-26T03:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_other",
+        workspaceId: "ws_other",
+        completedAt: "2026-04-26T04:00:00.000Z",
+      }),
     ];
     for (const record of seedRecords) upsertProviderCall(repository, record);
 
@@ -149,10 +191,16 @@ test("listProviderCallsForWorkspaceIndexed reads provider calls from the SQLite 
       since: "2026-04-26T02:00:00.000Z",
       limit: 2,
     });
-    assert.deepEqual(limited.map((entry) => entry.id), ["sqlite_c", "sqlite_b"]);
+    assert.deepEqual(
+      limited.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_b"],
+    );
 
     const allRows = listProviderCallsForWorkspaceIndexed("ws_sqlite");
-    assert.deepEqual(allRows.map((entry) => entry.id), ["sqlite_c", "sqlite_b", "sqlite_a"]);
+    assert.deepEqual(
+      allRows.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_b", "sqlite_a"],
+    );
   });
 });
 
@@ -160,28 +208,52 @@ test("listProviderCallsForWorkspaceViaRepository merges and de-dupes JSON fallba
   withTempSqlite((dbPath) => {
     const repository = createRepository(dbPath);
     const repoRecords = [
-      makeRecord({ id: "repo_new", workspaceId: "ws_merge", completedAt: "2026-04-26T06:00:00.000Z" }),
+      makeRecord({
+        id: "repo_new",
+        workspaceId: "ws_merge",
+        completedAt: "2026-04-26T06:00:00.000Z",
+      }),
       makeRecord({
         id: "shared_call",
         workspaceId: "ws_merge",
         routeKey: "repo.route",
         completedAt: "2026-04-26T03:00:00.000Z",
       }),
-      makeRecord({ id: "repo_tie_a", workspaceId: "ws_merge", completedAt: "2026-04-26T04:00:00.000Z" }),
-      makeRecord({ id: "repo_tie_b", workspaceId: "ws_merge", completedAt: "2026-04-26T04:00:00.000Z" }),
+      makeRecord({
+        id: "repo_tie_a",
+        workspaceId: "ws_merge",
+        completedAt: "2026-04-26T04:00:00.000Z",
+      }),
+      makeRecord({
+        id: "repo_tie_b",
+        workspaceId: "ws_merge",
+        completedAt: "2026-04-26T04:00:00.000Z",
+      }),
     ];
     for (const record of repoRecords) upsertProviderCall(repository, record);
 
     const fallbackData = makeStore([
-      makeRecord({ id: "json_only", workspaceId: "ws_merge", completedAt: "2026-04-26T05:00:00.000Z" }),
+      makeRecord({
+        id: "json_only",
+        workspaceId: "ws_merge",
+        completedAt: "2026-04-26T05:00:00.000Z",
+      }),
       makeRecord({
         id: "shared_call",
         workspaceId: "ws_merge",
         routeKey: "fallback.route",
         completedAt: "2026-04-26T07:00:00.000Z",
       }),
-      makeRecord({ id: "json_old", workspaceId: "ws_merge", completedAt: "2026-04-26T01:00:00.000Z" }),
-      makeRecord({ id: "json_other", workspaceId: "ws_other", completedAt: "2026-04-26T08:00:00.000Z" }),
+      makeRecord({
+        id: "json_old",
+        workspaceId: "ws_merge",
+        completedAt: "2026-04-26T01:00:00.000Z",
+      }),
+      makeRecord({
+        id: "json_other",
+        workspaceId: "ws_other",
+        completedAt: "2026-04-26T08:00:00.000Z",
+      }),
     ]);
 
     const merged = listProviderCallsForWorkspaceViaRepository(
@@ -189,13 +261,10 @@ test("listProviderCallsForWorkspaceViaRepository merges and de-dupes JSON fallba
       { since: "2026-04-26T02:00:00.000Z" },
       { loadStore: () => fallbackData },
     );
-    assert.deepEqual(merged.map((entry) => entry.id), [
-      "repo_new",
-      "json_only",
-      "repo_tie_b",
-      "repo_tie_a",
-      "shared_call",
-    ]);
+    assert.deepEqual(
+      merged.map((entry) => entry.id),
+      ["repo_new", "json_only", "repo_tie_b", "repo_tie_a", "shared_call"],
+    );
     assert.equal(merged.find((entry) => entry.id === "shared_call")?.routeKey, "repo.route");
 
     const limited = listProviderCallsForWorkspaceViaRepository(
@@ -203,6 +272,9 @@ test("listProviderCallsForWorkspaceViaRepository merges and de-dupes JSON fallba
       { since: "2026-04-26T02:00:00.000Z", limit: 3 },
       { loadStore: () => fallbackData },
     );
-    assert.deepEqual(limited.map((entry) => entry.id), ["repo_new", "json_only", "repo_tie_b"]);
+    assert.deepEqual(
+      limited.map((entry) => entry.id),
+      ["repo_new", "json_only", "repo_tie_b"],
+    );
   });
 });

@@ -1,5 +1,8 @@
 import type { PacketAgentData } from "./packetagent-store.js";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync } from "./packetagent-store.js";
+import {
+  loadStore as defaultLoadStore,
+  loadStoreAsync as defaultLoadStoreAsync,
+} from "./packetagent-store.js";
 import { getJobTypeMetrics, type JobTypeMetrics } from "./jobs/scheduler-metrics.js";
 
 export type { JobTypeMetrics } from "./jobs/scheduler-metrics.js";
@@ -28,7 +31,12 @@ export interface OperationsStatus {
     total: number;
     lastCapturedAt: string | null;
   };
-  accessLog: { mode: "off" | "stdout" | "file"; path: string | null; maxBytes: number; maxFiles: number };
+  accessLog: {
+    mode: "off" | "stdout" | "file";
+    path: string | null;
+    maxBytes: number;
+    maxFiles: number;
+  };
   runtime: { nodeVersion: string };
 }
 
@@ -171,13 +179,15 @@ export function getOperationsStatus(deps: OperationsStatusDeps = {}): Operations
   const storeMode = resolveStoreMode(env);
 
   const snapshotRows = (data.jobMetricSnapshots ?? []) as Array<{ capturedAt: string }>;
-  const lastCapturedAt = snapshotRows.length === 0
-    ? null
-    : snapshotRows.reduce((acc, row) => {
-        const t = Date.parse(row.capturedAt);
-        return Number.isFinite(t) && t > acc ? t : acc;
-      }, 0);
-  const lastCapturedAtIso = lastCapturedAt === null || lastCapturedAt === 0 ? null : new Date(lastCapturedAt).toISOString();
+  const lastCapturedAt =
+    snapshotRows.length === 0
+      ? null
+      : snapshotRows.reduce((acc, row) => {
+          const t = Date.parse(row.capturedAt);
+          return Number.isFinite(t) && t > acc ? t : acc;
+        }, 0);
+  const lastCapturedAtIso =
+    lastCapturedAt === null || lastCapturedAt === 0 ? null : new Date(lastCapturedAt).toISOString();
 
   return {
     generatedAt: now().toISOString(),
@@ -204,7 +214,9 @@ export function getOperationsStatus(deps: OperationsStatusDeps = {}): Operations
   };
 }
 
-export async function getOperationsStatusAsync(deps: OperationsStatusAsyncDeps = {}): Promise<OperationsStatus> {
+export async function getOperationsStatusAsync(
+  deps: OperationsStatusAsyncDeps = {},
+): Promise<OperationsStatus> {
   const loadStore = deps.loadStore ?? defaultLoadStoreAsync;
   const env = deps.env ?? process.env;
   const now = deps.now ?? (() => new Date());
@@ -214,13 +226,15 @@ export async function getOperationsStatusAsync(deps: OperationsStatusAsyncDeps =
   const storeMode = resolveStoreMode(env);
 
   const snapshotRows = (data.jobMetricSnapshots ?? []) as Array<{ capturedAt: string }>;
-  const lastCapturedAt = snapshotRows.length === 0
-    ? null
-    : snapshotRows.reduce((acc, row) => {
-        const t = Date.parse(row.capturedAt);
-        return Number.isFinite(t) && t > acc ? t : acc;
-      }, 0);
-  const lastCapturedAtIso = lastCapturedAt === null || lastCapturedAt === 0 ? null : new Date(lastCapturedAt).toISOString();
+  const lastCapturedAt =
+    snapshotRows.length === 0
+      ? null
+      : snapshotRows.reduce((acc, row) => {
+          const t = Date.parse(row.capturedAt);
+          return Number.isFinite(t) && t > acc ? t : acc;
+        }, 0);
+  const lastCapturedAtIso =
+    lastCapturedAt === null || lastCapturedAt === 0 ? null : new Date(lastCapturedAt).toISOString();
 
   return {
     generatedAt: now().toISOString(),

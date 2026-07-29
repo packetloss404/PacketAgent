@@ -35,7 +35,8 @@ agentWebhookRoutes.post("/agents/:agentId/rotate", async (c) => {
       agent.updatedAt = nowIso();
       return agent;
     });
-    if (!updated) return errorResponse(c, Object.assign(new Error("agent not found"), { status: 404 }));
+    if (!updated)
+      return errorResponse(c, Object.assign(new Error("agent not found"), { status: 404 }));
     return c.json({ webhookToken: updated.webhookToken });
   } catch (error) {
     return errorResponse(c, error);
@@ -69,8 +70,11 @@ publicWebhookRoutes.post("/agents/:token", async (c) => {
     const agent = data.agents.find((a) => a.webhookToken === tokenParam && a.status !== "archived");
     if (!agent) return errorResponse(c, Object.assign(new Error("not found"), { status: 404 }));
     let body: Record<string, unknown> = {};
-    try { body = (await c.req.json()) as Record<string, unknown>; }
-    catch { body = {}; }
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      body = {};
+    }
     const job = await enqueueJobAsync({
       workspaceId: agent.workspaceId,
       type: "agent.run",
@@ -111,26 +115,17 @@ publicWebhookRoutes.post("/workers/:webhookRef", async (c) => {
     try {
       body = await c.req.json();
     } catch {
-      throw new WorkerLifecycleError(
-        "invalid_input",
-        "Worker webhook body must be valid JSON.",
-      );
+      throw new WorkerLifecycleError("invalid_input", "Worker webhook body must be valid JSON.");
     }
     if (!body || typeof body !== "object" || Array.isArray(body)) {
-      throw new WorkerLifecycleError(
-        "invalid_input",
-        "Worker webhook body must be a JSON object.",
-      );
+      throw new WorkerLifecycleError("invalid_input", "Worker webhook body must be a JSON object.");
     }
     const result = await activateWorkerWebhookDelivery({
       webhookRef: c.req.param("webhookRef"),
       deliveryId,
       occurredAt: c.req.header("x-packetagent-occurred-at")?.trim() || undefined,
       payload: body as JsonObject,
-      trace: workerTraceFromTraceparent(
-        c.req.header("traceparent"),
-        c.req.header("tracestate"),
-      ),
+      trace: workerTraceFromTraceparent(c.req.header("traceparent"), c.req.header("tracestate")),
     });
     return c.json(result, 202);
   } catch (error) {

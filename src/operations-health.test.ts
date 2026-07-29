@@ -71,7 +71,10 @@ test("store returns null -> store down", () => {
 
 test("scheduler with schedulerStartedAt null -> down", () => {
   const report = getOperationsHealth(
-    baseDeps({ schedulerHeartbeat: () => heartbeat({ schedulerStartedAt: null, lastTickEndedAt: null, lastTickStartedAt: null }) }),
+    baseDeps({
+      schedulerHeartbeat: () =>
+        heartbeat({ schedulerStartedAt: null, lastTickEndedAt: null, lastTickStartedAt: null }),
+    }),
   );
   const scheduler = findSubsystem(report, "scheduler");
   assert.equal(scheduler.status, "down");
@@ -81,7 +84,10 @@ test("scheduler with schedulerStartedAt null -> down", () => {
 
 test("scheduler with no completed tick -> degraded", () => {
   const report = getOperationsHealth(
-    baseDeps({ schedulerHeartbeat: () => heartbeat({ lastTickEndedAt: null, lastTickStartedAt: "2026-04-26T10:00:00.000Z" }) }),
+    baseDeps({
+      schedulerHeartbeat: () =>
+        heartbeat({ lastTickEndedAt: null, lastTickStartedAt: "2026-04-26T10:00:00.000Z" }),
+    }),
   );
   const scheduler = findSubsystem(report, "scheduler");
   assert.equal(scheduler.status, "degraded");
@@ -106,7 +112,8 @@ test("scheduler with stale lastTickEndedAt -> degraded with rounded seconds", ()
 test("scheduler with recent tick -> ok with ticksSinceStart in detail", () => {
   const report = getOperationsHealth(
     baseDeps({
-      schedulerHeartbeat: () => heartbeat({ lastTickEndedAt: "2026-04-26T10:00:00.000Z", ticksSinceStart: 42 }),
+      schedulerHeartbeat: () =>
+        heartbeat({ lastTickEndedAt: "2026-04-26T10:00:00.000Z", ticksSinceStart: 42 }),
       now: fixedNow("2026-04-26T10:00:00.250Z"),
     }),
   );
@@ -135,7 +142,10 @@ test("access log mode file without path -> down", () => {
 test("access log mode file with missing parent dir -> down", () => {
   const report = getOperationsHealth(
     baseDeps({
-      env: { PACKETAGENT_ACCESS_LOG_MODE: "file", PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log" },
+      env: {
+        PACKETAGENT_ACCESS_LOG_MODE: "file",
+        PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log",
+      },
       fileExists: () => false,
     }),
   );
@@ -148,7 +158,10 @@ test("access log mode file with missing parent dir -> down", () => {
 test("access log mode file with parent dir present but file absent -> degraded", () => {
   const report = getOperationsHealth(
     baseDeps({
-      env: { PACKETAGENT_ACCESS_LOG_MODE: "file", PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log" },
+      env: {
+        PACKETAGENT_ACCESS_LOG_MODE: "file",
+        PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log",
+      },
       fileExists: (path) => !path.endsWith("access.log"),
     }),
   );
@@ -161,7 +174,10 @@ test("access log mode file with parent dir present but file absent -> degraded",
 test("access log mode file with file present -> ok", () => {
   const report = getOperationsHealth(
     baseDeps({
-      env: { PACKETAGENT_ACCESS_LOG_MODE: "file", PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log" },
+      env: {
+        PACKETAGENT_ACCESS_LOG_MODE: "file",
+        PACKETAGENT_ACCESS_LOG_PATH: "var/logs/access.log",
+      },
       fileExists: () => true,
     }),
   );
@@ -191,9 +207,7 @@ test("overall is degraded when only degraded subsystems exist", () => {
 });
 
 test("disabled access log does not poison overall", () => {
-  const report = getOperationsHealth(
-    baseDeps({ env: { PACKETAGENT_ACCESS_LOG_MODE: "off" } }),
-  );
+  const report = getOperationsHealth(baseDeps({ env: { PACKETAGENT_ACCESS_LOG_MODE: "off" } }));
   assert.equal(findSubsystem(report, "accessLog").status, "disabled");
   assert.equal(report.overall, "ok");
 });

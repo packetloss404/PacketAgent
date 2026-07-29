@@ -253,14 +253,9 @@ test("manual Worker run routes use the canonical activation inbox", async () => 
   assert.equal(harness.data.workerRuns.length, 1);
   assert.equal(harness.data.workerActivationInboxes[0].duplicateCount, 1);
 
-  const listed = await harness.routes.request(
-    `/activations?workerDeploymentId=${deployment.id}`,
-  );
+  const listed = await harness.routes.request(`/activations?workerDeploymentId=${deployment.id}`);
   assert.equal(listed.status, 200);
-  assert.equal(
-    ((await listed.json()) as { activations: unknown[] }).activations.length,
-    1,
-  );
+  assert.equal(((await listed.json()) as { activations: unknown[] }).activations.length, 1);
 });
 
 test("Worker route errors redact secret-shaped values", async () => {

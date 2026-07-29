@@ -21,17 +21,21 @@ export function listProviderCallsForWorkspaceViaRepository(
   opts: ListProviderCallsOptions = {},
   deps: ProviderCallsReadDeps = {},
 ): ProviderCallRecord[] {
-  const repo = deps.repository ?? createProviderCallsRepository({
-    loadStore: deps.loadStore,
-    mutateStore: deps.mutateStore,
-  });
+  const repo =
+    deps.repository ??
+    createProviderCallsRepository({
+      loadStore: deps.loadStore,
+      mutateStore: deps.mutateStore,
+    });
 
   if (process.env.PACKETAGENT_STORE !== "sqlite") {
     return repo.list({ workspaceId, since: opts.since, limit: opts.limit });
   }
 
   const primary = repo.list({ workspaceId }).filter((entry) => entry.workspaceId === workspaceId);
-  const fallback = legacyProviderCallsFromStore(deps).filter((entry) => entry.workspaceId === workspaceId);
+  const fallback = legacyProviderCallsFromStore(deps).filter(
+    (entry) => entry.workspaceId === workspaceId,
+  );
   return mergeFilterSortAndLimit(primary, fallback, opts);
 }
 

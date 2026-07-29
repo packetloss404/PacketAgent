@@ -44,11 +44,16 @@ function expectRun(result: RunAgentResult): RunAgentRunResult {
 }
 
 function expectApproval(result: RunAgentResult): RunAgentApprovalResult {
-  assert.ok("approval" in result, `expected an approval result, received ${JSON.stringify(result)}`);
+  assert.ok(
+    "approval" in result,
+    `expected an approval result, received ${JSON.stringify(result)}`,
+  );
   return result.approval;
 }
 
-function approveToolCapabilityRequest(approval: RunAgentApprovalResult): RunAgentToolApprovalPayload {
+function approveToolCapabilityRequest(
+  approval: RunAgentApprovalResult,
+): RunAgentToolApprovalPayload {
   return {
     decision: "launch",
     token: approval.approvalToken,
@@ -59,13 +64,15 @@ function approveToolCapabilityRequest(approval: RunAgentApprovalResult): RunAgen
 function installOnlyTestToolRegistry(toolNames: string[]) {
   const previousTools = getDefaultToolRegistry().list();
   resetDefaultToolRegistryForTests();
-  getDefaultToolRegistry().registerMany(toolNames.map((name) => ({
-    name,
-    description: `${name} test tool`,
-    inputSchema: {},
-    side: "read" as const,
-    handle: async () => ({ ok: true, output: {} }),
-  })));
+  getDefaultToolRegistry().registerMany(
+    toolNames.map((name) => ({
+      name,
+      description: `${name} test tool`,
+      inputSchema: {},
+      side: "read" as const,
+      handle: async () => ({ ok: true, output: {} }),
+    })),
+  );
 
   return () => {
     resetDefaultToolRegistryForTests();
@@ -182,7 +189,9 @@ test("agent runs with enabled tools request launch approval before execution", a
   });
 
   const runsBefore = getAgent(auth.context, created.agent.id).runs.length;
-  const approval = expectApproval(await runAgent(auth.context, created.agent.id, { toolApproval: undefined }));
+  const approval = expectApproval(
+    await runAgent(auth.context, created.agent.id, { toolApproval: undefined }),
+  );
   const approvalPayload = JSON.stringify(approval);
 
   assert.equal(getAgent(auth.context, created.agent.id).runs.length, runsBefore);
@@ -203,10 +212,14 @@ test("valid tool launch approval reaches setup-required execution blockers", asy
     routeKey: "agent.reasoning",
   });
 
-  const approval = expectApproval(await runAgent(auth.context, created.agent.id, { toolApproval: undefined }));
-  const result = expectRun(await runAgent(auth.context, created.agent.id, {
-    toolApproval: approveToolCapabilityRequest(approval),
-  }));
+  const approval = expectApproval(
+    await runAgent(auth.context, created.agent.id, { toolApproval: undefined }),
+  );
+  const result = expectRun(
+    await runAgent(auth.context, created.agent.id, {
+      toolApproval: approveToolCapabilityRequest(approval),
+    }),
+  );
 
   assert.equal(result.status, "failed");
   assert.match(result.title, /setup required/);
@@ -229,9 +242,11 @@ test("canceling tool launch approval records a canceled run", async () => {
     routeKey: "agent.reasoning",
   });
 
-  const run = expectRun(await runAgent(auth.context, created.agent.id, {
-    toolApproval: { decision: "cancel" },
-  }));
+  const run = expectRun(
+    await runAgent(auth.context, created.agent.id, {
+      toolApproval: { decision: "cancel" },
+    }),
+  );
 
   assert.equal(run.status, "canceled");
   assert.match(run.error ?? "", /canceled before execution/i);
@@ -250,7 +265,9 @@ test("integration readiness summarizes generated plan tool and provider setup ga
   assert.ok(readiness.tools.availableCount > 0);
   assert.ok(readiness.tools.names.includes("read_workflow_brief"));
   assert.equal(readiness.tools.missingForGeneratedPlans.includes("gmail"), false);
-  assert.deepEqual(readiness.providers.missingApiKeys, [{ provider: "anthropic", providerName: "Anthropic" }]);
+  assert.deepEqual(readiness.providers.missingApiKeys, [
+    { provider: "anthropic", providerName: "Anthropic" },
+  ]);
   assert.ok(readiness.providers.missingProviderKinds.includes("openai"));
   assert.ok(readiness.recommendedSetup.some((entry) => entry.includes("Store vault keys")));
 });
@@ -271,7 +288,8 @@ test("agent prompt generation returns a structured builder draft", async () => {
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const draft = await generateAgentBuilderDraftAsync(auth.context, {
-    prompt: "Build an agent that monitors support tickets daily, summarizes urgent escalations, opens blockers for unresolved incidents, and reports outcomes to operators.",
+    prompt:
+      "Build an agent that monitors support tickets daily, summarizes urgent escalations, opens blockers for unresolved incidents, and reports outcomes to operators.",
   });
 
   assert.equal(draft.agent.status, "active");
@@ -280,14 +298,16 @@ test("agent prompt generation returns a structured builder draft", async () => {
   assert.match(draft.agent.name ?? "", /Support|agent/i);
   assert.ok(draft.agent.instructions?.includes("User request"));
   assert.ok(draft.agent.enabledTools?.includes("list_blockers"));
-  assert.deepEqual(draft.agent.playbook.map((step) => step.title), [
-    "Understand request",
-    "Collect context",
-    "Produce output",
-    "Report result",
-  ]);
   assert.deepEqual(
-    draft.agent.inputSchema.map((field) => ({ key: field.key, type: field.type, required: field.required })),
+    draft.agent.playbook.map((step) => step.title),
+    ["Understand request", "Collect context", "Produce output", "Report result"],
+  );
+  assert.deepEqual(
+    draft.agent.inputSchema.map((field) => ({
+      key: field.key,
+      type: field.type,
+      required: field.required,
+    })),
     [
       { key: "mailbox", type: "string", required: true },
       { key: "urgency_threshold", type: "enum", required: true },
@@ -311,7 +331,8 @@ test("agent builder drafts surface missing tool setup as first-run blockers", as
   try {
     const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
     const draft = await generateAgentBuilderDraftAsync(auth.context, {
-      prompt: "Send Slack notifications for GitHub pull requests and email owners when review is needed.",
+      prompt:
+        "Send Slack notifications for GitHub pull requests and email owners when review is needed.",
     });
 
     assert.ok(draft.readiness.tools.recommended.includes("slack_post_webhook"));
@@ -324,9 +345,11 @@ test("agent builder drafts surface missing tool setup as first-run blockers", as
     assert.deepEqual(draft.agent.enabledTools, []);
     assert.equal(draft.readiness.provider.configured, true);
     assert.equal(draft.readiness.firstRun.canRun, false);
-    assert.ok(draft.readiness.firstRun.blockers.some((blocker) =>
-      blocker.includes("slack_post_webhook") && blocker.includes("github_api")
-    ));
+    assert.ok(
+      draft.readiness.firstRun.blockers.some(
+        (blocker) => blocker.includes("slack_post_webhook") && blocker.includes("github_api"),
+      ),
+    );
     assert.match(draft.readiness.tools.message, /not registered yet/);
   } finally {
     restoreTools();
@@ -338,7 +361,8 @@ test("agent builder drafts carry phase 71 integration flows and env setup refere
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const draft = await generateAgentBuilderDraftAsync(auth.context, {
-    prompt: "Create a daily agent that reads GitHub issues, sends Slack alerts, emails owners, and updates Stripe billing notes for escalations.",
+    prompt:
+      "Create a daily agent that reads GitHub issues, sends Slack alerts, emails owners, and updates Stripe billing notes for escalations.",
   });
 
   assert.equal(draft.agent.triggerKind, "schedule");
@@ -348,10 +372,25 @@ test("agent builder drafts carry phase 71 integration flows and env setup refere
   );
   assert.match(draft.agent.instructions, /GITHUB_TOKEN/);
   assert.match(draft.agent.instructions, /SLACK_WEBHOOK_URL/);
-  assert.ok(draft.agent.playbook.some((step) => step.title === "Prepare GitHub connector" && step.instruction.includes("GH_TOKEN")));
-  assert.ok(draft.plan.steps.some((step) => step.title === "Prepare Stripe payments" && step.detail.includes("STRIPE_SECRET_KEY")));
-  assert.ok(draft.plan.acceptanceChecks.some((check) => check.includes("remains draft-safe until setup is complete")));
-  assert.ok(!draft.readiness.firstRun.blockers.some((blocker) => blocker.includes("STRIPE_SECRET_KEY")));
+  assert.ok(
+    draft.agent.playbook.some(
+      (step) => step.title === "Prepare GitHub connector" && step.instruction.includes("GH_TOKEN"),
+    ),
+  );
+  assert.ok(
+    draft.plan.steps.some(
+      (step) =>
+        step.title === "Prepare Stripe payments" && step.detail.includes("STRIPE_SECRET_KEY"),
+    ),
+  );
+  assert.ok(
+    draft.plan.acceptanceChecks.some((check) =>
+      check.includes("remains draft-safe until setup is complete"),
+    ),
+  );
+  assert.ok(
+    !draft.readiness.firstRun.blockers.some((blocker) => blocker.includes("STRIPE_SECRET_KEY")),
+  );
 });
 
 test("prompt agent drafts include requested integration setup without blocking unrelated features", () => {
@@ -365,8 +404,14 @@ test("prompt agent drafts include requested integration setup without blocking u
   );
   assert.match(draft.agent.instructions, /GITHUB_TOKEN/);
   assert.match(draft.agent.instructions, /SLACK_WEBHOOK_URL/);
-  assert.ok(draft.plan.some((item) => item.title === "Configure GitHub connector" && item.detail.includes("GH_TOKEN")));
-  assert.ok(draft.assumptions.some((assumption) => assumption.includes("can be drafted before setup")));
+  assert.ok(
+    draft.plan.some(
+      (item) => item.title === "Configure GitHub connector" && item.detail.includes("GH_TOKEN"),
+    ),
+  );
+  assert.ok(
+    draft.assumptions.some((assumption) => assumption.includes("can be drafted before setup")),
+  );
 });
 
 test("prompt agent drafts include custom API integration setup", () => {
@@ -374,7 +419,9 @@ test("prompt agent drafts include custom API integration setup", () => {
     "Build an agent that calls a custom external API with a bearer token, normalizes the response, and writes a concise summary.",
   );
 
-  assert.ok(draft.integrationMetadata.requested.some((integration) => integration.id === "custom_api"));
+  assert.ok(
+    draft.integrationMetadata.requested.some((integration) => integration.id === "custom_api"),
+  );
   assert.match(draft.agent.instructions, /CUSTOM_API_BASE_URL/);
   assert.ok(draft.plan.some((item) => item.title === "Configure Custom API provider"));
 });
@@ -384,7 +431,8 @@ test("agent prompt generation can create an approved agent", async () => {
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const result = await approveAgentBuilderDraftAsync(auth.context, {
-    prompt: "Create a webhook agent to triage customer incidents, open blockers for critical risks, and log a concise summary.",
+    prompt:
+      "Create a webhook agent to triage customer incidents, open blockers for critical risks, and log a concise summary.",
   });
 
   assert.equal(result.created, true);
@@ -393,7 +441,10 @@ test("agent prompt generation can create an approved agent", async () => {
   assert.equal(result.agent.triggerKind, "webhook");
   assert.equal(result.draft.readiness.webhook.recommended, true);
   assert.equal(result.draft.readiness.webhook.tokenRequired, true);
-  assert.equal(result.draft.readiness.webhook.publicTriggerRoute, "/api/public/webhooks/agents/:token");
+  assert.equal(
+    result.draft.readiness.webhook.publicTriggerRoute,
+    "/api/public/webhooks/agents/:token",
+  );
   assert.deepEqual(result.draft.readiness.webhook.publishSteps, [
     "Save the agent",
     "Create or rotate the webhook token",
@@ -401,7 +452,9 @@ test("agent prompt generation can create an approved agent", async () => {
     "Rotate the token before sharing broadly",
   ]);
   assert.equal(result.draft.readiness.schedule.recommended, false);
-  assert.ok(result.draft.plan.steps.some((step) => step.title === "Prepare webhook publish readiness"));
+  assert.ok(
+    result.draft.plan.steps.some((step) => step.title === "Prepare webhook publish readiness"),
+  );
 
   const detail = getAgent(auth.context, result.agent.id);
   assert.equal(detail.agent.id, result.agent.id);
@@ -413,7 +466,8 @@ test("agent prompt generation can attach a first preview run with sample inputs"
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   const result = await approveAgentBuilderDraftAsync(auth.context, {
-    prompt: "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
+    prompt:
+      "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
     runPreview: true,
   });
 
@@ -426,7 +480,11 @@ test("agent prompt generation can attach a first preview run with sample inputs"
   assert.equal(result.firstRun.inputs?.evidence_url, "https://example.com");
   assert.match(result.firstRun.output ?? "", /preview dry run|did not call a model/i);
   assert.ok(result.firstRun.transcript?.some((step) => step.title === "Understand request"));
-  assert.ok(result.firstRun.logs?.some((entry) => entry.message.includes("without invoking tools or a model")));
+  assert.ok(
+    result.firstRun.logs?.some((entry) =>
+      entry.message.includes("without invoking tools or a model"),
+    ),
+  );
 
   const detail = getAgent(auth.context, result.agent.id);
   assert.equal(detail.runs[0].id, result.firstRun.id);
@@ -436,7 +494,8 @@ test("agent builder preview respects first-run readiness blockers", async () => 
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const draft = await generateAgentBuilderDraftAsync(auth.context, {
-    prompt: "Create a research assistant agent that reviews a source URL and reports the next action.",
+    prompt:
+      "Create a research assistant agent that reviews a source URL and reports the next action.",
   });
   const runsBefore = listAgentRuns(auth.context).runs.length;
 
@@ -448,7 +507,8 @@ test("agent builder preview respects first-run readiness blockers", async () => 
         firstRun: {
           canRun: false,
           blockers: ["Connect a provider API key before running with LLM tools."],
-          message: "The draft can be saved now, but resolve setup blockers before expecting real execution.",
+          message:
+            "The draft can be saved now, but resolve setup blockers before expecting real execution.",
         },
       },
     },
@@ -464,9 +524,28 @@ test("agent builder preview respects first-run readiness blockers", async () => 
 test("buildAgentSampleInputs returns valid typed defaults for run previews", () => {
   const sampleInputs = buildAgentSampleInputs([
     { key: "target_url", label: "Target URL", type: "url", required: true },
-    { key: "lookback_hours", label: "Lookback", type: "number", required: true, defaultValue: "48" },
-    { key: "include_runs", label: "Include runs", type: "boolean", required: false, defaultValue: "false" },
-    { key: "audience", label: "Audience", type: "enum", required: false, options: ["internal", "customer"], defaultValue: "customer" },
+    {
+      key: "lookback_hours",
+      label: "Lookback",
+      type: "number",
+      required: true,
+      defaultValue: "48",
+    },
+    {
+      key: "include_runs",
+      label: "Include runs",
+      type: "boolean",
+      required: false,
+      defaultValue: "false",
+    },
+    {
+      key: "audience",
+      label: "Audience",
+      type: "enum",
+      required: false,
+      options: ["internal", "customer"],
+      defaultValue: "customer",
+    },
     { key: "topic", label: "Topic", type: "string", required: true },
   ]);
 
@@ -573,7 +652,9 @@ test("activity and run DTOs redact sensitive values", async () => {
     occurredAt: new Date().toISOString(),
   });
 
-  const activity = listWorkspaceActivities(auth.context).find((entry) => entry.id === "activity_alpha_sensitive");
+  const activity = listWorkspaceActivities(auth.context).find(
+    (entry) => entry.id === "activity_alpha_sensitive",
+  );
   assert.ok(activity);
   assert.equal(JSON.stringify(activity).includes("whk_activity_secret"), false);
   assert.equal(JSON.stringify(activity).includes("invitation-token-1234"), false);
@@ -584,7 +665,9 @@ test("activity and run DTOs redact sensitive values", async () => {
     instructions: "Record supplied inputs for test verification.",
     inputSchema: [{ key: "api_key", label: "API key", type: "string", required: true }],
   });
-  const runResult = await runAgent(auth.context, created.agent.id, { inputs: { api_key: "sk_live_secret_1234" } });
+  const runResult = await runAgent(auth.context, created.agent.id, {
+    inputs: { api_key: "sk_live_secret_1234" },
+  });
   const detailWithRun = getAgent(auth.context, created.agent.id);
 
   assert.equal(JSON.stringify(runResult.run).includes("sk_live_secret_1234"), false);
@@ -658,7 +741,10 @@ test("activity list and detail preserve workspace isolation and neighbor orderin
   );
 
   const activities = listWorkspaceActivities(auth.context);
-  assert.deepEqual(activities.map((entry) => entry.id).slice(0, 2), ["activity_alpha_newest_test", "activity_alpha_next_test"]);
+  assert.deepEqual(activities.map((entry) => entry.id).slice(0, 2), [
+    "activity_alpha_newest_test",
+    "activity_alpha_next_test",
+  ]);
   assert.ok(!activities.some((entry) => entry.workspaceId === "beta"));
 
   const detail = getWorkspaceActivityDetail(auth.context, "activity_alpha_newest_test");
@@ -704,7 +790,10 @@ test("env vars: create masks secrets and sensitive keys, prevents duplicate keys
   const deleted = deleteWorkspaceEnvVarById(auth.context, created.envVar.id);
   assert.equal(deleted.ok, true);
   const after = listWorkspaceEnvVarsForUser(auth.context);
-  assert.equal(after.envVars.find((entry) => entry.id === created.envVar.id), undefined);
+  assert.equal(
+    after.envVars.find((entry) => entry.id === created.envVar.id),
+    undefined,
+  );
 });
 
 test("agent runs: list adds duration and capability flags; cancel and retry behave correctly", async () => {
@@ -728,11 +817,24 @@ test("agent runs: list adds duration and capability flags; cancel and retry beha
   await retryAgentRun(auth.context, failed.id);
 
   const store = loadStore();
-  const retrySignals = store.activationSignals.filter((entry) => entry.workspaceId === "beta" && entry.kind === "retry" && entry.sourceId === failed.id);
-  const retryActivities = store.activities.filter((entry) => entry.workspaceId === "beta" && entry.event === "agent.run.retry" && entry.data.previousRunId === failed.id);
+  const retrySignals = store.activationSignals.filter(
+    (entry) =>
+      entry.workspaceId === "beta" && entry.kind === "retry" && entry.sourceId === failed.id,
+  );
+  const retryActivities = store.activities.filter(
+    (entry) =>
+      entry.workspaceId === "beta" &&
+      entry.event === "agent.run.retry" &&
+      entry.data.previousRunId === failed.id,
+  );
   assert.equal(retrySignals.length, 1);
   assert.equal(retryActivities.length, 1);
-  assert.equal(snapshotForWorkspace(store, "beta").retryCount, store.activationSignals.filter((entry) => entry.workspaceId === "beta" && entry.kind === "retry").length);
+  assert.equal(
+    snapshotForWorkspace(store, "beta").retryCount,
+    store.activationSignals.filter(
+      (entry) => entry.workspaceId === "beta" && entry.kind === "retry",
+    ).length,
+  );
   assert.equal(retrySignals[0].origin, "user_entered");
   assert.equal(retrySignals[0].data?.origin, "user_action");
 });
@@ -815,17 +917,22 @@ test("record-as-playbook requires admin route access and redacts tool input secr
   assert.match(instruction, /\[redacted\]|•/);
 
   const data = loadStore();
-  const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+  const membership = data.memberships.find(
+    (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+  );
   assert.ok(membership);
   membership.role = "member";
   const member = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { app } = await import("./server");
-  const response = await app.request("/api/app/agent-runs/run_secret_tool_input/record-as-playbook", {
-    method: "POST",
-    headers: { Cookie: `${SESSION_COOKIE_NAME}=${member.cookieValue}` },
-  });
+  const response = await app.request(
+    "/api/app/agent-runs/run_secret_tool_input/record-as-playbook",
+    {
+      method: "POST",
+      headers: { Cookie: `${SESSION_COOKIE_NAME}=${member.cookieValue}` },
+    },
+  );
   assert.equal(response.status, 403);
-  const body = await response.json() as { error: string };
+  const body = (await response.json()) as { error: string };
   assert.match(body.error, /admin/);
 });
 
@@ -841,14 +948,21 @@ test("agent run detail is workspace scoped and returns derived trace spans", asy
   assert.equal(detail.trace.summary.stepCount, 4);
   assert.equal(detail.trace.summary.logCount, 3);
   assert.equal(detail.trace.summary.inputCount, 2);
-  assert.ok(detail.trace.spans.some((span) => span.kind === "run" && span.name === "Support inbox scanned"));
-  assert.ok(detail.trace.spans.some((span) => span.kind === "step" && span.name === "Read new inbox messages"));
-  assert.ok(detail.trace.spans.some((span) => span.kind === "output" && String(span.output).includes("Scanned 18 messages")));
-
-  assert.throws(
-    () => getAgentRunDetail(alpha.context, "missing-run"),
-    /agent run not found/,
+  assert.ok(
+    detail.trace.spans.some((span) => span.kind === "run" && span.name === "Support inbox scanned"),
   );
+  assert.ok(
+    detail.trace.spans.some(
+      (span) => span.kind === "step" && span.name === "Read new inbox messages",
+    ),
+  );
+  assert.ok(
+    detail.trace.spans.some(
+      (span) => span.kind === "output" && String(span.output).includes("Scanned 18 messages"),
+    ),
+  );
+
+  assert.throws(() => getAgentRunDetail(alpha.context, "missing-run"), /agent run not found/);
   assert.throws(
     () => getAgentRunDetail(alpha.context, "run_beta_dependency_latest"),
     /agent run not found/,
@@ -858,7 +972,7 @@ test("agent run detail is workspace scoped and returns derived trace spans", asy
   const routeResponse = await app.request("/api/app/agent-runs/run_alpha_support_latest/detail", {
     headers: { Cookie: `${SESSION_COOKIE_NAME}=${alpha.cookieValue}` },
   });
-  const routeBody = await routeResponse.json() as {
+  const routeBody = (await routeResponse.json()) as {
     run: { id: string };
     trace: { spans: Array<{ kind: string; name: string }>; summary: { spans: number } };
   };
@@ -868,10 +982,13 @@ test("agent run detail is workspace scoped and returns derived trace spans", asy
   assert.ok(routeBody.trace.summary.spans > 0);
   assert.ok(routeBody.trace.spans.some((span) => span.kind === "log"));
 
-  const scopedResponse = await app.request("/api/app/agent-runs/run_beta_dependency_latest/detail", {
-    headers: { Cookie: `${SESSION_COOKIE_NAME}=${alpha.cookieValue}` },
-  });
-  const scopedBody = await scopedResponse.json() as { error: string };
+  const scopedResponse = await app.request(
+    "/api/app/agent-runs/run_beta_dependency_latest/detail",
+    {
+      headers: { Cookie: `${SESSION_COOKIE_NAME}=${alpha.cookieValue}` },
+    },
+  );
+  const scopedBody = (await scopedResponse.json()) as { error: string };
   assert.equal(scopedResponse.status, 404);
   assert.equal(scopedBody.error, "agent run not found");
 });

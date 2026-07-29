@@ -1,7 +1,13 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve as resolvePath } from "node:path";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync } from "./packetagent-store.js";
-import { getSchedulerHeartbeat as defaultSchedulerHeartbeat, type SchedulerHeartbeat } from "./jobs/scheduler-heartbeat.js";
+import {
+  loadStore as defaultLoadStore,
+  loadStoreAsync as defaultLoadStoreAsync,
+} from "./packetagent-store.js";
+import {
+  getSchedulerHeartbeat as defaultSchedulerHeartbeat,
+  type SchedulerHeartbeat,
+} from "./jobs/scheduler-heartbeat.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 import {
   getDefaultSandboxService as defaultGetSandboxService,
@@ -46,7 +52,12 @@ function checkStore(loadStore: () => unknown, checkedAt: string): SubsystemHealt
     if (result && typeof result === "object") {
       return { name: "store", status: "ok", detail: "loaded successfully", checkedAt };
     }
-    return { name: "store", status: "down", detail: "store returned an unexpected shape", checkedAt };
+    return {
+      name: "store",
+      status: "down",
+      detail: "store returned an unexpected shape",
+      checkedAt,
+    };
   } catch (error) {
     return {
       name: "store",
@@ -57,13 +68,21 @@ function checkStore(loadStore: () => unknown, checkedAt: string): SubsystemHealt
   }
 }
 
-async function checkStoreAsync(loadStore: () => unknown | Promise<unknown>, checkedAt: string): Promise<SubsystemHealth> {
+async function checkStoreAsync(
+  loadStore: () => unknown | Promise<unknown>,
+  checkedAt: string,
+): Promise<SubsystemHealth> {
   try {
     const result = await loadStore();
     if (result && typeof result === "object") {
       return { name: "store", status: "ok", detail: "loaded successfully", checkedAt };
     }
-    return { name: "store", status: "down", detail: "store returned an unexpected shape", checkedAt };
+    return {
+      name: "store",
+      status: "down",
+      detail: "store returned an unexpected shape",
+      checkedAt,
+    };
   } catch (error) {
     return {
       name: "store",
@@ -242,7 +261,9 @@ export function getOperationsHealth(deps: OperationsHealthDeps = {}): Operations
   };
 }
 
-export async function getOperationsHealthAsync(deps: OperationsHealthAsyncDeps = {}): Promise<OperationsHealthReport> {
+export async function getOperationsHealthAsync(
+  deps: OperationsHealthAsyncDeps = {},
+): Promise<OperationsHealthReport> {
   const loadStore = deps.loadStore ?? defaultLoadStoreAsync;
   const schedulerHeartbeat = deps.schedulerHeartbeat ?? defaultSchedulerHeartbeat;
   const env = deps.env ?? process.env;

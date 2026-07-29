@@ -26,7 +26,7 @@ Status: foundation complete on `codex/packetagent-foundation`; inherited quality
 - [x] Carry the only uncommitted TaskLoom worktree fix into the new branch.
 - [x] Refresh every Markdown document, label historical plans, and add an authoritative Codex project handoff.
 - [x] Pass typecheck, lint with zero errors, production web build, API tests, web tests, migration tests, diff check, and compatibility-only brand scan.
-- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 46 files; files authored in the R1 review slices are formatted.
+- [x] Close the inherited repo-wide Prettier baseline. All 326 inherited files were formatted in reviewable R1 batches, and `npm run format:check` is clean.
 - [x] Reduce the inherited ESLint baseline of 145 warnings to zero while preserving the zero-error gate.
 - [x] Review and remediate dependency advisories deliberately. Targeted non-major upgrades reduced the full and production audits from 11/5 findings to two package entries for one unreachable React Router RSC advisory; [`dev/r1-dependency-advisory-audit.md`](dev/r1-dependency-advisory-audit.md) records ownership, reachability, and the exact-pin decision. No forced fix was used.
 - Gate: a clean PacketAgent checkout starts with new defaults and can read an existing default TaskLoom deployment without destructive migration.
@@ -226,8 +226,7 @@ is recorded in these checklists.
 
 ### R1 - Repository health and historical finding re-audit
 
-Status: active; only the repository-wide formatting cleanup remains. The
-ESLint and native-button-type gates are clean.
+Status: complete as of 2026-07-29. Resume at R2.
 
 Supporting finding-by-finding evidence is maintained in
 [`dev/r1-repository-health-audit.md`](dev/r1-repository-health-audit.md).
@@ -236,8 +235,8 @@ integrity/restore checks, and target-only managed-backfill preservation; the
 jobs slice closes the second writer and incomplete workspace scoping; and the
 backend security slice closes production-start truth, import-safe bootstrap,
 rate-limit/preview-token re-audit, baseline response headers/CSP, and
-workspace-authorized opt-in artifact serving. The broader R1 gate remains
-open. The frontend slice additionally closes render recovery, multi-secret
+workspace-authorized opt-in artifact serving. The frontend slice additionally
+closes render recovery, multi-secret
 redaction, corrupt-row re-audit, the historical preview iframe contract,
 audited dead controls, primary keyboard semantics, and stale web branding.
 The persistence authority/cutover contract is now explicit, and deliberate
@@ -246,7 +245,7 @@ while recording the single unreachable React Router RSC exception.
 
 - [x] Re-audit every still-relevant historical P0/P1 finding and close stale
       findings with evidence.
-- [ ] Finish the Prettier baseline in reviewable batches.
+- [x] Finish the Prettier baseline in reviewable batches.
 - [x] Reduce inherited ESLint warnings to zero and require an explicit type on
       every native React button.
 - [x] Triage dependency advisories without blind or forced upgrades.
@@ -255,10 +254,14 @@ while recording the single unreachable React Router RSC exception.
       findings.
 - [x] Decide and document the persistence end-state before removing any
       compatibility facade.
-- Gate: every historical P0/P1 finding is fixed, proven stale, or assigned to a
-  named later loop; CI and migration recovery are green.
+- Gate: passed 2026-07-29. Every historical P0/P1 finding is fixed, proven
+  stale, or assigned to a named later loop; typecheck, lint, formatting,
+  production build, migration recovery, 30 web tests, and the 1,525-test API
+  suite are green.
 
 ### R2 - Provider policy and key parity
+
+Status: active.
 
 - [ ] Add per-provider generation policy and capability metadata.
 - [ ] Add vLLM structured decoding/XGrammar with tested fallback.

@@ -64,6 +64,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Formatted the first half of the top-level backend routes, services, generated
   runtime, integrations, invitation delivery, and regression suites, reducing
   the remaining Prettier backlog from 123 files to 46.
+- Formatted the final backend, web-library, CSS, script, documentation, and
+  Tailwind files, closing the inherited 326-file Prettier baseline.
+- Closed R1 with clean typecheck, lint, formatting, production web build,
+  compatibility-only brand scan, 30 web tests, and the 1,525-test API gate
+  (1,521 passed, 4 intentional live-probe skips).
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

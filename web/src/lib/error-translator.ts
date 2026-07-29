@@ -127,9 +127,7 @@ const FALLBACK: Omit<FriendlyError, "technical"> = {
 
 export function translateError(raw: string | Error): FriendlyError {
   const message =
-    raw instanceof Error
-      ? raw.message || raw.name || "Unknown error"
-      : (raw ?? "").toString();
+    raw instanceof Error ? raw.message || raw.name || "Unknown error" : (raw ?? "").toString();
 
   const trimmed = message.trim();
   const technical = trimmed.length > 0 ? trimmed : undefined;

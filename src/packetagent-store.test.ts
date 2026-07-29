@@ -55,7 +55,10 @@ import {
   upsertWorkspaceMembership,
   type WorkspaceRole,
 } from "./packetagent-store";
-import { recordLocalInvitationEmailDelivery, PACKETAGENT_INVITATION_EMAIL_MODE_ENV } from "./invitation-email";
+import {
+  recordLocalInvitationEmailDelivery,
+  PACKETAGENT_INVITATION_EMAIL_MODE_ENV,
+} from "./invitation-email";
 
 test("seed store includes product workflow records for each workspace", () => {
   const store = resetStoreForTests();
@@ -79,34 +82,42 @@ test("upsert helpers create and update records by natural key", () => {
   const store = resetStoreForTests();
   const timestamp = "2026-01-02T03:04:05.000Z";
 
-  const brief = upsertWorkspaceBrief(store, {
-    workspaceId: "alpha",
-    summary: "Updated alpha brief",
-    goals: ["Clarify the release path"],
-    audience: "Product lead",
-    constraints: "Keep the validation scope focused.",
-    problemStatement: "A clearer problem statement.",
-    targetCustomers: ["Product lead"],
-    desiredOutcome: "A clearer release path.",
-    successMetrics: ["Brief is updated"],
-    updatedByUserId: "user_alpha",
-  }, timestamp);
+  const brief = upsertWorkspaceBrief(
+    store,
+    {
+      workspaceId: "alpha",
+      summary: "Updated alpha brief",
+      goals: ["Clarify the release path"],
+      audience: "Product lead",
+      constraints: "Keep the validation scope focused.",
+      problemStatement: "A clearer problem statement.",
+      targetCustomers: ["Product lead"],
+      desiredOutcome: "A clearer release path.",
+      successMetrics: ["Brief is updated"],
+      updatedByUserId: "user_alpha",
+    },
+    timestamp,
+  );
 
   assert.equal(brief.summary, "Updated alpha brief");
   assert.equal(brief.updatedAt, timestamp);
   assert.notEqual(brief.createdAt, timestamp);
   assert.equal(findWorkspaceBrief(store, "alpha")?.summary, "Updated alpha brief");
 
-  const requirement = upsertRequirement(store, {
-    workspaceId: "alpha",
-    title: "New durable requirement",
-    detail: "Exercise generated IDs and timestamps.",
-    priority: "could",
-    status: "draft",
-    acceptanceCriteria: ["Record exists"],
-    source: "team",
-    createdByUserId: "user_alpha",
-  }, timestamp);
+  const requirement = upsertRequirement(
+    store,
+    {
+      workspaceId: "alpha",
+      title: "New durable requirement",
+      detail: "Exercise generated IDs and timestamps.",
+      priority: "could",
+      status: "draft",
+      acceptanceCriteria: ["Record exists"],
+      source: "team",
+      createdByUserId: "user_alpha",
+    },
+    timestamp,
+  );
 
   assert.ok(requirement.id);
   assert.equal(requirement.createdAt, timestamp);
@@ -169,8 +180,16 @@ test("invitation email deliveries record local sent and skipped attempts", () =>
     assert.equal(skipped.mode, "skip");
     assert.equal(skipped.sentAt, undefined);
     assert.equal(skipped.error, `${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=skip`);
-    assert.deepEqual(listInvitationEmailDeliveries(store, "alpha").map((entry) => entry.id), ["delivery_skipped", "delivery_sent"]);
-    assert.deepEqual(listInvitationEmailDeliveries(store, "alpha", "invite_email_delivery").map((entry) => entry.id), ["delivery_sent"]);
+    assert.deepEqual(
+      listInvitationEmailDeliveries(store, "alpha").map((entry) => entry.id),
+      ["delivery_skipped", "delivery_sent"],
+    );
+    assert.deepEqual(
+      listInvitationEmailDeliveries(store, "alpha", "invite_email_delivery").map(
+        (entry) => entry.id,
+      ),
+      ["delivery_sent"],
+    );
   } finally {
     if (previousMode === undefined) delete process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV];
     else process.env[PACKETAGENT_INVITATION_EMAIL_MODE_ENV] = previousMode;
@@ -179,20 +198,30 @@ test("invitation email deliveries record local sent and skipped attempts", () =>
 
 test("invitation email delivery helpers create and mark durable records", () => {
   const store = resetStoreForTests();
-  const delivery = createInvitationEmailDelivery(store, {
-    id: "delivery_marking",
-    workspaceId: "alpha",
-    invitationId: "invite_marking",
-    recipientEmail: "Mark.Me@Example.Com",
-    subject: "Invitation",
-    provider: "local",
-    mode: "dev",
-  }, "2026-04-02T00:00:00.000Z");
+  const delivery = createInvitationEmailDelivery(
+    store,
+    {
+      id: "delivery_marking",
+      workspaceId: "alpha",
+      invitationId: "invite_marking",
+      recipientEmail: "Mark.Me@Example.Com",
+      subject: "Invitation",
+      provider: "local",
+      mode: "dev",
+    },
+    "2026-04-02T00:00:00.000Z",
+  );
 
   assert.equal(delivery.status, "pending");
   assert.equal(delivery.recipientEmail, "mark.me@example.com");
-  assert.equal(markInvitationEmailDeliverySent(store, "delivery_marking", "2026-04-02T00:00:01.000Z")?.sentAt, "2026-04-02T00:00:01.000Z");
-  assert.equal(markInvitationEmailDeliverySkipped(store, "delivery_marking", "not needed")?.status, "skipped");
+  assert.equal(
+    markInvitationEmailDeliverySent(store, "delivery_marking", "2026-04-02T00:00:01.000Z")?.sentAt,
+    "2026-04-02T00:00:01.000Z",
+  );
+  assert.equal(
+    markInvitationEmailDeliverySkipped(store, "delivery_marking", "not needed")?.status,
+    "skipped",
+  );
   assert.equal(findInvitationEmailDelivery(store, "delivery_marking")?.sentAt, undefined);
   assert.equal(markInvitationEmailDeliveryFailed(store, "delivery_marking", "boom")?.error, "boom");
   assert.equal(findInvitationEmailDelivery(store, "missing_delivery"), null);
@@ -207,39 +236,59 @@ test("activation signal repository deduplicates JSON records by stable key", () 
     delete process.env.PACKETAGENT_DB_PATH;
     const store = resetStoreForTests();
 
-    const direct = upsertActivationSignal(store, {
-      workspaceId: "alpha",
-      kind: "retry",
-      source: "user_fact",
-      stableKey: "alpha:retry:user-entered",
-      data: { reason: "Initial user-entered retry" },
-    }, "2026-04-01T00:00:00.000Z");
+    const direct = upsertActivationSignal(
+      store,
+      {
+        workspaceId: "alpha",
+        kind: "retry",
+        source: "user_fact",
+        stableKey: "alpha:retry:user-entered",
+        data: { reason: "Initial user-entered retry" },
+      },
+      "2026-04-01T00:00:00.000Z",
+    );
     assert.equal(direct.source, "user_fact");
     assert.equal(direct.origin, "user_entered");
 
     const repository = activationSignalRepository();
-    const first = repository.upsert({
-      workspaceId: "alpha",
-      kind: "retry",
-      source: "user_fact",
-      stableKey: "alpha:retry:repository",
-      data: { reason: "Entered by a user" },
-    }, "2026-04-02T00:00:00.000Z");
-    const second = repository.upsert({
-      workspaceId: "alpha",
-      kind: "retry",
-      source: "system_fact",
-      stableKey: "alpha:retry:repository",
-      data: { reason: "Observed by the system" },
-    }, "2026-04-03T00:00:00.000Z");
+    const first = repository.upsert(
+      {
+        workspaceId: "alpha",
+        kind: "retry",
+        source: "user_fact",
+        stableKey: "alpha:retry:repository",
+        data: { reason: "Entered by a user" },
+      },
+      "2026-04-02T00:00:00.000Z",
+    );
+    const second = repository.upsert(
+      {
+        workspaceId: "alpha",
+        kind: "retry",
+        source: "system_fact",
+        stableKey: "alpha:retry:repository",
+        data: { reason: "Observed by the system" },
+      },
+      "2026-04-03T00:00:00.000Z",
+    );
 
     assert.equal(second.id, first.id);
     assert.equal(second.createdAt, first.createdAt);
     assert.equal(second.updatedAt, "2026-04-03T00:00:00.000Z");
     assert.equal(second.source, "system_fact");
     assert.equal(second.origin, "system_observed");
-    assert.equal(repository.listForWorkspace("alpha").filter((entry) => entry.stableKey === "alpha:retry:repository").length, 1);
-    assert.equal(listActivationSignalsForWorkspace(loadStore(), "alpha").some((entry) => entry.id === first.id), true);
+    assert.equal(
+      repository
+        .listForWorkspace("alpha")
+        .filter((entry) => entry.stableKey === "alpha:retry:repository").length,
+      1,
+    );
+    assert.equal(
+      listActivationSignalsForWorkspace(loadStore(), "alpha").some(
+        (entry) => entry.id === first.id,
+      ),
+      true,
+    );
   } finally {
     clearStoreCacheForTests();
     if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
@@ -260,23 +309,30 @@ test("sqlite store persists mutations across cache reloads", () => {
 
     resetStoreForTests();
     mutateStore((data) => {
-      upsertRequirement(data, {
-        id: "req_sqlite_reload",
-        workspaceId: "alpha",
-        title: "SQLite reload requirement",
-        detail: "Persists through the database-backed store adapter.",
-        priority: "must",
-        status: "approved",
-        acceptanceCriteria: ["Requirement survives cache clear"],
-        source: "test",
-        createdByUserId: "user_alpha",
-      }, "2026-02-03T04:05:06.000Z");
+      upsertRequirement(
+        data,
+        {
+          id: "req_sqlite_reload",
+          workspaceId: "alpha",
+          title: "SQLite reload requirement",
+          detail: "Persists through the database-backed store adapter.",
+          priority: "must",
+          status: "approved",
+          acceptanceCriteria: ["Requirement survives cache clear"],
+          source: "test",
+          createdByUserId: "user_alpha",
+        },
+        "2026-02-03T04:05:06.000Z",
+      );
     });
 
     clearStoreCacheForTests();
     const reloaded = loadStore();
 
-    assert.equal(reloaded.requirements.some((entry) => entry.id === "req_sqlite_reload"), true);
+    assert.equal(
+      reloaded.requirements.some((entry) => entry.id === "req_sqlite_reload"),
+      true,
+    );
     assert.equal(findWorkspaceBrief(reloaded, "alpha")?.workspaceId, "alpha");
   } finally {
     clearStoreCacheForTests();
@@ -313,10 +369,16 @@ test("sqlite recordActivity writes activities to the dedicated table only", () =
 
     const db = new DatabaseSync(dbPath);
     try {
-      const appRecord = db.prepare("select count(*) as count from app_records where collection = 'activities' and id = ?")
+      const appRecord = db
+        .prepare(
+          "select count(*) as count from app_records where collection = 'activities' and id = ?",
+        )
         .get("activity_dual_write") as { count: number };
-      const dedicated = db.prepare("select workspace_id, type, payload from activities where id = ?")
-        .get("activity_dual_write") as { workspace_id: string; type: string; payload: string } | undefined;
+      const dedicated = db
+        .prepare("select workspace_id, type, payload from activities where id = ?")
+        .get("activity_dual_write") as
+        | { workspace_id: string; type: string; payload: string }
+        | undefined;
       const payload = JSON.parse(dedicated?.payload ?? "{}") as { data?: Record<string, unknown> };
 
       assert.equal(appRecord.count, 0);
@@ -520,7 +582,9 @@ test("sqlite store hydrates retired relational collections from dedicated tables
 
     const db = new DatabaseSync(dbPath);
     try {
-      const legacyRows = db.prepare(`
+      const legacyRows = db
+        .prepare(
+          `
         select count(*) as count
         from app_records
         where (collection = 'jobMetricSnapshots' and id = 'metric_dedicated')
@@ -531,30 +595,120 @@ test("sqlite store hydrates retired relational collections from dedicated tables
            or (collection = 'activities' and id = 'activity_dedicated')
            or (collection = 'providerCalls' and id = 'provider_call_dedicated')
            or (collection = 'activationSignals' and id = 'signal_dedicated')
-      `).get() as { count: number };
+      `,
+        )
+        .get() as { count: number };
       assert.equal(legacyRows.count, 0);
-      assert.equal((db.prepare("select count(*) as count from job_metric_snapshots where id = 'metric_dedicated'").get() as { count: number }).count, 1);
-      assert.equal((db.prepare("select count(*) as count from alert_events where id = 'alert_dedicated'").get() as { count: number }).count, 1);
-      assert.equal((db.prepare("select count(*) as count from agent_runs where id = 'run_dedicated'").get() as { count: number }).count, 1);
-      assert.equal((db.prepare("select count(*) as count from jobs where id = 'job_dedicated'").get() as { count: number }).count, 1);
-      assert.equal((db.prepare("select count(*) as count from invitation_email_deliveries where id = 'delivery_dedicated'").get() as { count: number }).count, 1);
-      assert.equal((db.prepare("select count(*) as count from activities where id = 'activity_dedicated'").get() as { count: number }).count, 1);
-      assert.equal((db.prepare("select count(*) as count from provider_calls where id = 'provider_call_dedicated'").get() as { count: number }).count, 1);
-      assert.equal((db.prepare("select count(*) as count from activation_signals where id = 'signal_dedicated'").get() as { count: number }).count, 1);
+      assert.equal(
+        (
+          db
+            .prepare(
+              "select count(*) as count from job_metric_snapshots where id = 'metric_dedicated'",
+            )
+            .get() as { count: number }
+        ).count,
+        1,
+      );
+      assert.equal(
+        (
+          db
+            .prepare("select count(*) as count from alert_events where id = 'alert_dedicated'")
+            .get() as { count: number }
+        ).count,
+        1,
+      );
+      assert.equal(
+        (
+          db
+            .prepare("select count(*) as count from agent_runs where id = 'run_dedicated'")
+            .get() as { count: number }
+        ).count,
+        1,
+      );
+      assert.equal(
+        (
+          db.prepare("select count(*) as count from jobs where id = 'job_dedicated'").get() as {
+            count: number;
+          }
+        ).count,
+        1,
+      );
+      assert.equal(
+        (
+          db
+            .prepare(
+              "select count(*) as count from invitation_email_deliveries where id = 'delivery_dedicated'",
+            )
+            .get() as { count: number }
+        ).count,
+        1,
+      );
+      assert.equal(
+        (
+          db
+            .prepare("select count(*) as count from activities where id = 'activity_dedicated'")
+            .get() as { count: number }
+        ).count,
+        1,
+      );
+      assert.equal(
+        (
+          db
+            .prepare(
+              "select count(*) as count from provider_calls where id = 'provider_call_dedicated'",
+            )
+            .get() as { count: number }
+        ).count,
+        1,
+      );
+      assert.equal(
+        (
+          db
+            .prepare(
+              "select count(*) as count from activation_signals where id = 'signal_dedicated'",
+            )
+            .get() as { count: number }
+        ).count,
+        1,
+      );
     } finally {
       db.close();
     }
 
     clearStoreCacheForTests();
     const reloaded = loadStore();
-    assert.equal(reloaded.jobMetricSnapshots.some((entry) => entry.id === "metric_dedicated"), true);
-    assert.equal(reloaded.alertEvents.some((entry) => entry.id === "alert_dedicated"), true);
-    assert.equal(reloaded.agentRuns.some((entry) => entry.id === "run_dedicated"), true);
-    assert.equal(reloaded.jobs.some((entry) => entry.id === "job_dedicated"), true);
-    assert.equal(reloaded.invitationEmailDeliveries.some((entry) => entry.id === "delivery_dedicated"), true);
-    assert.equal(reloaded.activities.some((entry) => entry.id === "activity_dedicated"), true);
-    assert.equal(reloaded.providerCalls.some((entry) => entry.id === "provider_call_dedicated"), true);
-    assert.equal(reloaded.activationSignals.some((entry) => entry.id === "signal_dedicated"), true);
+    assert.equal(
+      reloaded.jobMetricSnapshots.some((entry) => entry.id === "metric_dedicated"),
+      true,
+    );
+    assert.equal(
+      reloaded.alertEvents.some((entry) => entry.id === "alert_dedicated"),
+      true,
+    );
+    assert.equal(
+      reloaded.agentRuns.some((entry) => entry.id === "run_dedicated"),
+      true,
+    );
+    assert.equal(
+      reloaded.jobs.some((entry) => entry.id === "job_dedicated"),
+      true,
+    );
+    assert.equal(
+      reloaded.invitationEmailDeliveries.some((entry) => entry.id === "delivery_dedicated"),
+      true,
+    );
+    assert.equal(
+      reloaded.activities.some((entry) => entry.id === "activity_dedicated"),
+      true,
+    );
+    assert.equal(
+      reloaded.providerCalls.some((entry) => entry.id === "provider_call_dedicated"),
+      true,
+    );
+    assert.equal(
+      reloaded.activationSignals.some((entry) => entry.id === "signal_dedicated"),
+      true,
+    );
   } finally {
     clearStoreCacheForTests();
     if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
@@ -577,36 +731,53 @@ test("sqlite mutateStore loads fresh state before persisting cached mutations", 
 
     const cached = resetStoreForTests();
     const external = structuredClone(cached);
-    upsertRequirement(external, {
-      id: "req_sqlite_external",
-      workspaceId: "alpha",
-      title: "Externally persisted requirement",
-      detail: "Must survive a mutation started with stale cache.",
-      priority: "should",
-      status: "approved",
-      source: "test",
-      createdByUserId: "user_alpha",
-    }, "2026-02-04T00:00:00.000Z");
-    persistSqliteAppData(dbPath, external);
-
-    mutateStore((data) => {
-      assert.equal(data.requirements.some((entry) => entry.id === "req_sqlite_external"), true);
-      upsertRequirement(data, {
-        id: "req_sqlite_mutation",
+    upsertRequirement(
+      external,
+      {
+        id: "req_sqlite_external",
         workspaceId: "alpha",
-        title: "Mutation requirement",
-        detail: "Persists alongside fresh database state.",
-        priority: "must",
+        title: "Externally persisted requirement",
+        detail: "Must survive a mutation started with stale cache.",
+        priority: "should",
         status: "approved",
         source: "test",
         createdByUserId: "user_alpha",
-      }, "2026-02-04T00:01:00.000Z");
+      },
+      "2026-02-04T00:00:00.000Z",
+    );
+    persistSqliteAppData(dbPath, external);
+
+    mutateStore((data) => {
+      assert.equal(
+        data.requirements.some((entry) => entry.id === "req_sqlite_external"),
+        true,
+      );
+      upsertRequirement(
+        data,
+        {
+          id: "req_sqlite_mutation",
+          workspaceId: "alpha",
+          title: "Mutation requirement",
+          detail: "Persists alongside fresh database state.",
+          priority: "must",
+          status: "approved",
+          source: "test",
+          createdByUserId: "user_alpha",
+        },
+        "2026-02-04T00:01:00.000Z",
+      );
     });
 
     clearStoreCacheForTests();
     const reloaded = loadStore();
-    assert.equal(reloaded.requirements.some((entry) => entry.id === "req_sqlite_external"), true);
-    assert.equal(reloaded.requirements.some((entry) => entry.id === "req_sqlite_mutation"), true);
+    assert.equal(
+      reloaded.requirements.some((entry) => entry.id === "req_sqlite_external"),
+      true,
+    );
+    assert.equal(
+      reloaded.requirements.some((entry) => entry.id === "req_sqlite_mutation"),
+      true,
+    );
   } finally {
     clearStoreCacheForTests();
     if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
@@ -630,23 +801,33 @@ test("sqlite mutateStore rolls back and preserves cache when mutator throws", ()
 
     assert.throws(() => {
       mutateStore((data) => {
-        upsertRequirement(data, {
-          id: "req_sqlite_rollback",
-          workspaceId: "alpha",
-          title: "Rolled back requirement",
-          detail: "Should not persist after a mutator failure.",
-          priority: "must",
-          status: "draft",
-          source: "test",
-          createdByUserId: "user_alpha",
-        }, "2026-02-05T00:00:00.000Z");
+        upsertRequirement(
+          data,
+          {
+            id: "req_sqlite_rollback",
+            workspaceId: "alpha",
+            title: "Rolled back requirement",
+            detail: "Should not persist after a mutator failure.",
+            priority: "must",
+            status: "draft",
+            source: "test",
+            createdByUserId: "user_alpha",
+          },
+          "2026-02-05T00:00:00.000Z",
+        );
         throw new Error("stop mutation");
       });
     }, /stop mutation/);
 
-    assert.equal(loadStore().requirements.some((entry) => entry.id === "req_sqlite_rollback"), false);
+    assert.equal(
+      loadStore().requirements.some((entry) => entry.id === "req_sqlite_rollback"),
+      false,
+    );
     clearStoreCacheForTests();
-    assert.equal(loadStore().requirements.some((entry) => entry.id === "req_sqlite_rollback"), false);
+    assert.equal(
+      loadStore().requirements.some((entry) => entry.id === "req_sqlite_rollback"),
+      false,
+    );
   } finally {
     clearStoreCacheForTests();
     if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
@@ -669,27 +850,36 @@ test("activation signal repository persists and lists SQLite records by workspac
 
     resetStoreForTests();
     const repository = activationSignalRepository();
-    const first = repository.upsert({
-      workspaceId: "workspace_sqlite_signals",
-      kind: "scope_change",
-      source: "system_fact",
-      stableKey: "workspace_sqlite_signals:scope:billing",
-      sourceId: "activity_scope_billing",
-      data: { area: "billing" },
-    }, "2026-04-04T00:00:00.000Z");
-    const second = repository.upsert({
-      workspaceId: "workspace_sqlite_signals",
-      kind: "scope_change",
-      source: "user_fact",
-      stableKey: "workspace_sqlite_signals:scope:billing",
-      sourceId: "manual_scope_billing",
-      data: { area: "billing", confirmed: true },
-    }, "2026-04-05T00:00:00.000Z");
+    const first = repository.upsert(
+      {
+        workspaceId: "workspace_sqlite_signals",
+        kind: "scope_change",
+        source: "system_fact",
+        stableKey: "workspace_sqlite_signals:scope:billing",
+        sourceId: "activity_scope_billing",
+        data: { area: "billing" },
+      },
+      "2026-04-04T00:00:00.000Z",
+    );
+    const second = repository.upsert(
+      {
+        workspaceId: "workspace_sqlite_signals",
+        kind: "scope_change",
+        source: "user_fact",
+        stableKey: "workspace_sqlite_signals:scope:billing",
+        sourceId: "manual_scope_billing",
+        data: { area: "billing", confirmed: true },
+      },
+      "2026-04-05T00:00:00.000Z",
+    );
 
     assert.equal(second.id, first.id);
     assert.equal(repository.listForWorkspace("workspace_sqlite_signals").length, 1);
     assert.equal(repository.listForWorkspace("workspace_sqlite_signals")[0]?.source, "user_fact");
-    assert.equal(repository.listForWorkspace("workspace_sqlite_signals")[0]?.origin, "user_entered");
+    assert.equal(
+      repository.listForWorkspace("workspace_sqlite_signals")[0]?.origin,
+      "user_entered",
+    );
     assert.equal(activationSignalRowCount(dbPath, "workspace_sqlite_signals"), 1);
     assert.equal(activationSignalAppRecordRowCount(dbPath), 0);
 
@@ -720,13 +910,16 @@ test("activation signal repository de-dupes legacy fallback rows by stable key",
 
     resetStoreForTests();
     const repository = activationSignalRepository();
-    const dedicated = repository.upsert({
-      workspaceId: "workspace_sqlite_signals",
-      kind: "retry",
-      source: "agent_run",
-      stableKey: "workspace_sqlite_signals:retry:shared",
-      sourceId: "run_dedicated",
-    }, "2026-04-04T00:00:00.000Z");
+    const dedicated = repository.upsert(
+      {
+        workspaceId: "workspace_sqlite_signals",
+        kind: "retry",
+        source: "agent_run",
+        stableKey: "workspace_sqlite_signals:retry:shared",
+        sourceId: "run_dedicated",
+      },
+      "2026-04-04T00:00:00.000Z",
+    );
     insertLegacyActivationSignalAppRecord(dbPath, {
       ...dedicated,
       id: "legacy_signal_same_stable_key",
@@ -760,14 +953,18 @@ test("sqlite upsertActivationSignal writes dedicated records during mutations", 
 
     resetStoreForTests();
     mutateStore((data) => {
-      const record = upsertActivationSignal(data, {
-        workspaceId: "workspace_sqlite_signal_mutation",
-        kind: "retry",
-        source: "agent_run",
-        stableKey: "workspace_sqlite_signal_mutation:retry:run",
-        sourceId: "run_sqlite_signal_mutation",
-        data: { attempt: 2 },
-      }, "2026-04-06T00:00:00.000Z");
+      const record = upsertActivationSignal(
+        data,
+        {
+          workspaceId: "workspace_sqlite_signal_mutation",
+          kind: "retry",
+          source: "agent_run",
+          stableKey: "workspace_sqlite_signal_mutation:retry:run",
+          sourceId: "run_sqlite_signal_mutation",
+          data: { attempt: 2 },
+        },
+        "2026-04-06T00:00:00.000Z",
+      );
       assert.equal(record.origin, "user_entered");
     });
 
@@ -775,7 +972,10 @@ test("sqlite upsertActivationSignal writes dedicated records during mutations", 
     assert.equal(activationSignalAppRecordRowCount(dbPath), 0);
 
     clearStoreCacheForTests();
-    const signals = listActivationSignalsForWorkspace(loadStore(), "workspace_sqlite_signal_mutation");
+    const signals = listActivationSignalsForWorkspace(
+      loadStore(),
+      "workspace_sqlite_signal_mutation",
+    );
     assert.equal(signals.length, 1);
     assert.equal(signals[0]?.sourceId, "run_sqlite_signal_mutation");
   } finally {
@@ -870,15 +1070,47 @@ test("sqlite indexed helpers read high-value records and stay in sync", () => {
     assert.equal(findUserByEmailIndexed("indexed.user@example.com")?.id, "user_sqlite_index");
     assert.equal(findUserByIdIndexed("user_sqlite_index")?.email, "Indexed.User@Example.Com");
     assert.equal(findSessionByIdIndexed("session_sqlite_index")?.userId, "user_sqlite_index");
-    assert.equal(listSessionsForUserIndexed("user_sqlite_index").some((entry) => entry.id === "session_sqlite_index"), true);
-    assert.equal(findWorkspaceMembershipIndexed("workspace_sqlite_index", "user_sqlite_index")?.role, "admin");
-    assert.equal(listWorkspaceMembershipsIndexed("workspace_sqlite_index").some((entry) => entry.userId === "user_sqlite_index"), true);
-    assert.equal(findWorkspaceInvitationByTokenIndexed("invite-token-sqlite-index")?.id, "invite_sqlite_index");
-    assert.equal(listWorkspaceInvitationsIndexed("workspace_sqlite_index")[0]?.id, "invite_sqlite_index");
-    assert.equal(listInvitationEmailDeliveriesIndexed("workspace_sqlite_index")[0]?.id, "delivery_sqlite_index");
-    assert.equal(listInvitationEmailDeliveriesIndexed("workspace_sqlite_index", "invite_sqlite_index")[0]?.recipientEmail, "invitee@example.com");
-    assert.equal(findShareTokenByTokenIndexed("share-token-sqlite-index")?.id, "share_sqlite_index");
-    assert.equal(listShareTokensForWorkspaceIndexed("workspace_sqlite_index")[0]?.id, "share_sqlite_index");
+    assert.equal(
+      listSessionsForUserIndexed("user_sqlite_index").some(
+        (entry) => entry.id === "session_sqlite_index",
+      ),
+      true,
+    );
+    assert.equal(
+      findWorkspaceMembershipIndexed("workspace_sqlite_index", "user_sqlite_index")?.role,
+      "admin",
+    );
+    assert.equal(
+      listWorkspaceMembershipsIndexed("workspace_sqlite_index").some(
+        (entry) => entry.userId === "user_sqlite_index",
+      ),
+      true,
+    );
+    assert.equal(
+      findWorkspaceInvitationByTokenIndexed("invite-token-sqlite-index")?.id,
+      "invite_sqlite_index",
+    );
+    assert.equal(
+      listWorkspaceInvitationsIndexed("workspace_sqlite_index")[0]?.id,
+      "invite_sqlite_index",
+    );
+    assert.equal(
+      listInvitationEmailDeliveriesIndexed("workspace_sqlite_index")[0]?.id,
+      "delivery_sqlite_index",
+    );
+    assert.equal(
+      listInvitationEmailDeliveriesIndexed("workspace_sqlite_index", "invite_sqlite_index")[0]
+        ?.recipientEmail,
+      "invitee@example.com",
+    );
+    assert.equal(
+      findShareTokenByTokenIndexed("share-token-sqlite-index")?.id,
+      "share_sqlite_index",
+    );
+    assert.equal(
+      listShareTokensForWorkspaceIndexed("workspace_sqlite_index")[0]?.id,
+      "share_sqlite_index",
+    );
 
     mutateStore((data) => {
       const user = data.users.find((entry) => entry.id === "user_sqlite_index");
@@ -1128,28 +1360,71 @@ test("sqlite workspace record helpers read scoped collections with route orderin
     });
 
     clearStoreCacheForTests();
-    assert.deepEqual(listActivitiesForWorkspaceIndexed("workspace_records", 1).map((entry) => entry.id), ["activity_workspace_records_new"]);
-    assert.deepEqual(listImplementationPlanItemsForWorkspaceIndexed("workspace_records").map((entry) => entry.id), ["plan_workspace_records_first", "plan_workspace_records_second"]);
-    assert.deepEqual(listAgentsForWorkspaceIndexed("workspace_records").map((entry) => entry.id), ["agent_workspace_records_new", "agent_workspace_records_old"]);
-    assert.deepEqual(listAgentRunsForWorkspaceIndexed("workspace_records").map((entry) => entry.id), ["run_workspace_records_new", "run_workspace_records_old"]);
-    assert.deepEqual(listProviderCallsForWorkspaceIndexed("workspace_records", { limit: 1 }).map((entry) => entry.id), ["provider_call_workspace_records_new"]);
-    assert.deepEqual(listJobsForWorkspaceIndexed("workspace_records", { status: "queued", limit: 1 }).map((entry) => entry.id), ["job_workspace_records_new"]);
-    assert.deepEqual(listWorkspaceBriefVersionsIndexed("workspace_records").map((entry) => entry.id), ["brief_version_workspace_records_2", "brief_version_workspace_records_1"]);
-    assert.equal(listRequirementsForWorkspaceIndexed("workspace_records").some((entry) => entry.id === "req_workspace_records"), true);
-    assert.equal(listWorkflowConcernsForWorkspaceIndexed("workspace_records", "open_question").length, 1);
+    assert.deepEqual(
+      listActivitiesForWorkspaceIndexed("workspace_records", 1).map((entry) => entry.id),
+      ["activity_workspace_records_new"],
+    );
+    assert.deepEqual(
+      listImplementationPlanItemsForWorkspaceIndexed("workspace_records").map((entry) => entry.id),
+      ["plan_workspace_records_first", "plan_workspace_records_second"],
+    );
+    assert.deepEqual(
+      listAgentsForWorkspaceIndexed("workspace_records").map((entry) => entry.id),
+      ["agent_workspace_records_new", "agent_workspace_records_old"],
+    );
+    assert.deepEqual(
+      listAgentRunsForWorkspaceIndexed("workspace_records").map((entry) => entry.id),
+      ["run_workspace_records_new", "run_workspace_records_old"],
+    );
+    assert.deepEqual(
+      listProviderCallsForWorkspaceIndexed("workspace_records", { limit: 1 }).map(
+        (entry) => entry.id,
+      ),
+      ["provider_call_workspace_records_new"],
+    );
+    assert.deepEqual(
+      listJobsForWorkspaceIndexed("workspace_records", { status: "queued", limit: 1 }).map(
+        (entry) => entry.id,
+      ),
+      ["job_workspace_records_new"],
+    );
+    assert.deepEqual(
+      listWorkspaceBriefVersionsIndexed("workspace_records").map((entry) => entry.id),
+      ["brief_version_workspace_records_2", "brief_version_workspace_records_1"],
+    );
+    assert.equal(
+      listRequirementsForWorkspaceIndexed("workspace_records").some(
+        (entry) => entry.id === "req_workspace_records",
+      ),
+      true,
+    );
+    assert.equal(
+      listWorkflowConcernsForWorkspaceIndexed("workspace_records", "open_question").length,
+      1,
+    );
     assert.equal(listValidationEvidenceForWorkspaceIndexed("workspace_records").length, 1);
-    assert.equal(listActivitiesForWorkspaceIndexed("workspace_records").some((entry) => entry.workspaceId === "other_workspace"), false);
+    assert.equal(
+      listActivitiesForWorkspaceIndexed("workspace_records").some(
+        (entry) => entry.workspaceId === "other_workspace",
+      ),
+      false,
+    );
 
     mutateStore((data) => {
       const requirement = data.requirements.find((entry) => entry.id === "req_workspace_records");
       assert.ok(requirement);
       requirement.title = "Updated workspace-scoped requirement";
       requirement.updatedAt = "2026-03-03T00:00:00.000Z";
-      data.validationEvidence = data.validationEvidence.filter((entry) => entry.id !== "evidence_workspace_records");
+      data.validationEvidence = data.validationEvidence.filter(
+        (entry) => entry.id !== "evidence_workspace_records",
+      );
     });
 
     clearStoreCacheForTests();
-    assert.equal(listRequirementsForWorkspaceIndexed("workspace_records")[0]?.title, "Updated workspace-scoped requirement");
+    assert.equal(
+      listRequirementsForWorkspaceIndexed("workspace_records")[0]?.title,
+      "Updated workspace-scoped requirement",
+    );
     assert.equal(listValidationEvidenceForWorkspaceIndexed("workspace_records").length, 0);
   } finally {
     clearStoreCacheForTests();
@@ -1164,7 +1439,9 @@ test("sqlite workspace record helpers read scoped collections with route orderin
 function indexRowCount(dbPath: string): number {
   const db = new DatabaseSync(dbPath);
   try {
-    const row = db.prepare("select count(*) as count from app_record_search").get() as { count: number };
+    const row = db.prepare("select count(*) as count from app_record_search").get() as {
+      count: number;
+    };
     return row.count;
   } finally {
     db.close();
@@ -1174,7 +1451,9 @@ function indexRowCount(dbPath: string): number {
 function activationSignalRowCount(dbPath: string, workspaceId: string): number {
   const db = new DatabaseSync(dbPath);
   try {
-    const row = db.prepare("select count(*) as count from activation_signals where workspace_id = ?").get(workspaceId) as { count: number };
+    const row = db
+      .prepare("select count(*) as count from activation_signals where workspace_id = ?")
+      .get(workspaceId) as { count: number };
     return row.count;
   } finally {
     db.close();
@@ -1185,21 +1464,34 @@ function activationSignalAppRecordRowCount(dbPath: string, workspaceId?: string)
   const db = new DatabaseSync(dbPath);
   try {
     const row = workspaceId
-      ? db.prepare("select count(*) as count from app_records where collection = 'activationSignals' and workspace_id = ?").get(workspaceId) as { count: number }
-      : db.prepare("select count(*) as count from app_records where collection = 'activationSignals'").get() as { count: number };
+      ? (db
+          .prepare(
+            "select count(*) as count from app_records where collection = 'activationSignals' and workspace_id = ?",
+          )
+          .get(workspaceId) as { count: number })
+      : (db
+          .prepare(
+            "select count(*) as count from app_records where collection = 'activationSignals'",
+          )
+          .get() as { count: number });
     return row.count;
   } finally {
     db.close();
   }
 }
 
-function insertLegacyActivationSignalAppRecord(dbPath: string, record: import("./packetagent-store").ActivationSignalRecord): void {
+function insertLegacyActivationSignalAppRecord(
+  dbPath: string,
+  record: import("./packetagent-store").ActivationSignalRecord,
+): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('activationSignals', ?, ?, json(?), ?)
-    `).run(record.id, record.workspaceId, JSON.stringify(record), record.updatedAt);
+    `,
+    ).run(record.id, record.workspaceId, JSON.stringify(record), record.updatedAt);
   } finally {
     db.close();
   }

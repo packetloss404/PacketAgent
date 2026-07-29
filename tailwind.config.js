@@ -13,12 +13,7 @@ export default {
           "Segoe UI",
           "sans-serif",
         ],
-        serif: [
-          "Fraunces",
-          "ui-serif",
-          "Georgia",
-          "serif",
-        ],
+        serif: ["Fraunces", "ui-serif", "Georgia", "serif"],
         mono: [
           "JetBrains Mono",
           "ui-monospace",
@@ -79,7 +74,7 @@ export default {
       backgroundImage: {
         "graph-paper":
           "linear-gradient(rgba(42,44,52,0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(42,44,52,0.45) 1px, transparent 1px)",
-        "noise":
+        noise:
           "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
       },
       backgroundSize: {

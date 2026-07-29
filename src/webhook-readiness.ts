@@ -13,7 +13,9 @@ export type WebhookTriggerReadiness = {
 const TOKEN_MANAGEMENT_ROUTE = "/api/app/webhooks/agents/:agentId/rotate";
 const PUBLIC_TRIGGER_ROUTE = "/api/public/webhooks/agents/:token";
 
-export function buildWebhookTriggerReadiness(triggerKind?: AgentTriggerKind): WebhookTriggerReadiness {
+export function buildWebhookTriggerReadiness(
+  triggerKind?: AgentTriggerKind,
+): WebhookTriggerReadiness {
   const recommended = triggerKind === "webhook";
   return {
     recommended,

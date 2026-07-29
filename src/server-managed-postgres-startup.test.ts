@@ -55,7 +55,13 @@ test("server startup guard allows explicit PACKETAGENT_STORE=postgres startup wi
 });
 
 test("server startup guard keeps managed Postgres allowed regardless of the database topology hint", () => {
-  for (const topology of ["single-writer", "multi-writer", "distributed", "active-active", "multi-region"]) {
+  for (const topology of [
+    "single-writer",
+    "multi-writer",
+    "distributed",
+    "active-active",
+    "multi-region",
+  ]) {
     const report = assertServerStartupRuntimeSupported({
       PACKETAGENT_STORE: "postgres",
       PACKETAGENT_MANAGED_DATABASE_ADAPTER: "postgres",
@@ -81,7 +87,9 @@ test("server startup guard blocks an unsupported store posture before startup", 
       assert.equal(error.report.allowed, false);
       assert.equal(error.report.classification, "unsupported-store");
       assert.equal(error.report.observed.store, "memory");
-      assert.ok(error.report.blockers.some((blocker) => blocker.includes("PACKETAGENT_STORE=memory")));
+      assert.ok(
+        error.report.blockers.some((blocker) => blocker.includes("PACKETAGENT_STORE=memory")),
+      );
       return true;
     },
   );
@@ -92,7 +100,8 @@ test("server startup guard blocks a managed Postgres store requested without a r
     () =>
       assertServerStartupRuntimeSupported({
         PACKETAGENT_STORE: "postgres",
-        PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+        PACKETAGENT_MANAGED_DATABASE_URL:
+          "postgres://packetagent:secret@db.example.com/packetagent",
       }),
     (error) => {
       assert.ok(error instanceof ManagedDatabaseRuntimeGuardError);
@@ -109,7 +118,8 @@ test("server startup guard blocks a managed database URL configured without a re
   assert.throws(
     () =>
       assertServerStartupRuntimeSupported({
-        PACKETAGENT_MANAGED_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+        PACKETAGENT_MANAGED_DATABASE_URL:
+          "postgres://packetagent:secret@db.example.com/packetagent",
       }),
     (error) => {
       assert.ok(error instanceof ManagedDatabaseRuntimeGuardError);

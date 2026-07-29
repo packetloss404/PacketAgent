@@ -51,8 +51,14 @@ test("default JSON store remains supported when no managed database hints are pr
     const store = resetStoreForTests();
 
     assert.equal(resolvePacketAgentStoreMode().mode, "json");
-    assert.equal(store.workspaces.some((entry) => entry.id === "alpha"), true);
-    assert.equal(loadStore().users.some((entry) => entry.email === "alpha@packetagent.local"), true);
+    assert.equal(
+      store.workspaces.some((entry) => entry.id === "alpha"),
+      true,
+    );
+    assert.equal(
+      loadStore().users.some((entry) => entry.email === "alpha@packetagent.local"),
+      true,
+    );
   });
 });
 
@@ -65,18 +71,25 @@ test("sqlite store remains supported and persists through cache reloads", () => 
       assert.equal(resolvePacketAgentStoreMode().mode, "sqlite");
       resetStoreForTests();
       mutateStore((data) => {
-        upsertRequirement(data, {
-          id: "req_managed_boundary_sqlite",
-          workspaceId: "alpha",
-          title: "SQLite boundary requirement",
-          priority: "must",
-          status: "approved",
-          createdByUserId: "user_alpha",
-        }, "2026-04-28T12:00:00.000Z");
+        upsertRequirement(
+          data,
+          {
+            id: "req_managed_boundary_sqlite",
+            workspaceId: "alpha",
+            title: "SQLite boundary requirement",
+            priority: "must",
+            status: "approved",
+            createdByUserId: "user_alpha",
+          },
+          "2026-04-28T12:00:00.000Z",
+        );
       });
 
       clearStoreCacheForTests();
-      assert.equal(loadStore().requirements.some((entry) => entry.id === "req_managed_boundary_sqlite"), true);
+      assert.equal(
+        loadStore().requirements.some((entry) => entry.id === "req_managed_boundary_sqlite"),
+        true,
+      );
     });
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -103,10 +116,11 @@ test("managed database store modes fail at the synchronous store boundary", () =
 
       let mutatorRan = false;
       assert.throws(
-        () => mutateStore(() => {
-          mutatorRan = true;
-          return "should-not-run";
-        }),
+        () =>
+          mutateStore(() => {
+            mutatorRan = true;
+            return "should-not-run";
+          }),
         (error) => {
           assert.ok(error instanceof ManagedDatabaseStoreBoundaryError);
           assert.equal(error.storeMode, storeMode);
@@ -126,12 +140,18 @@ test("managed database URL hints guard synchronous load and mutate instead of fa
     { DATABASE_URL: url },
     { PACKETAGENT_DATABASE_URL: url },
     { PACKETAGENT_MANAGED_DATABASE_URL: url },
-    { PACKETAGENT_STORE: "sqlite", PACKETAGENT_DB_PATH: join(tmpdir(), "packetagent-boundary.sqlite"), DATABASE_URL: url },
+    {
+      PACKETAGENT_STORE: "sqlite",
+      PACKETAGENT_DB_PATH: join(tmpdir(), "packetagent-boundary.sqlite"),
+      DATABASE_URL: url,
+    },
   ];
 
   for (const env of cases) {
     withStoreEnv(env, () => {
-      const expectedUrlKeys = STORE_ENV_KEYS.filter((key) => key.endsWith("DATABASE_URL") && env[key]);
+      const expectedUrlKeys = STORE_ENV_KEYS.filter(
+        (key) => key.endsWith("DATABASE_URL") && env[key],
+      );
 
       assert.throws(
         () => loadStore(),
@@ -145,10 +165,11 @@ test("managed database URL hints guard synchronous load and mutate instead of fa
 
       let mutatorRan = false;
       assert.throws(
-        () => mutateStore(() => {
-          mutatorRan = true;
-          return "should-not-run";
-        }),
+        () =>
+          mutateStore(() => {
+            mutatorRan = true;
+            return "should-not-run";
+          }),
         (error) => {
           assert.ok(error instanceof ManagedDatabaseStoreBoundaryError);
           assert.deepEqual(error.managedDatabaseUrlKeys, expectedUrlKeys);

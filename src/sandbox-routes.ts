@@ -19,7 +19,12 @@ const VALID_STATUSES: ReadonlySet<SandboxExecStatus> = new Set([
 ]);
 
 function errorResponse(c: Context, error: unknown) {
-  const status = ((error as Error & { status?: number }).status ?? 500) as 400 | 401 | 403 | 404 | 500;
+  const status = ((error as Error & { status?: number }).status ?? 500) as
+    | 400
+    | 401
+    | 403
+    | 404
+    | 500;
   return c.json({ error: redactedErrorMessage(error) }, status);
 }
 
@@ -73,7 +78,9 @@ export function createSandboxRoutes(deps: SandboxRouteDeps = {}): Hono {
         ...(typeof body.checkpointId === "string" ? { checkpointId: body.checkpointId } : {}),
         ...(typeof body.runtime === "string" ? { runtime: body.runtime } : {}),
         ...(typeof body.workingDir === "string" ? { workingDir: body.workingDir } : {}),
-        ...(body.env && typeof body.env === "object" ? { env: body.env as Record<string, string> } : {}),
+        ...(body.env && typeof body.env === "object"
+          ? { env: body.env as Record<string, string> }
+          : {}),
         ...(typeof body.timeoutMs === "number" ? { timeoutMs: body.timeoutMs } : {}),
         ...(typeof body.stdin === "string" ? { stdin: body.stdin } : {}),
       });
@@ -184,7 +191,9 @@ export function createSandboxRoutes(deps: SandboxRouteDeps = {}): Hono {
 export const sandboxRoutes = createSandboxRoutes();
 
 function isTerminalStatus(status: SandboxExecStatus): boolean {
-  return status === "success" || status === "failed" || status === "timeout" || status === "canceled";
+  return (
+    status === "success" || status === "failed" || status === "timeout" || status === "canceled"
+  );
 }
 
 function parseLimit(raw: string | undefined): number | undefined {
@@ -204,7 +213,9 @@ async function readJsonBody(c: Context): Promise<Record<string, unknown>> {
   if (!contentType.includes("application/json")) return {};
   try {
     const body = await c.req.json();
-    return body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+    return body && typeof body === "object" && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : {};
   } catch {
     throw Object.assign(new Error("request body must be valid JSON"), { status: 400 });
   }

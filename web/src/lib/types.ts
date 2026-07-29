@@ -90,7 +90,13 @@ export type CreateWorkspaceInvitationInput = {
 
 export type AgentStatus = "active" | "paused" | "archived";
 export type AgentTriggerKind = "manual" | "schedule" | "webhook" | "email";
-export type ProviderKind = "openai" | "anthropic" | "minimax" | "azure_openai" | "ollama" | "custom";
+export type ProviderKind =
+  | "openai"
+  | "anthropic"
+  | "minimax"
+  | "azure_openai"
+  | "ollama"
+  | "custom";
 export type ProviderStatus = "connected" | "missing_key" | "disabled";
 export type AgentRunStatus = "queued" | "running" | "success" | "failed" | "canceled";
 export type AgentRunStepStatus = "success" | "failed" | "skipped";
@@ -230,7 +236,12 @@ export type IntegrationMarketplaceKind =
   | "database"
   | "custom_api";
 
-export type IntegrationSetupActionKind = "api_key" | "provider" | "env_url" | "env_secret" | "webhook";
+export type IntegrationSetupActionKind =
+  | "api_key"
+  | "provider"
+  | "env_url"
+  | "env_secret"
+  | "webhook";
 
 export interface IntegrationSetupAction {
   kind: IntegrationSetupActionKind;
@@ -276,7 +287,10 @@ export interface AgentRecord {
   description: string;
   instructions: string;
   providerId?: string;
-  provider?: Pick<ProviderRecord, "id" | "name" | "kind" | "defaultModel" | "status" | "apiKeyConfigured"> | null;
+  provider?: Pick<
+    ProviderRecord,
+    "id" | "name" | "kind" | "defaultModel" | "status" | "apiKeyConfigured"
+  > | null;
   model?: string;
   tools: string[];
   enabledTools?: string[];
@@ -741,10 +755,24 @@ export interface AppBuilderApproveResult {
   workspace?: AppBuilderWorkspaceSummary;
 }
 
-export type AppBuilderIterationTargetKind = "app" | "page" | "data_entity" | "api_route" | "auth" | "smoke" | "config" | "file" | "agent" | "tool";
+export type AppBuilderIterationTargetKind =
+  | "app"
+  | "page"
+  | "data_entity"
+  | "api_route"
+  | "auth"
+  | "smoke"
+  | "config"
+  | "file"
+  | "agent"
+  | "tool";
 export type AppBuilderIterationDiffStatus = "generated" | "pending" | "applied" | "blocked";
 export type AppBuilderIterationFileChangeType = "added" | "modified" | "deleted" | "renamed";
-export type AppBuilderIterationToolReadinessStatus = "not_requested" | "ready" | "needs_setup" | "blocked";
+export type AppBuilderIterationToolReadinessStatus =
+  | "not_requested"
+  | "ready"
+  | "needs_setup"
+  | "blocked";
 
 export interface AppBuilderIterationTarget {
   id: string;
@@ -922,7 +950,13 @@ export interface AppBuilderFixPromptResult {
 }
 
 export type AppPublishVisibility = "private" | "public";
-export type AppBuilderPublishStatus = "not_started" | "ready" | "publishing" | "published" | "failed" | "rolled_back";
+export type AppBuilderPublishStatus =
+  | "not_started"
+  | "ready"
+  | "publishing"
+  | "published"
+  | "failed"
+  | "rolled_back";
 
 export interface AppPublishEnvChecklistItem {
   name: string;
@@ -1021,16 +1055,19 @@ export interface AppPublishArtifactManifest {
 export interface AppPublishDockerComposeExport {
   fileName: "docker-compose.publish.yml" | string;
   projectName?: string;
-  services: Array<string | {
-    name: string;
-    imageHint?: string;
-    buildContext?: string;
-    ports?: string[];
-    envFile?: string;
-    volumes?: string[];
-    dependsOn?: string[];
-    healthcheck?: Record<string, unknown>;
-  }>;
+  services: Array<
+    | string
+    | {
+        name: string;
+        imageHint?: string;
+        buildContext?: string;
+        ports?: string[];
+        envFile?: string;
+        volumes?: string[];
+        dependsOn?: string[];
+        healthcheck?: Record<string, unknown>;
+      }
+  >;
   networks?: string[];
   volumes?: string[];
   outline: string[];
@@ -1705,7 +1742,13 @@ export interface RunDiagnostic {
 // ---------------------------------------------------------------------------
 
 export type SandboxDriver = "docker" | "native";
-export type SandboxExecStatus = "queued" | "running" | "success" | "failed" | "timeout" | "canceled";
+export type SandboxExecStatus =
+  | "queued"
+  | "running"
+  | "success"
+  | "failed"
+  | "timeout"
+  | "canceled";
 
 export interface SandboxRuntimeInfo {
   id: string;

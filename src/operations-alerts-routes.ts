@@ -4,7 +4,11 @@ import { listAlertsAsync } from "./alerts/alert-store.js";
 import type { AlertSeverity } from "./alerts/alert-engine.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 
-const ALLOWED_SEVERITIES: ReadonlySet<AlertSeverity> = new Set<AlertSeverity>(["info", "warning", "critical"]);
+const ALLOWED_SEVERITIES: ReadonlySet<AlertSeverity> = new Set<AlertSeverity>([
+  "info",
+  "warning",
+  "critical",
+]);
 
 export const operationsAlertsRoutes = new Hono();
 
@@ -24,7 +28,9 @@ operationsAlertsRoutes.get("/", async (c: Context) => {
       return c.json({ error: "invalid until" }, 400);
     }
     const limitRaw = c.req.query("limit");
-    const limit = limitRaw ? Math.max(1, Math.min(500, Number.parseInt(limitRaw, 10) || 100)) : undefined;
+    const limit = limitRaw
+      ? Math.max(1, Math.min(500, Number.parseInt(limitRaw, 10) || 100))
+      : undefined;
     const alerts = await listAlertsAsync({
       severity: severityRaw as AlertSeverity | undefined,
       since,

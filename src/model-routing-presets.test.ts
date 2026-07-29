@@ -83,13 +83,19 @@ test("model routing presets skip missing keys and fall back to deterministic stu
       },
     },
     providers: [
-      provider("openai", "OpenAI", "gpt-4.1-mini", { apiKeyConfigured: false, status: "missing_key" }),
+      provider("openai", "OpenAI", "gpt-4.1-mini", {
+        apiKeyConfigured: false,
+        status: "missing_key",
+      }),
     ],
   });
 
   assert.equal(surface.presets.fast.primary.provider, "openai");
   assert.equal(surface.presets.fast.primary.ready, false);
-  assert.deepEqual(surface.presets.fast.fallbacks.map((fallback) => fallback.provider), ["stub"]);
+  assert.deepEqual(
+    surface.presets.fast.fallbacks.map((fallback) => fallback.provider),
+    ["stub"],
+  );
   assert.equal(surface.presets.local.primary.provider, "openai");
   assert.equal(surface.presets.local.primary.ready, false);
   assert.ok(surface.presets.fast.primary.blockers.some((blocker) => blocker.includes("API key")));
@@ -118,7 +124,10 @@ test("model routing presets can infer local routing from env hints alone", () =>
   assert.equal(surface.presets.local.primary.provider, "ollama");
   assert.equal(surface.presets.local.primary.model, "llama3.1");
   assert.equal(surface.presets.local.primary.source, "env_hint");
-  assert.deepEqual(surface.presets.local.primary.envHints.sort(), ["OLLAMA_BASE_URL", "OLLAMA_MODEL"]);
+  assert.deepEqual(surface.presets.local.primary.envHints.sort(), [
+    "OLLAMA_BASE_URL",
+    "OLLAMA_MODEL",
+  ]);
 });
 
 function provider(

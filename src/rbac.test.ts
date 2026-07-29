@@ -27,8 +27,14 @@ import { mutateStore, resetStoreForTests } from "./packetagent-store.js";
 test("workspace roles are ordered from least to most privileged", () => {
   assert.deepEqual(WORKSPACE_ROLES, ["viewer", "member", "admin", "owner"]);
 
-  assert.equal(WORKSPACE_ROLE_DEFINITIONS.viewer.rank < WORKSPACE_ROLE_DEFINITIONS.member.rank, true);
-  assert.equal(WORKSPACE_ROLE_DEFINITIONS.member.rank < WORKSPACE_ROLE_DEFINITIONS.admin.rank, true);
+  assert.equal(
+    WORKSPACE_ROLE_DEFINITIONS.viewer.rank < WORKSPACE_ROLE_DEFINITIONS.member.rank,
+    true,
+  );
+  assert.equal(
+    WORKSPACE_ROLE_DEFINITIONS.member.rank < WORKSPACE_ROLE_DEFINITIONS.admin.rank,
+    true,
+  );
   assert.equal(WORKSPACE_ROLE_DEFINITIONS.admin.rank < WORKSPACE_ROLE_DEFINITIONS.owner.rank, true);
 });
 
@@ -97,7 +103,10 @@ test("assert helpers throw for missing, invalid, or insufficient role", () => {
   assert.throws(() => requireWorkspaceRole(null, "viewer"), WorkspaceAccessError);
   assert.throws(() => requireWorkspaceRole({ role: "billing" }, "viewer"), WorkspaceAccessError);
   assert.throws(() => requireWorkspaceRole({ role: "viewer" }, "member"), WorkspaceAccessError);
-  assert.throws(() => assertPermission({ role: "member" }, "manageWorkspace"), WorkspaceAccessError);
+  assert.throws(
+    () => assertPermission({ role: "member" }, "manageWorkspace"),
+    WorkspaceAccessError,
+  );
 
   assert.equal(assertPermission({ role: "admin" }, "manageWorkspace"), "admin");
 });
@@ -116,7 +125,9 @@ test("route policy helpers reject malformed workspace memberships", async () => 
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "billing" as typeof membership.role;
   });
@@ -132,7 +143,9 @@ test("route policy helpers reject insufficient workspace permissions", async () 
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "viewer";
   });
@@ -148,7 +161,9 @@ test("route policy helpers return the authenticated context when permission is a
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "member";
   });
@@ -175,7 +190,9 @@ test("async route policy helpers return the authenticated context when permissio
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "member";
   });

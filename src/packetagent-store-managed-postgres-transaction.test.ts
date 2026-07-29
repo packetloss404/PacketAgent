@@ -59,7 +59,9 @@ class TransactionConnection implements ManagedPostgresStoreTransactionClient {
     if (normalized.startsWith("insert into packetagent_document_store")) {
       if (this.failOnceOnInsert && !this.failOnceOnInsert.used) {
         this.failOnceOnInsert.used = true;
-        throw Object.assign(new Error("serialization failure"), { code: this.failOnceOnInsert.code });
+        throw Object.assign(new Error("serialization failure"), {
+          code: this.failOnceOnInsert.code,
+        });
       }
       this.payloadJson = String(params[3]);
     }
@@ -91,7 +93,11 @@ class ConnectedManagedPostgresClient implements ManagedPostgresStoreQueryClient 
   ): Promise<ManagedPostgresStoreQueryResult<TRow>> {
     this.queries.push({ target: "pool", sql, params });
     const normalized = normalizeSql(sql);
-    assert.equal(isTransactionStatement(normalized), false, `${normalized} must not use pool.query`);
+    assert.equal(
+      isTransactionStatement(normalized),
+      false,
+      `${normalized} must not use pool.query`,
+    );
 
     if (normalized.startsWith("select payload from packetagent_document_store")) {
       return {
@@ -118,8 +124,13 @@ class ConnectedManagedPostgresClient implements ManagedPostgresStoreQueryClient 
   }
 
   committedPayload(): string | null {
-    const committed = [...this.connections].reverse().find((connection) =>
-      connection.queries.some((entry) => entry.target === connection.target && normalizeSql(entry.sql) === "commit"));
+    const committed = [...this.connections]
+      .reverse()
+      .find((connection) =>
+        connection.queries.some(
+          (entry) => entry.target === connection.target && normalizeSql(entry.sql) === "commit",
+        ),
+      );
     return committed?.payloadJson ?? null;
   }
 
@@ -146,7 +157,8 @@ async function withManagedPostgresClient(
   try {
     for (const key of STORE_ENV_KEYS) delete process.env[key];
     process.env.PACKETAGENT_STORE = "postgres";
-    process.env.PACKETAGENT_DATABASE_URL = "postgres://packetagent:secret@db.example.com/packetagent";
+    process.env.PACKETAGENT_DATABASE_URL =
+      "postgres://packetagent:secret@db.example.com/packetagent";
     clearStoreCacheForTests();
     await run(configs);
   } finally {
@@ -164,14 +176,20 @@ test("managed Postgres mutations use a dedicated connection for the full transac
   const client = new ConnectedManagedPostgresClient();
 
   await withManagedPostgresClient(client, async (configs) => {
-    await mutateStoreAsync((data) => upsertRequirement(data, {
-      id: "req_managed_postgres_transaction_connection",
-      workspaceId: "alpha",
-      title: "Dedicated transaction connection",
-      priority: "must",
-      status: "approved",
-      createdByUserId: "user_alpha",
-    }, "2026-05-01T18:00:00.000Z"));
+    await mutateStoreAsync((data) =>
+      upsertRequirement(
+        data,
+        {
+          id: "req_managed_postgres_transaction_connection",
+          workspaceId: "alpha",
+          title: "Dedicated transaction connection",
+          priority: "must",
+          status: "approved",
+          createdByUserId: "user_alpha",
+        },
+        "2026-05-01T18:00:00.000Z",
+      ),
+    );
 
     assert.equal(configs[0]?.envKey, "PACKETAGENT_DATABASE_URL");
     assert.equal(client.connections.length, 1);
@@ -179,9 +197,22 @@ test("managed Postgres mutations use a dedicated connection for the full transac
       "create table if not exists packetagent_document_store ( document_key text primary key, schema_version integer not null, metadata jsonb not null default '{}'::jsonb, payload jsonb not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now() )",
     ]);
     assert.equal(client.normalizedQueries("connection-1").includes("begin"), true);
-    assert.equal(client.normalizedQueries("connection-1").some((query) => query.startsWith("select pg_advisory_xact_lock")), true);
-    assert.equal(client.normalizedQueries("connection-1").some((query) => query.includes("for update")), true);
-    assert.equal(client.normalizedQueries("connection-1").some((query) => query.startsWith("insert into packetagent_document_store")), true);
+    assert.equal(
+      client
+        .normalizedQueries("connection-1")
+        .some((query) => query.startsWith("select pg_advisory_xact_lock")),
+      true,
+    );
+    assert.equal(
+      client.normalizedQueries("connection-1").some((query) => query.includes("for update")),
+      true,
+    );
+    assert.equal(
+      client
+        .normalizedQueries("connection-1")
+        .some((query) => query.startsWith("insert into packetagent_document_store")),
+      true,
+    );
     assert.equal(client.normalizedQueries("connection-1").includes("commit"), true);
     assert.equal(client.connections[0]?.released, 1);
     assert.equal(client.closed, 1);
@@ -196,21 +227,28 @@ test("managed Postgres mutation retries serialization failures on a fresh transa
   await withManagedPostgresClient(client, async () => {
     await mutateStoreAsync((data) => {
       attempts += 1;
-      return upsertRequirement(data, {
-        id: "req_managed_postgres_retry",
-        workspaceId: "alpha",
-        title: "Retry managed Postgres transaction",
-        priority: "must",
-        status: "approved",
-        createdByUserId: "user_alpha",
-      }, "2026-05-01T18:30:00.000Z");
+      return upsertRequirement(
+        data,
+        {
+          id: "req_managed_postgres_retry",
+          workspaceId: "alpha",
+          title: "Retry managed Postgres transaction",
+          priority: "must",
+          status: "approved",
+          createdByUserId: "user_alpha",
+        },
+        "2026-05-01T18:30:00.000Z",
+      );
     });
 
     assert.equal(attempts, 2);
     assert.equal(client.connections.length, 2);
     assert.equal(client.normalizedQueries("connection-1").includes("rollback"), true);
     assert.equal(client.normalizedQueries("connection-2").includes("commit"), true);
-    assert.equal(client.connections.every((connection) => connection.released === 1), true);
+    assert.equal(
+      client.connections.every((connection) => connection.released === 1),
+      true,
+    );
     assert.match(client.committedPayload() ?? "", /req_managed_postgres_retry/);
   });
 });
@@ -220,10 +258,12 @@ function normalizeSql(sql: string): string {
 }
 
 function isTransactionStatement(normalizedSql: string): boolean {
-  return normalizedSql === "begin"
-    || normalizedSql === "commit"
-    || normalizedSql === "rollback"
-    || normalizedSql.startsWith("select pg_advisory_xact_lock")
-    || normalizedSql.includes("for update")
-    || normalizedSql.startsWith("insert into packetagent_document_store");
+  return (
+    normalizedSql === "begin" ||
+    normalizedSql === "commit" ||
+    normalizedSql === "rollback" ||
+    normalizedSql.startsWith("select pg_advisory_xact_lock") ||
+    normalizedSql.includes("for update") ||
+    normalizedSql.startsWith("insert into packetagent_document_store")
+  );
 }

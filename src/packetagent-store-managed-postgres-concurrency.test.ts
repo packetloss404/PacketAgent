@@ -138,7 +138,11 @@ class ConcurrentManagedPostgresClient implements ManagedPostgresStoreQueryClient
     }
 
     if (normalized === "begin") {
-      assert.equal(this.inTransaction, false, "transaction should not be nested on the same client");
+      assert.equal(
+        this.inTransaction,
+        false,
+        "transaction should not be nested on the same client",
+      );
       this.inTransaction = true;
       this.document.events.push({ clientId: this.id, event: "begin" });
       return { rows: [] };
@@ -154,7 +158,11 @@ class ConcurrentManagedPostgresClient implements ManagedPostgresStoreQueryClient
     if (normalized.startsWith("select payload from packetagent_document_store")) {
       if (normalized.includes("for update")) {
         assert.equal(this.inTransaction, true, "row lock must be taken inside the transaction");
-        assert.equal(this.advisoryLocked, true, "row lock must be taken after the advisory transaction lock");
+        assert.equal(
+          this.advisoryLocked,
+          true,
+          "row lock must be taken after the advisory transaction lock",
+        );
         await this.document.acquireRowLock(this.id);
         this.rowLocked = true;
         this.document.events.push({ clientId: this.id, event: "row-lock" });
@@ -175,7 +183,9 @@ class ConcurrentManagedPostgresClient implements ManagedPostgresStoreQueryClient
         throw error;
       }
       this.document.payloadJson = String(params[3]);
-      this.document.persistedPayloads.push(JSON.parse(this.document.payloadJson) as PacketAgentData);
+      this.document.persistedPayloads.push(
+        JSON.parse(this.document.payloadJson) as PacketAgentData,
+      );
       this.document.events.push({ clientId: this.id, event: "persist" });
       return { rows: [] };
     }
@@ -209,7 +219,9 @@ class ConcurrentManagedPostgresClient implements ManagedPostgresStoreQueryClient
   }
 }
 
-function createClientFactory(document: SharedManagedPostgresDocument): () => ConcurrentManagedPostgresClient {
+function createClientFactory(
+  document: SharedManagedPostgresDocument,
+): () => ConcurrentManagedPostgresClient {
   let nextId = 0;
   return () => {
     nextId += 1;
@@ -229,49 +241,66 @@ test("managed Postgres mutations serialize horizontal writers behind advisory an
   const secondBlockedOnRowLock = deferred();
   document.blockedOnRowLock = () => secondBlockedOnRowLock.resolve();
 
-  await withManagedPostgresEnv({
-    PACKETAGENT_STORE: "postgres",
-    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
-  }, createClient, async () => {
-    const firstWrite = mutateStoreAsync(async (data) => {
-      firstEnteredMutator.resolve();
-      await releaseFirstMutator.promise;
-      return upsertRequirement(data, {
-        id: "req_phase62_first_horizontal_writer",
-        workspaceId: "alpha",
-        title: "Phase 62 first horizontal writer",
-        priority: "must",
-        status: "approved",
-        createdByUserId: "user_alpha",
-      }, "2026-05-01T18:00:00.000Z").id;
-    });
+  await withManagedPostgresEnv(
+    {
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+    },
+    createClient,
+    async () => {
+      const firstWrite = mutateStoreAsync(async (data) => {
+        firstEnteredMutator.resolve();
+        await releaseFirstMutator.promise;
+        return upsertRequirement(
+          data,
+          {
+            id: "req_phase62_first_horizontal_writer",
+            workspaceId: "alpha",
+            title: "Phase 62 first horizontal writer",
+            priority: "must",
+            status: "approved",
+            createdByUserId: "user_alpha",
+          },
+          "2026-05-01T18:00:00.000Z",
+        ).id;
+      });
 
-    await firstEnteredMutator.promise;
+      await firstEnteredMutator.promise;
 
-    const secondWrite = mutateStoreAsync((data) => upsertRequirement(data, {
-      id: "req_phase62_second_horizontal_writer",
-      workspaceId: "alpha",
-      title: "Phase 62 second horizontal writer",
-      priority: "must",
-      status: "approved",
-      createdByUserId: "user_alpha",
-    }, "2026-05-01T18:01:00.000Z").id);
+      const secondWrite = mutateStoreAsync(
+        (data) =>
+          upsertRequirement(
+            data,
+            {
+              id: "req_phase62_second_horizontal_writer",
+              workspaceId: "alpha",
+              title: "Phase 62 second horizontal writer",
+              priority: "must",
+              status: "approved",
+              createdByUserId: "user_alpha",
+            },
+            "2026-05-01T18:01:00.000Z",
+          ).id,
+      );
 
-    await secondBlockedOnRowLock.promise;
-    releaseFirstMutator.resolve();
+      await secondBlockedOnRowLock.promise;
+      releaseFirstMutator.resolve();
 
-    assert.deepEqual(await Promise.all([firstWrite, secondWrite]), [
-      "req_phase62_first_horizontal_writer",
-      "req_phase62_second_horizontal_writer",
-    ]);
-  });
+      assert.deepEqual(await Promise.all([firstWrite, secondWrite]), [
+        "req_phase62_first_horizontal_writer",
+        "req_phase62_second_horizontal_writer",
+      ]);
+    },
+  );
 
   const storedIds = requirementIds(JSON.parse(document.payloadJson) as PacketAgentData);
   assert.equal(storedIds.includes("req_phase62_first_horizontal_writer"), true);
   assert.equal(storedIds.includes("req_phase62_second_horizontal_writer"), true);
 
   for (const clientId of ["client-1", "client-2"]) {
-    const events = document.events.filter((entry) => entry.clientId === clientId).map((entry) => entry.event);
+    const events = document.events
+      .filter((entry) => entry.clientId === clientId)
+      .map((entry) => entry.event);
     assert.deepEqual(events, ["begin", "advisory-lock", "row-lock", "persist", "commit", "close"]);
   }
 });
@@ -280,35 +309,40 @@ test("managed Postgres rollback releases the transaction client after a failed h
   const document = new SharedManagedPostgresDocument();
   const createClient = createClientFactory(document);
 
-  await withManagedPostgresEnv({
-    PACKETAGENT_STORE: "postgres",
-    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
-  }, createClient, async () => {
-    await assert.rejects(
-      mutateStoreAsync((data) => {
-        upsertRequirement(data, {
-          id: "req_phase62_rolled_back_horizontal_writer",
-          workspaceId: "alpha",
-          title: "Phase 62 rolled back horizontal writer",
-          priority: "must",
-          status: "approved",
-          createdByUserId: "user_alpha",
-        }, "2026-05-01T18:02:00.000Z");
-        throw new Error("abort horizontal write");
-      }),
-      /abort horizontal write/,
-    );
-  });
+  await withManagedPostgresEnv(
+    {
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+    },
+    createClient,
+    async () => {
+      await assert.rejects(
+        mutateStoreAsync((data) => {
+          upsertRequirement(
+            data,
+            {
+              id: "req_phase62_rolled_back_horizontal_writer",
+              workspaceId: "alpha",
+              title: "Phase 62 rolled back horizontal writer",
+              priority: "must",
+              status: "approved",
+              createdByUserId: "user_alpha",
+            },
+            "2026-05-01T18:02:00.000Z",
+          );
+          throw new Error("abort horizontal write");
+        }),
+        /abort horizontal write/,
+      );
+    },
+  );
 
   const storedIds = requirementIds(JSON.parse(document.payloadJson) as PacketAgentData);
   assert.equal(storedIds.includes("req_phase62_rolled_back_horizontal_writer"), false);
-  assert.deepEqual(document.events.map((entry) => entry.event), [
-    "begin",
-    "advisory-lock",
-    "row-lock",
-    "rollback",
-    "close",
-  ]);
+  assert.deepEqual(
+    document.events.map((entry) => entry.event),
+    ["begin", "advisory-lock", "row-lock", "rollback", "close"],
+  );
 });
 
 test("managed Postgres retries retryable transaction conflicts without duplicating failed writes", async () => {
@@ -317,40 +351,51 @@ test("managed Postgres retries retryable transaction conflicts without duplicati
   document.failNextPersistWith = retryableTransactionConflict("serialization failure");
   let mutatorCalls = 0;
 
-  await withManagedPostgresEnv({
-    PACKETAGENT_STORE: "postgres",
-    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
-  }, createClient, async () => {
-    const requirementId = await mutateStoreAsync((data) => {
-      mutatorCalls += 1;
-      return upsertRequirement(data, {
-        id: "req_phase62_retryable_conflict",
-        workspaceId: "alpha",
-        title: "Phase 62 retryable conflict",
-        priority: "must",
-        status: "approved",
-        createdByUserId: "user_alpha",
-      }, "2026-05-01T18:03:00.000Z").id;
-    });
+  await withManagedPostgresEnv(
+    {
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+    },
+    createClient,
+    async () => {
+      const requirementId = await mutateStoreAsync((data) => {
+        mutatorCalls += 1;
+        return upsertRequirement(
+          data,
+          {
+            id: "req_phase62_retryable_conflict",
+            workspaceId: "alpha",
+            title: "Phase 62 retryable conflict",
+            priority: "must",
+            status: "approved",
+            createdByUserId: "user_alpha",
+          },
+          "2026-05-01T18:03:00.000Z",
+        ).id;
+      });
 
-    assert.equal(requirementId, "req_phase62_retryable_conflict");
-  });
+      assert.equal(requirementId, "req_phase62_retryable_conflict");
+    },
+  );
 
   const storedIds = requirementIds(JSON.parse(document.payloadJson) as PacketAgentData);
   assert.equal(mutatorCalls, 2);
   assert.equal(storedIds.filter((id) => id === "req_phase62_retryable_conflict").length, 1);
   assert.equal(document.persistedPayloads.length, 1);
-  assert.deepEqual(document.events.map((entry) => entry.event), [
-    "begin",
-    "advisory-lock",
-    "row-lock",
-    "rollback",
-    "close",
-    "begin",
-    "advisory-lock",
-    "row-lock",
-    "persist",
-    "commit",
-    "close",
-  ]);
+  assert.deepEqual(
+    document.events.map((entry) => entry.event),
+    [
+      "begin",
+      "advisory-lock",
+      "row-lock",
+      "rollback",
+      "close",
+      "begin",
+      "advisory-lock",
+      "row-lock",
+      "persist",
+      "commit",
+      "close",
+    ],
+  );
 });

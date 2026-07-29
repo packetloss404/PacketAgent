@@ -94,7 +94,7 @@ test("operations job-metrics history returns empty snapshots array when none exi
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { snapshots: unknown[] };
+  const body = (await response.json()) as { snapshots: unknown[] };
   assert.ok(Array.isArray(body.snapshots));
   assert.equal(body.snapshots.length, 0);
 });
@@ -114,7 +114,7 @@ test("operations job-metrics history returns snapshots ordered ascending by capt
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { snapshots: Array<{ id: string; capturedAt: string }> };
+  const body = (await response.json()) as { snapshots: Array<{ id: string; capturedAt: string }> };
   assert.equal(body.snapshots.length, 3);
   const ordered = body.snapshots.map((entry) => entry.capturedAt);
   const sorted = [...ordered].sort();
@@ -136,7 +136,7 @@ test("operations job-metrics history filters by type", async () => {
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { snapshots: Array<{ id: string; type: string }> };
+  const body = (await response.json()) as { snapshots: Array<{ id: string; type: string }> };
   assert.equal(body.snapshots.length, 2);
   for (const entry of body.snapshots) {
     assert.equal(entry.type, "foo");
@@ -159,7 +159,7 @@ test("operations job-metrics history filters by since timestamp", async () => {
   );
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { snapshots: Array<{ id: string; capturedAt: string }> };
+  const body = (await response.json()) as { snapshots: Array<{ id: string; capturedAt: string }> };
   for (const entry of body.snapshots) {
     assert.ok(Date.parse(entry.capturedAt) >= Date.parse("2026-04-20T00:00:00.000Z"));
   }
@@ -183,7 +183,7 @@ test("operations job-metrics history caps response with limit", async () => {
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { snapshots: unknown[] };
+  const body = (await response.json()) as { snapshots: unknown[] };
   assert.equal(body.snapshots.length, 2);
 });
 
@@ -192,10 +192,9 @@ test("operations job-metrics history rejects invalid since with 400", async () =
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const app = createApp();
 
-  const response = await app.request(
-    "/api/app/operations/job-metrics/history?since=not-a-date",
-    { headers: authHeaders(auth.cookieValue) },
-  );
+  const response = await app.request("/api/app/operations/job-metrics/history?since=not-a-date", {
+    headers: authHeaders(auth.cookieValue),
+  });
 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: "invalid since" });

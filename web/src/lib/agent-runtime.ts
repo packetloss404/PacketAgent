@@ -30,7 +30,11 @@ export function triggerToneClass(kind: AgentTriggerKind | undefined): string {
   }
 }
 
-export function describeNextRun(schedule: string | undefined, kind: AgentTriggerKind | undefined, from: Date = new Date()): string {
+export function describeNextRun(
+  schedule: string | undefined,
+  kind: AgentTriggerKind | undefined,
+  from: Date = new Date(),
+): string {
   if (kind === "manual") return "Manual runs only";
   if (kind === "webhook") return "Webhook-triggered";
   if (kind === "email") return "Email-triggered";
@@ -50,7 +54,8 @@ export function describeNextRun(schedule: string | undefined, kind: AgentTrigger
 export function validateCronSchedule(schedule: string): string | null {
   const parts = schedule.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "Enter a five-field cron schedule.";
-  if (parts.length !== 5) return "Use five cron fields: minute hour day-of-month month day-of-week.";
+  if (parts.length !== 5)
+    return "Use five cron fields: minute hour day-of-month month day-of-week.";
 
   const fieldRanges: Array<[name: string, min: number, max: number]> = [
     ["minute", 0, 59],
@@ -81,7 +86,8 @@ function isValidCronPart(part: string, min: number, max: number): boolean {
 
   if (range.includes("-")) {
     const [start, end, trailing] = range.split("-");
-    if (trailing !== undefined || !isCronNumber(start, min, max) || !isCronNumber(end, min, max)) return false;
+    if (trailing !== undefined || !isCronNumber(start, min, max) || !isCronNumber(end, min, max))
+      return false;
     return Number(start) <= Number(end);
   }
 

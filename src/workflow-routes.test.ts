@@ -15,7 +15,9 @@ function createTestApp() {
 
 function loginAlphaAs(role: WorkspaceRole) {
   const store = resetStoreForTests();
-  const membership = store.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+  const membership = store.memberships.find(
+    (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+  );
   assert.ok(membership);
   membership.role = role;
   return login({ email: "alpha@packetagent.local", password: "demo12345" });
@@ -120,10 +122,13 @@ test("member can write workflow routes", async () => {
     headers,
     body: JSON.stringify({ summary: "Member edit" }),
   });
-  const applyResponse = await app.request("/api/app/workflow/templates/customer_onboarding_portal/apply", {
-    method: "POST",
-    headers,
-  });
+  const applyResponse = await app.request(
+    "/api/app/workflow/templates/customer_onboarding_portal/apply",
+    {
+      method: "POST",
+      headers,
+    },
+  );
   const planApplyResponse = await app.request("/api/app/workflow/plan-mode/apply", {
     method: "POST",
     headers,
@@ -144,11 +149,17 @@ test("brief template apply uses the route template id", async () => {
     method: "POST",
     headers: { cookie: `packetagent_session=${auth.cookieValue}` },
   });
-  const body = await response.json() as { summary: string; targetCustomers: string[] };
+  const body = (await response.json()) as { summary: string; targetCustomers: string[] };
 
   assert.equal(response.status, 200);
-  assert.equal(body.summary, "Roll out a guided activation experience that lifts the percentage of new accounts reaching first value within their first session.");
-  assert.deepEqual(body.targetCustomers, ["Self-serve trial accounts", "Pilot customers in the first 30 days"]);
+  assert.equal(
+    body.summary,
+    "Roll out a guided activation experience that lifts the percentage of new accounts reaching first value within their first session.",
+  );
+  assert.deepEqual(body.targetCustomers, [
+    "Self-serve trial accounts",
+    "Pilot customers in the first 30 days",
+  ]);
 });
 
 test("plan-mode apply filters empty items and normalizes statuses", async () => {
@@ -171,20 +182,24 @@ test("plan-mode apply filters empty items and normalizes statuses", async () => 
       ],
     }),
   });
-  const body = await response.json() as { planItems: { title: string; status: string }[] };
+  const body = (await response.json()) as { planItems: { title: string; status: string }[] };
 
   assert.equal(response.status, 200);
-  assert.deepEqual(body.planItems.map((item) => item.title), [
-    "Draft implementation plan",
-    "Confirm release",
-    "Unknown status falls back",
-  ]);
-  assert.deepEqual(body.planItems.map((item) => item.status), ["in_progress", "done", "todo"]);
+  assert.deepEqual(
+    body.planItems.map((item) => item.title),
+    ["Draft implementation plan", "Confirm release", "Unknown status falls back"],
+  );
+  assert.deepEqual(
+    body.planItems.map((item) => item.status),
+    ["in_progress", "done", "todo"],
+  );
 });
 
 test("generate-from-prompt applies the LLM-shaped draft", async () => {
   resetStoreForTests();
-  const router = new ProviderRouter({ "workflow.draft": { provider: "stub", model: "stub-small" } });
+  const router = new ProviderRouter({
+    "workflow.draft": { provider: "stub", model: "stub-small" },
+  });
   router.register("stub", new JsonDraftProvider());
   setDefaultRouter(router);
 
@@ -199,7 +214,10 @@ test("generate-from-prompt applies the LLM-shaped draft", async () => {
       },
       body: JSON.stringify({ prompt: "Build a workflow from this user prompt", apply: true }),
     });
-    const body = await response.json() as { draft: { brief: { summary: string } }; brief: { summary: string } };
+    const body = (await response.json()) as {
+      draft: { brief: { summary: string } };
+      brief: { summary: string };
+    };
 
     assert.equal(response.status, 200);
     assert.equal(body.draft.brief.summary, "LLM generated workflow summary");

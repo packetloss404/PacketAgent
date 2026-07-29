@@ -18,7 +18,9 @@ operationsJobMetricsRoutes.get("/history", async (c: Context) => {
       return c.json({ error: "invalid until" }, 400);
     }
     const limitRaw = c.req.query("limit");
-    const limit = limitRaw ? Math.max(1, Math.min(500, Number.parseInt(limitRaw, 10) || 100)) : undefined;
+    const limit = limitRaw
+      ? Math.max(1, Math.min(500, Number.parseInt(limitRaw, 10) || 100))
+      : undefined;
     const snapshots = await listJobMetricSnapshotsAsync({ type, since, until, limit });
     return c.json({ snapshots });
   } catch (error) {

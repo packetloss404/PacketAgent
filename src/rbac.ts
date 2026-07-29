@@ -1,5 +1,8 @@
 import type { Context } from "hono";
-import { requireAuthenticatedContext, requireAuthenticatedContextAsync } from "./packetagent-services.js";
+import {
+  requireAuthenticatedContext,
+  requireAuthenticatedContextAsync,
+} from "./packetagent-services.js";
 import { findWorkspaceMembership, loadStore, loadStoreAsync } from "./packetagent-store.js";
 
 export const WORKSPACE_ROLES = ["viewer", "member", "admin", "owner"] as const;
@@ -20,7 +23,9 @@ export interface WorkspaceMembershipLike {
 }
 
 export type AuthenticatedWorkspaceContext = ReturnType<typeof requireAuthenticatedContext>;
-export type AuthenticatedWorkspaceContextAsync = Awaited<ReturnType<typeof requireAuthenticatedContextAsync>>;
+export type AuthenticatedWorkspaceContextAsync = Awaited<
+  ReturnType<typeof requireAuthenticatedContextAsync>
+>;
 
 export interface WorkspaceRoleDefinition {
   rank: number;
@@ -44,40 +49,46 @@ const roleRanks: Record<WorkspaceRole, number> = {
   owner: 3,
 };
 
-export const WORKSPACE_ROLE_DEFINITIONS: Readonly<Record<WorkspaceRole, WorkspaceRoleDefinition>> = {
-  viewer: {
-    rank: roleRanks.viewer,
-    permissions: new Set<WorkspacePermission>(["viewWorkspace", "inspectWorkers"]),
-  },
-  member: {
-    rank: roleRanks.member,
-    permissions: new Set<WorkspacePermission>(["viewWorkspace", "editWorkflow", "inspectWorkers", "controlWorkerRuns"]),
-  },
-  admin: {
-    rank: roleRanks.admin,
-    permissions: new Set<WorkspacePermission>([
-      "viewWorkspace",
-      "editWorkflow",
-      "manageWorkspace",
-      "inspectWorkers",
-      "controlWorkerRuns",
-      "controlWorkerDeployments",
-      "approveWorkerActions",
-    ]),
-  },
-  owner: {
-    rank: roleRanks.owner,
-    permissions: new Set<WorkspacePermission>([
-      "viewWorkspace",
-      "editWorkflow",
-      "manageWorkspace",
-      "inspectWorkers",
-      "controlWorkerRuns",
-      "controlWorkerDeployments",
-      "approveWorkerActions",
-    ]),
-  },
-};
+export const WORKSPACE_ROLE_DEFINITIONS: Readonly<Record<WorkspaceRole, WorkspaceRoleDefinition>> =
+  {
+    viewer: {
+      rank: roleRanks.viewer,
+      permissions: new Set<WorkspacePermission>(["viewWorkspace", "inspectWorkers"]),
+    },
+    member: {
+      rank: roleRanks.member,
+      permissions: new Set<WorkspacePermission>([
+        "viewWorkspace",
+        "editWorkflow",
+        "inspectWorkers",
+        "controlWorkerRuns",
+      ]),
+    },
+    admin: {
+      rank: roleRanks.admin,
+      permissions: new Set<WorkspacePermission>([
+        "viewWorkspace",
+        "editWorkflow",
+        "manageWorkspace",
+        "inspectWorkers",
+        "controlWorkerRuns",
+        "controlWorkerDeployments",
+        "approveWorkerActions",
+      ]),
+    },
+    owner: {
+      rank: roleRanks.owner,
+      permissions: new Set<WorkspacePermission>([
+        "viewWorkspace",
+        "editWorkflow",
+        "manageWorkspace",
+        "inspectWorkers",
+        "controlWorkerRuns",
+        "controlWorkerDeployments",
+        "approveWorkerActions",
+      ]),
+    },
+  };
 
 const permissionMinimumRoles: Record<WorkspacePermission, WorkspaceRole> = {
   viewWorkspace: "viewer",
@@ -93,7 +104,9 @@ export function isWorkspaceRole(value: unknown): value is WorkspaceRole {
   return typeof value === "string" && value in WORKSPACE_ROLE_DEFINITIONS;
 }
 
-export function getWorkspaceRole(membership: WorkspaceMembershipLike | null | undefined): WorkspaceRole | null {
+export function getWorkspaceRole(
+  membership: WorkspaceMembershipLike | null | undefined,
+): WorkspaceRole | null {
   return isWorkspaceRole(membership?.role) ? membership.role : null;
 }
 
@@ -113,7 +126,9 @@ export function canEditWorkflow(membership: WorkspaceMembershipLike | null | und
   return hasWorkspacePermission(membership, "editWorkflow");
 }
 
-export function canManageWorkspace(membership: WorkspaceMembershipLike | null | undefined): boolean {
+export function canManageWorkspace(
+  membership: WorkspaceMembershipLike | null | undefined,
+): boolean {
   return hasWorkspacePermission(membership, "manageWorkspace");
 }
 
@@ -153,13 +168,18 @@ export function requirePrivateWorkspace(c: Context): AuthenticatedWorkspaceConte
   return context;
 }
 
-export async function requirePrivateWorkspaceAsync(c: Context): Promise<AuthenticatedWorkspaceContextAsync> {
+export async function requirePrivateWorkspaceAsync(
+  c: Context,
+): Promise<AuthenticatedWorkspaceContextAsync> {
   const context = await requireAuthenticatedContextAsync(c);
   await requireWorkspaceMembershipAsync(context);
   return context;
 }
 
-export function requirePrivateWorkspaceRole(c: Context, minimumRole: WorkspaceRole): AuthenticatedWorkspaceContext {
+export function requirePrivateWorkspaceRole(
+  c: Context,
+  minimumRole: WorkspaceRole,
+): AuthenticatedWorkspaceContext {
   const context = requireAuthenticatedContext(c);
   requireWorkspaceRole(requireWorkspaceMembership(context), minimumRole);
   return context;
@@ -192,7 +212,9 @@ export async function requirePrivateWorkspacePermissionAsync(
   return context;
 }
 
-function requireWorkspaceMembership(context: AuthenticatedWorkspaceContext): WorkspaceMembershipLike {
+function requireWorkspaceMembership(
+  context: AuthenticatedWorkspaceContext,
+): WorkspaceMembershipLike {
   const membership = findWorkspaceMembership(loadStore(), context.workspace.id, context.user.id);
   if (!membership || getWorkspaceRole(membership) === null) {
     throw new WorkspaceAccessError("workspace membership is required");
@@ -200,8 +222,14 @@ function requireWorkspaceMembership(context: AuthenticatedWorkspaceContext): Wor
   return membership;
 }
 
-async function requireWorkspaceMembershipAsync(context: AuthenticatedWorkspaceContextAsync): Promise<WorkspaceMembershipLike> {
-  const membership = findWorkspaceMembership(await loadStoreAsync(), context.workspace.id, context.user.id);
+async function requireWorkspaceMembershipAsync(
+  context: AuthenticatedWorkspaceContextAsync,
+): Promise<WorkspaceMembershipLike> {
+  const membership = findWorkspaceMembership(
+    await loadStoreAsync(),
+    context.workspace.id,
+    context.user.id,
+  );
   if (!membership || getWorkspaceRole(membership) === null) {
     throw new WorkspaceAccessError("workspace membership is required");
   }

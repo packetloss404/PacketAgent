@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **R1 - repository health and historical finding re-audit**. Repository/session state
+Current active loop: **R2 - provider policy and key parity**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -40,10 +40,10 @@ role-bounded approve/reject/pause/stop/revoke controls, exact-binding signed
 POST callbacks, and durable one-use consumption through W7. W10.4 now closes
 the local remote-control gate with fake-endpoint contracts, local/remote race
 orderings, restart/replay/credential-rotation checks, and audited bounded
-dead-letter redrive. Resume at R1 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#r1---repository-health-and-historical-finding-re-audit).
+dead-letter redrive. R1 repository health is complete; resume at R2 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#r2---provider-policy-and-key-parity).
 
-R1 is underway. Its first persistence slice now reuses managed Postgres pools,
+R1 is complete. Its persistence slice reuses managed Postgres pools,
 validates SQLite migration/restore integrity and foreign keys, rejects corrupt
 restore candidates without replacing current data, and preserves target-only
 managed-backfill records. The jobs single-writer/workspace-scoping audit is
@@ -56,8 +56,9 @@ render recovery, multi-secret redaction, the preview iframe contract, audited
 dead controls, primary keyboard semantics, and stale web branding are also
 closed. The storage-authority/cutover decision and deliberate dependency
 disposition are now closed, including the documented unreachable React Router
-RSC exception. Repository-wide formatting, button-type, and ESLint cleanup is
-the only remaining R1 work;
+RSC exception. The 326-file Prettier baseline, 145-warning ESLint baseline, and
+native-button-type audit are closed. Typecheck, lint, formatting, production
+build, 30 web tests, and the 1,525-test API suite pass;
 [`r1-repository-health-audit.md`](r1-repository-health-audit.md) records
 supporting evidence while `BACKLOG.md` remains the ledger.
 

@@ -1,10 +1,7 @@
 import { getDefaultRouter } from "./providers/router.js";
 import { recordedCall } from "./providers/ledger.js";
 import { generateWorkflowDraftFromPrompt, type WorkflowDraft } from "./workflow-prompt-service.js";
-import {
-  type WorkflowContext,
-  getWorkflowOverview,
-} from "./workflow-service.js";
+import { type WorkflowContext, getWorkflowOverview } from "./workflow-service.js";
 import type { ProviderMessage } from "./providers/types.js";
 
 export interface LlmDraftInput {
@@ -66,9 +63,18 @@ export function extractJson(content: string): unknown {
   let escape = false;
   for (let i = start; i < candidate.length; i++) {
     const ch = candidate[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
     if (ch === "{") depth++;
     else if (ch === "}") {
@@ -88,8 +94,12 @@ function fallbackToRegex(prompt: string): WorkflowDraft {
 function shapeDraftFromLlm(parsed: unknown, prompt: string): WorkflowDraft {
   const obj = (parsed ?? {}) as Record<string, unknown>;
   const brief = (obj.brief ?? {}) as Record<string, unknown>;
-  const requirements = Array.isArray(obj.requirements) ? (obj.requirements as Record<string, unknown>[]) : [];
-  const planItems = Array.isArray(obj.planItems) ? (obj.planItems as Record<string, unknown>[]) : [];
+  const requirements = Array.isArray(obj.requirements)
+    ? (obj.requirements as Record<string, unknown>[])
+    : [];
+  const planItems = Array.isArray(obj.planItems)
+    ? (obj.planItems as Record<string, unknown>[])
+    : [];
   return {
     prompt,
     brief: {
@@ -99,25 +109,31 @@ function shapeDraftFromLlm(parsed: unknown, prompt: string): WorkflowDraft {
       targetCustomers: Array.isArray(brief.customers) ? brief.customers.map(String) : [],
       successMetrics: Array.isArray(brief.metrics) ? brief.metrics.map(String) : [],
       goals: [],
-      audience: Array.isArray(brief.customers) ? (brief.customers as unknown[]).map(String).join(", ") : "",
+      audience: Array.isArray(brief.customers)
+        ? (brief.customers as unknown[]).map(String).join(", ")
+        : "",
       constraints: "",
     },
-    requirements: requirements.map((r) => {
-      const rawPriority = String(r.priority ?? "must");
-      const priority: "must" | "should" | "could" =
-        rawPriority === "should" ? "should" : rawPriority === "could" ? "could" : "must";
-      return {
-        title: String(r.summary ?? r.title ?? ""),
-        detail: String(r.detail ?? ""),
-        priority,
-        status: "accepted" as const,
-      };
-    }).filter((r) => r.title.length > 0),
-    planItems: planItems.map((p) => ({
-      title: String(p.summary ?? p.title ?? ""),
-      description: String(p.description ?? ""),
-      status: "todo" as const,
-    })).filter((p) => p.title.length > 0),
+    requirements: requirements
+      .map((r) => {
+        const rawPriority = String(r.priority ?? "must");
+        const priority: "must" | "should" | "could" =
+          rawPriority === "should" ? "should" : rawPriority === "could" ? "could" : "must";
+        return {
+          title: String(r.summary ?? r.title ?? ""),
+          detail: String(r.detail ?? ""),
+          priority,
+          status: "accepted" as const,
+        };
+      })
+      .filter((r) => r.title.length > 0),
+    planItems: planItems
+      .map((p) => ({
+        title: String(p.summary ?? p.title ?? ""),
+        description: String(p.description ?? ""),
+        status: "todo" as const,
+      }))
+      .filter((p) => p.title.length > 0),
   };
 }
 
@@ -130,18 +146,38 @@ export async function llmDraftWorkflow(input: LlmDraftInput): Promise<LlmDraftRe
   ];
   try {
     const result = await recordedCall(
-      { workspaceId: input.workspaceId, routeKey: "workflow.draft", provider: route.provider, model: route.model },
-      () => router.call({ workspaceId: input.workspaceId, routeKey: "workflow.draft", messages, temperature: 0.2, maxTokens: 2048 }),
+      {
+        workspaceId: input.workspaceId,
+        routeKey: "workflow.draft",
+        provider: route.provider,
+        model: route.model,
+      },
+      () =>
+        router.call({
+          workspaceId: input.workspaceId,
+          routeKey: "workflow.draft",
+          messages,
+          temperature: 0.2,
+          maxTokens: 2048,
+        }),
     );
     let parsed: unknown;
     try {
       parsed = extractJson(result.content);
     } catch {
-      return { draft: fallbackToRegex(input.prompt), modelUsed: result.model, costUsd: result.usage.costUsd };
+      return {
+        draft: fallbackToRegex(input.prompt),
+        modelUsed: result.model,
+        costUsd: result.usage.costUsd,
+      };
     }
     const draft = shapeDraftFromLlm(parsed, input.prompt);
     if (draft.requirements.length === 0 && draft.planItems.length === 0) {
-      return { draft: fallbackToRegex(input.prompt), modelUsed: result.model, costUsd: result.usage.costUsd };
+      return {
+        draft: fallbackToRegex(input.prompt),
+        modelUsed: result.model,
+        costUsd: result.usage.costUsd,
+      };
     }
     return { draft, modelUsed: result.model, costUsd: result.usage.costUsd };
   } catch {
@@ -151,15 +187,19 @@ export async function llmDraftWorkflow(input: LlmDraftInput): Promise<LlmDraftRe
 
 function shapePlanFromLlm(parsed: unknown): { planItems: PlanModePlanItem[]; rationale: string } {
   const obj = (parsed ?? {}) as Record<string, unknown>;
-  const planItems = Array.isArray(obj.planItems) ? (obj.planItems as Record<string, unknown>[]) : [];
+  const planItems = Array.isArray(obj.planItems)
+    ? (obj.planItems as Record<string, unknown>[])
+    : [];
   const rationale = typeof obj.rationale === "string" ? obj.rationale : "";
   return {
-    planItems: planItems.map((p) => {
-      const rawStatus = String(p.status ?? "todo");
-      const status: "todo" | "doing" | "done" =
-        rawStatus === "doing" ? "doing" : rawStatus === "done" ? "done" : "todo";
-      return { summary: String(p.summary ?? p.title ?? ""), status };
-    }).filter((p) => p.summary.length > 0),
+    planItems: planItems
+      .map((p) => {
+        const rawStatus = String(p.status ?? "todo");
+        const status: "todo" | "doing" | "done" =
+          rawStatus === "doing" ? "doing" : rawStatus === "done" ? "done" : "todo";
+        return { summary: String(p.summary ?? p.title ?? ""), status };
+      })
+      .filter((p) => p.summary.length > 0),
     rationale,
   };
 }
@@ -180,16 +220,41 @@ export async function llmPlanMode(context: WorkflowContext): Promise<PlanModeRes
   ];
   try {
     const result = await recordedCall(
-      { workspaceId: context.workspace.id, routeKey: "workflow.plan_mode", provider: route.provider, model: route.model },
-      () => router.call({ workspaceId: context.workspace.id, routeKey: "workflow.plan_mode", messages, temperature: 0.2, maxTokens: 2048 }),
+      {
+        workspaceId: context.workspace.id,
+        routeKey: "workflow.plan_mode",
+        provider: route.provider,
+        model: route.model,
+      },
+      () =>
+        router.call({
+          workspaceId: context.workspace.id,
+          routeKey: "workflow.plan_mode",
+          messages,
+          temperature: 0.2,
+          maxTokens: 2048,
+        }),
     );
     let parsed: unknown;
-    try { parsed = extractJson(result.content); }
-    catch { return { planItems: [], rationale: "Plan Mode could not parse the model output. Try again or refine the brief.", modelUsed: result.model, costUsd: result.usage.costUsd }; }
+    try {
+      parsed = extractJson(result.content);
+    } catch {
+      return {
+        planItems: [],
+        rationale: "Plan Mode could not parse the model output. Try again or refine the brief.",
+        modelUsed: result.model,
+        costUsd: result.usage.costUsd,
+      };
+    }
     const shaped = shapePlanFromLlm(parsed);
     return { ...shaped, modelUsed: result.model, costUsd: result.usage.costUsd };
   } catch (error) {
-    return { planItems: [], rationale: `Plan Mode failed: ${(error as Error).message}`, modelUsed: route.model, costUsd: 0 };
+    return {
+      planItems: [],
+      rationale: `Plan Mode failed: ${(error as Error).message}`,
+      modelUsed: route.model,
+      costUsd: 0,
+    };
   }
 }
 

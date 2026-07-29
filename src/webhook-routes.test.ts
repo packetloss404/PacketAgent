@@ -33,16 +33,22 @@ test("webhook token rotation and deletion are workspace-scoped", async () => {
     method: "POST",
     headers: authHeaders(alpha.cookieValue),
   });
-  const rotateBody = await rotateResponse.json() as { webhookToken: string };
+  const rotateBody = (await rotateResponse.json()) as { webhookToken: string };
 
   assert.equal(rotateResponse.status, 200);
   assert.match(rotateBody.webhookToken, /^whk_/);
-  assert.equal(loadStore().agents.find((agent) => agent.id === "agent_alpha_support")?.webhookToken, rotateBody.webhookToken);
+  assert.equal(
+    loadStore().agents.find((agent) => agent.id === "agent_alpha_support")?.webhookToken,
+    rotateBody.webhookToken,
+  );
 
-  const crossWorkspaceResponse = await app.request("/api/app/webhooks/agents/agent_beta_dependency_watch/rotate", {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
+  const crossWorkspaceResponse = await app.request(
+    "/api/app/webhooks/agents/agent_beta_dependency_watch/rotate",
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
   const crossWorkspaceBody = await crossWorkspaceResponse.json();
 
   assert.equal(crossWorkspaceResponse.status, 404);
@@ -56,7 +62,10 @@ test("webhook token rotation and deletion are workspace-scoped", async () => {
 
   assert.equal(deleteResponse.status, 200);
   assert.deepEqual(deleteBody, { ok: true });
-  assert.equal(loadStore().agents.find((agent) => agent.id === "agent_alpha_support")?.webhookToken, undefined);
+  assert.equal(
+    loadStore().agents.find((agent) => agent.id === "agent_alpha_support")?.webhookToken,
+    undefined,
+  );
 });
 
 test("webhook token management requires an admin role", async () => {
@@ -64,7 +73,9 @@ test("webhook token management requires an admin role", async () => {
   const app = createTestApp();
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "viewer";
   });
@@ -93,7 +104,7 @@ test("public webhook enqueues an agent run job with request inputs", async () =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ticketId: "T-123", priority: "high" }),
   });
-  const body = await response.json() as { accepted: boolean; jobId: string };
+  const body = (await response.json()) as { accepted: boolean; jobId: string };
   const job = findJob("alpha", body.jobId);
 
   assert.equal(response.status, 200);
@@ -152,9 +163,7 @@ test("public Worker webhook enters the deduplicating activation inbox", async ()
     data.workerVersions.push(
       makeWorkerVersion({ workspaceId: "alpha", status: "validated", content }),
     );
-    data.workerDeployments.push(
-      makeWorkerDeployment({ workspaceId: "alpha", status: "active" }),
-    );
+    data.workerDeployments.push(makeWorkerDeployment({ workspaceId: "alpha", status: "active" }));
   });
 
   const request = () =>
@@ -182,13 +191,10 @@ test("public Worker webhook enters the deduplicating activation inbox", async ()
 
 test("public Worker webhook requires a stable upstream delivery ID", async () => {
   resetStoreForTests();
-  const response = await createTestApp().request(
-    "/api/public/webhooks/workers/missing",
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "{}",
-    },
-  );
+  const response = await createTestApp().request("/api/public/webhooks/workers/missing", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  });
   assert.equal(response.status, 400);
 });

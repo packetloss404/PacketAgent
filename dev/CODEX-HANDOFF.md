@@ -291,8 +291,8 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R1 - repository health and historical finding re-audit** in
-[`../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit`](../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit).
+Continue **R2 - provider policy and key parity** in
+[`../BACKLOG.md#r2---provider-policy-and-key-parity`](../BACKLOG.md#r2---provider-policy-and-key-parity).
 `BACKLOG.md` is the single ledger for every remaining W10 and R1-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
 active work absent from the backlog.
@@ -346,10 +346,11 @@ use; [`r1-dependency-advisory-audit.md`](r1-dependency-advisory-audit.md)
 records the reachability and exact-pin decision. Typecheck, production build,
 30 web tests, and the full 1,525-test API gate pass.
 
-Resume with the remaining repo-wide Prettier batches. ESLint is clean, and all
-123 native React buttons declare an explicit type. Keep each formatting batch
-mechanically scoped and reviewable; update the counts here and in `BACKLOG.md`
-after every checkpoint.
+R1 is complete. All 326 inherited Prettier files are formatted, ESLint is
+clean, and all 123 native React buttons declare an explicit type. The full
+closure gate passes typecheck, formatting, lint, production build, 30 web
+tests, and 1,525 API tests (1,521 passed with 4 intentional live-probe skips).
+Resume at R2's provider-policy inventory and contract slice.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -501,7 +502,7 @@ PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
 The exact next slice is
-[`R1 - repository health and historical finding re-audit`](../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit).
+[`R2 - provider policy and key parity`](../BACKLOG.md#r2---provider-policy-and-key-parity).
 After each gate passes, continue through R1-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
@@ -531,6 +532,7 @@ handoff, the roadmap, or the backlog.
 
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 0 warnings
+- `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
 - `npm run test:api` - 1,521 passed, 4 intentionally skipped live probes, 0
   failed
@@ -634,7 +636,6 @@ handoff, the roadmap, or the backlog.
 
 Known inherited quality debt:
 
-- repo-wide `npm run format:check` flags 46 inherited files;
 - full and production dependency audits each report two high package entries
   for the same accepted, unreachable React Router RSC advisory; and
 - ESLint is clean with zero errors and zero warnings.

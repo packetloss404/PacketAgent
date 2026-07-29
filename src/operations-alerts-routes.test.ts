@@ -87,7 +87,7 @@ test("operations alerts returns empty array when none exist", async () => {
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { alerts: unknown[] };
+  const body = (await response.json()) as { alerts: unknown[] };
   assert.ok(Array.isArray(body.alerts));
   assert.equal(body.alerts.length, 0);
 });
@@ -107,9 +107,12 @@ test("operations alerts returns alerts ordered descending by observedAt", async 
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { alerts: Array<{ id: string; observedAt: string }> };
+  const body = (await response.json()) as { alerts: Array<{ id: string; observedAt: string }> };
   assert.equal(body.alerts.length, 3);
-  assert.deepEqual(body.alerts.map((entry) => entry.id), ["a_2", "a_3", "a_1"]);
+  assert.deepEqual(
+    body.alerts.map((entry) => entry.id),
+    ["a_2", "a_3", "a_1"],
+  );
 });
 
 test("operations alerts filters by severity", async () => {
@@ -126,7 +129,7 @@ test("operations alerts filters by severity", async () => {
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { alerts: Array<{ id: string; severity: string }> };
+  const body = (await response.json()) as { alerts: Array<{ id: string; severity: string }> };
   assert.equal(body.alerts.length, 1);
   assert.equal(body.alerts[0].id, "a_crit");
 });
@@ -186,6 +189,6 @@ test("operations alerts caps response with limit", async () => {
   });
 
   assert.equal(response.status, 200);
-  const body = await response.json() as { alerts: unknown[] };
+  const body = (await response.json()) as { alerts: unknown[] };
   assert.equal(body.alerts.length, 2);
 });

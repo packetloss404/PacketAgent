@@ -25,7 +25,9 @@ interface MockHandleInternal extends SandboxHandle {
   done: Promise<void>;
 }
 
-function createMockDriver(behavior: (handle: MockHandleInternal, spec: SandboxStartSpec) => void): SandboxDriver {
+function createMockDriver(
+  behavior: (handle: MockHandleInternal, spec: SandboxStartSpec) => void,
+): SandboxDriver {
   let counter = 0;
   return {
     id: "native",
@@ -76,7 +78,7 @@ function createInMemoryStore() {
   const data: Partial<PacketAgentData> = {};
   return createJsonSandboxStore({
     loadStore: () => data as PacketAgentData,
-    mutateStore: <T,>(mutator: (data: PacketAgentData) => T): T => mutator(data as PacketAgentData),
+    mutateStore: <T>(mutator: (data: PacketAgentData) => T): T => mutator(data as PacketAgentData),
   });
 }
 
@@ -96,7 +98,13 @@ test("sandbox routes: GET /status requires authentication", async () => {
   resetStoreForTests();
   const store = createInMemoryStore();
   const driver = createMockDriver(() => {});
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "native",
+    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+  });
   const app = createTestApp(service);
   const response = await app.request("/api/app/sandbox/status");
   assert.equal(response.status, 401);
@@ -106,13 +114,21 @@ test("sandbox routes: POST /exec rejects users without member role", async () =>
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
-    const m = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const m = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(m);
     m.role = "viewer";
   });
   const store = createInMemoryStore();
   const driver = createMockDriver(() => {});
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "native",
+    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+  });
   const app = createTestApp(service);
 
   const response = await app.request("/api/app/sandbox/exec", {
@@ -131,7 +147,13 @@ test("sandbox routes: POST /exec returns running record on happy path", async ()
     handle.emitter.emit("chunk", { stream: "stdout", data: "hello\n" });
     handle.emitter.emit("exit", { exitCode: 0, signal: null });
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "native",
+    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+  });
   const app = createTestApp(service);
 
   const response = await app.request("/api/app/sandbox/exec", {
@@ -140,7 +162,9 @@ test("sandbox routes: POST /exec returns running record on happy path", async ()
     body: JSON.stringify({ command: "echo hello" }),
   });
   assert.equal(response.status, 201);
-  const body = (await response.json()) as { exec: { id: string; status: string; driver: string; runtime: string } };
+  const body = (await response.json()) as {
+    exec: { id: string; status: string; driver: string; runtime: string };
+  };
   assert.ok(body.exec.id);
   assert.ok(["queued", "running", "success"].includes(body.exec.status));
   assert.equal(body.exec.driver, "native");
@@ -151,7 +175,9 @@ test("sandbox routes: POST /exec returns running record on happy path", async ()
     headers: authHeaders(auth.cookieValue),
   });
   assert.equal(detail.status, 200);
-  const detailBody = (await detail.json()) as { exec: { status: string; exitCode: number; stdoutPreview: string } };
+  const detailBody = (await detail.json()) as {
+    exec: { status: string; exitCode: number; stdoutPreview: string };
+  };
   assert.equal(detailBody.exec.status, "success");
   assert.equal(detailBody.exec.exitCode, 0);
   assert.ok(detailBody.exec.stdoutPreview.includes("hello"));
@@ -164,7 +190,13 @@ test("sandbox routes: GET /exec lists workspace execs", async () => {
   const driver = createMockDriver((handle) => {
     handle.emitter.emit("exit", { exitCode: 0, signal: null });
   });
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "native",
+    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+  });
   const app = createTestApp(service);
 
   const created = await app.request("/api/app/sandbox/exec", {
@@ -245,7 +277,13 @@ test("sandbox routes: POST /exec/:id/cancel returns canceled record", async () =
     return inst;
   })();
 
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "native",
+    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+  });
   const app = createTestApp(service);
 
   const created = await app.request("/api/app/sandbox/exec", {
@@ -269,7 +307,13 @@ test("sandbox routes: POST /exec rejects empty command", async () => {
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const store = createInMemoryStore();
   const driver = createMockDriver(() => {});
-  const service = new SandboxService({ store, dockerDriver: driver, nativeDriver: driver, forcedDriver: "native", env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" } });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "native",
+    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+  });
   const app = createTestApp(service);
 
   const response = await app.request("/api/app/sandbox/exec", {

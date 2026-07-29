@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { JobRecord, PacketAgentData } from "./packetagent-store.js";
-import {
-  getOperationsStatus,
-  type JobTypeMetrics,
-} from "./operations-status.js";
+import { getOperationsStatus, type JobTypeMetrics } from "./operations-status.js";
 
 function emptyStore(): PacketAgentData {
   return { jobs: [] } as unknown as PacketAgentData;
@@ -79,7 +76,8 @@ test("http leader mode strips query string from URL summary", () => {
     loadStore: () => emptyStore(),
     env: {
       PACKETAGENT_SCHEDULER_LEADER_MODE: "http",
-      PACKETAGENT_SCHEDULER_LEADER_HTTP_URL: "https://coord.internal/leader?token=secret123&extra=yes",
+      PACKETAGENT_SCHEDULER_LEADER_HTTP_URL:
+        "https://coord.internal/leader?token=secret123&extra=yes",
     },
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   });
@@ -103,17 +101,18 @@ test("invalid leader mode falls back to off without throwing", () => {
 
 test("jobs grouping aggregates statuses across types and uses succeeded for success", () => {
   const status = getOperationsStatus({
-    loadStore: () => storeWithJobs([
-      fakeJob("agent.run", "queued", "j1"),
-      fakeJob("agent.run", "queued", "j2"),
-      fakeJob("agent.run", "running", "j3"),
-      fakeJob("agent.run", "success", "j4"),
-      fakeJob("agent.run", "failed", "j5"),
-      fakeJob("agent.run", "canceled", "j6"),
-      fakeJob("brief.send", "queued", "j7"),
-      fakeJob("brief.send", "success", "j8"),
-      fakeJob("brief.send", "success", "j9"),
-    ]),
+    loadStore: () =>
+      storeWithJobs([
+        fakeJob("agent.run", "queued", "j1"),
+        fakeJob("agent.run", "queued", "j2"),
+        fakeJob("agent.run", "running", "j3"),
+        fakeJob("agent.run", "success", "j4"),
+        fakeJob("agent.run", "failed", "j5"),
+        fakeJob("agent.run", "canceled", "j6"),
+        fakeJob("brief.send", "queued", "j7"),
+        fakeJob("brief.send", "success", "j8"),
+        fakeJob("brief.send", "success", "j9"),
+      ]),
     env: {},
     now: () => new Date("2026-04-26T12:00:00.000Z"),
   });
@@ -235,9 +234,7 @@ test("jobMetricsSnapshots picks the max capturedAt across out-of-order rows", ()
 test("jobMetricsSnapshots falls back to null when the only row has an unparseable capturedAt", () => {
   const store = {
     jobs: [],
-    jobMetricSnapshots: [
-      { id: "s1", capturedAt: "not-a-date", type: "agent.run" },
-    ],
+    jobMetricSnapshots: [{ id: "s1", capturedAt: "not-a-date", type: "agent.run" }],
   } as unknown as PacketAgentData;
 
   const status = getOperationsStatus({

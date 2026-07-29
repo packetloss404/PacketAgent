@@ -50,11 +50,18 @@ test("workflow surfaces update activation facts and overview", () => {
     { title: "Wire routes later", status: "todo" },
   ]);
   replaceBlockersAndQuestions(auth.context, {
-    blockers: [{ title: "Await integration route", severity: "high", relatedRequirementId: "req-route" }],
+    blockers: [
+      { title: "Await integration route", severity: "high", relatedRequirementId: "req-route" },
+    ],
     questions: [{ title: "Which route owns workflow reads?" }],
   });
   replaceValidationEvidence(auth.context, [
-    { title: "Service tests pass", outcome: "passed", type: "automated_test", evidenceUrl: "node --test" },
+    {
+      title: "Service tests pass",
+      outcome: "passed",
+      type: "automated_test",
+      evidenceUrl: "node --test",
+    },
   ]);
   const release = updateReleaseConfirmation(auth.context, {
     confirmed: true,
@@ -110,11 +117,15 @@ test("brief scope changes emit durable activation signals idempotently by versio
   });
 
   const store = loadStore();
-  const signals = store.activationSignals.filter((entry) =>
-    entry.workspaceId === "alpha" && entry.kind === "scope_change" && entry.source === "workflow"
+  const signals = store.activationSignals.filter(
+    (entry) =>
+      entry.workspaceId === "alpha" && entry.kind === "scope_change" && entry.source === "workflow",
   );
-  const activities = store.activities.filter((entry) =>
-    entry.workspaceId === "alpha" && entry.event === "workflow.scope_changed" && entry.data.activationSignalId === signals[0]?.id
+  const activities = store.activities.filter(
+    (entry) =>
+      entry.workspaceId === "alpha" &&
+      entry.event === "workflow.scope_changed" &&
+      entry.data.activationSignalId === signals[0]?.id,
   );
 
   assert.equal(signals.length, 1);
@@ -122,7 +133,12 @@ test("brief scope changes emit durable activation signals idempotently by versio
   assert.ok(signals[0].stableKey);
   assert.equal(activities.length, 1);
   assert.equal(activities[0].data.origin, "user_entered");
-  assert.equal(snapshotForWorkspace(store, "alpha").scopeChangeCount, store.activationSignals.filter((entry) => entry.workspaceId === "alpha" && entry.kind === "scope_change").length);
+  assert.equal(
+    snapshotForWorkspace(store, "alpha").scopeChangeCount,
+    store.activationSignals.filter(
+      (entry) => entry.workspaceId === "alpha" && entry.kind === "scope_change",
+    ).length,
+  );
 });
 
 test("brief templates populate the brief and snapshot a template version", () => {
@@ -307,6 +323,9 @@ test("workflow read paths preserve workspace isolation and ordering", () => {
   assert.ok(!overview.planItems.some((entry) => entry.workspaceId === "beta"));
 
   const history = listWorkspaceBriefHistory(alpha.context);
-  assert.deepEqual(history.map((entry) => entry.id).slice(0, 2), ["brief_alpha_v3_test", "brief_alpha_v1_test"]);
+  assert.deepEqual(history.map((entry) => entry.id).slice(0, 2), [
+    "brief_alpha_v3_test",
+    "brief_alpha_v1_test",
+  ]);
   assert.ok(!history.some((entry) => entry.workspaceId === "beta"));
 });
