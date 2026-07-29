@@ -1126,7 +1126,7 @@ live interoperability skips).
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1-R5.3 completed on 2026-07-29. Resume at R5.4.
+Status: in progress. R5.1-R5.4 completed on 2026-07-29. Resume at R5.5.
 
 1. [Complete 2026-07-29] Make real sandboxed `tsc` and Vite validation the
    default; remove synthetic success. The required validator uses a
@@ -1149,8 +1149,12 @@ Status: in progress. R5.1-R5.3 completed on 2026-07-29. Resume at R5.4.
    and explicit-environment policy. Stored environment values are redacted.
    JSON/SQLite parity and `npm run verify:sandbox-policy` cover the durable and
    real-container boundary.
-4. Reuse W6 network protections for redirects, SSRF, IPv4/IPv6, and DNS
-   rebinding.
+4. [Complete 2026-07-29] Reuse W6 network protections for redirects, SSRF,
+   IPv4/IPv6, and DNS rebinding. Declared egress is exact-origin,
+   operator-allowlisted, bounded GET-only prefetch through the existing W6
+   pinned-network port. Results are digest-receipted and mounted read-only;
+   Docker remains `--network=none`. `npm run verify:sandbox-egress` is the
+   real-container proof.
 5. Serve generated previews on an isolated origin with appropriately scoped
    cookies, CSP, and proxy rules.
 6. Harden container execution with a non-root user, dropped capabilities,

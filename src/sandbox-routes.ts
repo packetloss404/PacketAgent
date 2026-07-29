@@ -3,6 +3,7 @@ import { streamSSE } from "hono/streaming";
 import { requirePrivateWorkspaceRoleAsync } from "./rbac.js";
 import { getDefaultSandboxService, type SandboxService } from "./sandbox/sandbox-service.js";
 import type {
+  SandboxEgressRequest,
   SandboxExecRecord,
   SandboxExecRequestBody,
   SandboxExecStatus,
@@ -86,6 +87,7 @@ export function createSandboxRoutes(deps: SandboxRouteDeps = {}): Hono {
         ...(body.env && typeof body.env === "object"
           ? { env: body.env as Record<string, string> }
           : {}),
+        ...(body.egress !== undefined ? { egress: parseEgress(body.egress) } : {}),
         ...(typeof body.timeoutMs === "number" ? { timeoutMs: body.timeoutMs } : {}),
         ...(typeof body.stdin === "string" ? { stdin: body.stdin } : {}),
       };
@@ -228,4 +230,18 @@ async function readJsonBody(c: Context): Promise<Record<string, unknown>> {
   } catch {
     throw Object.assign(new Error("request body must be valid JSON"), { status: 400 });
   }
+}
+
+function parseEgress(value: unknown): SandboxEgressRequest[] {
+  if (!Array.isArray(value)) throw badRequest("egress must be an array");
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw badRequest("each egress declaration must be an object");
+    }
+    const candidate = entry as Record<string, unknown>;
+    if (typeof candidate.id !== "string" || typeof candidate.url !== "string") {
+      throw badRequest("each egress declaration requires string id and url");
+    }
+    return { id: candidate.id, url: candidate.url };
+  });
 }

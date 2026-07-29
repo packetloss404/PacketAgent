@@ -199,7 +199,7 @@ PacketAgent keeps one logical `PacketAgentData` mutation contract with a differe
 - **SQLite** uses Node's built-in `node:sqlite` with WAL, foreign keys, `busy_timeout`, and one `BEGIN IMMEDIATE` whole-store transaction. Promoted hot and Worker collections live in dedicated relational tables; remaining records live in `app_records`.
 - **Managed Postgres** stores one normalized document in `packetagent_document_store`. A row lock plus transaction-scoped advisory lock serializes writers across processes. It does not currently use the SQLite per-entity migration tables.
 - **Staged backfill and verification** move old `app_records` collections into dedicated SQLite tables or copy a stopped JSON/SQLite source into the managed document adapter. There is no live SQLite-to-Postgres dual-write cutover.
-- **26 ordered SQLite migrations** live in `src/db/migrations`.
+- **27 ordered SQLite migrations** live in `src/db/migrations`.
 
 Managed startup requires a database URL plus
 `PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres`. Multiple app processes can
@@ -241,6 +241,15 @@ app-builder TypeScript/Vite validation pipeline before publish handoff.
   containers; secret-bearing and runtime-control variable names are rejected,
   and accepted values are redacted in stored records. The selected exec view
   reports the effective resource, network, filesystem, and environment policy.
+- **Declared egress.** Containers always retain Docker `--network=none`.
+  Operators may configure exact HTTP(S) origins for bounded, GET-only input
+  prefetch. PacketAgent performs those requests through the W6 pinned-network
+  client, which validates all A/AAAA answers and the connected address and
+  refuses redirects. Successful bodies are mounted read-only under
+  `/input/egress`; records contain a query-redacted target, size, digest,
+  status, and connected address, while broker receipts never copy the body or
+  query values. As with any command input, code can still print body content
+  into its bounded stdout/stderr preview.
 - **Endpoints.** `GET /status`, `GET /runtimes`, `POST /exec`, `GET /exec`, `GET /exec/:id`, `POST /exec/:id/cancel`, `GET /exec/:id/stream` (SSE).
 - **Workbench UI.** Status panel, runtime readiness, command composer, exec history, and a live log viewer with stdout / stderr tabs and follow-tail. The Builder also gains a per-app Sandbox tab.
 - **Generated-code validation.** Draft apply, change apply, preview refresh, and
@@ -347,6 +356,9 @@ Common environment variables:
 | `PACKETAGENT_SANDBOX_CPUS`                        | `1`                       | Container CPU limit.                                                                                                                                                                                  |
 | `PACKETAGENT_SANDBOX_PIDS_LIMIT`                  | `64`                      | Container PID and process-count limit.                                                                                                                                                                |
 | `PACKETAGENT_SANDBOX_TMPFS_MB`                    | `256`                     | Size limit for the container's writable `/tmp`.                                                                                                                                                       |
+| `PACKETAGENT_SANDBOX_EGRESS_ALLOWLIST`            | _unset_                   | Comma-separated exact HTTP(S) origins allowed for GET-only brokered input prefetch. Empty means deny-all; containers always remain networkless.                                                       |
+| `PACKETAGENT_SANDBOX_EGRESS_TIMEOUT_MS`           | `15000`                   | Per-fetch broker timeout, clamped to `1000-60000`.                                                                                                                                                    |
+| `PACKETAGENT_SANDBOX_EGRESS_MAX_RESPONSE_BYTES`   | `65536`                   | Per-fetch response cap, clamped to `1024-1048576`; the total per exec is capped at 512 KiB.                                                                                                           |
 | `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` | `4`                       | Maximum warm generated-app child processes per PacketAgent server. Values are clamped to `1-64`; an idle least-recently-used process is evicted at the limit.                                         |
 | `PACKETAGENT_GENERATED_APP_BIND_ADDRESS`          | `127.0.0.1`               | Host address used by a generated publish package's Compose port mapping. Set `0.0.0.0` only for deliberate, protected direct LAN exposure.                                                            |
 | `PACKETAGENT_GENERATED_APP_PORT`                  | `8787`                    | Host port used by a generated publish package. The container always listens on `8080`.                                                                                                                |
@@ -376,7 +388,7 @@ returned by these routes.
 - **Backend.** Hono on `@hono/node-server`. `src/server.ts` mounts ~20 route groups (`app-routes`, `workflow-routes`, `webhook-routes`, `share-routes`, `sandbox-routes`, four `operations-*-routes`, and more) with access-log middleware, redacted error envelopes, baseline security headers/CSP, `enforcePrivateAppMutationSecurity` on `/api/app/*`, cross-origin/CSRF enforcement, public webhooks, and static serving of the built web plus explicitly enabled, authenticated, workspace-scoped run artifacts.
 - **LLM layer.** `ProviderRouter` route-key dispatch over six BYOK clients, a canonical capability/model/generation catalog, vault-aware preset resolution and readiness, native/conditional structured response mapping, one bounded malformed-tool correction, and a cost `ledger`. A `stub` provider keeps the loop runnable with zero keys.
 - **Codegen + agents.** `src/codegen/` (plan/write/chunk orchestrator, path validator, derived-draft, app-builder/iteration services, generated-app runtime/workspace, preview/snapshot/publish-readiness) and `src/tools/` (agent loop, registry/executor, read/write/browser builtins, Playwright runtime) plus `src/sandbox/`.
-- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, `busy_timeout`) for single-node; and an advisory-lock-serialized managed-Postgres document adapter for shared app processes. SQLite has 26 ordered SQL migrations.
+- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, `busy_timeout`) for single-node; and an advisory-lock-serialized managed-Postgres document adapter for shared app processes. SQLite has 27 ordered SQL migrations.
 - **Jobs / ops.** Persisted queue with five-field cron, exponential retry, dead-letter, three-way scheduler leader election, an alert engine, and metrics snapshots.
 
 ## Engineering & testing
@@ -454,10 +466,12 @@ driver, restricts native host execution to explicit owner/admin diagnostics,
 and permanently guards against `node:vm`. R5.3 centralizes the sandbox boundary
 policy, enforces and records the effective wall-clock, CPU, memory, PID,
 filesystem, environment, and deny-all-network limits, and proves the boundary
-against real Docker. Active remaining work resumes at R5.4 hardened handling
-for any future declared egress in `BACKLOG.md`.
+against real Docker. R5.4 adds operator-allowlisted, W6-hardened, GET-only
+read-only input prefetch without giving the container a network interface.
+Active remaining work resumes at R5.5 generated-preview origin isolation in
+`BACKLOG.md`.
 
-The exact resume point is R5.4 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+The exact resume point is R5.5 in [BACKLOG.md](BACKLOG.md), the sole ledger for
 the conditional live W10 check and all remaining R5-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.

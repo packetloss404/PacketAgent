@@ -539,6 +539,24 @@ runtime-control environment names are rejected, and accepted values are
 redacted from persisted execution records. Run
 `npm run verify:sandbox-policy` after changing Docker or these limits.
 
+Sandbox egress remains deny-all unless you explicitly allow exact origins:
+
+```dotenv
+PACKETAGENT_SANDBOX_EGRESS_ALLOWLIST=https://example.com,https://api.example.com:8443
+PACKETAGENT_SANDBOX_EGRESS_TIMEOUT_MS=15000
+PACKETAGENT_SANDBOX_EGRESS_MAX_RESPONSE_BYTES=65536
+```
+
+This does not give containers bridge networking. PacketAgent performs bounded
+GET-only requests through its pinned public-network client and mounts
+successful bodies read-only under `/input/egress`. Redirects, local/special
+IPv4 and IPv6 destinations, mixed DNS answers, and connected-address changes
+fail closed. Allowlist entries must be exact origins with no wildcard, path,
+query, fragment, or credentials. Execution records keep query-redacted digest
+receipts rather than copying response bodies into the receipt. A command can
+still print its input into the separately bounded stdout/stderr preview. Run
+`npm run verify:sandbox-egress` after changing this configuration.
+
 ### Reset everything
 
 ```bash

@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R5.4 brokered sandbox egress
+
+- Added deny-by-default, operator-configured exact-origin sandbox egress as
+  bounded GET-only input prefetch through the existing W6 pinned-network
+  client; containers retain Docker `--network=none`.
+- Reused protocol/host validation, alternate-IP blocking, all-address A/AAAA
+  validation, connected-address pinning, redirect denial, deadlines, and
+  response-size bounds rather than adding a second network implementation.
+- Materialized successful bodies and a receipt manifest on a transient
+  read-only `/input/egress` mount. Persisted JSON/SQLite receipts include only
+  query-redacted targets, response metadata, size, SHA-256 digest, and
+  connected address; bodies and query values are not stored.
+- Added route/workbench support, cleanup and failure auditing, hostile network
+  and persistence-parity coverage, and `npm run verify:sandbox-egress` to prove
+  immutable materialization and continued direct network denial in real
+  Docker.
+- Typecheck, zero-warning lint, formatting, production web build, 32 web
+  tests, 66 focused tests, the real Docker verifier, and 1,608 API tests pass
+  (1,605 passed with three intentional live interoperability skips).
+- Resume at R5.5 generated-preview origin, cookie, CSP, messaging, and proxy
+  isolation.
+
 ### 2026-07-29 - R5.3 sandbox boundary policy and resource enforcement
 
 - Centralized command/stdin, working-directory, explicit-environment, timeout,

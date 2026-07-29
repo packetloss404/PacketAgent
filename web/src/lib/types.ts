@@ -1898,6 +1898,10 @@ export interface SandboxStatus {
   executionClass: "isolated" | "trusted-host-only";
   untrustedCodeSupported: boolean;
   runtimes: SandboxRuntimeInfo[];
+  egressPolicy: "deny-all" | "brokered-prefetch";
+  egressAllowedOrigins: string[];
+  egressMaxFetches: number;
+  egressMaxResponseBytes: number;
   note?: string;
 }
 
@@ -1965,9 +1969,22 @@ export interface SandboxExecRecord {
   memoryLimitMb?: number;
   processLimit?: number;
   tmpfsSizeMb?: number;
-  networkPolicy?: "none" | "host";
+  networkPolicy?: "none" | "brokered-prefetch" | "host";
   filesystemPolicy?: "read-only-root+bounded-tmpfs" | "host";
   environmentPolicy?: "validated-explicit" | "scrubbed-host+validated-explicit";
+  egress?: Array<{
+    id: string;
+    target: string;
+    origin: string;
+    method: "GET";
+    status: "declared" | "materialized";
+    mountPath: string;
+    responseStatus?: number;
+    contentType?: string;
+    byteLength?: number;
+    sha256?: string;
+    connectedAddress?: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -1979,6 +1996,7 @@ export interface SandboxExecRequest {
   runtime?: string;
   workingDir?: string;
   env?: Record<string, string>;
+  egress?: Array<{ id: string; url: string }>;
   timeoutMs?: number;
   stdin?: string;
 }

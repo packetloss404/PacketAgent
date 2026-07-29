@@ -13,6 +13,9 @@
  *   PACKETAGENT_SANDBOX_CPUS            per-exec cpu count (default: 1)
  *   PACKETAGENT_SANDBOX_PIDS_LIMIT      per-exec process limit (default: 64)
  *   PACKETAGENT_SANDBOX_TMPFS_MB        writable /tmp limit (default: 256)
+ *   PACKETAGENT_SANDBOX_EGRESS_ALLOWLIST exact origins for brokered GET inputs
+ *   PACKETAGENT_SANDBOX_EGRESS_TIMEOUT_MS per-fetch timeout (default: 15000)
+ *   PACKETAGENT_SANDBOX_EGRESS_MAX_RESPONSE_BYTES per-fetch cap (default: 65536)
  *
  * Future hook for the app builder integration:
  *   `runBuildInSandbox(appId, checkpointId)` — the eventual entry point that
@@ -26,6 +29,7 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { createDockerDriver } from "./docker-driver.js";
 import { createNativeDriver } from "./native-driver.js";
+import type { WorkerNetworkPort } from "../workers/network.js";
 import {
   type SandboxChunkEvent,
   type SandboxDriver,
@@ -35,9 +39,16 @@ import {
   type SandboxSubscription,
 } from "./sandbox-driver.js";
 import { createSandboxStore, type SandboxStore } from "./sandbox-store.js";
+import {
+  describeSandboxEgressConfig,
+  materializeSandboxEgress,
+  resolveSandboxEgressPlan,
+  type SandboxEgressMaterialization,
+} from "./sandbox-egress.js";
 import { redactedSandboxEnvironment, resolveSandboxExecutionPolicy } from "./sandbox-policy.js";
 import type {
   SandboxDriver as SandboxDriverId,
+  SandboxEgressRequest,
   SandboxExecRecord,
   SandboxExecStatus,
   SandboxRuntimeView,
@@ -65,6 +76,7 @@ export interface SandboxExecRequest {
   env?: Record<string, string>;
   timeoutMs?: number;
   stdin?: string;
+  egress?: SandboxEgressRequest[];
   /** Internal-only: reject execution unless this driver is selected. */
   requiredDriver?: SandboxDriverId;
   /** Internal-only trusted image and bind-mount overrides. */
@@ -139,6 +151,7 @@ interface ActiveExec {
   subscription: SandboxSubscription;
   stdoutBuffer: BufferedStream;
   stderrBuffer: BufferedStream;
+  cleanup: () => Promise<void>;
   done: Promise<SandboxExecRecord>;
 }
 
@@ -179,6 +192,7 @@ export interface SandboxServiceDeps {
   /** Selection override – mainly for tests. */
   forcedDriver?: SandboxDriverId;
   env?: NodeJS.ProcessEnv;
+  network?: WorkerNetworkPort;
   now?: () => Date;
 }
 
@@ -188,6 +202,7 @@ export class SandboxService {
   private readonly dockerDriver: SandboxDriver;
   private readonly nativeDriver: SandboxDriver;
   private readonly env: NodeJS.ProcessEnv;
+  private readonly network?: WorkerNetworkPort;
   private readonly forcedDriver?: SandboxDriverId;
   private readonly nowFn: () => Date;
   private readonly active = new Map<string, ActiveExec>();
@@ -200,6 +215,7 @@ export class SandboxService {
     this.dockerDriver = deps.dockerDriver ?? createDockerDriver();
     this.nativeDriver = deps.nativeDriver ?? createNativeDriver();
     this.env = deps.env ?? process.env;
+    this.network = deps.network;
     this.nowFn = deps.now ?? (() => new Date());
     if (deps.forcedDriver) this.forcedDriver = deps.forcedDriver;
   }
@@ -208,12 +224,17 @@ export class SandboxService {
     const driver = await this.resolveDriver();
     const available = await driver.available();
     const runtimes = driver.runtimes();
+    const egress = describeSandboxEgressConfig(this.env);
     const view: SandboxStatusView = {
       driver: driver.id,
       available,
       executionClass: driver.id === "docker" ? "isolated" : "trusted-host-only",
       untrustedCodeSupported: driver.id === "docker" && available,
       runtimes,
+      egressPolicy: egress.policy,
+      egressAllowedOrigins: egress.allowedOrigins,
+      egressMaxFetches: egress.maxFetches,
+      egressMaxResponseBytes: egress.maxResponseBytes,
     };
     if (driver.id === "native") view.note = NATIVE_INSECURE_NOTE;
     return view;
@@ -289,6 +310,8 @@ export class SandboxService {
     const now = this.nowFn().toISOString();
     const id = randomUUID();
     const runtime = request.runtime ?? this.defaultRuntime();
+    const egressPlan = resolveSandboxEgressPlan(request.egress, this.env, driver.id);
+    assertNoEgressMountOverlap(request.mounts, egressPlan !== null);
     const policy = resolveSandboxExecutionPolicy({
       driver: driver.id,
       command: request.command,
@@ -296,6 +319,7 @@ export class SandboxService {
       ...(request.env ? { requestedEnv: request.env } : {}),
       ...(request.stdin !== undefined ? { stdin: request.stdin } : {}),
       ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+      hasBrokeredEgress: egressPlan !== null,
       configEnv: this.env,
     });
 
@@ -327,16 +351,36 @@ export class SandboxService {
     if (Object.keys(policy.env).length > 0) {
       baseRecord.env = redactedSandboxEnvironment(policy.env);
     }
+    if (egressPlan) {
+      baseRecord.egress = egressPlan.requests.map((entry) => entry.receipt);
+    }
 
     await this.store.insertExec(baseRecord);
 
+    let queuedRecord = baseRecord;
+    let egressMaterialization: SandboxEgressMaterialization | null = null;
     let handle: SandboxHandle;
     try {
+      if (egressPlan) {
+        egressMaterialization = await materializeSandboxEgress(egressPlan, {
+          ...(this.network ? { network: this.network } : {}),
+        });
+        const updated = await this.persistUpdate(id, {
+          egress: egressMaterialization.receipts,
+        });
+        if (!updated)
+          throw new Error("sandbox exec record disappeared during egress materialization");
+        queuedRecord = updated;
+      }
+      const mounts = [
+        ...(request.mounts ?? []),
+        ...(egressMaterialization ? [egressMaterialization.mount] : []),
+      ];
       handle = await driver.start({
         execId: id,
         runtime,
         command: request.command,
-        workingDir: baseRecord.workingDir,
+        workingDir: queuedRecord.workingDir,
         ...(Object.keys(policy.env).length > 0 ? { env: policy.env } : {}),
         ...(request.stdin !== undefined ? { stdin: request.stdin } : {}),
         timeoutMs: policy.timeoutMs,
@@ -344,11 +388,12 @@ export class SandboxService {
         cpus: policy.cpus,
         pidsLimit: policy.pidsLimit,
         tmpfsSizeMb: policy.tmpfsSizeMb,
-        networkPolicy: policy.networkPolicy,
+        networkPolicy: policy.driverNetworkPolicy,
         ...(request.image ? { image: request.image } : {}),
-        ...(request.mounts ? { mounts: request.mounts } : {}),
+        ...(mounts.length > 0 ? { mounts } : {}),
       });
     } catch (error) {
+      await egressMaterialization?.cleanup().catch(() => {});
       const message = error instanceof Error ? error.message : String(error);
       const failedRecord = await this.persistUpdate(id, {
         status: "failed",
@@ -371,6 +416,9 @@ export class SandboxService {
       startedAt,
     });
     if (!startedRecord) {
+      await driver.cancel(handle).catch(() => {});
+      await handle.done.catch(() => {});
+      await egressMaterialization?.cleanup().catch(() => {});
       throw new Error("sandbox exec record disappeared after start");
     }
 
@@ -404,6 +452,7 @@ export class SandboxService {
         subscription,
         stdoutBuffer,
         stderrBuffer,
+        cleanup: egressMaterialization?.cleanup ?? (async () => {}),
         done: Promise.resolve(startedRecord), // overwritten below
       });
     });
@@ -593,10 +642,15 @@ export class SandboxService {
     if (typeof exit.exitCode === "number") patch.exitCode = exit.exitCode;
     if (exit.errorMessage) patch.errorMessage = exit.errorMessage;
 
-    const updated = await this.persistUpdate(id, patch);
-    if (active) {
-      active.subscription.unsubscribe();
-      this.active.delete(id);
+    let updated: SandboxExecRecord | null = null;
+    try {
+      updated = await this.persistUpdate(id, patch);
+    } finally {
+      if (active) {
+        active.subscription.unsubscribe();
+        this.active.delete(id);
+        await active.cleanup().catch(() => {});
+      }
     }
     if (updated) {
       if (updated.status !== "success") this.recordFailure(updated);
@@ -700,6 +754,25 @@ function isTruthy(value: string | undefined): boolean {
 
 function defaultWorkingDirForDriver(driver: SandboxDriverId): string {
   return driver === "native" ? process.cwd() : "/workspace";
+}
+
+function assertNoEgressMountOverlap(
+  mounts: SandboxExecRequest["mounts"],
+  hasBrokeredEgress: boolean,
+): void {
+  if (!hasBrokeredEgress) return;
+  if (
+    mounts?.some(
+      (mount) =>
+        mount.target === "/input" ||
+        mount.target === "/input/egress" ||
+        mount.target.startsWith("/input/egress/"),
+    )
+  ) {
+    throw Object.assign(new Error("sandbox egress: trusted mount overlaps /input/egress"), {
+      status: 400,
+    });
+  }
 }
 
 let defaultInstance: SandboxService | null = null;

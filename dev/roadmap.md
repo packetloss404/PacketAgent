@@ -66,7 +66,10 @@ native host execution is explicit owner/admin trusted diagnostics only, and
 production `node:vm` imports are prohibited. R5.3 centralizes the sandbox
 policy, enforces exact wall-clock/CPU/memory/PID/tmpfs bounds, read-only
 filesystem and explicit redacted environment rules, and proves deny-all egress
-with real Docker. Resume at R5.4 reuse of W6 hardened network protections in
+with real Docker. R5.4 provides optional exact-origin, GET-only input prefetch
+through the W6 pinned-network client while the container remains networkless;
+receipts redact query values and bind mounted content by digest. Resume at R5.5
+generated-preview origin/cookie/CSP/proxy isolation in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r5---sandbox-egress-and-preview-isolation).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

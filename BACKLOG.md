@@ -341,8 +341,8 @@ Status: complete as of 2026-07-29. Resume at R5.
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1-R5.3 are complete as of 2026-07-29. Resume at
-R5.4.
+Status: in progress. R5.1-R5.4 are complete as of 2026-07-29. Resume at
+R5.5.
 
 - [x] Make real sandboxed TypeScript and Vite validation the default and remove
       synthetic success.
@@ -350,7 +350,7 @@ R5.4.
       and remove `node:vm` as a security boundary.
 - [x] Enforce CPU, memory, process, timeout, filesystem, environment, and
       egress limits at the sandbox boundary.
-- [ ] Reuse W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections.
+- [x] Reuse W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections.
 - [ ] Isolate generated previews by origin with scoped cookies, CSP, and proxy
       rules.
 - [ ] Harden containers with non-root users, dropped capabilities,
@@ -402,6 +402,23 @@ R5.4.
   tests pass (1,595 passed with three intentional live interoperability
   skips). Resume at R5.4 reuse of W6 hardened network protections for any
   future declared sandbox egress.
+- R5.4 result: optional sandbox egress is an operator-allowlisted, bounded,
+  GET-only prefetch performed by PacketAgent through the existing W6
+  pinned-network client before command start. Exact origins, every A/AAAA
+  answer, alternate IP forms, the connected address, response size/deadline,
+  and redirect denial are enforced outside the untrusted process. Successful
+  bodies and a receipt manifest are mounted read-only at `/input/egress`; the
+  container still runs with `--network=none`. Durable JSON/SQLite receipts
+  contain query-redacted targets, response metadata, byte counts, digests, and
+  connected addresses; the broker does not copy response bodies or query
+  values into receipts. Failed broker calls are audited and prevent Docker
+  start. `npm run verify:sandbox-egress` proves one broker call, immutable
+  materialization, query redaction, and continued real-container network
+  denial. Typecheck, zero-warning lint, formatting, production web build, 32
+  web tests, 66 focused tests, the real Docker verifier, and 1,608 API tests
+  pass (1,605 passed with three intentional live interoperability skips).
+  Resume at R5.5 generated-preview origin, cookie, CSP, messaging, and proxy
+  isolation.
 
 ### R6 - Agent authoring and execution depth
 

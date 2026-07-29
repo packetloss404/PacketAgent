@@ -55,6 +55,23 @@ function formatRelative(iso?: string): string {
   return `${d}d ago`;
 }
 
+function parseEgressDeclarations(value: string): Array<{ id: string; url: string }> {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separator = line.indexOf("=");
+      if (separator <= 0 || separator === line.length - 1) {
+        throw new Error("Each brokered input must use id=https://origin/path");
+      }
+      return {
+        id: line.slice(0, separator).trim(),
+        url: line.slice(separator + 1).trim(),
+      };
+    });
+}
+
 export function SandboxView() {
   const { session } = useAuth();
   const status = useApiData(() => api.getSandboxStatus(), []);
@@ -69,6 +86,7 @@ export function SandboxView() {
   const [command, setCommand] = useState("");
   const [runtime, setRuntime] = useState<string>("");
   const [workingDir, setWorkingDir] = useState("/workspace");
+  const [egressDeclarations, setEgressDeclarations] = useState("");
   const [currentTime] = useState(Date.now);
 
   const defaultRuntime = runtimes.data?.find((candidate) => candidate.ready) ?? runtimes.data?.[0];
@@ -105,12 +123,15 @@ export function SandboxView() {
     setWorking(true);
     setComposerError(null);
     try {
+      const egress = parseEgressDeclarations(egressDeclarations);
       const exec = await api.startSandboxExec({
         command: command.trim(),
         runtime: selectedRuntime || undefined,
         workingDir: workingDir || undefined,
+        ...(egress.length > 0 ? { egress } : {}),
       });
       setCommand("");
+      setEgressDeclarations("");
       setSelectedId(exec.id);
       void execs.refresh();
     } catch (e) {
@@ -146,6 +167,10 @@ export function SandboxView() {
         untrustedCodeSupported={status.data?.untrustedCodeSupported}
         note={status.data?.note}
         runtimes={status.data?.runtimes ?? runtimes.data ?? []}
+        egressPolicy={status.data?.egressPolicy}
+        egressAllowedOrigins={status.data?.egressAllowedOrigins ?? []}
+        egressMaxFetches={status.data?.egressMaxFetches}
+        egressMaxResponseBytes={status.data?.egressMaxResponseBytes}
       />
 
       {/* Stats row */}
@@ -179,6 +204,10 @@ export function SandboxView() {
         setRuntime={setRuntime}
         workingDir={workingDir}
         setWorkingDir={setWorkingDir}
+        egressDeclarations={egressDeclarations}
+        setEgressDeclarations={setEgressDeclarations}
+        egressPolicy={status.data?.egressPolicy}
+        egressAllowedOrigins={status.data?.egressAllowedOrigins ?? []}
         runtimes={runtimes.data ?? []}
         working={working}
         error={composerError}
@@ -265,6 +294,10 @@ function StatusPanel({
   untrustedCodeSupported,
   note,
   runtimes,
+  egressPolicy,
+  egressAllowedOrigins,
+  egressMaxFetches,
+  egressMaxResponseBytes,
 }: {
   loading: boolean;
   error: string | null;
@@ -274,6 +307,10 @@ function StatusPanel({
   untrustedCodeSupported?: boolean;
   note?: string;
   runtimes: SandboxRuntimeInfo[];
+  egressPolicy?: "deny-all" | "brokered-prefetch";
+  egressAllowedOrigins: string[];
+  egressMaxFetches?: number;
+  egressMaxResponseBytes?: number;
 }) {
   return (
     <div className="card" style={{ padding: 16 }}>
@@ -316,6 +353,19 @@ function StatusPanel({
       {note && (
         <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
           {note}
+        </div>
+      )}
+      {egressPolicy && (
+        <div className="muted" style={{ fontSize: 11.5, marginBottom: 10 }}>
+          Egress:{" "}
+          <span className="mono">
+            {egressPolicy === "deny-all"
+              ? "deny-all"
+              : `brokered read-only prefetch · ${egressMaxFetches ?? 0} files · ${egressMaxResponseBytes ?? 0} bytes/file`}
+          </span>
+          {egressAllowedOrigins.length > 0 && (
+            <span className="mono"> · {egressAllowedOrigins.join(", ")}</span>
+          )}
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
@@ -413,6 +463,10 @@ function Composer({
   setRuntime,
   workingDir,
   setWorkingDir,
+  egressDeclarations,
+  setEgressDeclarations,
+  egressPolicy,
+  egressAllowedOrigins,
   runtimes,
   working,
   error,
@@ -425,6 +479,10 @@ function Composer({
   setRuntime: (v: string) => void;
   workingDir: string;
   setWorkingDir: (v: string) => void;
+  egressDeclarations: string;
+  setEgressDeclarations: (v: string) => void;
+  egressPolicy?: "deny-all" | "brokered-prefetch";
+  egressAllowedOrigins: string[];
   runtimes: SandboxRuntimeInfo[];
   working: boolean;
   error: string | null;
@@ -445,6 +503,28 @@ function Composer({
         disabled={disabledReason !== null}
         onChange={(e) => setCommand(e.target.value)}
       />
+      <label className="kicker" htmlFor="sandbox-egress-inputs">
+        BROKERED READ-ONLY INPUTS
+      </label>
+      <textarea
+        id="sandbox-egress-inputs"
+        className="field mono"
+        style={{ minHeight: 48, fontSize: 11.5, resize: "vertical", margin: "6px 0 8px" }}
+        placeholder={
+          egressPolicy === "deny-all"
+            ? "Disabled by operator policy"
+            : "docs=https://allowed.example/path"
+        }
+        value={egressDeclarations}
+        disabled={disabledReason !== null || egressPolicy === "deny-all"}
+        onChange={(event) => setEgressDeclarations(event.target.value)}
+        aria-describedby="sandbox-egress-help"
+      />
+      <div id="sandbox-egress-help" className="muted" style={{ fontSize: 10.5, marginBottom: 8 }}>
+        {egressPolicy === "brokered-prefetch"
+          ? `Exact allowed origins: ${egressAllowedOrigins.join(", ")}. Responses appear under /input/egress; the container remains networkless.`
+          : "Set PACKETAGENT_SANDBOX_EGRESS_ALLOWLIST to exact origins to enable hardened prefetch."}
+      </div>
       {disabledReason && (
         <div
           role="status"
@@ -753,6 +833,23 @@ export function SelectedExecPanel({
           {liveExec.cpuLimit && <span>cpus={liveExec.cpuLimit}</span>}
           {liveExec.processLimit && <span>pids={liveExec.processLimit}</span>}
           {liveExec.tmpfsSizeMb && <span>tmpfs={liveExec.tmpfsSizeMb}MB</span>}
+        </div>
+      )}
+
+      {liveExec.egress && liveExec.egress.length > 0 && (
+        <div
+          style={{ padding: "8px 16px", borderTop: "1px solid var(--line)", fontSize: 11 }}
+          aria-label="Brokered egress receipts"
+        >
+          <div className="kicker" style={{ marginBottom: 5 }}>
+            BROKERED INPUTS
+          </div>
+          {liveExec.egress.map((receipt) => (
+            <div key={receipt.id} className="mono muted" style={{ marginTop: 3 }}>
+              {receipt.id} · {receipt.status} · {receipt.target} → {receipt.mountPath}
+              {receipt.byteLength !== undefined ? ` · ${receipt.byteLength} bytes` : ""}
+            </div>
+          ))}
         </div>
       )}
 

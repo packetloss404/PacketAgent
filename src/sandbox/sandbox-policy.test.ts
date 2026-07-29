@@ -33,6 +33,7 @@ test("sandbox policy resolves bounded Docker defaults and explicit safe env", ()
     workingDir: "/workspace",
     env: { CI: "1", NODE_ENV: "sandbox" },
     networkPolicy: "none",
+    driverNetworkPolicy: "none",
     filesystemPolicy: "read-only-root+bounded-tmpfs",
     environmentPolicy: "validated-explicit",
   });
@@ -108,6 +109,14 @@ test("trusted host policy is labeled as host authority, not isolated", () => {
   });
 
   assert.equal(policy.networkPolicy, "host");
+  assert.equal(policy.driverNetworkPolicy, "host");
   assert.equal(policy.filesystemPolicy, "host");
   assert.equal(policy.environmentPolicy, "scrubbed-host+validated-explicit");
+});
+
+test("brokered egress changes the recorded policy but never Docker networking", () => {
+  const policy = dockerPolicy({ hasBrokeredEgress: true });
+
+  assert.equal(policy.networkPolicy, "brokered-prefetch");
+  assert.equal(policy.driverNetworkPolicy, "none");
 });

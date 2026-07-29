@@ -195,6 +195,7 @@ interface SandboxExecRow {
   command: string;
   working_dir: string;
   env: string | null;
+  egress: string | null;
   status: SandboxExecStatus;
   exit_code: number | null;
   started_at: string | null;
@@ -221,12 +222,12 @@ function upsertRow(db: DatabaseSync, record: SandboxExecRecord): void {
     `
     insert or replace into sandbox_execs (
       id, workspace_id, app_id, checkpoint_id, sandbox_id, driver, runtime,
-      command, working_dir, env, status, exit_code, started_at, completed_at,
+      command, working_dir, env, egress, status, exit_code, started_at, completed_at,
       duration_ms, stdout_preview, stderr_preview, error_message,
       cpu_limit_ms, wall_clock_timeout_ms, cpu_limit, memory_limit_mb,
       process_limit, tmpfs_size_mb, network_policy, filesystem_policy,
       environment_policy, created_at, updated_at
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
   ).run(
     record.id,
@@ -239,6 +240,7 @@ function upsertRow(db: DatabaseSync, record: SandboxExecRecord): void {
     record.command,
     record.workingDir,
     record.env === undefined ? null : JSON.stringify(record.env),
+    record.egress === undefined ? null : JSON.stringify(record.egress),
     record.status,
     record.exitCode ?? null,
     record.startedAt ?? null,
@@ -282,6 +284,14 @@ function rowToRecord(row: SandboxExecRow): SandboxExecRecord {
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         record.env = parsed as Record<string, string>;
       }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (row.egress !== null) {
+    try {
+      const parsed = JSON.parse(row.egress);
+      if (Array.isArray(parsed)) record.egress = parsed;
     } catch {
       /* ignore */
     }

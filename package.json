@@ -70,7 +70,8 @@
     "verify:generated-app-publish": "node --import tsx src/generated-app-publish-verify-cli.ts",
     "verify:generated-app-reachability": "node --import tsx src/generated-app-publish-reachability-cli.ts",
     "verify:codegen-sandbox": "node --import tsx src/codegen/validate-cli.ts",
-    "verify:sandbox-policy": "node --import tsx src/sandbox/sandbox-policy-verify-cli.ts"
+    "verify:sandbox-policy": "node --import tsx src/sandbox/sandbox-policy-verify-cli.ts",
+    "verify:sandbox-egress": "node --import tsx src/sandbox/sandbox-egress-verify-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

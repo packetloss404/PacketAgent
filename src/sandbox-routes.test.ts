@@ -393,3 +393,68 @@ test("sandbox routes: Docker policy rejects env, filesystem, and timeout escapes
   }
   assert.equal(started, 0);
 });
+
+test("sandbox routes: declared egress is parsed and brokered without container networking", async () => {
+  resetStoreForTests();
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
+  const startedSpecs: SandboxStartSpec[] = [];
+  const store = createInMemoryStore();
+  const driver = createMockDriver((handle, spec) => {
+    startedSpecs.push(spec);
+    handle.emitter.emit("exit", { exitCode: 0, signal: null });
+  }, "docker");
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "docker",
+    env: { PACKETAGENT_SANDBOX_EGRESS_ALLOWLIST: "https://example.com" },
+    network: {
+      request: async () => ({
+        status: 200,
+        headers: { "content-type": "text/plain" },
+        body: "declared input",
+        connectedAddress: "93.184.216.34",
+      }),
+    },
+  });
+  const app = createTestApp(service);
+  const headers = { ...authHeaders(auth.cookieValue), "content-type": "application/json" };
+
+  const malformed = await app.request("/api/app/sandbox/exec", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ command: "true", egress: "https://example.com" }),
+  });
+  assert.equal(malformed.status, 400);
+
+  const response = await app.request("/api/app/sandbox/exec", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      command: "cat /input/egress/docs",
+      egress: [{ id: "docs", url: "https://example.com/data?token=transient" }],
+    }),
+  });
+  assert.equal(response.status, 201);
+  const body = (await response.json()) as {
+    exec: {
+      id: string;
+      networkPolicy: string;
+      egress: Array<{ target: string; status: string }>;
+    };
+  };
+  assert.equal(body.exec.networkPolicy, "brokered-prefetch");
+  assert.equal(body.exec.egress[0]?.target, "https://example.com/data?[redacted]");
+  assert.equal(body.exec.egress[0]?.status, "materialized");
+  await service.waitForExec(body.exec.id);
+  const startedSpec = startedSpecs[0];
+  assert.equal(startedSpec?.networkPolicy, "none");
+  assert.equal(
+    startedSpec?.mounts?.some(
+      (mount: { target: string; readOnly?: boolean }) =>
+        mount.target === "/input/egress" && mount.readOnly,
+    ),
+    true,
+  );
+});

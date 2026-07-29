@@ -178,13 +178,78 @@ production web build, 32/32 web tests, 51/51 focused sandbox/route/Worker
 tests, both uninjected real Docker verifiers, and the complete 1,598-test API
 suite (1,595 passed with three intentional live interoperability skips).
 
+## R5.4 decision: broker inputs, never bridge untrusted code
+
+Docker documents that the `none` network driver leaves only loopback and
+isolates a container from the host and other containers:
+<https://docs.docker.com/engine/network/drivers/none/>. Replacing it with a
+normal bridge after validating a URL would not enforce an allowlist against the
+untrusted process; the process could open a different socket after admission.
+
+OWASP's SSRF guidance calls for strict destination allowlists, disabling
+redirect following, resolving and validating every IPv4/IPv6 answer, and
+accounting for DNS pinning:
+<https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html>.
+Node's DNS API explicitly returns every address with `all: true`, and its
+socket APIs allow a caller-supplied lookup function:
+<https://nodejs.org/api/dns.html#dnslookuphostname-options-callback>.
+Those are already the mechanics of the W6 `WorkerNetworkPort`.
+
+R5.4 therefore adds declared egress as brokered read-only input:
+
+- default policy remains deny-all;
+- an operator may configure at most 32 exact HTTP(S) origins, without
+  wildcard, path, query, fragment, or credentials;
+- each execution may declare at most eight unique, path-safe IDs and GET URLs
+  on those origins;
+- PacketAgent fetches them through the existing W6 client, which validates all
+  A/AAAA answers and the final connected address, pins the connection, blocks
+  local/special/alternate IP forms, and refuses redirects;
+- each response has a bounded deadline and byte cap, with a 512 KiB aggregate
+  limit;
+- successful bodies plus `_manifest.json` are written to a transient directory
+  and bind-mounted read-only at `/input/egress`; and
+- Docker still receives `networkPolicy=none`, so untrusted code has no direct
+  network route.
+
+The record uses `networkPolicy: "brokered-prefetch"` and persists only a
+query-redacted target, exact origin, GET method, response status/content type,
+byte length, SHA-256 digest, connected address, and container mount path.
+Response bodies, host temp paths, and query values never enter the record.
+Failed network work terminalizes the already-created audit record before
+Docker starts. Cleanup runs after driver failure, completion, timeout, or
+cancel.
+
+## R5.4 proof
+
+Focused tests prove default denial, exact-origin matching, safe unique IDs,
+alternate-IP rejection, mixed public/private A/AAAA rejection, redirect
+denial, connected-address mismatch, response and aggregate bounds,
+query-safe/digest-bound receipts, transient cleanup, route parsing,
+JSON/SQLite parity, and that Docker always receives `networkPolicy=none`.
+
+The real-container verification command is:
+
+```bash
+npm run verify:sandbox-egress
+```
+
+It injects one deterministic host-broker response and executes a real
+networkless container. The command must read the mounted body and manifest,
+fail to mutate the read-only body, and fail a direct external-IP connection.
+The verifier also requires exactly one broker call,
+`networkPolicy: "brokered-prefetch"`, a materialized digest receipt, and
+absence of the transient query value from the serialized record.
+
+The R5.4 closeout passed typecheck, zero-warning lint, formatting, the
+production web build, 32/32 web tests, 66/66 focused sandbox/network/route
+tests, the real Docker verifier, and the complete 1,608-test API suite (1,605
+passed with three intentional live interoperability skips).
+
 ## Remaining R5 order
 
 Resume only from the unchecked R5 items in `BACKLOG.md`:
 
-1. R5.4: reuse the W6 hardened network port for any declared sandbox egress,
-   including redirects, all A/AAAA answers, alternate IP forms, and DNS
-   rebinding.
-2. R5.5: move generated previews to an isolated origin and narrow cookies, CSP,
+1. R5.5: move generated previews to an isolated origin and narrow cookies, CSP,
    messaging, and proxy rules.
-3. R5.6: close the container-hardening matrix and the complete R5 gate.
+2. R5.6: close the container-hardening matrix and the complete R5 gate.

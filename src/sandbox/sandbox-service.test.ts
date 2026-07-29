@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
+import { access, readFile } from "node:fs/promises";
 import { SandboxService } from "./sandbox-service.js";
 import { createJsonSandboxStore } from "./sandbox-store.js";
 import type {
@@ -240,6 +241,10 @@ test("sandbox service: status reflects native driver insecure note", async () =>
   assert.equal(status.available, true);
   assert.equal(status.executionClass, "trusted-host-only");
   assert.equal(status.untrustedCodeSupported, false);
+  assert.equal(status.egressPolicy, "deny-all");
+  assert.deepEqual(status.egressAllowedOrigins, []);
+  assert.equal(status.egressMaxFetches, 8);
+  assert.equal(status.egressMaxResponseBytes, 64 * 1024);
   assert.match(status.note ?? "", /no isolation/i);
 });
 
@@ -310,6 +315,94 @@ test("sandbox service: resolves, persists, and passes one bounded Docker policy"
   assert.equal(spec?.tmpfsSizeMb, 128);
   assert.equal(spec?.networkPolicy, "none");
   assert.deepEqual(spec?.env, { CI: "1" });
+});
+
+test("sandbox service: brokered egress is materialized read-only while Docker stays networkless", async () => {
+  const store = createInMemoryStore();
+  let mountedBody = "";
+  const driver = createMockDriver({
+    id: "docker",
+    behavior: (handle, spec) => {
+      const mount = spec.mounts?.find((candidate) => candidate.target === "/input/egress");
+      assert.ok(mount);
+      void readFile(`${mount.source}/docs`, "utf8").then((value) => {
+        mountedBody = value;
+        handle.emitter.emit("exit", { exitCode: 0, signal: null });
+      });
+    },
+  });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "docker",
+    env: {
+      PACKETAGENT_SANDBOX_EGRESS_ALLOWLIST: "https://example.com",
+    },
+    network: {
+      request: async () => ({
+        status: 200,
+        headers: { "content-type": "text/plain" },
+        body: "brokered input",
+        connectedAddress: "93.184.216.34",
+      }),
+    },
+  });
+
+  const started = await service.startExec({
+    workspaceId: "alpha",
+    command: "cat /input/egress/docs",
+    egress: [{ id: "docs", url: "https://example.com/data?key=do-not-persist" }],
+  });
+  const mount = driver.startedSpecs[0]?.mounts?.find(
+    (candidate) => candidate.target === "/input/egress",
+  );
+  assert.ok(mount);
+  assert.equal(mount.readOnly, true);
+  assert.equal(driver.startedSpecs[0]?.networkPolicy, "none");
+
+  const final = await service.waitForExec(started.id);
+  assert.equal(mountedBody, "brokered input");
+  assert.equal(final?.networkPolicy, "brokered-prefetch");
+  assert.equal(final?.egress?.[0]?.status, "materialized");
+  assert.equal(final?.egress?.[0]?.target, "https://example.com/data?[redacted]");
+  assert.doesNotMatch(JSON.stringify(final), /do-not-persist/);
+  await assert.rejects(access(mount.source));
+});
+
+test("sandbox service: hardened egress failure is audited and prevents Docker start", async () => {
+  const store = createInMemoryStore();
+  const driver = createMockDriver({ id: "docker", behavior: () => {} });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "docker",
+    env: {
+      PACKETAGENT_SANDBOX_EGRESS_ALLOWLIST: "https://example.com",
+    },
+    network: {
+      request: async () => {
+        throw new Error("Worker network host resolution failed.");
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.startExec({
+        workspaceId: "alpha",
+        command: "true",
+        egress: [{ id: "docs", url: "https://example.com/data" }],
+      }),
+    /resolution failed/,
+  );
+  assert.equal(driver.startedSpecs.length, 0);
+  const records = await store.listExecs("alpha");
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.status, "failed");
+  assert.equal(records[0]?.networkPolicy, "brokered-prefetch");
+  assert.equal(records[0]?.egress?.[0]?.status, "declared");
 });
 
 test("sandbox service: rejects policy escapes before Docker starts", async () => {

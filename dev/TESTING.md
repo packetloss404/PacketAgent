@@ -910,7 +910,24 @@ Required sandbox boundary verification:
    Docker working directory outside `/workspace` and `/tmp`, and a timeout over
    `PACKETAGENT_SANDBOX_MAX_TIMEOUT_MS`. Each must return a policy error before
    the driver starts.
-6. Stop Docker and repeat. Confirm Builder reports blocked failure; it must not
+
+Required brokered-egress verification:
+
+1. Leave `PACKETAGENT_SANDBOX_EGRESS_ALLOWLIST` unset and submit an execution
+   with `egress: [{ "id": "docs", "url": "https://example.com/data" }]`.
+   Confirm it fails before Docker starts.
+2. Set the allowlist to an exact test origin. Confirm sibling subdomains,
+   credentials, fragments, alternate loopback forms, any mixed public/private
+   A/AAAA result, a changed connected address, and redirects all fail closed.
+3. Run `npm run verify:sandbox-egress`. Confirm it reports `ok: true`, one
+   broker call, `networkPolicy: "brokered-prefetch"`, a materialized SHA-256
+   receipt, direct container network denial, and
+   `transientQueryPersisted: false`.
+4. In `/sandbox`, enter one `id=https://allowed-origin/path` brokered input.
+   Confirm the completed record shows only the redacted target, mount path,
+   status, and size. The command may read `/input/egress/<id>` and
+   `_manifest.json` but cannot mutate either.
+5. Stop Docker and repeat. Confirm Builder reports blocked failure; it must not
    return pass or use the insecure native driver.
 
 ## Operations Sanity

@@ -23,6 +23,7 @@ const DANGEROUS_ENV_NAME =
   /^(?:PATH|HOME|NODE_OPTIONS|BUN_OPTIONS|DENO_.+|LD_.+|DYLD_.+|DOCKER_.+|CONTAINER_.+|KUBECONFIG|COMSPEC|SYSTEMROOT|WINDIR)$/i;
 
 export type SandboxNetworkPolicy = "none" | "host";
+export type SandboxRecordedNetworkPolicy = SandboxNetworkPolicy | "brokered-prefetch";
 export type SandboxFilesystemPolicy = "read-only-root+bounded-tmpfs" | "host";
 export type SandboxEnvironmentPolicy = "validated-explicit" | "scrubbed-host+validated-explicit";
 
@@ -35,7 +36,8 @@ export interface SandboxExecutionPolicy {
   tmpfsSizeMb: number;
   workingDir: string;
   env: Record<string, string>;
-  networkPolicy: SandboxNetworkPolicy;
+  networkPolicy: SandboxRecordedNetworkPolicy;
+  driverNetworkPolicy: SandboxNetworkPolicy;
   filesystemPolicy: SandboxFilesystemPolicy;
   environmentPolicy: SandboxEnvironmentPolicy;
 }
@@ -47,6 +49,7 @@ export interface SandboxPolicyInput {
   requestedEnv?: Record<string, string>;
   stdin?: string;
   timeoutMs?: number;
+  hasBrokeredEgress?: boolean;
   configEnv: NodeJS.ProcessEnv;
 }
 
@@ -101,7 +104,9 @@ export function resolveSandboxExecutionPolicy(input: SandboxPolicyInput): Sandbo
     ),
     workingDir,
     env: validatedExplicitEnvironment(input.requestedEnv),
-    networkPolicy: input.driver === "docker" ? "none" : "host",
+    networkPolicy:
+      input.driver === "docker" ? (input.hasBrokeredEgress ? "brokered-prefetch" : "none") : "host",
+    driverNetworkPolicy: input.driver === "docker" ? "none" : "host",
     filesystemPolicy: input.driver === "docker" ? "read-only-root+bounded-tmpfs" : "host",
     environmentPolicy:
       input.driver === "docker" ? "validated-explicit" : "scrubbed-host+validated-explicit",

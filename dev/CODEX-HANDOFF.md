@@ -699,10 +699,26 @@ production web build, 32 web tests, 51 focused tests, both uninjected Docker
 verifiers, and 1,598 API tests pass (1,595 passed with three intentional live
 interoperability skips).
 
-The exact next slice is R5.4 under
+R5.4 is complete. Optional sandbox network input is not direct container
+egress: operators configure exact HTTP(S) origins, PacketAgent performs bounded
+GET-only prefetch through the existing W6 pinned-network client, and the
+networkless container receives successful bodies plus a receipt manifest on a
+read-only `/input/egress` mount. All DNS A/AAAA answers, alternate IP forms,
+connected-address pinning, redirects, timeout, and response size are enforced
+before Docker starts. Stored receipts omit response bodies and query values
+while retaining the redacted target, status, byte count, SHA-256 digest, and
+connected address. Failed broker calls create a failed audit record and never
+start Docker. The real `npm run verify:sandbox-egress` proof confirms one
+broker call, immutable mounted input, query redaction, and continued direct
+network denial inside the container. Typecheck, zero-warning lint, formatting,
+production web build, 32 web tests, 66 focused tests, the real Docker verifier,
+and 1,608 API tests pass (1,605 passed with three intentional live
+interoperability skips).
+
+The exact next slice is R5.5 under
 [`R5 - sandbox, egress, and preview isolation`](../BACKLOG.md#r5---sandbox-egress-and-preview-isolation):
-reuse the W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections for any
-declared sandbox egress while preserving deny-all as the default.
+isolate generated previews by origin and narrow cookies, CSP, cross-window
+messaging, and proxy rules.
 After each gate passes, continue through R5-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
