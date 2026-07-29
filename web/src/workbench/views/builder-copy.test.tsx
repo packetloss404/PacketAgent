@@ -3,13 +3,15 @@ import test from "node:test";
 import {
   BUILDER_STARTER_PROMPTS,
   builderPrimaryActionCopy,
+  resolveBuilderStartKind,
+  shouldRouteToAgentBuilder,
+} from "./builder-start";
+import {
   getPreviewNavigationTarget,
   publishPrimaryActionLabel,
   publishReadinessHeading,
-  resolveBuilderStartKind,
-  shouldRouteToAgentBuilder,
-} from "./builder";
-import { CHECKS, PREVIEW_TRUTH_COPY } from "./app-preview";
+} from "./builder/helpers";
+import { CHECKS, PREVIEW_TRUTH_COPY } from "./preview-copy";
 
 test("preview truth copy stays honest about local-only delivery", () => {
   assert.match(PREVIEW_TRUTH_COPY, /local preview route/i);
@@ -20,22 +22,43 @@ test("preview truth copy stays honest about local-only delivery", () => {
 test("publish labels describe handoff records instead of hosted deploys", () => {
   assert.equal(publishReadinessHeading(null), "Loading publish handoff");
   assert.equal(publishReadinessHeading({ canPublish: false }), "Publish handoff blocked");
-  assert.equal(publishReadinessHeading({ canPublish: true, publishedUrl: "http://localhost:8484/app/alpha/crm" }), "Ready for local publish handoff");
+  assert.equal(
+    publishReadinessHeading({
+      canPublish: true,
+      publishedUrl: "http://localhost:8484/app/alpha/crm",
+    }),
+    "Ready for local publish handoff",
+  );
   assert.equal(publishPrimaryActionLabel(false), " Publish");
   assert.equal(publishPrimaryActionLabel(true), " Publishing...");
 });
 
 test("preview navigation stays local unless backend provides an absolute URL", () => {
   assert.equal(getPreviewNavigationTarget(null, "app_123"), "/builder/preview/workspace/app_123");
-  assert.equal(getPreviewNavigationTarget("builder/preview/alpha/app_123", "app_123"), "/builder/preview/alpha/app_123");
-  assert.equal(getPreviewNavigationTarget("/builder/preview/alpha/app_123", "app_123"), "/builder/preview/alpha/app_123");
-  assert.equal(getPreviewNavigationTarget("https://example.test/app", "app_123"), "https://example.test/app");
+  assert.equal(
+    getPreviewNavigationTarget("builder/preview/alpha/app_123", "app_123"),
+    "/builder/preview/alpha/app_123",
+  );
+  assert.equal(
+    getPreviewNavigationTarget("/builder/preview/alpha/app_123", "app_123"),
+    "/builder/preview/alpha/app_123",
+  );
+  assert.equal(
+    getPreviewNavigationTarget("https://example.test/app", "app_123"),
+    "https://example.test/app",
+  );
 });
 
 test("builder start routing sends explicit agent intent to the agent builder", () => {
   assert.equal(shouldRouteToAgentBuilder("Build an agent that posts a daily standup digest"), true);
-  assert.equal(shouldRouteToAgentBuilder("Create a webhook agent to triage incidents and post to Slack"), true);
-  assert.equal(resolveBuilderStartKind("I need an AI assistant that summarizes new leads"), "agent");
+  assert.equal(
+    shouldRouteToAgentBuilder("Create a webhook agent to triage incidents and post to Slack"),
+    true,
+  );
+  assert.equal(
+    resolveBuilderStartKind("I need an AI assistant that summarizes new leads"),
+    "agent",
+  );
   assert.equal(resolveBuilderStartKind("I need a Slack bot"), "agent");
   assert.equal(resolveBuilderStartKind("Want a daily standup agent"), "agent");
 });
@@ -51,6 +74,12 @@ test("starter prompt modes match their routing and app copy stays unchanged", ()
     assert.equal(resolveBuilderStartKind(starter.prompt), starter.kind, starter.label);
   }
   assert.equal(builderPrimaryActionCopy("Build a lightweight CRM", false), "Build");
-  assert.equal(builderPrimaryActionCopy("Build an agent that posts a daily digest", false), "Open agent builder");
-  assert.equal(builderPrimaryActionCopy("Build an agent that posts a daily digest", true), "Generating");
+  assert.equal(
+    builderPrimaryActionCopy("Build an agent that posts a daily digest", false),
+    "Open agent builder",
+  );
+  assert.equal(
+    builderPrimaryActionCopy("Build an agent that posts a daily digest", true),
+    "Generating",
+  );
 });

@@ -1,6 +1,6 @@
 # Codex project handoff
 
-Last updated: 2026-07-28.
+Last updated: 2026-07-29.
 
 This is the authoritative starting point when opening `D:\projects\PacketAgent`
 as a new project in the Codex app.
@@ -529,10 +529,12 @@ handoff, the roadmap, or the backlog.
 ## Last verified gates
 
 - `npm run typecheck` - passed
-- `npm run lint` - passed with 0 errors and 145 inherited warnings
-- `npm run build:web` - passed
-- `npm run test:api` - 1,509 passed, 4 skipped, 0 failed
-- `npm run test:web` - 28 passed, 0 failed
+- `npm run lint` - passed with 0 errors and 24 frontend-only inherited
+  warnings; backend warnings are closed
+- `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
+- `npm run test:api` - 1,521 passed, 4 intentionally skipped live probes, 0
+  failed
+- `npm run test:web` - 30 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
   approval-required checkpointing, exact one-time/run grant consumption,
@@ -632,10 +634,10 @@ handoff, the roadmap, or the backlog.
 
 Known inherited quality debt:
 
-- repo-wide `npm run format:check` flags 279 inherited files;
+- repo-wide `npm run format:check` flags 274 inherited files;
 - full and production dependency audits each report two high package entries
   for the same accepted, unreachable React Router RSC advisory; and
-- ESLint reports zero errors and 40 frontend-only inherited warnings; backend
+- ESLint reports zero errors and 24 frontend-only inherited warnings; backend
   warnings are closed.
 
 Do not use `npm audit fix --force` or format the entire repository as an
@@ -654,8 +656,9 @@ npm run typecheck
 
 Expected branch: `codex/packetagent-foundation`.
 
-Expected remote: `taskloom-source` only.
+Expected remotes: PacketAgent `origin` and the read-only historical
+`taskloom-source`.
 
-Expected status after the W9.3 commit: clean. Stop if the active folder is
+Expected status after the latest pushed R1 checkpoint: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

@@ -43,6 +43,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Split auth, toast, and workbench context state/hooks from component-only
   provider modules, stabilized auth callbacks and bootstrap state updates, and
   retained the existing import consumers through explicit state modules.
+- Split command-palette, active-view, Builder starter/tour state, and preview
+  copy from component-only modules; palette-open now remounts fresh local state
+  instead of synchronously resetting it from effects.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

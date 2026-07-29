@@ -1,43 +1,13 @@
 import { Fragment, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+
 import { I, type IconKey } from "./icons";
+import { useActiveView, type ViewKey } from "./active-view";
 import { useUser, useWorkbench, useWorkspaceName } from "./workbench-state";
-import { useCommandPalette } from "./CommandPalette";
+import { useCommandPalette } from "./command-palette-state";
 import { brand } from "@/config/brand";
 
-export type ViewKey =
-  | "dashboard"
-  | "builder"
-  | "agents"
-  | "workflows"
-  | "runs"
-  | "integrations"
-  | "operations"
-  | "sandbox"
-  | "activation"
-  | "settings"
-  | "billing"
-  | "roles"
-  | "sso"
-  | "secrets"
-  | "webhooks"
-  | "rate-limits"
-  | "notifications"
-  | "admin";
-
 type NavSpec = { id: ViewKey; label: string; icon: IconKey; badge?: string; title?: string };
-
-function viewFromPath(pathname: string): ViewKey {
-  const m = pathname.match(/^\/?([^/?#]*)/);
-  const key = (m?.[1] ?? "") as string;
-  if (!key) return "builder";
-  return key as ViewKey;
-}
-
-export function useActiveView(): ViewKey {
-  const { pathname } = useLocation();
-  return viewFromPath(pathname);
-}
 
 export function Sidebar({ agentBadge }: { agentBadge?: string }) {
   const navigate = useNavigate();

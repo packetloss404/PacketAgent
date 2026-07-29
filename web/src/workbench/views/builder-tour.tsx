@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
+import { markBuilderTourSeen, readBuilderTourSeen } from "./builder-tour-state";
 
 /**
  * First-run guided tour for `/builder`.
@@ -16,8 +25,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
  * cold-start screen in `builder.tsx` exposes a small "Show tour" link that does
  * this for users who want to revisit the walkthrough.
  */
-const STORAGE_KEY = "packetagent_builder_tour_seen";
-
 interface TourStep {
   anchor: string;
   title: string;
@@ -57,35 +64,6 @@ const STEPS: TourStep[] = [
     placement: "bottom",
   },
 ];
-
-function readSeen(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) === "1";
-  } catch {
-    // localStorage can be blocked (e.g. private mode, missing storage); treat
-    // as "seen" so we never trap the user in a loop they can't dismiss.
-    return true;
-  }
-}
-
-function markSeen(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, "1");
-  } catch {
-    /* ignore */
-  }
-}
-
-function clearSeen(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
-}
 
 function findAnchor(name: string): HTMLElement | null {
   if (typeof document === "undefined") return null;
@@ -156,7 +134,7 @@ export function BuilderTour(): ReactElement | null {
   // Track localStorage state in component state so the "Show tour" re-trigger
   // (which clears the flag) can re-mount us cleanly via the key prop, but
   // even within the same mount Skip should immediately unmount.
-  const [active, setActive] = useState<boolean>(() => !readSeen());
+  const [active, setActive] = useState<boolean>(() => !readBuilderTourSeen());
   const [stepIndex, setStepIndex] = useState(0);
   const [position, setPosition] = useState<CalloutPosition | null>(null);
   const calloutRef = useRef<HTMLDivElement | null>(null);
@@ -165,7 +143,7 @@ export function BuilderTour(): ReactElement | null {
   const visibleSteps = useMemo(() => STEPS, []);
 
   const dismiss = useCallback(() => {
-    markSeen();
+    markBuilderTourSeen();
     setActive(false);
   }, []);
 
@@ -177,7 +155,7 @@ export function BuilderTour(): ReactElement | null {
         if (findAnchor(step.anchor)) return i;
       }
       // No further visible steps — mark complete.
-      markSeen();
+      markBuilderTourSeen();
       setActive(false);
       return prev;
     });
@@ -342,12 +320,17 @@ export function BuilderTour(): ReactElement | null {
             {stepIndex + 1} of {total}
           </span>
         </div>
-        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4, color: "var(--silver-50, #E8ECEF)" }}>
+        <div
+          style={{
+            fontWeight: 600,
+            fontSize: 14,
+            marginBottom: 4,
+            color: "var(--silver-50, #E8ECEF)",
+          }}
+        >
           {step.title}
         </div>
-        <div style={{ color: "var(--silver-300, #B5BCC1)", marginBottom: 12 }}>
-          {step.body}
-        </div>
+        <div style={{ color: "var(--silver-300, #B5BCC1)", marginBottom: 12 }}>{step.body}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button
             type="button"
@@ -391,12 +374,4 @@ export function BuilderTour(): ReactElement | null {
       `}</style>
     </div>
   );
-}
-
-/**
- * Clear the persisted "seen" flag so the tour will fire on the next render.
- * Use this for a "Show tour" re-trigger link.
- */
-export function resetBuilderTour(): void {
-  clearSeen();
 }
