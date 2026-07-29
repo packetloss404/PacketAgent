@@ -297,6 +297,16 @@ Continue **R1 - repository health and historical finding re-audit** in
 `worker-implementation-loops.md` provides execution mechanics but cannot add
 active work absent from the backlog.
 
+R1's first persistence slice is implemented: production managed Postgres pools
+are reused per connection target and closed at server shutdown; migration and
+restore candidates must pass SQLite integrity and foreign-key checks; corrupt
+restore candidates leave the current database untouched; and managed backfill
+preserves target-only records. The current re-audit evidence and remaining
+open findings are in
+[`r1-repository-health-audit.md`](r1-repository-health-audit.md). Resume with
+the open jobs single-writer/workspace-scoping audit, followed by the backend
+security/startup findings.
+
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is

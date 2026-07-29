@@ -692,6 +692,13 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env): Promise
     } catch {
       /* ignore */
     }
+    try {
+      const { shutdownManagedPostgresStoreClientPool } =
+        await import("./store/backends/managed-postgres.js");
+      await shutdownManagedPostgresStoreClientPool();
+    } catch {
+      /* ignore */
+    }
     process.exit(0);
   };
   process.on("SIGINT", shutdown);

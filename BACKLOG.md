@@ -228,6 +228,12 @@ is recorded in these checklists.
 
 Status: active.
 
+Supporting finding-by-finding evidence is maintained in
+[`dev/r1-repository-health-audit.md`](dev/r1-repository-health-audit.md).
+The first persistence slice closes managed pool churn, destructive-migration
+integrity/restore checks, and target-only managed-backfill preservation; the
+broader R1 gate remains open.
+
 - [ ] Re-audit every still-relevant historical P0/P1 finding and close stale
       findings with evidence.
 - [ ] Finish the Prettier baseline in reviewable batches and reduce inherited

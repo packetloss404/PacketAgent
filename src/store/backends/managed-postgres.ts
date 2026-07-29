@@ -26,9 +26,20 @@ import type { AsyncStoreBackend } from "./types.js";
 const MANAGED_POSTGRES_DOCUMENT_KEY = "packetagent:store";
 const MANAGED_POSTGRES_SCHEMA_VERSION = 1;
 
-let managedPostgresStoreClientFactory: ManagedPostgresStoreClientFactory = createDefaultManagedPostgresStoreClient;
+let managedPostgresStoreClientFactory: ManagedPostgresStoreClientFactory =
+  createDefaultManagedPostgresStoreClient;
+let managedPostgresPoolClientFactory: ManagedPostgresStoreClientFactory =
+  createUncachedManagedPostgresPoolClient;
+const managedPostgresPoolHandles = new Map<string, Promise<ManagedPostgresPoolHandle>>();
 
-export function setManagedPostgresStoreClientFactoryForTests(factory: ManagedPostgresStoreClientFactory | null): () => void {
+interface ManagedPostgresPoolHandle {
+  client: ManagedPostgresStoreQueryClient;
+  close(): Promise<void>;
+}
+
+export function setManagedPostgresStoreClientFactoryForTests(
+  factory: ManagedPostgresStoreClientFactory | null,
+): () => void {
   const previous = managedPostgresStoreClientFactory;
   managedPostgresStoreClientFactory = factory ?? createDefaultManagedPostgresStoreClient;
   return () => {
@@ -36,7 +47,19 @@ export function setManagedPostgresStoreClientFactoryForTests(factory: ManagedPos
   };
 }
 
-export function managedDatabaseAsyncStoreBackend(resolution: ResolvedPacketAgentStoreMode): AsyncStoreBackend {
+export function setManagedPostgresPoolClientFactoryForTests(
+  factory: ManagedPostgresStoreClientFactory | null,
+): () => void {
+  const previous = managedPostgresPoolClientFactory;
+  managedPostgresPoolClientFactory = factory ?? createUncachedManagedPostgresPoolClient;
+  return () => {
+    managedPostgresPoolClientFactory = previous;
+  };
+}
+
+export function managedDatabaseAsyncStoreBackend(
+  resolution: ResolvedPacketAgentStoreMode,
+): AsyncStoreBackend {
   const config = resolveManagedPostgresStoreClientConfig(resolution);
 
   return {
@@ -50,8 +73,12 @@ export function managedDatabaseAsyncStoreBackend(resolution: ResolvedPacketAgent
   };
 }
 
-function resolveManagedPostgresStoreClientConfig(resolution: ResolvedPacketAgentStoreMode): ManagedPostgresStoreClientConfig {
-  const envKey = MANAGED_DATABASE_URL_ENV_KEYS.find((key) => cleanStoreEnvValue(process.env[key]).length > 0);
+function resolveManagedPostgresStoreClientConfig(
+  resolution: ResolvedPacketAgentStoreMode,
+): ManagedPostgresStoreClientConfig {
+  const envKey = MANAGED_DATABASE_URL_ENV_KEYS.find(
+    (key) => cleanStoreEnvValue(process.env[key]).length > 0,
+  );
   if (!envKey) {
     throw new ManagedPostgresStoreConfigurationError(
       "Managed Postgres storage requires DATABASE_URL, PACKETAGENT_DATABASE_URL, or PACKETAGENT_MANAGED_DATABASE_URL.",
@@ -65,8 +92,48 @@ function resolveManagedPostgresStoreClientConfig(resolution: ResolvedPacketAgent
   };
 }
 
-async function createDefaultManagedPostgresStoreClient(config: ManagedPostgresStoreClientConfig): Promise<ManagedPostgresStoreQueryClient> {
-  const importModule = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<unknown>;
+async function createDefaultManagedPostgresStoreClient(
+  config: ManagedPostgresStoreClientConfig,
+): Promise<ManagedPostgresStoreQueryClient> {
+  const poolKey = createHash("sha256").update(config.url).digest("hex");
+  let handlePromise = managedPostgresPoolHandles.get(poolKey);
+  if (!handlePromise) {
+    handlePromise = createManagedPostgresPoolHandle(config);
+    managedPostgresPoolHandles.set(poolKey, handlePromise);
+    void handlePromise.catch(() => {
+      if (managedPostgresPoolHandles.get(poolKey) === handlePromise) {
+        managedPostgresPoolHandles.delete(poolKey);
+      }
+    });
+  }
+  return (await handlePromise).client;
+}
+
+async function createManagedPostgresPoolHandle(
+  config: ManagedPostgresStoreClientConfig,
+): Promise<ManagedPostgresPoolHandle> {
+  const pool = await managedPostgresPoolClientFactory(config);
+  return {
+    client: {
+      query(sql, params) {
+        return pool.query(sql, params);
+      },
+      connect() {
+        return pool.connect?.() ?? Promise.resolve(pool);
+      },
+    },
+    async close() {
+      await pool.close?.();
+    },
+  };
+}
+
+async function createUncachedManagedPostgresPoolClient(
+  config: ManagedPostgresStoreClientConfig,
+): Promise<ManagedPostgresStoreQueryClient> {
+  const importModule = new Function("specifier", "return import(specifier)") as (
+    specifier: string,
+  ) => Promise<unknown>;
   let pgModule: unknown;
   try {
     pgModule = await importModule("pg");
@@ -76,9 +143,17 @@ async function createDefaultManagedPostgresStoreClient(config: ManagedPostgresSt
     );
   }
 
-  const poolConstructor = (pgModule as { Pool?: new (options: { connectionString: string }) => ManagedPostgresStoreQueryClient & { end?: () => Promise<void> | void } }).Pool;
+  const poolConstructor = (
+    pgModule as {
+      Pool?: new (options: { connectionString: string }) => ManagedPostgresStoreQueryClient & {
+        end?: () => Promise<void> | void;
+      };
+    }
+  ).Pool;
   if (!poolConstructor) {
-    throw new ManagedPostgresStoreConfigurationError("Managed Postgres storage could not find pg.Pool.");
+    throw new ManagedPostgresStoreConfigurationError(
+      "Managed Postgres storage could not find pg.Pool.",
+    );
   }
 
   const pool = new poolConstructor({ connectionString: config.url });
@@ -95,6 +170,17 @@ async function createDefaultManagedPostgresStoreClient(config: ManagedPostgresSt
   };
 }
 
+export async function shutdownManagedPostgresStoreClientPool(): Promise<void> {
+  const handles = [...managedPostgresPoolHandles.values()];
+  managedPostgresPoolHandles.clear();
+  const settledHandles = await Promise.allSettled(handles);
+  await Promise.all(
+    settledHandles.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value.close()] : [],
+    ),
+  );
+}
+
 async function withManagedPostgresClient<T>(
   config: ManagedPostgresStoreClientConfig,
   run: (client: ManagedPostgresStoreQueryClient) => Promise<T>,
@@ -107,7 +193,9 @@ async function withManagedPostgresClient<T>(
   }
 }
 
-async function ensureManagedPostgresDocumentStore(client: ManagedPostgresStoreQueryClient): Promise<void> {
+async function ensureManagedPostgresDocumentStore(
+  client: ManagedPostgresStoreQueryClient,
+): Promise<void> {
   await client.query(`
     create table if not exists packetagent_document_store (
       document_key text primary key,
@@ -120,7 +208,9 @@ async function ensureManagedPostgresDocumentStore(client: ManagedPostgresStoreQu
   `);
 }
 
-async function loadManagedPostgresStore(config: ManagedPostgresStoreClientConfig): Promise<PacketAgentData> {
+async function loadManagedPostgresStore(
+  config: ManagedPostgresStoreClientConfig,
+): Promise<PacketAgentData> {
   const backendKey = managedPostgresBackendKey(config);
   return withManagedPostgresClient(config, async (client) => {
     await ensureManagedPostgresDocumentStore(client);
@@ -129,7 +219,9 @@ async function loadManagedPostgresStore(config: ManagedPostgresStoreClientConfig
 
     return withManagedPostgresMutationRetry(async () => {
       return withManagedPostgresTransactionClient(client, async (transactionClient) => {
-        await transactionClient.query("select pg_advisory_xact_lock(hashtext($1))", [MANAGED_POSTGRES_DOCUMENT_KEY]);
+        await transactionClient.query("select pg_advisory_xact_lock(hashtext($1))", [
+          MANAGED_POSTGRES_DOCUMENT_KEY,
+        ]);
         const existing = await readManagedPostgresStore(transactionClient, true);
         if (existing) return existing;
 
@@ -147,17 +239,21 @@ async function mutateManagedPostgresStore<T>(
   mutator: (data: PacketAgentData) => T | Promise<T>,
 ): Promise<T> {
   const backendKey = managedPostgresBackendKey(config);
-  return withManagedPostgresMutationRetry(() => withManagedPostgresClient(config, async (client) => {
-    await ensureManagedPostgresDocumentStore(client);
-    return withManagedPostgresTransactionClient(client, async (transactionClient) => {
-      await transactionClient.query("select pg_advisory_xact_lock(hashtext($1))", [MANAGED_POSTGRES_DOCUMENT_KEY]);
-      const data = await readManagedPostgresStore(transactionClient, true) ?? seedStore();
-      const result = await mutator(data);
-      await persistManagedPostgresStore(transactionClient, data);
-      setCachedStore(data, backendKey);
-      return result;
-    });
-  }));
+  return withManagedPostgresMutationRetry(() =>
+    withManagedPostgresClient(config, async (client) => {
+      await ensureManagedPostgresDocumentStore(client);
+      return withManagedPostgresTransactionClient(client, async (transactionClient) => {
+        await transactionClient.query("select pg_advisory_xact_lock(hashtext($1))", [
+          MANAGED_POSTGRES_DOCUMENT_KEY,
+        ]);
+        const data = (await readManagedPostgresStore(transactionClient, true)) ?? seedStore();
+        const result = await mutator(data);
+        await persistManagedPostgresStore(transactionClient, data);
+        setCachedStore(data, backendKey);
+        return result;
+      });
+    }),
+  );
 }
 
 async function withManagedPostgresTransactionClient<T>(
@@ -222,9 +318,10 @@ async function withManagedPostgresMutationRetry<T>(run: () => Promise<T>): Promi
 }
 
 function isRetryableManagedPostgresTransactionError(error: unknown): boolean {
-  const code = typeof error === "object" && error !== null && "code" in error
-    ? String((error as { code?: unknown }).code ?? "")
-    : "";
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code ?? "")
+      : "";
   return code === "40001" || code === "40P01" || code === "55P03" || code === "57014";
 }
 
@@ -262,7 +359,10 @@ async function readManagedPostgresStore(
   return normalizeStore(payload as Partial<PacketAgentData>);
 }
 
-async function persistManagedPostgresStore(client: ManagedPostgresStoreQueryClient, data: PacketAgentData): Promise<void> {
+async function persistManagedPostgresStore(
+  client: ManagedPostgresStoreQueryClient,
+  data: PacketAgentData,
+): Promise<void> {
   await client.query(
     `
       insert into packetagent_document_store (

@@ -235,6 +235,32 @@ test("migrationStatus reports pending and applied migrations without creating a 
   }
 });
 
+test("migrateDatabase rejects an existing database with foreign-key violations", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
+  try {
+    const dbPath = join(tempDir, "packetagent.sqlite");
+    migrateDatabase({ dbPath });
+
+    const db = new DatabaseSync(dbPath);
+    try {
+      db.exec("pragma foreign_keys = off");
+      db.prepare(`
+        insert into workspace_memberships (workspace_id, user_id, role, joined_at)
+        values (?, ?, 'viewer', ?)
+      `).run("missing-workspace", "missing-user", "2026-07-28T12:00:00.000Z");
+    } finally {
+      db.close();
+    }
+
+    assert.throws(
+      () => migrateDatabase({ dbPath }),
+      /migration validation failed SQLite foreign_key_check with 2 violation\(s\)/,
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("backupDatabase copies a migrated database and restoreDatabase validates before replacing", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
   try {
@@ -255,6 +281,53 @@ test("backupDatabase copies a migrated database and restoreDatabase validates be
     assert.equal(restore.backupPath, backupPath);
     assert.deepEqual(migrationStatus({ dbPath }).pending, []);
     assert.equal(restored?.workspaces.length, 3);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("restoreDatabase rejects a foreign-key-corrupt backup without replacing the current database", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-db-"));
+  try {
+    const dbPath = join(tempDir, "packetagent.sqlite");
+    const backupPath = join(tempDir, "packetagent.corrupt.sqlite");
+    seedAppDatabase({ dbPath });
+    backupDatabase({ dbPath, backupPath });
+
+    const currentDb = new DatabaseSync(dbPath);
+    try {
+      currentDb.exec("create table current_restore_marker (value text not null)");
+      currentDb.prepare("insert into current_restore_marker (value) values (?)").run(
+        "preserve-me",
+      );
+    } finally {
+      currentDb.close();
+    }
+
+    const corruptBackup = new DatabaseSync(backupPath);
+    try {
+      corruptBackup.exec("pragma foreign_keys = off");
+      corruptBackup.prepare(`
+        insert into workspace_memberships (workspace_id, user_id, role, joined_at)
+        values (?, ?, 'viewer', ?)
+      `).run("missing-workspace", "missing-user", "2026-07-28T12:00:00.000Z");
+    } finally {
+      corruptBackup.close();
+    }
+
+    assert.throws(
+      () => restoreDatabase({ dbPath, backupPath }),
+      /migration validation failed SQLite foreign_key_check with 2 violation\(s\)/,
+    );
+    const preservedDb = new DatabaseSync(dbPath);
+    try {
+      const marker = preservedDb.prepare("select value from current_restore_marker").get() as {
+        value: string;
+      };
+      assert.equal(marker.value, "preserve-me");
+    } finally {
+      preservedDb.close();
+    }
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -454,6 +527,16 @@ test("backfillManagedPostgres writes JSON source data through the async target b
   const source = createSeedStore();
   source.workspaces[0] = { ...source.workspaces[0], name: "Managed Backfill Workspace" };
   const target = createSeedStore();
+  target.shareTokens.push({
+    id: "share_target_only",
+    workspaceId: "alpha",
+    token: "target-only",
+    scope: "overview",
+    createdByUserId: "user_alpha",
+    readCount: 0,
+    createdAt: "2026-07-28T12:00:00.000Z",
+    expiresAt: "2026-08-28T12:00:00.000Z",
+  });
 
   const result = await backfillManagedPostgres(
     { source: "json", jsonPath: "ignored.json" },
@@ -466,6 +549,41 @@ test("backfillManagedPostgres writes JSON source data through the async target b
   assert.equal(result.writtenRecords, result.sourceRecords);
   assert.equal(target.workspaces[0]?.name, "Managed Backfill Workspace");
   assert.equal(result.targetCountsAfter?.workspaces, source.workspaces.length);
+  assert.equal(target.shareTokens.some((token) => token.id === "share_target_only"), true);
+  assert.equal(result.targetCountsAfter?.shareTokens, source.shareTokens.length + 1);
+});
+
+test("backfillManagedPostgres does not rewrite a target that only has additional records", async () => {
+  const source = createSeedStore();
+  const target = structuredClone(source);
+  target.shareTokens.push({
+    id: "share_target_only",
+    workspaceId: "alpha",
+    token: "target-only",
+    scope: "overview",
+    createdByUserId: "user_alpha",
+    readCount: 0,
+    createdAt: "2026-07-28T12:00:00.000Z",
+    expiresAt: "2026-08-28T12:00:00.000Z",
+  });
+  let mutations = 0;
+
+  const result = await backfillManagedPostgres(
+    { source: "json", jsonPath: "ignored.json" },
+    {
+      ...managedPostgresDeps(target),
+      loadJsonSource: () => source,
+      async mutateTargetStore(mutator) {
+        mutations += 1;
+        return mutator(target);
+      },
+    },
+  );
+
+  assert.equal(result.targetOnly, 1);
+  assert.equal(result.wouldWriteRecords, 0);
+  assert.equal(result.writtenRecords, 0);
+  assert.equal(mutations, 0);
 });
 
 test("verifyManagedPostgres compares a SQLite hydrated source with the async target", async () => {

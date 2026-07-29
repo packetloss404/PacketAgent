@@ -257,7 +257,10 @@ export {
 export { normalizeStore } from "./store/normalize.js";
 export { createSeedStore } from "./store/seed.js";
 export { loadSqliteAppData, persistSqliteAppData } from "./store/backends/sqlite.js";
-export { setManagedPostgresStoreClientFactoryForTests } from "./store/backends/managed-postgres.js";
+export {
+  setManagedPostgresStoreClientFactoryForTests,
+  shutdownManagedPostgresStoreClientPool,
+} from "./store/backends/managed-postgres.js";
 
 function assertSupportedSyncStoreMode(resolution: ResolvedPacketAgentStoreMode): void {
   if (resolution.mode === "managed" || resolution.mode === "postgres" || resolution.managedDatabaseUrlKeys.length > 0) {

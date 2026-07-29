@@ -43,6 +43,13 @@ orderings, restart/replay/credential-rotation checks, and audited bounded
 dead-letter redrive. Resume at R1 in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r1---repository-health-and-historical-finding-re-audit).
 
+R1 is underway. Its first persistence slice now reuses managed Postgres pools,
+validates SQLite migration/restore integrity and foreign keys, rejects corrupt
+restore candidates without replacing current data, and preserves target-only
+managed-backfill records. The jobs single-writer/workspace-scoping audit is
+next; [`r1-repository-health-audit.md`](r1-repository-health-audit.md) records
+supporting evidence while `BACKLOG.md` remains the ledger.
+
 ## North star
 
 PacketAgent is a self-hosted runtime for creating and operating autonomous workers.

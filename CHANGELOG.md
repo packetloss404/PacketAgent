@@ -6,6 +6,22 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - R1 persistence correctness
+
+- Reused one managed Postgres pool per connection target instead of opening and
+  closing a pool for every store operation, while retaining dedicated
+  transaction clients and adding graceful server-shutdown cleanup.
+- Required SQLite migration and restore candidates to pass database integrity
+  and foreign-key checks. Corrupt backups are rejected before they can replace
+  the current database.
+- Changed managed-Postgres backfill to preserve target-only records, keep the
+  source authoritative for shared identities, and avoid no-op rewrites when
+  the target only contains additional records.
+- Started a current, evidence-linked R1 historical-finding audit without
+  reviving archived review files as active ledgers.
+- Passed the 1,517-test API gate: 1,513 passed, 4 intentionally skipped live
+  Packet-product probes, and 0 failed.
+
 ### 2026-07-28 - Local remote-control certification (W10.4)
 
 - Certified the PacketChat and PacketPhone transports against fake hardened

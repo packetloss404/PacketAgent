@@ -426,6 +426,7 @@ export function migrateDatabase(options: DbCliOptions = {}): MigrationResult {
       db.exec("begin");
       try {
         db.exec(sql);
+        assertSqliteDatabaseIntegrity(db, `migration "${name}"`);
         db.prepare("insert into schema_migrations (name) values (?)").run(name);
         db.exec("commit");
         applied.push(name);
@@ -435,6 +436,7 @@ export function migrateDatabase(options: DbCliOptions = {}): MigrationResult {
       }
     }
 
+    assertSqliteDatabaseIntegrity(db, "migration validation");
     return { command: "migrate", dbPath, applied, skipped };
   } finally {
     db.close();
@@ -481,6 +483,25 @@ function backupBeforeDestructiveMigration(
   mkdirSync(dirname(backupPath), { recursive: true });
   copyFileSync(dbPath, backupPath);
   return backupPath;
+}
+
+function assertSqliteDatabaseIntegrity(db: DatabaseSync, context: string): void {
+  const integrityRows = db.prepare("pragma integrity_check").all() as Array<{
+    integrity_check: string;
+  }>;
+  const integrityErrors = integrityRows
+    .map((row) => row.integrity_check)
+    .filter((result) => result.toLowerCase() !== "ok");
+  if (integrityErrors.length > 0) {
+    throw new Error(`${context} failed SQLite integrity_check: ${integrityErrors.join("; ")}`);
+  }
+
+  const foreignKeyErrors = db.prepare("pragma foreign_key_check").all();
+  if (foreignKeyErrors.length > 0) {
+    throw new Error(
+      `${context} failed SQLite foreign_key_check with ${foreignKeyErrors.length} violation(s)`,
+    );
+  }
 }
 
 export function migrationStatus(options: DbCliOptions = {}): MigrationStatusResult {
@@ -803,15 +824,13 @@ export async function backfillManagedPostgres(
   const targetBeforeStats = managedPostgresStoreStats(targetBefore);
   const comparison = compareManagedPostgresStores(source.data, targetBefore);
   const wouldWriteRecords =
-    comparison.sourceOnly > 0 || comparison.targetOnly > 0 || comparison.contentDrift > 0
-      ? sourceStats.records
-      : 0;
+    comparison.sourceOnly > 0 || comparison.contentDrift > 0 ? sourceStats.records : 0;
 
   let writtenRecords = 0;
   let targetCountsAfter: Record<string, number> | undefined;
   if (!dryRun && wouldWriteRecords > 0) {
     await mutateTargetStore((target) => {
-      replaceManagedPostgresStoreData(target, source.data);
+      mergeManagedPostgresStoreData(target, source.data);
     });
     writtenRecords = sourceStats.records;
     targetCountsAfter = managedPostgresStoreStats(
@@ -970,10 +989,32 @@ export function compareManagedPostgresStores(
   return { sourceOnly, targetOnly, contentDrift, matched };
 }
 
-function replaceManagedPostgresStoreData(target: PacketAgentData, source: PacketAgentData): void {
-  const normalized = normalizeStore(source);
+function mergeManagedPostgresStoreData(target: PacketAgentData, source: PacketAgentData): void {
+  const normalizedSource = normalizeStore(source);
+  const normalizedTarget = normalizeStore(target);
   for (const collection of STORE_COMPARISON_COLLECTIONS) {
-    target[collection] = normalized[collection] as never;
+    const sourceCollection = normalizedSource[collection];
+    const targetCollection = normalizedTarget[collection];
+    if (Array.isArray(sourceCollection) && Array.isArray(targetCollection)) {
+      const sourceIds = new Set(
+        sourceCollection.map((entry, index) => recordComparisonId(collection, entry, index)),
+      );
+      const targetOnly = targetCollection.filter(
+        (entry, index) => !sourceIds.has(recordComparisonId(collection, entry, index)),
+      );
+      target[collection] = [...sourceCollection, ...targetOnly] as never;
+      continue;
+    }
+    if (
+      sourceCollection &&
+      typeof sourceCollection === "object" &&
+      targetCollection &&
+      typeof targetCollection === "object"
+    ) {
+      target[collection] = { ...targetCollection, ...sourceCollection } as never;
+      continue;
+    }
+    target[collection] = sourceCollection as never;
   }
 }
 
