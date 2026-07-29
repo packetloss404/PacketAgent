@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { Hono } from "hono";
+import { strFromU8, unzipSync } from "fflate";
 import { SESSION_COOKIE_NAME } from "./auth-utils";
 import { appRoutes, setHostInfoSourcesForTests } from "./app-routes";
 import { shutdownDefaultGeneratedAppRuntimeProcessPool } from "./generated-app-runtime/server.js";
@@ -940,6 +941,35 @@ test("generated app source routes are workspace-scoped", async () => {
   );
   assert.equal(JSON.stringify(sourceBody).includes("beta secret artifact"), false);
 
+  const planResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/package-plan?checkpointId=${applied.checkpoint.id}`,
+    { headers: authHeaders(alpha.cookieValue) },
+  );
+  const planBody = (await planResponse.json()) as {
+    checkpoint?: { id?: string };
+    plan?: { status?: string; executionPolicy?: { executed?: boolean } };
+  };
+  assert.equal(planResponse.status, 200);
+  assert.equal(planBody.checkpoint?.id, applied.checkpoint.id);
+  assert.equal(planBody.plan?.status, "ready");
+  assert.equal(planBody.plan?.executionPolicy?.executed, false);
+
+  const exportResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/export?checkpointId=${applied.checkpoint.id}`,
+    { headers: authHeaders(alpha.cookieValue) },
+  );
+  assert.equal(exportResponse.status, 200);
+  assert.equal(exportResponse.headers.get("content-type"), "application/zip");
+  assert.match(exportResponse.headers.get("content-disposition") ?? "", /\.zip"/);
+  assert.equal(exportResponse.headers.get("x-packetagent-package-plan"), "ready");
+  const archive = unzipSync(new Uint8Array(await exportResponse.arrayBuffer()));
+  const archivePaths = Object.keys(archive);
+  assert.ok(archivePaths.some((path) => path.endsWith("/src/App.tsx")));
+  assert.ok(archivePaths.some((path) => path.endsWith("/.packetagent/package-install-plan.json")));
+  const exportReadmePath = archivePaths.find((path) => path.endsWith("/PACKETAGENT_EXPORT.md"));
+  assert.ok(exportReadmePath);
+  assert.match(strFromU8(archive[exportReadmePath]!), /did not run a package installation/i);
+
   const betaResponse = await app.request(
     "/api/app/generated-apps/gapp_beta_source_route_test/source",
     {
@@ -949,6 +979,12 @@ test("generated app source routes are workspace-scoped", async () => {
   const betaBody = (await betaResponse.json()) as { error?: string };
   assert.equal(betaResponse.status, 404);
   assert.equal(betaBody.error, "generated app not found");
+
+  const betaExportResponse = await app.request(
+    "/api/app/generated-apps/gapp_beta_source_route_test/export",
+    { headers: authHeaders(alpha.cookieValue) },
+  );
+  assert.equal(betaExportResponse.status, 404);
 });
 
 test("generated app runtime API persists records through per-app SQLite", async () => {

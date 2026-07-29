@@ -27,6 +27,7 @@ import type {
   AppBuilderIterationApplyResult,
   AppBuilderIterationRequest,
   AppBuilderIterationResult,
+  AppBuilderPackageInstallPlan,
   AppBuilderPublishRequest,
   AppBuilderPublishResult,
   AppBuilderPublishRollbackResult,
@@ -156,6 +157,21 @@ async function j<T>(url: string, init?: RequestInit): Promise<T> {
     throw error;
   }
   return payload as T;
+}
+
+async function downloadBinary(url: string): Promise<{ blob: Blob; fileName: string }> {
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(
+      typeof payload?.error === "string"
+        ? payload.error
+        : `${response.status} ${response.statusText}`,
+    );
+  }
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const fileName = disposition.match(/filename="([^"]+)"/i)?.[1] ?? "generated-app.zip";
+  return { blob: await response.blob(), fileName };
 }
 
 function csrfTokenForRequest(init?: RequestInit) {
@@ -347,6 +363,25 @@ export const api = {
     j<{ generatedApps: GeneratedAppSummary[] }>("/api/app/generated-apps").then(
       (payload) => payload.generatedApps,
     ),
+  getGeneratedAppPackagePlan: (input: { appId: string; checkpointId?: string }) => {
+    const params = new URLSearchParams();
+    if (input.checkpointId) params.set("checkpointId", input.checkpointId);
+    const query = params.toString();
+    return j<{
+      checkpoint: { id: string; createdAt: string };
+      plan: AppBuilderPackageInstallPlan;
+    }>(
+      `/api/app/generated-apps/${encodeURIComponent(input.appId)}/package-plan${query ? `?${query}` : ""}`,
+    );
+  },
+  downloadGeneratedAppExport: (input: { appId: string; checkpointId?: string }) => {
+    const params = new URLSearchParams();
+    if (input.checkpointId) params.set("checkpointId", input.checkpointId);
+    const query = params.toString();
+    return downloadBinary(
+      `/api/app/generated-apps/${encodeURIComponent(input.appId)}/export${query ? `?${query}` : ""}`,
+    );
+  },
   createPreviewToken: (appId: string, options: { ttlSeconds?: number } = {}) => {
     const params = new URLSearchParams();
     if (options.ttlSeconds && Number.isFinite(options.ttlSeconds) && options.ttlSeconds > 0) {

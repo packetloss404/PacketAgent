@@ -155,7 +155,12 @@ You can also register a new account from the sign-up page. To reset local data b
 
 - **Prompt-to-app and prompt-to-agent.** Describe an internal app or agent in plain language; PacketAgent drafts a brief, page map, data model, and acceptance checks, then has the LLM author the file tree directly.
 - **Two-phase file-tree codegen.** Plan-then-write orchestrator with chunked planning for larger apps, partial-result tolerance, workspace-escape guards, and `tsc --noEmit` + `vite build` validation (phase-tagged, surfaced inline in chat).
-- **Draft, preview, iterate, publish handoff.** Diff-review every change before applying. Each apply creates a checkpoint with source files on disk, a PacketAgent-served local preview, smoke checks, and rollback metadata.
+- **Draft, preview, iterate, export, publish handoff.** Review live
+  plan/write/validate progress and every changed or unchanged file before
+  applying. Each apply creates a checkpoint with source files on disk, a
+  PacketAgent-served local preview, smoke checks, and rollback metadata. The
+  Source view exports that immutable checkpoint as a git-ready ZIP with
+  SHA-256 provenance and a plan-only, never-executed package-install review.
 - **Template gallery.** Six ready-to-edit agent templates ship in the box (see below). Use them as starting points or compose from scratch.
 - **First-class scoped iteration.** Targeted change prompts edit one slice of the app instead of regenerating everything.
 - **Connector pre-flight.** The integration sandbox deterministically verifies model / db / email / webhook / payment / github / browser connector readiness before preview/runtime.

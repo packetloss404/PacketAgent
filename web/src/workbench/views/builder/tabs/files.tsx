@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
 import type {
   AppBuilderDraft,
   AppBuilderFileProgress,
   AppBuilderIterationDiffFile,
   AppBuilderIterationFileReview,
   AppBuilderIterationResult,
+  AppBuilderPackageInstallPlan,
   AppBuilderSourceFileSummary,
   AppBuilderWorkspaceSummary,
 } from "@/lib/types";
@@ -98,12 +100,16 @@ export function FilesTab({
   iteration,
   sourceFiles,
   workspace,
+  appId,
+  checkpointId,
   progress = [],
 }: {
   draft: AppBuilderDraft;
   iteration: AppBuilderIterationResult | null;
   sourceFiles: AppBuilderSourceFileSummary[];
   workspace: AppBuilderWorkspaceSummary | null;
+  appId: string | null;
+  checkpointId: string | null;
   progress?: AppBuilderFileProgress[];
 }) {
   const [reviewFilter, setReviewFilter] = useState<"all" | "changed" | "unchanged">("all");
@@ -158,6 +164,7 @@ export function FilesTab({
               {draft.app.pages.length} pages · {draft.app.apiRoutes.length} routes
             </span>
           </div>
+          <WorkspaceExportPanel appId={appId} checkpointId={checkpointId} />
           {sourceFiles.length > 0 && (
             <div className="card" style={{ overflow: "hidden" }}>
               <table className="tbl">
@@ -214,6 +221,7 @@ export function FilesTab({
       }}
     >
       <div className="card" style={{ overflow: "auto" }}>
+        <WorkspaceExportPanel appId={appId} checkpointId={checkpointId} compact />
         {reviewCounts && (
           <div
             style={{
@@ -334,6 +342,119 @@ export function FilesTab({
           Select a review filter with matching files.
         </div>
       )}
+    </div>
+  );
+}
+
+function WorkspaceExportPanel({
+  appId,
+  checkpointId,
+  compact = false,
+}: {
+  appId: string | null;
+  checkpointId: string | null;
+  compact?: boolean;
+}) {
+  const planKey = `${appId ?? ""}:${checkpointId ?? ""}`;
+  const [planState, setPlanState] = useState<{
+    key: string;
+    plan: AppBuilderPackageInstallPlan | null;
+    error: string | null;
+  }>({ key: "", plan: null, error: null });
+  const [working, setWorking] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const plan = planState.key === planKey ? planState.plan : null;
+  const planError = planState.key === planKey ? planState.error : null;
+
+  useEffect(() => {
+    let active = true;
+    if (!appId) return () => undefined;
+    void api
+      .getGeneratedAppPackagePlan({
+        appId,
+        ...(checkpointId ? { checkpointId } : {}),
+      })
+      .then((payload) => {
+        if (active) setPlanState({ key: planKey, plan: payload.plan, error: null });
+      })
+      .catch((cause: unknown) => {
+        if (active) {
+          setPlanState({
+            key: planKey,
+            plan: null,
+            error: cause instanceof Error ? cause.message : String(cause),
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [appId, checkpointId, planKey]);
+
+  const download = async () => {
+    if (!appId || working) return;
+    setWorking(true);
+    setExportError(null);
+    try {
+      const exported = await api.downloadGeneratedAppExport({
+        appId,
+        ...(checkpointId ? { checkpointId } : {}),
+      });
+      const url = URL.createObjectURL(exported.blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = exported.fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setExportError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: compact ? "10px 12px" : 14,
+        marginBottom: compact ? 0 : 14,
+        borderBottom: compact ? "1px solid var(--line)" : undefined,
+        border: compact ? undefined : "1px solid var(--line)",
+        borderRadius: compact ? undefined : 8,
+        background: compact ? undefined : "var(--bg-elev)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, color: "var(--silver-100)" }}>Git-ready ZIP export</div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+            Package plan: {plan?.status ?? (appId ? "loading" : "save the app first")}
+            {plan?.packages.length ? ` · ${plan.packages.length} packages reviewed` : ""}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={!appId || working}
+          onClick={() => {
+            void download();
+          }}
+        >
+          {working ? "Exporting…" : "Download ZIP"}
+        </button>
+      </div>
+      {plan?.status === "blocked" || plan?.status === "invalid" ? (
+        <p style={{ color: "var(--warn)", fontSize: 11, marginTop: 6 }}>
+          The source is exportable, but package installation is blocked. Review the included plan.
+        </p>
+      ) : null}
+      {planError || exportError ? (
+        <p style={{ color: "var(--danger)", fontSize: 11, marginTop: 6 }}>
+          {exportError ?? planError}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -412,6 +412,21 @@ The focused R3.4 gate passes typecheck, lint, 24 backend tests, and the two
 progress reducer tests. Resume at R3's sandboxed package planning and
 zip/git-ready export slice.
 
+R3.5 is complete. Generated `package.json` dependencies are parsed into a
+versioned allow/block plan. Only the React/Vite/TypeScript/Tailwind toolchain
+with exact/caret/tilde semver specs can become ready; package aliases, tags,
+URLs, git/local paths, conflicting versions, and unapproved packages block
+the plan. The recorded execution policy requires Docker, registry-only
+networking, disabled lifecycle scripts, bounded time/output, and always
+reports `executed: false`; PacketAgent does not run the command. Authenticated,
+workspace-scoped package-plan and ZIP routes export one immutable checkpoint
+with git ignores, human instructions, source, package plan, and a digest-bound
+export manifest. The Builder Source view exposes plan status and download.
+The focused gate passes typecheck, zero-warning lint, five package/export
+tests, and 43 HTTP route tests (42 passed, one intentional Windows sandbox
+skip). Run the full repository R3 gate next, then close R3 and resume R4 from
+`BACKLOG.md`.
+
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is

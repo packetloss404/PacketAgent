@@ -1381,6 +1381,8 @@ export function BuilderView() {
                     iteration={state.iteration}
                     sourceFiles={state.sourceFiles}
                     workspace={state.workspace}
+                    appId={state.appId}
+                    checkpointId={state.checkpointId}
                     progress={fileProgress}
                   />
                 )}

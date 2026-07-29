@@ -787,7 +787,13 @@ Use this as the short confidence pass when time is tight.
 5. Approve the draft. Confirm the **Generated source** tab lists source files and a workspace path under `data/generated-apps/<workspace>/<app>/workspace`.
 6. Open the preview route and confirm it serves `/api/app/generated-apps/:appId/preview`, including nested generated files such as `src/App.tsx`.
 7. Open **Publish handoff**. Confirm it shows local package/runtime details, artifact paths, workspace manifest, health/smoke expectations, and next actions. It must not claim a cloud deployment unless a validated handoff URL and publish history entry exist.
-8. Optional single-port serve: run `npm run build:web && npm start`, then open `http://localhost:8484`.
+8. Open **Source** for a saved generated app. Confirm package-plan status is
+   visible, download the git-ready ZIP, and inspect the archive. It must contain
+   source, `.gitignore`, `PACKETAGENT_EXPORT.md`, the package-install plan, and
+   the checkpoint-bound export manifest. Confirm the plan says
+   `executed: false`; an unapproved package or URL/git/local dependency must
+   block installation without blocking source export.
+9. Optional single-port serve: run `npm run build:web && npm start`, then open `http://localhost:8484`.
 
 ## Golden Path: Build An App
 

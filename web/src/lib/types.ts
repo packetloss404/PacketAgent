@@ -766,6 +766,31 @@ export interface AppBuilderWorkspaceSummary {
   };
 }
 
+export interface AppBuilderPackageInstallPlan {
+  version: "packetagent.package-install-plan/v1";
+  status: "ready" | "blocked" | "not_required" | "invalid";
+  packageManager: "npm";
+  packageJsonPath?: "package.json";
+  packages: Array<{
+    name: string;
+    requested: string;
+    kind: "dependency" | "devDependency" | "optionalDependency" | "peerDependency";
+    decision: "allowed" | "blocked";
+    reason: string;
+  }>;
+  lifecycleScripts: string[];
+  command?: string[];
+  errors: string[];
+  executionPolicy: {
+    executed: false;
+    requiredSandboxDriver: "docker";
+    networkPolicy: "npm-registry-only";
+    lifecycleScripts: false;
+    timeoutMs: number;
+    maxOutputBytes: number;
+  };
+}
+
 export interface AppBuilderApproveResult {
   draft: AppBuilderDraft;
   created: true;

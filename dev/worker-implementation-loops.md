@@ -1072,8 +1072,10 @@ Status: active.
    changed/unchanged/new/deleted review and scope page, route, entity, and
    component regeneration so unrelated model mutations are restored before
    validation.
-5. Add sandboxed package-install planning and workspace export as zip or
-   git-ready files.
+5. [Complete 2026-07-29] Add allowlisted, semver-only package-install planning
+   that never executes and requires Docker/registry-only/no-lifecycle-script
+   constraints, plus a bounded workspace-owned git-ready ZIP with checkpoint,
+   file-digest, and plan provenance.
 
 Gate: both new and legacy drafts use one file-tree source of truth and users can
 review, repair, target, and export changes without hidden mutation.

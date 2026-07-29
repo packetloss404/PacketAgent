@@ -285,7 +285,7 @@ Status: active.
 - [x] Stream per-file plan/write/validate progress.
 - [x] Add file-level change review and targeted route/entity/component
       regeneration.
-- [ ] Add sandboxed package planning and workspace export as zip or git-ready
+- [x] Add sandboxed package planning and workspace export as zip or git-ready
       files.
 - Gate: new and legacy drafts use one reviewable, repairable, exportable
   file-tree source of truth.

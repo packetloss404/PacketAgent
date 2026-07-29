@@ -37,6 +37,8 @@ import {
 } from "../app-iteration-service.js";
 import { deriveDraftFromFiles } from "../codegen/derived-draft.js";
 import type { GeneratedFile } from "../codegen/llm-author.js";
+import { planGeneratedAppPackageInstall } from "../codegen/package-plan.js";
+import { buildGeneratedAppWorkspaceExport } from "../codegen/workspace-export.js";
 import { derivePreviewRefreshState } from "../app-preview-iteration.js";
 import { inspectAppIterationTools } from "../app-iteration-tools.js";
 import {
@@ -1834,6 +1836,68 @@ async function getGeneratedAppSourceFiles(c: Context) {
               role: entry.role,
             },
       ),
+    });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+}
+
+async function getGeneratedAppPackagePlan(c: Context) {
+  try {
+    const context = await requireAuthenticatedContextAsync(c);
+    await requireWorkspacePermission(context, "viewWorkspace");
+    const record = await findGeneratedAppRecord(
+      context,
+      c.req.param("appId"),
+      c.req.query("checkpointId"),
+    );
+    if (!record) throw httpRouteError(404, "generated app not found");
+    const checkpoint = checkpointForPublish(record, c.req.query("checkpointId"));
+    if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
+    const artifact = generatedAppRuntimeArtifact(record, checkpoint);
+    const files = generatedFilesFromSourceRecords(artifact.files) ?? [];
+    return c.json({
+      app: { id: record.id, slug: record.slug, name: record.name },
+      checkpoint: { id: checkpoint.id, createdAt: checkpoint.createdAt },
+      plan: planGeneratedAppPackageInstall(files),
+    });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+}
+
+async function exportGeneratedAppWorkspace(c: Context) {
+  try {
+    const context = await requireAuthenticatedContextAsync(c);
+    await requireWorkspacePermission(context, "viewWorkspace");
+    const record = await findGeneratedAppRecord(
+      context,
+      c.req.param("appId"),
+      c.req.query("checkpointId"),
+    );
+    if (!record) throw httpRouteError(404, "generated app not found");
+    const checkpoint = checkpointForPublish(record, c.req.query("checkpointId"));
+    if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
+    const artifact = generatedAppRuntimeArtifact(record, checkpoint);
+    const files = generatedFilesFromSourceRecords(artifact.files) ?? [];
+    const packagePlan = planGeneratedAppPackageInstall(files);
+    const exported = buildGeneratedAppWorkspaceExport({
+      appId: record.id,
+      appSlug: record.slug,
+      workspaceId: context.workspace.id,
+      checkpointId: checkpoint.id,
+      checkpointCreatedAt: checkpoint.createdAt,
+      files,
+      packagePlan,
+    });
+    const responseBytes = Uint8Array.from(exported.bytes);
+    return c.body(responseBytes, 200, {
+      "Cache-Control": "private, no-store",
+      "Content-Disposition": `attachment; filename="${exported.fileName}"`,
+      "Content-Length": String(exported.bytes.byteLength),
+      "Content-Type": "application/zip",
+      "X-PacketAgent-Checkpoint": checkpoint.id,
+      "X-PacketAgent-Package-Plan": packagePlan.status,
     });
   } catch (error) {
     return errorResponse(c, error);
@@ -4000,6 +4064,8 @@ export function registerBuilderRoutes(app: Hono): void {
   app.get("/app/generated-apps", async (c) => listGeneratedApps(c));
   app.get("/app/generated-apps/:appId/source", async (c) => getGeneratedAppSourceFiles(c));
   app.get("/app/generated-apps/:appId/source-files", async (c) => getGeneratedAppSourceFiles(c));
+  app.get("/app/generated-apps/:appId/package-plan", async (c) => getGeneratedAppPackagePlan(c));
+  app.get("/app/generated-apps/:appId/export", async (c) => exportGeneratedAppWorkspace(c));
   app.post("/app/builder/app-draft/apply", async (c) => applyAppBuilderDraft(c));
   app.post("/app/builder/app-draft/approve", async (c) => applyAppBuilderDraft(c));
   app.post("/app/builder/app-iteration", async (c) => generateAppIteration(c));
