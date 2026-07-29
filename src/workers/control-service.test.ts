@@ -100,6 +100,26 @@ test("pause fences a live run and resume queues the same checkpointed budget", a
   );
 });
 
+test("remote control metadata requires a PacketPhone product actor", async () => {
+  const harness = controlHarness({ runStatus: "running", includeExecutionJob: true });
+  await assert.rejects(
+    () =>
+      harness.service.pauseRun({
+        ...control("invalid-remote-actor", 1),
+        workerRunId: "run-1",
+        remoteControl: {
+          source: "packetphone",
+          audience: "PacketPhone",
+          actorRole: "admin",
+          tokenIdDigest: `sha256:${"a".repeat(64)}`,
+          nonceDigest: `sha256:${"b".repeat(64)}`,
+        },
+      }),
+    (error: unknown) => error instanceof WorkerLifecycleError && error.code === "invalid_input",
+  );
+  assert.equal(harness.data.workerControlCommands.length, 0);
+});
+
 test("pausing a queued run cancels its queued execution job before resume replaces it", async () => {
   const harness = controlHarness({ runStatus: "queued", includeExecutionJob: true });
   harness.data.jobs.push({

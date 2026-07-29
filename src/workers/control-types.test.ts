@@ -114,6 +114,39 @@ test("control commands enforce kind-specific targets and durable terminal outcom
       }),
     ),
   );
+  assert.doesNotThrow(() =>
+    assertValidWorkerControlCommand(
+      makeWorkerControlCommand({
+        actor: {
+          type: "packet_product",
+          id: "phone-operator-1",
+          product: "PacketPhone",
+        },
+        remoteControl: {
+          source: "packetphone",
+          audience: "PacketPhone",
+          actorRole: "admin",
+          tokenIdDigest: `sha256:${"a".repeat(64)}`,
+          nonceDigest: `sha256:${"b".repeat(64)}`,
+        },
+      }),
+    ),
+  );
+  assert.throws(
+    () =>
+      assertValidWorkerControlCommand(
+        makeWorkerControlCommand({
+          remoteControl: {
+            source: "packetphone",
+            audience: "PacketPhone",
+            actorRole: "admin",
+            tokenIdDigest: `sha256:${"a".repeat(64)}`,
+            nonceDigest: `sha256:${"b".repeat(64)}`,
+          },
+        }),
+      ),
+    /invalid/,
+  );
 });
 
 test("notification delivery records separate retry state from proven delivery", () => {

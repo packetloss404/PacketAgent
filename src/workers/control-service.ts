@@ -13,6 +13,7 @@ import {
   type WorkerAttentionRequest,
   type WorkerControlCommand,
   type WorkerControlCommandKind,
+  type WorkerRemoteControlAuthorization,
 } from "./control-types.js";
 import { appendWorkerJournalEntry, workerEventCorrelation } from "./observability/journal.js";
 import { validateWorkerPersistence } from "./repository.js";
@@ -61,6 +62,7 @@ export interface WorkerControlContext {
   readonly actor: WorkerActorReference;
   readonly idempotencyKey: string;
   readonly expectedRevision: number;
+  readonly remoteControl?: WorkerRemoteControlAuthorization;
 }
 
 export interface WorkerRunControlInput extends WorkerControlContext {
@@ -103,6 +105,7 @@ interface NormalizedControlRequest {
   readonly actor: WorkerActorReference;
   readonly idempotencyKey: string;
   readonly expectedRevision: number;
+  readonly remoteControl?: WorkerRemoteControlAuthorization;
   readonly kind: WorkerControlCommandKind;
   readonly targetId: string;
   readonly expiresAt?: string;
@@ -217,6 +220,7 @@ export function workerControlRequestDigest(request: NormalizedControlRequest): s
     targetId: request.targetId,
     expectedRevision: request.expectedRevision,
     actor: request.actor,
+    remoteControl: request.remoteControl ?? null,
     expiresAt: request.expiresAt ?? null,
   });
 }
@@ -260,6 +264,21 @@ function assertControlRequest(request: NormalizedControlRequest): void {
     throw new WorkerLifecycleError(
       "invalid_input",
       "Worker approval expiry must be a canonical timestamp.",
+    );
+  }
+  if (
+    request.remoteControl !== undefined &&
+    (request.remoteControl.source !== "packetphone" ||
+      request.remoteControl.audience !== "PacketPhone" ||
+      !["viewer", "member", "admin", "owner"].includes(request.remoteControl.actorRole) ||
+      !isDigest(request.remoteControl.tokenIdDigest) ||
+      !isDigest(request.remoteControl.nonceDigest) ||
+      request.actor.type !== "packet_product" ||
+      request.actor.product !== "PacketPhone")
+  ) {
+    throw new WorkerLifecycleError(
+      "invalid_input",
+      "Worker remote control authorization is invalid.",
     );
   }
 }
@@ -350,6 +369,7 @@ function makePendingCommand(
     idempotencyKey: request.idempotencyKey,
     requestDigest,
     actor: request.actor,
+    ...(request.remoteControl ? { remoteControl: structuredClone(request.remoteControl) } : {}),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -844,6 +864,17 @@ function appendControlEvent(
     ...(command.workerRunId ? { workerRunId: command.workerRunId } : {}),
     ...(command.attentionRequestId ? { attentionRequestId: command.attentionRequestId } : {}),
     ...(command.approvalGrantId ? { approvalGrantId: command.approvalGrantId } : {}),
+    ...(command.remoteControl
+      ? {
+          remoteControl: {
+            source: command.remoteControl.source,
+            audience: command.remoteControl.audience,
+            actorRole: command.remoteControl.actorRole,
+            tokenIdDigest: command.remoteControl.tokenIdDigest,
+            nonceDigest: command.remoteControl.nonceDigest,
+          },
+        }
+      : {}),
     ...(affectedRunIds.length > 0 ? { affectedRunIds: [...affectedRunIds] } : {}),
   };
   const run = command.workerRunId
@@ -983,6 +1014,10 @@ function replaceWorkspaceRecord<T extends { readonly id: string; readonly worksp
 function isCanonicalTimestamp(value: string): boolean {
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
+}
+
+function isDigest(value: string): boolean {
+  return /^sha256:[a-f0-9]{64}$/.test(value);
 }
 
 function digest(value: unknown): string {

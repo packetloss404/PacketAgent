@@ -72,6 +72,12 @@ const ACTOR = {
   id: "user_alpha",
   displayName: "Alpha",
 } as const;
+const PACKETPHONE_ACTOR = {
+  type: "packet_product",
+  id: "phone-operator-parity",
+  displayName: "PacketPhone admin remote actor",
+  product: "PacketPhone",
+} as const;
 const SOURCE: WorkerSourceProvenance = {
   product: "PacketAgent",
   kind: "native",
@@ -113,6 +119,7 @@ interface BackendScenarioResult {
   readonly exportedBudgetReservationCount: number;
   readonly controlRecordStatuses: readonly string[];
   readonly exportedControlRecordCounts: readonly number[];
+  readonly remoteControlAuthorizations: readonly string[];
   readonly exportedEvidenceCount: number;
   readonly exportedArtifactManifestCount: number;
   readonly retentionEventCount: number;
@@ -180,6 +187,19 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
   assert.equal(exported.data.workerAttentionRequests.length, stored.workerAttentionRequests.length);
   assert.equal(exported.data.workerApprovalGrants.length, stored.workerApprovalGrants.length);
   assert.equal(exported.data.workerControlCommands.length, stored.workerControlCommands.length);
+  const storedRemoteControl = stored.workerControlCommands.find(
+    (record) => record.idempotencyKey === "parity-pause",
+  )?.remoteControl;
+  assert.ok(storedRemoteControl);
+  const exportedRemoteControl = exported.data.workerControlCommands.find(
+    (record) => record.idempotencyKey === "parity-pause",
+  )?.remoteControl;
+  assert.ok(exportedRemoteControl);
+  assert.equal(exportedRemoteControl.source, storedRemoteControl.source);
+  assert.equal(exportedRemoteControl.audience, storedRemoteControl.audience);
+  assert.equal(exportedRemoteControl.actorRole, storedRemoteControl.actorRole);
+  assert.match(exportedRemoteControl.tokenIdDigest, /^\[redacted\]/);
+  assert.equal(exportedRemoteControl.nonceDigest, storedRemoteControl.nonceDigest);
   assert.equal(
     exported.data.workerNotificationDeliveries.length,
     stored.workerNotificationDeliveries.length,
@@ -283,6 +303,13 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       exported.data.workerControlCommands.length,
       exported.data.workerNotificationDeliveries.length,
     ],
+    remoteControlAuthorizations: stored.workerControlCommands
+      .filter((record) => record.remoteControl)
+      .map(
+        (record) =>
+          `${record.kind}:${record.actor.product}:${record.remoteControl!.source}:${record.remoteControl!.actorRole}:${record.remoteControl!.audience}`,
+      )
+      .sort(),
     exportedEvidenceCount: exported.data.workerEvidenceEntries.length,
     exportedArtifactManifestCount: exported.data.workerArtifactManifests.length,
     retentionEventCount: stored.workerEvents.filter((event) =>
@@ -660,9 +687,16 @@ async function runRuntimePersistence(): Promise<void> {
   const paused = await controls.pauseRun({
     workspaceId: admittedRun.workspaceId,
     workerRunId: admittedRun.id,
-    actor: ACTOR,
+    actor: PACKETPHONE_ACTOR,
     idempotencyKey: "parity-pause",
     expectedRevision: admittedRun.revision,
+    remoteControl: {
+      source: "packetphone",
+      audience: "PacketPhone",
+      actorRole: "admin",
+      tokenIdDigest: `sha256:${"a".repeat(64)}`,
+      nonceDigest: `sha256:${"b".repeat(64)}`,
+    },
   });
   assert.equal(paused.run?.status, "paused");
   const controlBinding = {

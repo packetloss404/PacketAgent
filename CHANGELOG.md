@@ -6,17 +6,35 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - PacketPhone Worker controls (W10.3)
+
+- Added encrypted `packetagent.packetphone-route/v1` configuration and an
+  HTTPS-only PacketPhone transport that reloads exact immutable Worker
+  bindings before resolving route secrets around the hardened network call.
+- Added role-bounded approve, reject, pause, stop, and revoke controls with
+  explicitly typed HS256 POST callbacks bound to the exact action, workspace,
+  definition, deployment, run, attention, version, actor, role, route, source
+  event, revision, nonce, JTI, and expiry.
+- Routed valid callbacks exclusively through W7. Its atomic idempotent
+  `WorkerControlCommand` now serves as the durable single-use consumption
+  record and retains only digest-safe PacketPhone authorization metadata.
+- Added all-five-action, role-narrowing, deterministic retry, strict callback,
+  restart replay, stale/resolved/tamper/expiry/cross-binding, secret-rotation,
+  non-persistence, and three-backend parity coverage. The W10.3 baseline passes
+  1,506 API tests plus 28 web tests, with 2 intentional API skips and no
+  failures. W10.4 certification remains active.
+
 ### 2026-07-28 - Pause handoff and implementation reports
 
 - Consolidated every remaining W10 and inherited R1-R8 task into
   `BACKLOG.md`, the single active implementation ledger, and made the Codex
-  handoff resume directly at W10.3 there.
+  handoff resume directly at W10.3 there at that pause.
 - Added a 15-page canonical Worker implementation report covering W1-W10.2,
   the runtime safety model, verification baseline, and exact pause state.
 - Added a separate 9-page Packet-suite integration reality check that states
   which work exists only inside PacketAgent, what PacketADE and PacketChat
-  still need in their own repositories, and why PacketPhone W10.3 is not yet
-  implemented.
+  still need in their own repositories, and why PacketPhone W10.3 was not yet
+  implemented at that pause.
 - Recorded the PacketAgent `origin` and `main` branch while retaining
   `taskloom-source` as a read-only historical source.
 

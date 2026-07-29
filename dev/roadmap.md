@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **W10.3 - implement PacketPhone controls**. Repository/session state
+Current active loop: **W10.4 - close the remote-control gate**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -35,8 +35,10 @@ event/evidence binding, stable idempotency, bounded scheduler retry/expiry,
 dead-letter state, and retention-safe provenance across all three storage
 modes. W10.2 now adds encrypted PacketChat route resolution, pinned-network
 delivery of bounded replaceable progress cards, and short-lived exact-binding
-open/inspect callbacks. Resume at W10.3 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#w103---implement-packetphone-controls).
+open/inspect callbacks. W10.3 adds encrypted HTTPS-only PacketPhone delivery,
+role-bounded approve/reject/pause/stop/revoke controls, exact-binding signed
+POST callbacks, and durable one-use consumption through W7. Resume at W10.4 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#w104---close-the-remote-control-gate).
 
 ## North star
 
@@ -152,8 +154,10 @@ later update, pause/resume, rollback, and revoke operations.
 
 The channel-neutral notification outbox and PacketChat adapter are complete.
 PacketChat receives bounded threaded Worker summaries and authenticated
-inspect/open callbacks. Next, add PacketPhone approval and kill controls
-without weakening W7 controls.
+inspect/open callbacks. PacketPhone now receives role-bounded approval and kill
+controls whose signed callbacks consume the same atomic W7 commands. Next,
+certify both adapters under local/remote races, credential rotation, restart,
+replay, and dead-letter recovery before making a unified lifecycle claim.
 
 ### 11. Integrations and worker templates
 

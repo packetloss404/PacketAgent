@@ -19,7 +19,7 @@ on `origin/main`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W9 and W10.1-W10.2 are implemented as
+in foundation commit `d60cd47`. W1-W9 and W10.1-W10.3 are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -267,6 +267,9 @@ Implemented substrate:
 - encrypted PacketChat route credentials, pinned-network delivery of bounded
   threaded Worker cards, replaceable progress summaries, and short-lived
   exact-binding read-only open/inspect callbacks;
+- encrypted HTTPS-only PacketPhone route credentials, role-bounded approve,
+  reject, pause, stop, and revoke controls, and durable single-use callbacks
+  executed through W7;
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
@@ -281,20 +284,22 @@ Not shipped:
 
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
-- PacketPhone delivery and mutating callback routes;
-- live PacketChat/PacketPhone cross-product interoperability certification.
+- W10.4 local cross-product race, restart, replay, credential-rotation, and
+  dead-letter recovery certification; and
+- live PacketChat/PacketPhone interoperability certification when endpoint
+  credentials are available.
 
 Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W10.3 - implement PacketPhone controls** in
+Continue **W10.4 - close the remote-control gate** in
 [`../BACKLOG.md#w10---packetchat-and-packetphone-routes`](../BACKLOG.md#w10---packetchat-and-packetphone-routes).
 `BACKLOG.md` is the single ledger for every remaining W10 and R1-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
 active work absent from the backlog.
 
-W1-W9 and W10.1-W10.2 are complete under `src/workers/`, the store, migrations,
+W1-W9 and W10.1-W10.3 are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -414,9 +419,25 @@ only the matching workbench URL or W8 redacted detail. W10.2 callbacks are
 read-only, and no endpoint, bearer value, callback secret, or signed token is
 persisted. Workspace admins configure route secrets through metadata-only
 private Worker credential list/upsert/remove routes.
+W10.3 adds a PacketPhone transport using the same encrypted credential and
+hardened network boundaries. Its HTTPS-only configuration fixes one PacketPhone
+actor, workspace role, and role-valid action subset; each message contains the
+exact immutable Worker/deployment/run/version/event/evidence/revision state and
+only controls valid for that actor and current state. Strict POST callbacks use
+explicitly typed HS256 tokens bound to the action, workspace, definition,
+deployment, run, optional attention request, version ID and digest, actor,
+role, route, source event and digest, expected revision, nonce, JTI, issued-at,
+and expiry. Valid callbacks delegate exclusively to W7 using a digest-derived
+idempotency key, so the atomic `WorkerControlCommand` is the durable single-use
+consumption record. Only PacketPhone source, role, audience, and token/nonce
+digests persist; raw route secrets, bearer values, callback tokens, and
+approval nonces do not. Restart replay, stale or resolved actions,
+cross-workspace/version substitution, tampering, expiry, weak roles, and
+callback-secret rotation all fail closed across JSON, SQLite, and managed
+Postgres.
 
 The exact next slice is
-[`W10.3 - PacketPhone controls`](../BACKLOG.md#w10---packetchat-and-packetphone-routes).
+[`W10.4 - remote-control certification`](../BACKLOG.md#w10---packetchat-and-packetphone-routes).
 After each gate passes, continue through W10 and then R1-R8 using that
 backlog's unchecked checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
@@ -434,9 +455,9 @@ must not be resumed independently.
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
 - Verification: [`TESTING.md`](TESTING.md)
 - Shipped history: [`../CHANGELOG.md`](../CHANGELOG.md)
-- W1-W10.2 implementation report:
+- Pre-W10.3 W1-W10.2 implementation-report snapshot:
   [`../output/pdf/packetagent-worker-implementation-report.pdf`](../output/pdf/packetagent-worker-implementation-report.pdf)
-- Packet-suite integration reality check:
+- Matching pre-W10.3 Packet-suite integration snapshot:
   [`../output/pdf/packet-suite-integration-reality-check.pdf`](../output/pdf/packet-suite-integration-reality-check.pdf)
 
 Historical documents are labeled at their top and must not override this
@@ -447,7 +468,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,493 passed, 2 skipped, 0 failed
+- `npm run test:api` - 1,506 passed, 2 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -530,6 +551,12 @@ handoff, the roadmap, or the backlog.
   stable progress replacement, secret non-persistence, transport delegation,
   retry classification, HS256 signature/tamper/expiry/cross-workspace binding,
   redacted inspect projection, and no-store callback routes - passed
+- focused W10.3 all-five-action delivery, W7 role narrowing, stable retry
+  payloads, pinned-network delivery, strict POST/no-store callbacks, durable
+  restart replay rejection, stale/resolved/cross-workspace/cross-version/
+  tamper/expiry rejection, callback-secret rotation, token and secret
+  non-persistence, and JSON/SQLite/managed-Postgres persistence/export parity -
+  passed
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 

@@ -23,17 +23,19 @@ capability acceptance, durable pre-deployment receipts, rate limiting,
 token-safe audit, and three-backend parity. W9.3 adds receipt-bound
 deployment/control routes, and W9.4 adds reconnectable event streams plus
 durable cursor acknowledgement. The serialized disconnect/process-restart
-gate passes in W9.5. PacketPhone remote controls remain W10 work and are
-not yet a current product claim. W10.1 adds the channel-neutral notification
+gate passes in W9.5. W10.1 adds the channel-neutral notification
 outbox, atomic event/evidence binding, stable idempotency, bounded
 retry/expiry/dead-letter handling, scheduler integration, redaction, and
 retention-safe provenance. W10.2 adds encrypted PacketChat route resolution,
 pinned-network delivery of bounded threaded cards, stable progress
-replacement, and short-lived exact-binding read-only callbacks.
+replacement, and short-lived exact-binding read-only callbacks. W10.3 adds
+encrypted HTTPS-only PacketPhone delivery, role-bounded controls, and durable
+single-use callbacks through W7. W10.4 local certification and live
+interoperability remain outstanding.
 
-Last automated W10.2 baseline (2026-07-28):
+Last automated W10.3 baseline (2026-07-28):
 
-- API: 1,493 passed, 2 skipped, 0 failed
+- API: 1,506 passed, 2 skipped, 0 failed
 - Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -710,6 +712,41 @@ it in a URL, package, log, event, or evidence payload.
 9. No live PacketChat endpoint is configured in this repository. Treat local
    fake-endpoint contracts as the W10.2 gate and leave real interoperability
    for W10.4.
+
+## W10.3 PacketPhone Control Smoke
+
+1. As a workspace admin, create an opaque Worker credential whose plaintext
+   schema is `packetagent.packetphone-route/v1`. Use HTTPS endpoints, a
+   32-byte-or-longer callback secret, one fixed PacketPhone actor ID and role,
+   a role-valid allowed-action subset, and optional bearer, timeout, and
+   callback-lifetime values. Confirm credential reads return metadata only.
+2. Add a `packetphone` notification route using that exact declared `vault:*`
+   reference. Confirm undeclared, non-vault, HTTP, weak-secret, weak-role, and
+   role-invalid action configurations fail closed.
+3. Produce an actionable Worker event. Confirm delivery contains the exact
+   Worker, deployment, run, immutable version, source event/evidence, attention,
+   and revision state, and only currently valid controls. Confirm callback
+   tokens appear only in strict POST bodies and never in URLs.
+4. Verify a member can pause or stop but cannot approve, reject, or revoke.
+   Verify only admin/owner roles can receive and execute all five controls.
+5. Execute approve, reject, pause, stop, and revoke through the PacketPhone
+   callback. Confirm each delegates to W7 and creates the same durable control
+   state and audit event as an independently authenticated local operator.
+6. Serialize the durable store, construct fresh services, and replay a consumed
+   callback. Confirm it is rejected without creating a second command, grant,
+   nonce, transition, or external effect.
+7. Exercise stale revisions, already-resolved attention, cross-workspace and
+   cross-version substitution, token tampering, wrong audience/role/route, and
+   expiry. Confirm every case fails without leaking Worker state.
+8. Rotate the callback secret and confirm an old token stops authenticating.
+   Deliver a new message and confirm its token succeeds under the new secret.
+9. Repeat persistence and export checks through JSON, SQLite, and managed
+   Postgres. Confirm endpoints, bearers, callback secrets, signed tokens, and
+   approval nonces never persist; remote-control audit state contains only its
+   source, role, audience, and token/nonce digests.
+10. No live PacketPhone endpoint is configured in this repository. Treat the
+    local fake-endpoint contract as the W10.3 gate and leave cross-product
+    certification for W10.4.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

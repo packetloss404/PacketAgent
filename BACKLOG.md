@@ -184,7 +184,7 @@ Status: complete. Resume at
 Dependencies: W7-W9.
 
 Status: active. Resume at
-[`W10.3 - Implement PacketPhone controls`](dev/worker-implementation-loops.md#w103---implement-packetphone-controls).
+[`W10.4 - Close the remote-control gate`](dev/worker-implementation-loops.md#w104---close-the-remote-control-gate).
 
 - [x] Add a versioned channel-neutral notification outbox with atomic
       event/evidence binding, stable idempotency, bounded retry/expiry,
@@ -195,13 +195,13 @@ Status: active. Resume at
       route credential, pinned-network transport, stable progress replacement,
       bounded state/budget/checkpoint/evidence cards, and short-lived
       exact-binding open/inspect callbacks.
-- [ ] **W10.3 - PacketPhone controls:** deliver approve, reject, pause, stop,
+- [x] **W10.3 - PacketPhone controls:** deliver approve, reject, pause, stop,
       and revoke actions only when the PacketPhone actor and role are allowed
       by W7.
-- [ ] Bind each W10.3 token to action, workspace, deployment, run, attention
+- [x] Bind each W10.3 token to action, workspace, deployment, run, attention
       request when applicable, immutable version digest, actor, audience,
       nonce, and expiry.
-- [ ] Consume W10.3 callbacks durably and reject stale, replayed,
+- [x] Consume W10.3 callbacks durably and reject stale, replayed,
       cross-workspace, cross-version, and already-resolved actions.
 - [ ] **W10.4 - Remote-control certification:** contract-test PacketChat and
       PacketPhone adapters against fake endpoints; race local and remote

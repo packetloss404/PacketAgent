@@ -48,8 +48,8 @@ When a loop is active:
    `dev/roadmap.md`, `dev/CODEX-HANDOFF.md`, public truth in `README.md`, and
    shipped history in `CHANGELOG.md`; commit the gate; then continue to the
    next loop.
-7. Never push to `taskloom-source`. A PacketAgent `origin` must be created and
-   confirmed separately before any push.
+7. Never push to `taskloom-source`. Publish PacketAgent commits only to the
+   confirmed `origin` remote.
 
 Continue through normal implementation uncertainty. Stop and request a product
 or operator decision only when:
@@ -739,7 +739,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: complete as of 2026-07-28. Resume at W10.3.
+Status: complete as of 2026-07-28. Resume at W10.4.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -841,7 +841,7 @@ Packet surfaces without weakening W7 policy or audit guarantees.
 
 ### W10.1 - Add a notification outbox
 
-Status: complete as of 2026-07-28. Resume at W10.3.
+Status: complete as of 2026-07-28. Resume at W10.4.
 
 - Define a versioned, channel-neutral notification envelope for attention,
   progress summaries, and terminal outcomes.
@@ -872,7 +872,7 @@ Implementation record:
 
 ### W10.2 - Implement PacketChat delivery
 
-Status: complete as of 2026-07-28. Resume at W10.3.
+Status: complete as of 2026-07-28. Resume at W10.4.
 
 - Send concise deployment/run/version state, reason, budget, checkpoint,
   evidence link, and required action.
@@ -914,12 +914,44 @@ Implementation record:
 
 ### W10.3 - Implement PacketPhone controls
 
+Status: complete as of 2026-07-28. Resume at W10.4.
+
 - Deliver approve, reject, pause, stop, and revoke actions only when the actor
   and role permit them.
 - Bind signed callback tokens to action, workspace, deployment, run, attention
   request, version digest, actor/audience, nonce, and expiry.
 - Consume callbacks durably and reject stale, replayed, cross-workspace, or
   already-resolved actions.
+
+Implementation record:
+
+- `packetagent.packetphone-route/v1` stores only inside an encrypted `vault:*`
+  credential: HTTPS endpoint, optional bearer, callback origin and secret,
+  fixed PacketPhone actor/role, a role-valid action subset, timeout, and token
+  lifetime. Member roles can pause or stop; only admin/owner roles can approve,
+  reject, or revoke, matching the W7 RBAC permission matrix.
+- `packetagent.packetphone-worker-control/v1` carries the immutable Worker,
+  deployment, run, version digest, event/evidence, current revisions, optional
+  attention, and only controls valid for the configured role and current
+  state. Stable event-time claims and secret-derived nonces keep retry payloads
+  identical under the W10.1 idempotency key.
+- HTTPS-only control callbacks use an explicitly typed HS256 JWT with fixed
+  issuer/audience/algorithm and exact action, workspace, definition,
+  deployment, run, attention, version digest, actor, role, route, source
+  event/digest, expected revision, nonce, JTI, issued-at, and expiry bindings.
+  Tokens are sent in a strict POST body and never enter URLs, stores, events,
+  evidence, logs, jobs, or callback responses.
+- Each valid callback delegates to W7 with a digest-derived idempotency key.
+  The resulting atomic `WorkerControlCommand` is the durable one-use
+  consumption record and carries only PacketPhone source/role/audience plus
+  token/JTI digests. Replays, stale revisions, already-resolved attention,
+  cross-tenant/version substitution, weak roles, expiry, and secret rotation
+  fail closed.
+- Focused and full gates cover all five actions, role narrowing, stable retry
+  payloads, pinned-network delivery, no-store public errors, restart replay,
+  JSON/SQLite/managed-Postgres persistence/export parity, and secret
+  non-persistence. Live PacketPhone interoperability remains W10.4 because no
+  endpoint or credential is configured.
 
 ### W10.4 - Close the remote-control gate
 

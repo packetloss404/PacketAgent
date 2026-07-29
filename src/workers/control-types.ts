@@ -86,6 +86,16 @@ export type WorkerControlCommandKind =
 
 export type WorkerControlCommandStatus = "pending" | "applied" | "rejected";
 
+export type WorkerRemoteControlRole = "viewer" | "member" | "admin" | "owner";
+
+export interface WorkerRemoteControlAuthorization {
+  readonly source: "packetphone";
+  readonly audience: "PacketPhone";
+  readonly actorRole: WorkerRemoteControlRole;
+  readonly tokenIdDigest: string;
+  readonly nonceDigest: string;
+}
+
 export interface WorkerControlCommand {
   readonly schemaVersion: typeof WORKER_CONTROL_COMMAND_SCHEMA_VERSION;
   readonly id: string;
@@ -104,6 +114,7 @@ export interface WorkerControlCommand {
   readonly idempotencyKey: string;
   readonly requestDigest: string;
   readonly actor: WorkerActorReference;
+  readonly remoteControl?: WorkerRemoteControlAuthorization;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly appliedAt?: string;
@@ -345,6 +356,7 @@ export function assertValidWorkerControlCommand(record: WorkerControlCommand): v
     !isNonEmpty(record.idempotencyKey) ||
     !isDigest(record.requestDigest) ||
     !isActor(record.actor) ||
+    !isValidRemoteAuthorization(record.remoteControl, record.actor) ||
     !isTimestamp(record.createdAt) ||
     !isTimestamp(record.updatedAt) ||
     Date.parse(record.updatedAt) < Date.parse(record.createdAt)
@@ -695,6 +707,22 @@ function isActor(value: unknown): value is WorkerActorReference {
   if (!value || typeof value !== "object") return false;
   const actor = value as Partial<WorkerActorReference>;
   return ["user", "system", "packet_product"].includes(actor.type ?? "") && isNonEmpty(actor.id);
+}
+
+function isValidRemoteAuthorization(
+  value: WorkerRemoteControlAuthorization | undefined,
+  actor: WorkerActorReference,
+): boolean {
+  if (value === undefined) return true;
+  return (
+    value.source === "packetphone" &&
+    value.audience === "PacketPhone" &&
+    ["viewer", "member", "admin", "owner"].includes(value.actorRole) &&
+    isDigest(value.tokenIdDigest) &&
+    isDigest(value.nonceDigest) &&
+    actor.type === "packet_product" &&
+    actor.product === "PacketPhone"
+  );
 }
 
 function isUniqueNonEmptyStrings(values: readonly string[]): boolean {
