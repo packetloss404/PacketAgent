@@ -52,7 +52,10 @@ job controls, and collision/race coverage. The backend security/startup slice
 now makes `npm start` a single non-watch server, defers bootstrap side effects
 until explicit startup, applies baseline headers/CSP, and authorizes opt-in
 artifact reads against the owning workspace and exact run. Frontend safety,
-persistence end-state, dependency disposition, and formatting/lint are next;
+render recovery, multi-secret redaction, the preview iframe contract, audited
+dead controls, primary keyboard semantics, and stale web branding are also
+closed. Persistence end-state, dependency disposition, and formatting/lint are
+next;
 [`r1-repository-health-audit.md`](r1-repository-health-audit.md) records
 supporting evidence while `BACKLOG.md` remains the ledger.
 

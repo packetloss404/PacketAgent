@@ -41,6 +41,18 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Re-audited the rate-limit and generated-preview-token findings as already
   fixed, with current proxy-chain, hashed-identity, distributed fail-closed,
   and production-fallback rejection tests cited in the R1 evidence.
+- Added a generic top-level React recovery boundary, a titled/sandboxed builder
+  preview iframe, and complete multi-secret redaction for persisted app
+  iteration metadata.
+- Removed the advertised Alerts stub, replaced inert controls with honest
+  status or live navigation, and converted primary navigation, tabs, role
+  selectors, output selectors, and project cards to native keyboard-operable
+  buttons.
+- Replaced stale workbench, sign-in, logged-out, and public-share TaskLoom
+  wordmarks with the canonical PacketAgent web brand configuration.
+- Passed 23 focused backend safety tests, 30 web tests, typecheck, the production
+  web build, and a local signed-out/signed-in browser inspection. The inherited
+  baselines are reduced to 143 ESLint warnings and 311 Prettier files.
 
 ### 2026-07-28 - Local remote-control certification (W10.4)
 

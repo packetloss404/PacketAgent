@@ -20,15 +20,6 @@ interface AdminTab {
   Component: ComponentType;
 }
 
-function AlertsView() {
-  return (
-    <div style={{ padding: 24, color: "var(--silver-300)", fontSize: 13 }}>
-      <div style={{ fontSize: 15, color: "var(--silver-50)", marginBottom: 6 }}>Alerts</div>
-      <div className="muted">Alerts configuration is coming soon.</div>
-    </div>
-  );
-}
-
 const ADMIN_TABS: AdminTab[] = [
   { id: "roles", label: "Roles", Component: RolesView },
   { id: "sso", label: "SSO & auth", Component: SSOView },
@@ -42,7 +33,6 @@ const ADMIN_TABS: AdminTab[] = [
   { id: "sandbox", label: "Sandbox", Component: SandboxView },
   { id: "workflows", label: "Workflows", Component: WorkflowsView },
   { id: "billing", label: "Billing", Component: BillingView },
-  { id: "alerts", label: "Alerts", Component: AlertsView },
 ];
 
 const DEFAULT_TAB_ID = "roles";
@@ -83,6 +73,7 @@ export function AdminPage() {
           const isActive = t.id === activeTab.id;
           return (
             <button
+              type="button"
               key={t.id}
               role="tab"
               aria-selected={isActive}

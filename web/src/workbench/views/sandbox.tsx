@@ -2,25 +2,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { I } from "../icons";
 import { useApiData } from "../useApiData";
 import { api, streamSandboxExec } from "@/lib/api";
-import type {
-  SandboxExecRecord,
-  SandboxExecStatus,
-  SandboxRuntimeInfo,
-} from "@/lib/types";
+import type { SandboxExecRecord, SandboxExecStatus, SandboxRuntimeInfo } from "@/lib/types";
 
 const STATUS_FILTERS: Array<"all" | SandboxExecStatus> = [
-  "all", "queued", "running", "success", "failed", "timeout", "canceled",
+  "all",
+  "queued",
+  "running",
+  "success",
+  "failed",
+  "timeout",
+  "canceled",
 ];
 
 function statusPillClass(status: SandboxExecStatus): string {
   switch (status) {
-    case "success": return "good";
-    case "running": return "info";
-    case "queued": return "muted";
+    case "success":
+      return "good";
+    case "running":
+      return "info";
+    case "queued":
+      return "muted";
     case "failed":
-    case "timeout": return "danger";
-    case "canceled": return "warn";
-    default: return "muted";
+    case "timeout":
+      return "danger";
+    case "canceled":
+      return "warn";
+    default:
+      return "muted";
   }
 }
 
@@ -119,91 +127,130 @@ export function SandboxView() {
 
   return (
     <div style={{ padding: "26px 28px", maxWidth: 1320 }}>
-        <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
-          Run commands in a sandboxed runtime. Streams stdout/stderr live.
-        </p>
+      <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
+        Run commands in a sandboxed runtime. Streams stdout/stderr live.
+      </p>
 
-        <StatusPanel
-          loading={status.loading}
-          error={status.error}
-          driver={status.data?.driver}
-          available={status.data?.available}
-          note={status.data?.note}
-          runtimes={status.data?.runtimes ?? runtimes.data ?? []}
+      <StatusPanel
+        loading={status.loading}
+        error={status.error}
+        driver={status.data?.driver}
+        available={status.data?.available}
+        note={status.data?.note}
+        runtimes={status.data?.runtimes ?? runtimes.data ?? []}
+      />
+
+      {/* Stats row */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 10,
+          margin: "18px 0",
+        }}
+      >
+        <StatCard
+          label="Total execs"
+          value={String(list.length)}
+          sub={`${last24h.length} in last 24h`}
         />
-
-        {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, margin: "18px 0" }}>
-          <StatCard label="Total execs" value={String(list.length)} sub={`${last24h.length} in last 24h`} />
-          <StatCard label="Running" value={String(running)} tone={running > 0 ? "info" : "default"} />
-          <StatCard label="Failed · 24h" value={String(failed24h)} tone={failed24h > 0 ? "danger" : "good"} />
-          <StatCard label="Median duration" value={formatDuration(median)} />
-        </div>
-
-        {/* Composer */}
-        <Composer
-          command={command}
-          setCommand={setCommand}
-          runtime={runtime}
-          setRuntime={setRuntime}
-          workingDir={workingDir}
-          setWorkingDir={setWorkingDir}
-          runtimes={runtimes.data ?? []}
-          working={working}
-          error={composerError}
-          onStart={() => { void startExec(); }}
+        <StatCard label="Running" value={String(running)} tone={running > 0 ? "info" : "default"} />
+        <StatCard
+          label="Failed · 24h"
+          value={String(failed24h)}
+          tone={failed24h > 0 ? "danger" : "good"}
         />
+        <StatCard label="Median duration" value={formatDuration(median)} />
+      </div>
 
-        {/* Filter row */}
-        <div style={{ display: "flex", gap: 6, margin: "18px 0 12px", alignItems: "center" }}>
-          <span className="kicker">FILTER</span>
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f}
-              className="btn btn-sm"
-              onClick={() => setFilter(f)}
-              style={{
-                background: filter === f ? "var(--bg-elev)" : "var(--panel)",
-                color: filter === f ? "var(--silver-50)" : "var(--silver-300)",
-                borderColor: filter === f ? "var(--line-3)" : "var(--line-2)",
-              }}
-            >
-              {f}
-            </button>
-          ))}
-          <button className="btn btn-sm" style={{ marginLeft: "auto" }} onClick={() => void execs.refresh()}>
-            Refresh
+      {/* Composer */}
+      <Composer
+        command={command}
+        setCommand={setCommand}
+        runtime={runtime}
+        setRuntime={setRuntime}
+        workingDir={workingDir}
+        setWorkingDir={setWorkingDir}
+        runtimes={runtimes.data ?? []}
+        working={working}
+        error={composerError}
+        onStart={() => {
+          void startExec();
+        }}
+      />
+
+      {/* Filter row */}
+      <div style={{ display: "flex", gap: 6, margin: "18px 0 12px", alignItems: "center" }}>
+        <span className="kicker">FILTER</span>
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f}
+            className="btn btn-sm"
+            onClick={() => setFilter(f)}
+            style={{
+              background: filter === f ? "var(--bg-elev)" : "var(--panel)",
+              color: filter === f ? "var(--silver-50)" : "var(--silver-300)",
+              borderColor: filter === f ? "var(--line-3)" : "var(--line-2)",
+            }}
+          >
+            {f}
           </button>
+        ))}
+        <button
+          className="btn btn-sm"
+          style={{ marginLeft: "auto" }}
+          onClick={() => void execs.refresh()}
+        >
+          Refresh
+        </button>
+      </div>
+
+      {execs.loading && (
+        <div className="muted" style={{ padding: 16 }}>
+          Loading executions…
         </div>
+      )}
+      {execs.error && (
+        <div className="card" style={{ padding: 16, color: "var(--danger)" }}>
+          {execs.error}
+        </div>
+      )}
 
-        {execs.loading && <div className="muted" style={{ padding: 16 }}>Loading executions…</div>}
-        {execs.error && (
-          <div className="card" style={{ padding: 16, color: "var(--danger)" }}>{execs.error}</div>
-        )}
+      <ExecTable
+        execs={filtered}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onCancel={async (id) => {
+          await api.cancelSandboxExec(id).catch(() => {});
+          void execs.refresh();
+        }}
+      />
 
-        <ExecTable
-          execs={filtered}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onCancel={async (id) => { await api.cancelSandboxExec(id).catch(() => {}); void execs.refresh(); }}
-        />
-
-        {selectedExec && (
-          <div style={{ marginTop: 18 }}>
-            <SelectedExecPanel
-              exec={selectedExec}
-              onCancel={() => { void cancelSelected(); }}
-              onClose={() => setSelectedId(null)}
-              onUpdate={() => { void execs.refresh(); }}
-            />
-          </div>
-        )}
+      {selectedExec && (
+        <div style={{ marginTop: 18 }}>
+          <SelectedExecPanel
+            exec={selectedExec}
+            onCancel={() => {
+              void cancelSelected();
+            }}
+            onClose={() => setSelectedId(null)}
+            onUpdate={() => {
+              void execs.refresh();
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
 function StatusPanel({
-  loading, error, driver, available, note, runtimes,
+  loading,
+  error,
+  driver,
+  available,
+  note,
+  runtimes,
 }: {
   loading: boolean;
   error: string | null;
@@ -217,47 +264,88 @@ function StatusPanel({
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <I.cpu size={15} style={{ color: "var(--green)" }} />
         <div className="kicker">DRIVER</div>
-        {loading && <span className="muted" style={{ fontSize: 12 }}>Loading…</span>}
-        {!loading && driver && (
-          <span className={`pill ${driver === "docker" ? "good" : "warn"}`}>
-            <span className="dot"></span>{driver}
+        {loading && (
+          <span className="muted" style={{ fontSize: 12 }}>
+            Loading…
           </span>
         )}
-        {!loading && driver === "native" && (
-          <span className="pill danger">INSECURE</span>
+        {!loading && driver && (
+          <span className={`pill ${driver === "docker" ? "good" : "warn"}`}>
+            <span className="dot"></span>
+            {driver}
+          </span>
         )}
+        {!loading && driver === "native" && <span className="pill danger">INSECURE</span>}
         {!loading && available !== undefined && (
           <span className={`pill ${available ? "good" : "danger"}`}>
-            <span className="dot"></span>{available ? "available" : "unavailable"}
+            <span className="dot"></span>
+            {available ? "available" : "unavailable"}
           </span>
         )}
         <span className="mono muted" style={{ fontSize: 11, marginLeft: "auto" }}>
           {runtimes.length} runtime{runtimes.length === 1 ? "" : "s"}
         </span>
       </div>
-      {error && <div className="muted" style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{error}</div>}
-      {note && <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>{note}</div>}
+      {error && (
+        <div className="muted" style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>
+          {error}
+        </div>
+      )}
+      {note && (
+        <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+          {note}
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         {runtimes.map((r) => (
-          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6, background: "var(--panel)" }}>
-            <span style={{
-              width: 8, height: 8, borderRadius: "50%",
-              background: r.ready ? "var(--green)" : "var(--silver-500)",
-              boxShadow: r.ready ? "0 0 6px var(--green)" : "none",
-            }} />
+          <div
+            key={r.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 10px",
+              border: "1px solid var(--line)",
+              borderRadius: 6,
+              background: "var(--panel)",
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: r.ready ? "var(--green)" : "var(--silver-500)",
+                boxShadow: r.ready ? "0 0 6px var(--green)" : "none",
+              }}
+            />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="mono" style={{ fontSize: 12, color: "var(--silver-50)" }}>{r.id}</div>
+              <div className="mono" style={{ fontSize: 12, color: "var(--silver-50)" }}>
+                {r.id}
+              </div>
               {(r.image || r.description) && (
-                <div className="mono muted" style={{ fontSize: 10.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div
+                  className="mono muted"
+                  style={{
+                    fontSize: 10.5,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {r.image ?? r.description ?? ""}
                 </div>
               )}
             </div>
-            <span className={`pill ${r.ready ? "good" : "muted"}`}>{r.ready ? "ready" : "off"}</span>
+            <span className={`pill ${r.ready ? "good" : "muted"}`}>
+              {r.ready ? "ready" : "off"}
+            </span>
           </div>
         ))}
         {runtimes.length === 0 && !loading && (
-          <div className="muted" style={{ fontSize: 12, padding: 8 }}>No runtimes registered.</div>
+          <div className="muted" style={{ fontSize: 12, padding: 8 }}>
+            No runtimes registered.
+          </div>
         )}
       </div>
     </div>
@@ -265,7 +353,10 @@ function StatusPanel({
 }
 
 function StatCard({
-  label, value, sub, tone = "default",
+  label,
+  value,
+  sub,
+  tone = "default",
 }: {
   label: string;
   value: string;
@@ -273,22 +364,37 @@ function StatCard({
   tone?: "default" | "good" | "danger" | "info";
 }) {
   const color =
-    tone === "good" ? "var(--green)" :
-    tone === "danger" ? "var(--danger)" :
-    tone === "info" ? "var(--silver-50)" :
-    "var(--silver-50)";
+    tone === "good"
+      ? "var(--green)"
+      : tone === "danger"
+        ? "var(--danger)"
+        : tone === "info"
+          ? "var(--silver-50)"
+          : "var(--silver-50)";
   return (
     <div className="card" style={{ padding: 14 }}>
       <div className="kicker">{label}</div>
       <div style={{ fontSize: 24, fontWeight: 500, marginTop: 4, color }}>{value}</div>
-      {sub && <div className="mono muted" style={{ fontSize: 11 }}>{sub}</div>}
+      {sub && (
+        <div className="mono muted" style={{ fontSize: 11 }}>
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
 
 function Composer({
-  command, setCommand, runtime, setRuntime, workingDir, setWorkingDir,
-  runtimes, working, error, onStart,
+  command,
+  setCommand,
+  runtime,
+  setRuntime,
+  workingDir,
+  setWorkingDir,
+  runtimes,
+  working,
+  error,
+  onStart,
 }: {
   command: string;
   setCommand: (v: string) => void;
@@ -315,7 +421,9 @@ function Composer({
         onChange={(e) => setCommand(e.target.value)}
       />
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <label className="kicker" style={{ marginRight: 4 }}>RUNTIME</label>
+        <label className="kicker" style={{ marginRight: 4 }}>
+          RUNTIME
+        </label>
         <select
           className="field"
           value={runtime}
@@ -325,11 +433,14 @@ function Composer({
           {runtimes.length === 0 && <option value="">— none —</option>}
           {runtimes.map((r) => (
             <option key={r.id} value={r.id} disabled={!r.ready}>
-              {r.id}{r.ready ? "" : " (off)"}
+              {r.id}
+              {r.ready ? "" : " (off)"}
             </option>
           ))}
         </select>
-        <label className="kicker" style={{ marginLeft: 8, marginRight: 4 }}>CWD</label>
+        <label className="kicker" style={{ marginLeft: 8, marginRight: 4 }}>
+          CWD
+        </label>
         <input
           className="field mono"
           style={{ padding: "5px 8px", fontSize: 12, width: 180 }}
@@ -338,13 +449,23 @@ function Composer({
           placeholder="/workspace"
         />
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          {error && <span className="mono" style={{ fontSize: 11, color: "var(--danger)" }}>ERR · {error}</span>}
+          {error && (
+            <span className="mono" style={{ fontSize: 11, color: "var(--danger)" }}>
+              ERR · {error}
+            </span>
+          )}
           <button
             className="btn btn-primary"
             disabled={!command.trim() || working}
             onClick={onStart}
           >
-            {working ? <span className="spin"><I.refresh size={12} /></span> : <I.play size={12} />}
+            {working ? (
+              <span className="spin">
+                <I.refresh size={12} />
+              </span>
+            ) : (
+              <I.play size={12} />
+            )}
             {working ? " Starting…" : " Start"}
           </button>
         </div>
@@ -354,7 +475,10 @@ function Composer({
 }
 
 export function ExecTable({
-  execs, selectedId, onSelect, onCancel,
+  execs,
+  selectedId,
+  onSelect,
+  onCancel,
 }: {
   execs: SandboxExecRecord[];
   selectedId: string | null;
@@ -382,19 +506,48 @@ export function ExecTable({
               <tr key={e.id} style={{ background: isSelected ? "var(--bg-elev)" : undefined }}>
                 <td>
                   <span className={`pill ${statusPillClass(e.status)}`}>
-                    <span className="dot"></span>{e.status}
+                    <span className="dot"></span>
+                    {e.status}
                   </span>
                 </td>
-                <td className="mono" style={{ fontSize: 11.5, color: "var(--silver-50)", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <td
+                  className="mono"
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--silver-50)",
+                    maxWidth: 360,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {e.command}
                 </td>
-                <td className="mono" style={{ fontSize: 11.5 }}>{e.runtime}</td>
-                <td className="mono" style={{ fontSize: 11.5 }}>{formatDuration(e.durationMs)}</td>
-                <td className="mono muted" style={{ fontSize: 11.5 }}>{formatRelative(e.startedAt ?? e.createdAt)}</td>
+                <td className="mono" style={{ fontSize: 11.5 }}>
+                  {e.runtime}
+                </td>
+                <td className="mono" style={{ fontSize: 11.5 }}>
+                  {formatDuration(e.durationMs)}
+                </td>
+                <td className="mono muted" style={{ fontSize: 11.5 }}>
+                  {formatRelative(e.startedAt ?? e.createdAt)}
+                </td>
                 <td style={{ display: "flex", gap: 4 }}>
-                  <button className="btn btn-sm" style={{ padding: "3px 8px" }} onClick={() => onSelect(e.id)}>View</button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ padding: "3px 8px" }}
+                    onClick={() => onSelect(e.id)}
+                  >
+                    View
+                  </button>
                   {cancellable && (
-                    <button className="btn btn-sm" style={{ padding: "3px 8px" }} onClick={() => onCancel(e.id)}>Cancel</button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ padding: "3px 8px" }}
+                      onClick={() => onCancel(e.id)}
+                    >
+                      Cancel
+                    </button>
                   )}
                 </td>
               </tr>
@@ -413,10 +566,16 @@ export function ExecTable({
   );
 }
 
-interface LogLine { stream: "stdout" | "stderr"; data: string; }
+interface LogLine {
+  stream: "stdout" | "stderr";
+  data: string;
+}
 
 export function SelectedExecPanel({
-  exec, onCancel, onClose, onUpdate,
+  exec,
+  onCancel,
+  onClose,
+  onUpdate,
 }: {
   exec: SandboxExecRecord;
   onCancel: () => void;
@@ -461,19 +620,41 @@ export function SelectedExecPanel({
   // Auto-tail
   useEffect(() => {
     if (!follow) return;
-    if (tab === "stdout" && stdoutRef.current) stdoutRef.current.scrollTop = stdoutRef.current.scrollHeight;
-    if (tab === "stderr" && stderrRef.current) stderrRef.current.scrollTop = stderrRef.current.scrollHeight;
+    if (tab === "stdout" && stdoutRef.current)
+      stdoutRef.current.scrollTop = stdoutRef.current.scrollHeight;
+    if (tab === "stderr" && stderrRef.current)
+      stderrRef.current.scrollTop = stderrRef.current.scrollHeight;
   }, [stdout, stderr, follow, tab]);
 
   const cancellable = liveExec.status === "running" || liveExec.status === "queued";
 
   return (
     <div className="card" style={{ overflow: "hidden" }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div
+        style={{
+          padding: "12px 16px",
+          borderBottom: "1px solid var(--line)",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
         <span className={`pill ${statusPillClass(liveExec.status)}`}>
-          <span className="dot"></span>{liveExec.status}
+          <span className="dot"></span>
+          {liveExec.status}
         </span>
-        <div className="mono" style={{ fontSize: 12, color: "var(--silver-50)", maxWidth: 540, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div
+          className="mono"
+          style={{
+            fontSize: 12,
+            color: "var(--silver-50)",
+            maxWidth: 540,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           {liveExec.command}
         </div>
         <span className="mono muted" style={{ fontSize: 11 }}>
@@ -481,15 +662,21 @@ export function SelectedExecPanel({
         </span>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           {typeof liveExec.exitCode === "number" && (
-            <span className="mono muted" style={{ fontSize: 11 }}>exit {liveExec.exitCode}</span>
+            <span className="mono muted" style={{ fontSize: 11 }}>
+              exit {liveExec.exitCode}
+            </span>
           )}
           <span className="mono muted" style={{ fontSize: 11 }}>
             {formatDuration(liveExec.durationMs)}
           </span>
           {cancellable && (
-            <button className="btn btn-sm" onClick={onCancel}>Cancel</button>
+            <button type="button" className="btn btn-sm" onClick={onCancel}>
+              Cancel
+            </button>
           )}
-          <button className="btn btn-sm" onClick={onClose}>Close</button>
+          <button type="button" className="btn btn-sm" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
 
@@ -499,22 +686,52 @@ export function SelectedExecPanel({
         </div>
       )}
       {streamErr && (
-        <div style={{ padding: "6px 16px", color: "var(--warn)", fontSize: 11.5 }} className="mono muted">
+        <div
+          style={{ padding: "6px 16px", color: "var(--warn)", fontSize: 11.5 }}
+          className="mono muted"
+        >
           stream · {streamErr}
         </div>
       )}
 
       <div className="tabbar">
-        <div className={`tab ${tab === "stdout" ? "active" : ""}`} onClick={() => setTab("stdout")}>
+        <button
+          type="button"
+          className={`tab ${tab === "stdout" ? "active" : ""}`}
+          onClick={() => setTab("stdout")}
+          aria-pressed={tab === "stdout"}
+        >
           <I.activity size={12} style={{ marginRight: 6, verticalAlign: "-2px" }} />
           stdout
-        </div>
-        <div className={`tab ${tab === "stderr" ? "active" : ""}`} onClick={() => setTab("stderr")}>
+        </button>
+        <button
+          type="button"
+          className={`tab ${tab === "stderr" ? "active" : ""}`}
+          onClick={() => setTab("stderr")}
+          aria-pressed={tab === "stderr"}
+        >
           <I.alert size={12} style={{ marginRight: 6, verticalAlign: "-2px" }} />
           stderr
-        </div>
-        <div style={{ marginLeft: "auto", padding: "0 12px", display: "flex", alignItems: "center", gap: 6 }}>
-          <label className="mono muted" style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+        </button>
+        <div
+          style={{
+            marginLeft: "auto",
+            padding: "0 12px",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <label
+            className="mono muted"
+            style={{
+              fontSize: 11,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              cursor: "pointer",
+            }}
+          >
             <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
             follow tail
           </label>
@@ -537,8 +754,10 @@ export function SelectedExecPanel({
           wordBreak: "break-all",
         }}
       >
-        {tab === "stdout" ? (stdout || (liveExec.status === "queued" ? "(queued — waiting for runtime)" : "(no stdout)")) :
-         (stderr || "(no stderr)")}
+        {tab === "stdout"
+          ? stdout ||
+            (liveExec.status === "queued" ? "(queued — waiting for runtime)" : "(no stdout)")
+          : stderr || "(no stderr)"}
       </pre>
     </div>
   );

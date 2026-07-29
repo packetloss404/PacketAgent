@@ -1,10 +1,7 @@
 import type { LLMProvider, ProviderStreamChunk } from "./providers/types.js";
 import { getDefaultRouter, type ProviderRouter } from "./providers/router.js";
 import { registerDefaultProviders } from "./providers/bootstrap.js";
-import {
-  resolvePresetToProviderModel,
-  type ModelPreset,
-} from "./providers/preset-resolver.js";
+import { resolvePresetToProviderModel, type ModelPreset } from "./providers/preset-resolver.js";
 import {
   authorAndValidateAppViaLLM,
   authorAppViaLLM,
@@ -13,10 +10,7 @@ import {
   type GeneratedFile,
   type ResolvedPrompts,
 } from "./codegen/llm-author.js";
-import {
-  validateFileTree,
-  type ValidationResult,
-} from "./codegen/validate.js";
+import { validateFileTree, type ValidationResult } from "./codegen/validate.js";
 
 export type AppIterationTargetKind = "page" | "api" | "data" | "auth" | "config";
 export type AppIterationAction = "add" | "update" | "remove";
@@ -90,7 +84,10 @@ const ITERATION_TOOL_SCHEMA: Record<string, unknown> = {
             enum: ["added", "modified", "deleted", "renamed"],
           },
           summary: { type: "string", description: "One-line description of this file change." },
-          diff: { type: "string", description: "Unified-diff style snippet describing the change." },
+          diff: {
+            type: "string",
+            description: "Unified-diff style snippet describing the change.",
+          },
         },
         required: ["path", "changeType", "summary", "diff"],
       },
@@ -247,7 +244,10 @@ export interface AppIterationApplyResult {
 
 const DEFAULT_DRAFT_ID = "generated-app-draft";
 const VERSION = "phase-69-lane-2";
-const SECRET_PATTERN = /\b((?:[A-Z0-9_]*(?:API[_-]?KEY|SECRET|TOKEN|PASSWORD)[A-Z0-9_]*)|authorization|bearer)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/i;
+const SECRET_PATTERN =
+  /\b((?:[A-Z0-9_]*(?:API[_-]?KEY|SECRET|TOKEN|PASSWORD)[A-Z0-9_]*)|authorization|bearer)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/i;
+const SECRET_PATTERN_GLOBAL =
+  /\b((?:[A-Z0-9_]*(?:API[_-]?KEY|SECRET|TOKEN|PASSWORD)[A-Z0-9_]*)|authorization|bearer)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/gi;
 
 export function buildAppIterationPlan(
   draft: GeneratedAppDraftLike,
@@ -308,14 +308,16 @@ export function generateAppIterationDiffHunks(
 
   if (request.action === "remove" && !request.target.exists) return [];
 
-  return [{
-    id: `${request.target.kind}:${request.action}:${stableKey(request.target.key)}`,
-    target: request.target,
-    action: request.action,
-    summary: buildHunkSummary(request),
-    before: stableStringify(before),
-    after: stableStringify(after),
-  }];
+  return [
+    {
+      id: `${request.target.kind}:${request.action}:${stableKey(request.target.key)}`,
+      target: request.target,
+      action: request.action,
+      summary: buildHunkSummary(request),
+      before: stableStringify(before),
+      after: stableStringify(after),
+    },
+  ];
 }
 
 export function assessAppIterationRisk(request: NormalizedAppIterationRequest): AppIterationRisk[] {
@@ -350,7 +352,8 @@ export function assessAppIterationRisk(request: NormalizedAppIterationRequest): 
     risks.push({
       severity: SECRET_PATTERN.test(request.requestedChange) ? "high" : "low",
       code: "configuration",
-      message: "Configuration changes should avoid embedding literal secrets in generated draft metadata.",
+      message:
+        "Configuration changes should avoid embedding literal secrets in generated draft metadata.",
     });
   }
 
@@ -362,11 +365,13 @@ export function buildRollbackCheckpoint(
   request: NormalizedAppIterationRequest,
 ): AppIterationRollbackCheckpoint {
   const draftHash = shortHash(stableStringify(draft));
-  const requestHash = shortHash(stableStringify({
-    action: request.action,
-    target: request.target,
-    requestedChange: request.requestedChange,
-  }));
+  const requestHash = shortHash(
+    stableStringify({
+      action: request.action,
+      target: request.target,
+      requestedChange: request.requestedChange,
+    }),
+  );
 
   return {
     checkpointId: `app-iteration-${draftHash}-${requestHash}`,
@@ -412,19 +417,30 @@ function buildAppIterationWarnings(
   const warnings = [
     ...(request.requestedChange.length === 0 ? ["Requested change is empty."] : []),
     ...(!request.target.exists && request.action !== "add"
-      ? [`Selected ${request.target.kind} target does not exist; applying will create a scoped draft entry instead.`]
+      ? [
+          `Selected ${request.target.kind} target does not exist; applying will create a scoped draft entry instead.`,
+        ]
       : []),
-    ...(request.action === "remove" ? ["Removal request should be reviewed before publishing generated app changes."] : []),
+    ...(request.action === "remove"
+      ? ["Removal request should be reviewed before publishing generated app changes."]
+      : []),
     ...(SECRET_PATTERN.test(request.requestedChange)
-      ? ["Requested change appears to include a literal secret; store secrets in environment configuration instead."]
+      ? [
+          "Requested change appears to include a literal secret; store secrets in environment configuration instead.",
+        ]
       : []),
-    ...(request.target.kind === "auth" && !draft.auth ? ["Draft has no auth block; applying will create one."] : []),
+    ...(request.target.kind === "auth" && !draft.auth
+      ? ["Draft has no auth block; applying will create one."]
+      : []),
   ];
 
   return uniqueSorted(warnings);
 }
 
-function applyTargetMutation(draft: GeneratedAppDraftLike, request: NormalizedAppIterationRequest): void {
+function applyTargetMutation(
+  draft: GeneratedAppDraftLike,
+  request: NormalizedAppIterationRequest,
+): void {
   if (request.target.kind === "page") applyPageMutation(draft, request);
   if (request.target.kind === "api") applyApiMutation(draft, request);
   if (request.target.kind === "data") applyDataMutation(draft, request);
@@ -432,7 +448,10 @@ function applyTargetMutation(draft: GeneratedAppDraftLike, request: NormalizedAp
   if (request.target.kind === "config") applyConfigMutation(draft, request);
 }
 
-function applyPageMutation(draft: GeneratedAppDraftLike, request: NormalizedAppIterationRequest): void {
+function applyPageMutation(
+  draft: GeneratedAppDraftLike,
+  request: NormalizedAppIterationRequest,
+): void {
   const pages = [...(draft.pageMap ?? [])];
   const index = pages.findIndex((page) => pageTargetKey(page) === request.target.key);
 
@@ -442,56 +461,82 @@ function applyPageMutation(draft: GeneratedAppDraftLike, request: NormalizedAppI
   }
 
   const nextPage = pageAfterSnapshot(draft, request);
-  draft.pageMap = index >= 0
-    ? pages.map((page, pageIndex) => pageIndex === index ? nextPage : page)
-    : [...pages, nextPage].sort(comparePages);
+  draft.pageMap =
+    index >= 0
+      ? pages.map((page, pageIndex) => (pageIndex === index ? nextPage : page))
+      : [...pages, nextPage].sort(comparePages);
 }
 
-function applyApiMutation(draft: GeneratedAppDraftLike, request: NormalizedAppIterationRequest): void {
+function applyApiMutation(
+  draft: GeneratedAppDraftLike,
+  request: NormalizedAppIterationRequest,
+): void {
   const routes = [...(draft.apiRouteStubs ?? [])];
   const index = routes.findIndex((route) => apiTargetKey(route) === request.target.key);
 
   if (request.action === "remove") {
-    draft.apiRouteStubs = index >= 0 ? routes.filter((_, routeIndex) => routeIndex !== index) : routes;
+    draft.apiRouteStubs =
+      index >= 0 ? routes.filter((_, routeIndex) => routeIndex !== index) : routes;
     return;
   }
 
   const nextRoute = apiAfterSnapshot(draft, request);
-  draft.apiRouteStubs = index >= 0
-    ? routes.map((route, routeIndex) => routeIndex === index ? nextRoute : route)
-    : [...routes, nextRoute].sort(compareApiRoutes);
+  draft.apiRouteStubs =
+    index >= 0
+      ? routes.map((route, routeIndex) => (routeIndex === index ? nextRoute : route))
+      : [...routes, nextRoute].sort(compareApiRoutes);
 }
 
-function applyDataMutation(draft: GeneratedAppDraftLike, request: NormalizedAppIterationRequest): void {
+function applyDataMutation(
+  draft: GeneratedAppDraftLike,
+  request: NormalizedAppIterationRequest,
+): void {
   const dataSchema = cloneDataSchema(draft.dataSchema);
   const entities = [...(dataSchema.entities ?? [])];
   const index = entities.findIndex((entity) => dataTargetKey(entity) === request.target.key);
 
   if (request.action === "remove") {
-    dataSchema.entities = index >= 0 ? entities.filter((_, entityIndex) => entityIndex !== index) : entities;
+    dataSchema.entities =
+      index >= 0 ? entities.filter((_, entityIndex) => entityIndex !== index) : entities;
     draft.dataSchema = dataSchema;
     return;
   }
 
   const nextEntity = dataAfterSnapshot(draft, request);
-  dataSchema.entities = index >= 0
-    ? entities.map((entity, entityIndex) => entityIndex === index ? nextEntity : entity)
-    : [...entities, nextEntity].sort((left, right) => left.name.localeCompare(right.name));
+  dataSchema.entities =
+    index >= 0
+      ? entities.map((entity, entityIndex) => (entityIndex === index ? nextEntity : entity))
+      : [...entities, nextEntity].sort((left, right) => left.name.localeCompare(right.name));
   draft.dataSchema = dataSchema;
 }
 
-function applyAuthMutation(draft: GeneratedAppDraftLike, request: NormalizedAppIterationRequest): void {
+function applyAuthMutation(
+  draft: GeneratedAppDraftLike,
+  request: NormalizedAppIterationRequest,
+): void {
   draft.auth = authAfterSnapshot(draft, request);
 }
 
-function applyConfigMutation(draft: GeneratedAppDraftLike, request: NormalizedAppIterationRequest): void {
+function applyConfigMutation(
+  draft: GeneratedAppDraftLike,
+  request: NormalizedAppIterationRequest,
+): void {
   draft.config = configAfterSnapshot(draft, request);
 }
 
-function readTargetSnapshot(draft: GeneratedAppDraftLike, target: SelectedAppIterationTarget): unknown {
-  if (target.kind === "page") return (draft.pageMap ?? []).find((page) => pageTargetKey(page) === target.key) ?? null;
-  if (target.kind === "api") return (draft.apiRouteStubs ?? []).find((route) => apiTargetKey(route) === target.key) ?? null;
-  if (target.kind === "data") return (draft.dataSchema?.entities ?? []).find((entity) => dataTargetKey(entity) === target.key) ?? null;
+function readTargetSnapshot(
+  draft: GeneratedAppDraftLike,
+  target: SelectedAppIterationTarget,
+): unknown {
+  if (target.kind === "page")
+    return (draft.pageMap ?? []).find((page) => pageTargetKey(page) === target.key) ?? null;
+  if (target.kind === "api")
+    return (draft.apiRouteStubs ?? []).find((route) => apiTargetKey(route) === target.key) ?? null;
+  if (target.kind === "data")
+    return (
+      (draft.dataSchema?.entities ?? []).find((entity) => dataTargetKey(entity) === target.key) ??
+      null
+    );
   if (target.kind === "auth") return draft.auth ?? null;
   return draft.config ?? null;
 }
@@ -513,7 +558,10 @@ function pageAfterSnapshot(
   request: NormalizedAppIterationRequest,
 ): GeneratedPageDraftLike {
   const existing = readTargetSnapshot(draft, request.target) as GeneratedPageDraftLike | null;
-  const path = normalizePath(request.target.path) ?? normalizePath(pathFromText(request.requestedChange)) ?? "/iteration";
+  const path =
+    normalizePath(request.target.path) ??
+    normalizePath(pathFromText(request.requestedChange)) ??
+    "/iteration";
   const name = request.target.name ?? existing?.name ?? titleCase(lastPathSegment(path));
   const action = actionPhrase(request.requestedChange);
 
@@ -533,7 +581,10 @@ function apiAfterSnapshot(
   request: NormalizedAppIterationRequest,
 ): GeneratedApiRouteDraftLike {
   const existing = readTargetSnapshot(draft, request.target) as GeneratedApiRouteDraftLike | null;
-  const path = normalizePath(request.target.path) ?? normalizePath(pathFromText(request.requestedChange)) ?? "/api/generated/iteration";
+  const path =
+    normalizePath(request.target.path) ??
+    normalizePath(pathFromText(request.requestedChange)) ??
+    "/api/generated/iteration";
   const method = inferMethod(request.requestedChange, existing?.method ?? "GET");
 
   return removeUndefined({
@@ -542,7 +593,10 @@ function apiAfterSnapshot(
     path,
     access: inferAccess(request.requestedChange, existing?.access ?? "private"),
     purpose: appendSentence(existing?.purpose, `Iteration request: ${request.requestedChange}`),
-    requestBody: method === "GET" || method === "DELETE" ? existing?.requestBody : existing?.requestBody ?? "generated iteration payload",
+    requestBody:
+      method === "GET" || method === "DELETE"
+        ? existing?.requestBody
+        : (existing?.requestBody ?? "generated iteration payload"),
     responseShape: existing?.responseShape ?? "{ ok: true }",
   });
 }
@@ -552,7 +606,8 @@ function dataAfterSnapshot(
   request: NormalizedAppIterationRequest,
 ): GeneratedEntityDraftLike {
   const existing = readTargetSnapshot(draft, request.target) as GeneratedEntityDraftLike | null;
-  const name = request.target.name ?? existing?.name ?? entityNameFromChange(request.requestedChange);
+  const name =
+    request.target.name ?? existing?.name ?? entityNameFromChange(request.requestedChange);
 
   return removeUndefined({
     ...(existing ?? {}),
@@ -566,7 +621,10 @@ function dataAfterSnapshot(
     ],
     indexes: uniqueSorted([...(existing?.indexes ?? []), "status"]),
     relations: existing?.relations ?? [],
-    notes: uniqueSorted([...(arrayValue(existing?.notes)), `Iteration request: ${request.requestedChange}`]),
+    notes: uniqueSorted([
+      ...arrayValue(existing?.notes),
+      `Iteration request: ${request.requestedChange}`,
+    ]),
   });
 }
 
@@ -575,8 +633,12 @@ function authAfterSnapshot(
   request: NormalizedAppIterationRequest,
 ): GeneratedAuthDraftLike {
   const existing = cloneAuth(draft.auth);
-  const routePath = normalizePath(request.target.path) ?? normalizePath(pathFromText(request.requestedChange));
-  const access = inferAccess(request.requestedChange, routePath ? routeAccess(existing, routePath) : "private");
+  const routePath =
+    normalizePath(request.target.path) ?? normalizePath(pathFromText(request.requestedChange));
+  const access = inferAccess(
+    request.requestedChange,
+    routePath ? routeAccess(existing, routePath) : "private",
+  );
   const publicRoutes = new Set(existing.publicRoutes ?? []);
   const privateRoutes = new Set(existing.privateRoutes ?? []);
   const roleRoutes = cloneRoleRoutes(existing.roleRoutes);
@@ -592,11 +654,12 @@ function authAfterSnapshot(
     else if (access === "admin") {
       const admin = roleRoutes.find((roleRoute) => roleRoute.role === "admin");
       if (admin) admin.routes = uniqueSorted([...admin.routes, routePath]);
-      else roleRoutes.push({
-        role: "admin",
-        routes: [routePath],
-        reason: "Iteration request requires role-gated generated app access.",
-      });
+      else
+        roleRoutes.push({
+          role: "admin",
+          routes: [routePath],
+          reason: "Iteration request requires role-gated generated app access.",
+        });
     } else privateRoutes.add(routePath);
   }
 
@@ -647,11 +710,19 @@ function selectPageTarget(
   const requestedName = cleanText(target?.name ?? target?.key);
   const matched = requestedPath
     ? pages.find((page) => normalizePath(page.path) === requestedPath)
-    : pages.find((page) => requestedName && cleanText(page.name).toLowerCase() === requestedName.toLowerCase())
-      ?? pages.find((page) => cleanText(page.name).length > 0 && requestedChange.toLowerCase().includes(cleanText(page.name).toLowerCase()));
+    : (pages.find(
+        (page) =>
+          requestedName && cleanText(page.name).toLowerCase() === requestedName.toLowerCase(),
+      ) ??
+      pages.find(
+        (page) =>
+          cleanText(page.name).length > 0 &&
+          requestedChange.toLowerCase().includes(cleanText(page.name).toLowerCase()),
+      ));
   const selected = matched ?? (!requestedPath && !requestedName ? pages[0] : undefined);
   const path = requestedPath ?? normalizePath(selected?.path);
-  const name = requestedName || selected?.name || (path ? titleCase(lastPathSegment(path)) : "Generated page");
+  const name =
+    requestedName || selected?.name || (path ? titleCase(lastPathSegment(path)) : "Generated page");
   const key = selected ? pageTargetKey(selected) : stableKey(path ?? name);
 
   return {
@@ -674,7 +745,8 @@ function selectApiTarget(
   const matched = requestedPath
     ? routes.find((route) => normalizePath(route.path) === requestedPath)
     : routes.find((route) => requestedChange.toLowerCase().includes(route.path.toLowerCase()));
-  const selected = matched ?? (!requestedPath && !target?.key && !target?.name ? routes[0] : undefined);
+  const selected =
+    matched ?? (!requestedPath && !target?.key && !target?.name ? routes[0] : undefined);
   const path = requestedPath ?? normalizePath(selected?.path);
   const key = selected ? apiTargetKey(selected) : stableKey(path ?? target?.key ?? "api");
 
@@ -694,9 +766,11 @@ function selectDataTarget(
   requestedChange: string,
 ): SelectedAppIterationTarget {
   const entities = draft.dataSchema?.entities ?? [];
-  const requestedName = cleanText(target?.name ?? target?.key) || entityNameFromChange(requestedChange);
-  const matched = entities.find((entity) => entity.name.toLowerCase() === requestedName.toLowerCase())
-    ?? entities.find((entity) => requestedChange.toLowerCase().includes(entity.name.toLowerCase()));
+  const requestedName =
+    cleanText(target?.name ?? target?.key) || entityNameFromChange(requestedChange);
+  const matched =
+    entities.find((entity) => entity.name.toLowerCase() === requestedName.toLowerCase()) ??
+    entities.find((entity) => requestedChange.toLowerCase().includes(entity.name.toLowerCase()));
   const selected = matched;
   const name = requestedName || selected?.name || "iterationItem";
   const key = selected ? dataTargetKey(selected) : stableKey(name);
@@ -715,7 +789,10 @@ function selectAuthTarget(
   target: AppIterationTargetInput | undefined,
   requestedChange: string,
 ): SelectedAppIterationTarget {
-  const path = normalizePath(target?.path) ?? normalizePath(pathFromText(requestedChange)) ?? firstRoutePath(draft);
+  const path =
+    normalizePath(target?.path) ??
+    normalizePath(pathFromText(requestedChange)) ??
+    firstRoutePath(draft);
   return {
     kind: "auth",
     key: stableKey(path ?? "auth"),
@@ -792,8 +869,9 @@ function pathFromText(value: string): string | undefined {
 
 function entityNameFromChange(value: string): string {
   const lower = value.toLowerCase();
-  const named = lower.match(/\b(?:entity|table|schema|model)\s+([a-z][a-z0-9_-]*)/i)?.[1]
-    ?? lower.match(/\bfor\s+([a-z][a-z0-9_-]*)\b/i)?.[1];
+  const named =
+    lower.match(/\b(?:entity|table|schema|model)\s+([a-z][a-z0-9_-]*)/i)?.[1] ??
+    lower.match(/\bfor\s+([a-z][a-z0-9_-]*)\b/i)?.[1];
   return camelCase(named ?? "iteration item");
 }
 
@@ -804,7 +882,9 @@ function configNameFromChange(value: string): string {
 
 function actionPhrase(value: string): string {
   const cleaned = cleanText(value).replace(/[.]+$/g, "");
-  return cleaned.length > 80 ? `${cleaned.slice(0, 77).trim()}...` : cleaned || "review iteration request";
+  return cleaned.length > 80
+    ? `${cleaned.slice(0, 77).trim()}...`
+    : cleaned || "review iteration request";
 }
 
 function buildHunkSummary(request: NormalizedAppIterationRequest): string {
@@ -831,13 +911,20 @@ function dataTargetKey(entity: GeneratedEntityDraftLike): string {
 }
 
 function comparePages(left: GeneratedPageDraftLike, right: GeneratedPageDraftLike): number {
-  return (normalizePath(left.path) ?? "").localeCompare(normalizePath(right.path) ?? "")
-    || cleanText(left.name).localeCompare(cleanText(right.name));
+  return (
+    (normalizePath(left.path) ?? "").localeCompare(normalizePath(right.path) ?? "") ||
+    cleanText(left.name).localeCompare(cleanText(right.name))
+  );
 }
 
-function compareApiRoutes(left: GeneratedApiRouteDraftLike, right: GeneratedApiRouteDraftLike): number {
-  return (normalizePath(left.path) ?? "").localeCompare(normalizePath(right.path) ?? "")
-    || left.method.localeCompare(right.method);
+function compareApiRoutes(
+  left: GeneratedApiRouteDraftLike,
+  right: GeneratedApiRouteDraftLike,
+): number {
+  return (
+    (normalizePath(left.path) ?? "").localeCompare(normalizePath(right.path) ?? "") ||
+    left.method.localeCompare(right.method)
+  );
 }
 
 function normalizePath(value: string | undefined): string | undefined {
@@ -850,19 +937,28 @@ function normalizePath(value: string | undefined): string | undefined {
 }
 
 function cleanText(value: string | undefined): string {
-  return String(value ?? "").replace(/\s+/g, " ").trim();
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function stableKey(value: string): string {
-  return cleanText(value).toLowerCase().replace(/[^a-z0-9:_/-]+/g, "-").replace(/^-+|-+$/g, "") || "generated";
+  return (
+    cleanText(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9:_/-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "generated"
+  );
 }
 
 function titleCase(value: string): string {
-  return value
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ") || "Generated";
+  return (
+    value
+      .split(/[\s_-]+/)
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ") || "Generated"
+  );
 }
 
 function lastPathSegment(path: string): string {
@@ -872,10 +968,14 @@ function lastPathSegment(path: string): string {
 
 function camelCase(value: string): string {
   const words = value.split(/[^a-zA-Z0-9]+/).filter(Boolean);
-  return words.map((word, index) => {
-    const lower = word.toLowerCase();
-    return index === 0 ? lower : `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
-  }).join("") || "iterationItem";
+  return (
+    words
+      .map((word, index) => {
+        const lower = word.toLowerCase();
+        return index === 0 ? lower : `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
+      })
+      .join("") || "iterationItem"
+  );
 }
 
 function stableStringify(value: unknown): string {
@@ -903,14 +1003,19 @@ function shortHash(value: string): string {
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.map(cleanText).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values.map(cleanText).filter(Boolean))].sort((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
 function uniqueRisks(risks: AppIterationRisk[]): AppIterationRisk[] {
   const byCode = new Map<string, AppIterationRisk>();
   for (const risk of risks) byCode.set(risk.code, risk);
-  return [...byCode.values()].sort((left, right) => severityRank(right.severity) - severityRank(left.severity)
-    || left.code.localeCompare(right.code));
+  return [...byCode.values()].sort(
+    (left, right) =>
+      severityRank(right.severity) - severityRank(left.severity) ||
+      left.code.localeCompare(right.code),
+  );
 }
 
 function severityRank(severity: AppIterationRiskSeverity): number {
@@ -921,7 +1026,9 @@ function cloneDraft(draft: GeneratedAppDraftLike): GeneratedAppDraftLike {
   return sortValue(draft) as GeneratedAppDraftLike;
 }
 
-function cloneDataSchema(schema: GeneratedDataSchemaDraftLike | undefined): GeneratedDataSchemaDraftLike {
+function cloneDataSchema(
+  schema: GeneratedDataSchemaDraftLike | undefined,
+): GeneratedDataSchemaDraftLike {
   return {
     ...(schema ?? {}),
     entities: (schema?.entities ?? []).map((entity) => ({
@@ -947,7 +1054,9 @@ function cloneAuth(auth: GeneratedAuthDraftLike | undefined): GeneratedAuthDraft
   };
 }
 
-function cloneRoleRoutes(roleRoutes: GeneratedAuthDraftLike["roleRoutes"]): Array<{ role: string; routes: string[]; reason?: string }> {
+function cloneRoleRoutes(
+  roleRoutes: GeneratedAuthDraftLike["roleRoutes"],
+): Array<{ role: string; routes: string[]; reason?: string }> {
   return (roleRoutes ?? []).map((roleRoute) => ({
     ...roleRoute,
     routes: [...roleRoute.routes],
@@ -964,11 +1073,13 @@ function cloneConfig(config: GeneratedConfigDraftLike | undefined): GeneratedCon
 }
 
 function arrayValue(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 function redactSecrets(value: string): string {
-  return value.replace(SECRET_PATTERN, "$1=[redacted]");
+  return value.replace(SECRET_PATTERN_GLOBAL, "$1=[redacted]");
 }
 
 function removeUndefined<T extends Record<string, unknown>>(record: T): T {
@@ -1047,11 +1158,13 @@ export async function applyAppIterationViaLLM(
       { role: "system", content: ITERATION_SYSTEM_PROMPT },
       { role: "user", content: userMessage },
     ],
-    tools: [{
-      name: ITERATION_TOOL_NAME,
-      description: "Emit the final iteration diff with file-level changes.",
-      inputSchema: ITERATION_TOOL_SCHEMA,
-    }],
+    tools: [
+      {
+        name: ITERATION_TOOL_NAME,
+        description: "Emit the final iteration diff with file-level changes.",
+        inputSchema: ITERATION_TOOL_SCHEMA,
+      },
+    ],
   });
 
   const proseChunks: string[] = [];
@@ -1067,7 +1180,11 @@ export async function applyAppIterationViaLLM(
       if (chunk.delta) {
         proseChunks.push(chunk.delta);
         if (emit) {
-          try { await emit(chunk.delta); } catch { /* swallow emit errors */ }
+          try {
+            await emit(chunk.delta);
+          } catch {
+            /* swallow emit errors */
+          }
         }
       }
       if (chunk.toolCall && chunk.toolCall.name === ITERATION_TOOL_NAME) {
@@ -1089,22 +1206,26 @@ export async function applyAppIterationViaLLM(
   if (files.length === 0) return null;
 
   return {
-    changedSummary: typeof toolInput.changedSummary === "string" && toolInput.changedSummary.trim().length > 0
-      ? toolInput.changedSummary.trim()
-      : `LLM iteration for ${target?.kind ?? "app"}`,
+    changedSummary:
+      typeof toolInput.changedSummary === "string" && toolInput.changedSummary.trim().length > 0
+        ? toolInput.changedSummary.trim()
+        : `LLM iteration for ${target?.kind ?? "app"}`,
     files,
     prose: proseChunks.join(""),
     model,
   };
 }
 
-function normalizeLLMFile(entry: Record<string, unknown>): AppIterationLLMResult["files"][number] | null {
+function normalizeLLMFile(
+  entry: Record<string, unknown>,
+): AppIterationLLMResult["files"][number] | null {
   const path = typeof entry.path === "string" ? entry.path.trim() : "";
   if (!path) return null;
   const allowedTypes = new Set(["added", "modified", "deleted", "renamed"]);
-  const changeType = typeof entry.changeType === "string" && allowedTypes.has(entry.changeType)
-    ? entry.changeType as AppIterationLLMResult["files"][number]["changeType"]
-    : "modified";
+  const changeType =
+    typeof entry.changeType === "string" && allowedTypes.has(entry.changeType)
+      ? (entry.changeType as AppIterationLLMResult["files"][number]["changeType"])
+      : "modified";
   return {
     path,
     changeType,
@@ -1193,11 +1314,10 @@ export function shouldUseFileTreeIteration(input: {
  * the longest files are replaced with a short summary line (path + byte count)
  * to keep the prompt within a sensible token budget.
  */
-export function buildFileTreeIterationGoal(
-  files: GeneratedFile[],
-  changeRequest: string,
-): string {
-  const safe = Array.isArray(files) ? files.filter((f) => f && typeof f.path === "string" && typeof f.content === "string") : [];
+export function buildFileTreeIterationGoal(files: GeneratedFile[], changeRequest: string): string {
+  const safe = Array.isArray(files)
+    ? files.filter((f) => f && typeof f.path === "string" && typeof f.content === "string")
+    : [];
 
   // Greedy budget: include full contents until we exceed the budget; then
   // switch to summary lines for the remaining (largest) files.
@@ -1305,9 +1425,11 @@ function buildSimpleDiff(before: string, after: string): string {
   parts.push("--- before");
   parts.push("+++ after");
   for (const line of beforePreview) parts.push(`-${line}`);
-  if (beforeLines.length > maxPreview) parts.push(`-... (${beforeLines.length - maxPreview} more lines)`);
+  if (beforeLines.length > maxPreview)
+    parts.push(`-... (${beforeLines.length - maxPreview} more lines)`);
   for (const line of afterPreview) parts.push(`+${line}`);
-  if (afterLines.length > maxPreview) parts.push(`+... (${afterLines.length - maxPreview} more lines)`);
+  if (afterLines.length > maxPreview)
+    parts.push(`+... (${afterLines.length - maxPreview} more lines)`);
   return parts.join("\n");
 }
 
@@ -1347,11 +1469,15 @@ export async function applyAppIterationViaFileTree(
 
   let result: (AuthorAppResult & { validation: ValidationResult; repairAttempts: number }) | null;
   try {
-    result = await authorAndValidateAppViaLLM(userGoal, {
-      ...authorOptions,
-      authorFn: author,
-      validateFn: validate,
-    }, emitFn);
+    result = await authorAndValidateAppViaLLM(
+      userGoal,
+      {
+        ...authorOptions,
+        authorFn: author,
+        validateFn: validate,
+      },
+      emitFn,
+    );
   } catch (error) {
     console.warn(`[app-iteration-filetree] orchestrator threw: ${(error as Error).message}`);
     return null;

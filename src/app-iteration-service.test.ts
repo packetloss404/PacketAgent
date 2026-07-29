@@ -110,9 +110,15 @@ test("applyAppIterationToDraft updates a cloned page draft and preserves the ori
 
   assert.equal(result.applied, true);
   assert.equal(originalTasks?.access, "private");
-  assert.equal(originalTasks?.actions?.includes("Make /tasks public and add a quick-start action"), false);
+  assert.equal(
+    originalTasks?.actions?.includes("Make /tasks public and add a quick-start action"),
+    false,
+  );
   assert.equal(nextTasks?.access, "public");
-  assert.equal(nextTasks?.actions?.includes("Make /tasks public and add a quick-start action"), true);
+  assert.equal(
+    nextTasks?.actions?.includes("Make /tasks public and add a quick-start action"),
+    true,
+  );
   assert.ok(result.plan.risks.some((risk) => risk.code === "access-control"));
   assert.notEqual(result.rollbackCheckpoint.draftHash, result.afterDraftHash);
 });
@@ -128,12 +134,17 @@ test("API target selection can add a scoped route without touching existing rout
   assert.equal(result.plan.request.target.exists, false);
   assert.equal(result.plan.warnings.length, 0);
   assert.equal(result.draft.apiRouteStubs?.length, 2);
-  assert.ok(result.draft.apiRouteStubs?.some((route) => (
-    route.method === "POST"
-      && route.path === "/api/app/generated/launch/tasks/export"
-      && route.purpose?.includes("CSV export")
-  )));
-  assert.ok(draft.apiRouteStubs?.every((route) => route.path !== "/api/app/generated/launch/tasks/export"));
+  assert.ok(
+    result.draft.apiRouteStubs?.some(
+      (route) =>
+        route.method === "POST" &&
+        route.path === "/api/app/generated/launch/tasks/export" &&
+        route.purpose?.includes("CSV export"),
+    ),
+  );
+  assert.ok(
+    draft.apiRouteStubs?.every((route) => route.path !== "/api/app/generated/launch/tasks/export"),
+  );
 });
 
 test("auth changes move routes between generated access buckets", () => {
@@ -144,12 +155,16 @@ test("auth changes move routes between generated access buckets", () => {
   });
 
   assert.equal(result.plan.request.target.kind, "auth");
-  assert.ok(result.plan.risks.some((risk) => risk.severity === "high" && risk.code === "access-control"));
+  assert.ok(
+    result.plan.risks.some((risk) => risk.severity === "high" && risk.code === "access-control"),
+  );
   assert.equal(result.draft.auth?.privateRoutes?.includes("/reports"), false);
   assert.equal(result.draft.auth?.publicRoutes?.includes("/reports"), false);
-  assert.ok(result.draft.auth?.roleRoutes?.some((roleRoute) => (
-    roleRoute.role === "admin" && roleRoute.routes.includes("/reports")
-  )));
+  assert.ok(
+    result.draft.auth?.roleRoutes?.some(
+      (roleRoute) => roleRoute.role === "admin" && roleRoute.routes.includes("/reports"),
+    ),
+  );
 });
 
 test("data remove requests generate destructive risk and scoped rollback metadata", () => {
@@ -162,7 +177,10 @@ test("data remove requests generate destructive risk and scoped rollback metadat
 
   assert.equal(plan.request.action, "remove");
   assert.equal(plan.request.target.exists, true);
-  assert.deepEqual(plan.diffHunks.map((hunk) => hunk.after), ["null"]);
+  assert.deepEqual(
+    plan.diffHunks.map((hunk) => hunk.after),
+    ["null"],
+  );
   assert.ok(plan.warnings.some((warning) => warning.includes("Removal request")));
   assert.ok(plan.risks.some((risk) => risk.code === "destructive-change"));
   assert.ok(plan.risks.some((risk) => risk.code === "data-contract"));
@@ -179,10 +197,29 @@ test("config iteration warnings redact literal secrets in applied draft metadata
 
   assert.equal(result.plan.request.target.kind, "config");
   assert.ok(result.plan.warnings.some((warning) => warning.includes("literal secret")));
-  assert.ok(result.plan.risks.some((risk) => risk.code === "configuration" && risk.severity === "high"));
+  assert.ok(
+    result.plan.risks.some((risk) => risk.code === "configuration" && risk.severity === "high"),
+  );
   assert.equal(result.draft.config?.featureFlags?.["stripe-checkout"], true);
-  assert.ok(result.draft.config?.notes?.some((note) => note.includes("STRIPE_SECRET_KEY=[redacted]")));
-  assert.equal(result.draft.config?.notes?.some((note) => note.includes("sk_live_123")), false);
+  assert.ok(
+    result.draft.config?.notes?.some((note) => note.includes("STRIPE_SECRET_KEY=[redacted]")),
+  );
+  assert.equal(
+    result.draft.config?.notes?.some((note) => note.includes("sk_live_123")),
+    false,
+  );
+});
+
+test("config iteration metadata redacts every literal secret in one request", () => {
+  const result = applyAppIterationToDraft(draftFixture(), {
+    target: { kind: "config", name: "multi-provider setup" },
+    change: "Configure OPENAI_API_KEY=sk-openai-secret and STRIPE_SECRET_KEY=sk-stripe-secret.",
+  });
+  const notes = result.draft.config?.notes?.join(" ") ?? "";
+
+  assert.match(notes, /OPENAI_API_KEY=\[redacted\]/);
+  assert.match(notes, /STRIPE_SECRET_KEY=\[redacted\]/);
+  assert.doesNotMatch(notes, /sk-openai-secret|sk-stripe-secret/);
 });
 
 test("target and request normalization infer stable defaults", () => {

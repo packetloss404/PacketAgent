@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { brand } from "@/config/brand";
 import { I } from "../icons";
 
 const VERSION = "v0.1.0";
@@ -34,16 +35,27 @@ export function LoggedOutView({ onSignIn: _onSignIn }: { onSignIn: () => void })
         alignItems: "center",
         justifyContent: "center",
         padding: "32px",
-        background: "radial-gradient(900px 500px at 50% 20%, rgba(184,242,92,0.07), transparent 60%), var(--bg)",
+        background:
+          "radial-gradient(900px 500px at 50% 20%, rgba(184,242,92,0.07), transparent 60%), var(--bg)",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginBottom: 32 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 14,
+          marginBottom: 32,
+        }}
+      >
         <div className="brand-mark" style={{ width: 56, height: 56, borderRadius: 14 }} />
         <div style={{ textAlign: "center" }}>
           <div className="brand-name" style={{ fontSize: 26, letterSpacing: "-0.02em" }}>
-            task<span>loom</span>
+            {brand.name}
           </div>
-          <div className="brand-tag" style={{ marginTop: 4 }}>Agent · App workbench</div>
+          <div className="brand-tag" style={{ marginTop: 4 }}>
+            {brand.tagline}
+          </div>
         </div>
       </div>
 
@@ -111,7 +123,10 @@ export function LoggedOutView({ onSignIn: _onSignIn }: { onSignIn: () => void })
         >
           {submitting ? (
             <>
-              <span className="spin"><I.refresh size={13} /></span> Signing in…
+              <span className="spin">
+                <I.refresh size={13} />
+              </span>{" "}
+              Signing in…
             </>
           ) : (
             <>
@@ -137,8 +152,12 @@ export function LoggedOutView({ onSignIn: _onSignIn }: { onSignIn: () => void })
       </form>
 
       <div style={{ marginTop: 28, display: "flex", gap: 14, alignItems: "center" }}>
-        <span className="mono muted" style={{ fontSize: 10.5 }}>© PacketAgent · {VERSION}</span>
-        <span className="mono muted" style={{ fontSize: 10.5 }}>self-hosted · MIT</span>
+        <span className="mono muted" style={{ fontSize: 10.5 }}>
+          © PacketAgent · {VERSION}
+        </span>
+        <span className="mono muted" style={{ fontSize: 10.5 }}>
+          self-hosted · MIT
+        </span>
       </div>
     </div>
   );

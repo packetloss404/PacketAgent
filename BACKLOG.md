@@ -26,8 +26,8 @@ Status: foundation complete on `codex/packetagent-foundation`; inherited quality
 - [x] Carry the only uncommitted TaskLoom worktree fix into the new branch.
 - [x] Refresh every Markdown document, label historical plans, and add an authoritative Codex project handoff.
 - [x] Pass typecheck, lint with zero errors, production web build, API tests, web tests, migration tests, diff check, and compatibility-only brand scan.
-- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 326 files; files authored in this foundation pass are formatted.
-- [ ] Reduce the inherited ESLint baseline of 145 warnings while preserving the current zero-error gate.
+- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 311 files; files authored in the R1 review slices are formatted.
+- [ ] Reduce the inherited ESLint baseline of 143 warnings to zero while preserving the current zero-error gate.
 - [ ] Review and remediate dependency advisories deliberately. The full install reports 11 advisories (including 2 critical development-tree advisories); `npm audit --omit=dev` reports 5 production advisories (1 low, 1 moderate, 3 high, 0 critical). Do not apply a blind force-fix that causes unrelated dependency churn.
 - Gate: a clean PacketAgent checkout starts with new defaults and can read an existing default TaskLoom deployment without destructive migration.
 
@@ -236,7 +236,9 @@ jobs slice closes the second writer and incomplete workspace scoping; and the
 backend security slice closes production-start truth, import-safe bootstrap,
 rate-limit/preview-token re-audit, baseline response headers/CSP, and
 workspace-authorized opt-in artifact serving. The broader R1 gate remains
-open.
+open. The frontend slice additionally closes render recovery, multi-secret
+redaction, corrupt-row re-audit, the historical preview iframe contract,
+audited dead controls, primary keyboard semantics, and stale web branding.
 
 - [ ] Re-audit every still-relevant historical P0/P1 finding and close stale
       findings with evidence.

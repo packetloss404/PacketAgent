@@ -319,9 +319,21 @@ CSP exception pending R5 origin isolation; and opt-in artifact reads require
 an authenticated viewer whose workspace owns the exact legacy-agent or
 canonical-Worker run ID in the URL. The focused startup/security gate passes
 11 tests, typecheck passes, and the broader server/app/auth regression
-selection passed 116 tests with one intentional sandbox skip. Resume with the
-verified frontend/error-boundary/dead-control findings, then the persistence
-end-state, dependency disposition, and repo-wide formatting/lint gate.
+selection passed 116 tests with one intentional sandbox skip.
+
+The frontend finding slice is now implemented. A top-level generic recovery
+boundary protects the app tree; the preview iframe has an accessible title and
+explicit sandbox contract while full origin isolation remains R5; iteration
+metadata redacts every secret literal rather than only the first; corrupt
+activity-row handling was proven already fixed; audited inert controls are
+removed, relabeled, or connected to live views; primary navigation, tabs, role
+choices, output tabs, and project cards use native button semantics; and all
+visible stale TaskLoom wordmarks now consume the PacketAgent web brand config.
+The focused backend safety set passes 23 tests, the web gate passes 30 tests,
+the production web build and typecheck pass, and a local signed-out/signed-in
+browser pass is clean. Resume with the persistence end-state and dependency
+advisory disposition, then close the remaining repo-wide Prettier/button-type
+and ESLint batches.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -605,7 +617,7 @@ handoff, the roadmap, or the backlog.
 
 Known inherited quality debt:
 
-- repo-wide `npm run format:check` flags 326 inherited files;
+- repo-wide `npm run format:check` flags 311 inherited files;
 - full dependency audit reports 11 advisories, including 2 critical
   development-tree advisories; and
 - production-only audit reports 5 advisories: 1 low, 1 moderate, 3 high,
