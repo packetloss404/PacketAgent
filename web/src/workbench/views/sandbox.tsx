@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { I } from "../icons";
 import { useApiData } from "../useApiData";
 import { api, streamSandboxExec } from "@/lib/api";
+import { useAuth } from "@/context/auth-state";
 import type { SandboxExecRecord, SandboxExecStatus, SandboxRuntimeInfo } from "@/lib/types";
 
 const STATUS_FILTERS: Array<"all" | SandboxExecStatus> = [
@@ -55,6 +56,7 @@ function formatRelative(iso?: string): string {
 }
 
 export function SandboxView() {
+  const { session } = useAuth();
   const status = useApiData(() => api.getSandboxStatus(), []);
   const runtimes = useApiData(() => api.listSandboxRuntimes(), []);
   const [filter, setFilter] = useState<"all" | SandboxExecStatus>("all");
@@ -71,6 +73,12 @@ export function SandboxView() {
 
   const defaultRuntime = runtimes.data?.find((candidate) => candidate.ready) ?? runtimes.data?.[0];
   const selectedRuntime = runtime || defaultRuntime?.id || "";
+  const trustedHostRole =
+    session?.workspace.role === "owner" || session?.workspace.role === "admin";
+  const composerDisabledReason =
+    status.data?.executionClass === "trusted-host-only" && !trustedHostRole
+      ? "Native host diagnostics require an owner or admin. Docker is required for untrusted code."
+      : null;
   const list = execs.data ?? EMPTY_EXECS;
   const filtered = filter === "all" ? list : list.filter((e) => e.status === filter);
 
@@ -93,7 +101,7 @@ export function SandboxView() {
   const median = durations.length > 0 ? durations[Math.floor(durations.length / 2)]! : 0;
 
   const startExec = async () => {
-    if (!command.trim() || working) return;
+    if (!command.trim() || working || composerDisabledReason) return;
     setWorking(true);
     setComposerError(null);
     try {
@@ -125,7 +133,8 @@ export function SandboxView() {
   return (
     <div style={{ padding: "26px 28px", maxWidth: 1320 }}>
       <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
-        Run commands in a sandboxed runtime. Streams stdout/stderr live.
+        Run untrusted commands only in the isolated Docker runtime. Native mode is owner/admin-only
+        trusted-host diagnostics and is not a sandbox.
       </p>
 
       <StatusPanel
@@ -133,6 +142,8 @@ export function SandboxView() {
         error={status.error}
         driver={status.data?.driver}
         available={status.data?.available}
+        executionClass={status.data?.executionClass}
+        untrustedCodeSupported={status.data?.untrustedCodeSupported}
         note={status.data?.note}
         runtimes={status.data?.runtimes ?? runtimes.data ?? []}
       />
@@ -171,6 +182,7 @@ export function SandboxView() {
         runtimes={runtimes.data ?? []}
         working={working}
         error={composerError}
+        disabledReason={composerDisabledReason}
         onStart={() => {
           void startExec();
         }}
@@ -249,6 +261,8 @@ function StatusPanel({
   error,
   driver,
   available,
+  executionClass,
+  untrustedCodeSupported,
   note,
   runtimes,
 }: {
@@ -256,6 +270,8 @@ function StatusPanel({
   error: string | null;
   driver?: "docker" | "native";
   available?: boolean;
+  executionClass?: "isolated" | "trusted-host-only";
+  untrustedCodeSupported?: boolean;
   note?: string;
   runtimes: SandboxRuntimeInfo[];
 }) {
@@ -276,6 +292,12 @@ function StatusPanel({
           </span>
         )}
         {!loading && driver === "native" && <span className="pill danger">INSECURE</span>}
+        {!loading && executionClass === "trusted-host-only" && (
+          <span className="pill warn">TRUSTED HOST ONLY</span>
+        )}
+        {!loading && untrustedCodeSupported === false && (
+          <span className="pill danger">UNTRUSTED CODE BLOCKED</span>
+        )}
         {!loading && available !== undefined && (
           <span className={`pill ${available ? "good" : "danger"}`}>
             <span className="dot"></span>
@@ -394,6 +416,7 @@ function Composer({
   runtimes,
   working,
   error,
+  disabledReason,
   onStart,
 }: {
   command: string;
@@ -405,6 +428,7 @@ function Composer({
   runtimes: SandboxRuntimeInfo[];
   working: boolean;
   error: string | null;
+  disabledReason: string | null;
   onStart: () => void;
 }) {
   return (
@@ -418,8 +442,18 @@ function Composer({
         style={{ minHeight: 70, fontSize: 12.5, resize: "vertical", marginBottom: 8 }}
         placeholder="e.g. echo hello   or   npm test   or   ls -la"
         value={command}
+        disabled={disabledReason !== null}
         onChange={(e) => setCommand(e.target.value)}
       />
+      {disabledReason && (
+        <div
+          role="status"
+          className="muted"
+          style={{ fontSize: 11.5, color: "var(--warning)", marginBottom: 8 }}
+        >
+          {disabledReason}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <label className="kicker" style={{ marginRight: 4 }}>
           RUNTIME
@@ -427,6 +461,7 @@ function Composer({
         <select
           className="field"
           value={runtime}
+          disabled={disabledReason !== null}
           onChange={(e) => setRuntime(e.target.value)}
           style={{ padding: "5px 8px", fontSize: 12, minWidth: 140 }}
         >
@@ -445,6 +480,7 @@ function Composer({
           className="field mono"
           style={{ padding: "5px 8px", fontSize: 12, width: 180 }}
           value={workingDir}
+          disabled={disabledReason !== null}
           onChange={(e) => setWorkingDir(e.target.value)}
           placeholder="/workspace"
         />
@@ -457,7 +493,7 @@ function Composer({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!command.trim() || working}
+            disabled={!command.trim() || working || disabledReason !== null}
             onClick={onStart}
           >
             {working ? (

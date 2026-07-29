@@ -44,11 +44,13 @@ const PREVIEW_BYTE_BUDGET = 16 * 1024;
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_RUNTIME = "node-20";
 const NATIVE_INSECURE_NOTE =
-  "Native driver is active. Commands run on the host with no isolation; use only on trusted dev hosts.";
+  "Native driver is active for owner/admin trusted-host diagnostics only. It has no isolation, is not a sandbox, and never runs generated or autonomous code.";
 const NATIVE_PRODUCTION_BLOCK_MESSAGE =
   "sandbox: native driver is blocked; it runs untrusted code on the host with no isolation. Use PACKETAGENT_SANDBOX_DRIVER=docker, or set PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX=true only for a trusted development host";
 const DOCKER_UNAVAILABLE_BLOCK_MESSAGE =
   "sandbox: Docker is unavailable and the native fallback is disabled. Start Docker (PACKETAGENT_SANDBOX_DRIVER=docker), or set PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX=true only for a trusted development host to allow the insecure native fallback";
+const NATIVE_UNTRUSTED_BLOCK_MESSAGE =
+  "sandbox: untrusted execution requires Docker; the native host driver is restricted to explicit owner/admin trusted-host diagnostics";
 
 export interface SandboxExecRequest {
   workspaceId: string;
@@ -119,6 +121,8 @@ export interface SandboxServiceFailureSnapshot {
 export interface SandboxServiceHealthSnapshot {
   driver: SandboxDriverId;
   available: boolean;
+  executionClass: "isolated" | "trusted-host-only";
+  untrustedCodeSupported: boolean;
   runtimes: SandboxRuntimeView[];
   activeExecs: number;
   recentFailures: SandboxServiceFailureSnapshot[];
@@ -203,6 +207,8 @@ export class SandboxService {
     const view: SandboxStatusView = {
       driver: driver.id,
       available,
+      executionClass: driver.id === "docker" ? "isolated" : "trusted-host-only",
+      untrustedCodeSupported: driver.id === "docker" && available,
       runtimes,
     };
     if (driver.id === "native") view.note = NATIVE_INSECURE_NOTE;
@@ -220,6 +226,8 @@ export class SandboxService {
     const snapshot: SandboxServiceHealthSnapshot = {
       driver: driver.id,
       available,
+      executionClass: driver.id === "docker" ? "isolated" : "trusted-host-only",
+      untrustedCodeSupported: driver.id === "docker" && available,
       runtimes: driver.runtimes(),
       activeExecs: this.active.size,
       recentFailures: this.recentFailures.slice(-5),
@@ -245,12 +253,30 @@ export class SandboxService {
   }
 
   /**
-   * Starts an execution. The returned record is persisted with status=running
-   * (or queued if the driver could not start) and the actual lifecycle plays
-   * out asynchronously over `events`.
+   * Starts untrusted execution. Docker is the only supported security
+   * boundary; native host execution always fails closed here.
    */
   async startExec(request: SandboxExecRequest): Promise<SandboxExecRecord> {
+    return await this.startExecWithTrust(request, false);
+  }
+
+  /**
+   * Explicit operator-only diagnostic path. Callers must independently prove
+   * owner/admin authority before using it. It never becomes a generated-code
+   * or autonomous-Worker fallback.
+   */
+  async startTrustedHostExec(request: SandboxExecRequest): Promise<SandboxExecRecord> {
+    return await this.startExecWithTrust(request, true);
+  }
+
+  private async startExecWithTrust(
+    request: SandboxExecRequest,
+    trustedHostDiagnostic: boolean,
+  ): Promise<SandboxExecRecord> {
     const driver = await this.resolveDriver();
+    if (driver.id === "native" && !trustedHostDiagnostic) {
+      throw new Error(NATIVE_UNTRUSTED_BLOCK_MESSAGE);
+    }
     if (request.requiredDriver && driver.id !== request.requiredDriver) {
       throw new Error(
         `sandbox: execution requires ${request.requiredDriver}; selected driver is ${driver.id}`,

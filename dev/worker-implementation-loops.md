@@ -1126,7 +1126,7 @@ live interoperability skips).
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1 completed on 2026-07-29. Resume at R5.2.
+Status: in progress. R5.1-R5.2 completed on 2026-07-29. Resume at R5.3.
 
 1. [Complete 2026-07-29] Make real sandboxed `tsc` and Vite validation the
    default; remove synthetic success. The required validator uses a
@@ -1135,8 +1135,13 @@ Status: in progress. R5.1 completed on 2026-07-29. Resume at R5.2.
    TypeScript/Vite exit codes, and fail-closed blocked results. Builder smoke
    consumes the same result. `npm run verify:codegen-sandbox` is the
    uninjected proof.
-2. Default to a fail-closed isolated driver for untrusted code and define the
-   supported non-Docker fallback. Remove `node:vm` as a security boundary.
+2. [Complete 2026-07-29] Default to fail-closed untrusted execution and define
+   the supported non-Docker behavior: there is no non-Docker security fallback.
+   Docker remains required for untrusted/generated/Worker code. Native host
+   execution is a separately named, explicitly opted-in, owner/admin-only
+   trusted diagnostic path. Status exposes the distinction, ordinary service
+   calls refuse native, and lint plus source-inventory coverage prohibit
+   `node:vm`.
 3. Enforce CPU, memory, process, timeout, filesystem, environment, and egress
    limits at the sandbox boundary.
 4. Reuse W6 network protections for redirects, SSRF, IPv4/IPv6, and DNS

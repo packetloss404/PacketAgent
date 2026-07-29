@@ -341,12 +341,13 @@ Status: complete as of 2026-07-29. Resume at R5.
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1 is complete as of 2026-07-29. Resume at R5.2.
+Status: in progress. R5.1-R5.2 are complete as of 2026-07-29. Resume at
+R5.3.
 
 - [x] Make real sandboxed TypeScript and Vite validation the default and remove
       synthetic success.
-- [ ] Define a fail-closed isolated non-Docker fallback and remove `node:vm` as
-      a security boundary.
+- [x] Define fail-closed non-Docker behavior (no supported untrusted fallback)
+      and remove `node:vm` as a security boundary.
 - [ ] Enforce CPU, memory, process, timeout, filesystem, environment, and
       egress limits at the sandbox boundary.
 - [ ] Reuse W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections.
@@ -370,6 +371,20 @@ Status: in progress. R5.1 is complete as of 2026-07-29. Resume at R5.2.
   passed with three intentional live interoperability skips). Resume at R5.2
   fail-closed non-Docker behavior and removal of `node:vm` as a security
   boundary.
+- R5.2 result: Docker is the only supported untrusted-code driver. Official
+  Node guidance forbids `node:vm` for untrusted code, and official Deno
+  guidance recommends an additional OS sandbox/VM for arbitrary untrusted
+  code, so PacketAgent does not claim a Deno-only fallback. The service refuses
+  native execution on every ordinary/untrusted call even when its opt-in is
+  set; the separate native path is owner/admin-only trusted-host diagnostics.
+  Status/API/UI expose `isolated` versus `trusted-host-only` and whether
+  untrusted execution is supported. An ESLint restriction plus a source
+  inventory test prevent production `node:vm` imports. Canonical Workers and
+  generated validation continue to require Docker. Typecheck, zero-warning
+  lint, formatting, production web build, 32 web tests, 25 focused tests, the
+  real Docker validator, and 1,586 API tests pass (1,583 passed with three
+  intentional live interoperability skips). Resume at R5.3 consolidated
+  resource, filesystem, environment, timeout, and egress enforcement.
 
 ### R6 - Agent authoring and execution depth
 
@@ -497,14 +512,21 @@ planning plus zip/git-ready export.
 
 ### Sandbox and execution farm
 
-- Wire `src/codegen/validate.ts` to invoke the existing sandbox service for real `tsc --noEmit` + `vite build` against the generated tree.
-- Remove synthetic smoke-pass default; sandbox is the default, opt-out for environments without Docker.
+- Shipped in R5.1: `src/codegen/validate.ts` invokes the required Docker
+  validator for real `tsc --noEmit` plus `vite build`; there is no
+  synthetic-success opt-out.
+- Shipped in R5.2: Docker is the only untrusted-code driver. Without Docker,
+  untrusted execution fails closed; the native host process is explicit
+  owner/admin trusted diagnostics only.
 - Egress allowlist enforced at the sandbox boundary, not just documented.
 - Per-build CPU + memory caps so a runaway build cannot take down the farm.
 
 ### Cross-cutting security
 
-- Drop the `node:vm` sandbox option entirely. For users without Docker, add a Deno-subprocess sandbox with `--allow-fs-read/write=<workspace>` + `--allow-net=<allowlist>`.
+- Resolved in R5.2: production `node:vm` imports are prohibited. A Deno-only
+  subprocess is deliberately not claimed as a secure fallback because Deno's
+  own untrusted-code guidance requires layered OS or VM isolation; no Docker
+  means no supported untrusted execution.
 - `process.env` scrubbing on every spawned process (sandbox build, per-app runtime, agent tool execution).
 - Network egress deny-by-default + SSRF blocklist (`169.254.169.254`, RFC1918, loopback, IPv6 link-local) + DNS pinning at allowlist-check time.
 - Same-origin CSRF fix for generated app preview: serve preview on a different port (or strict CSP) so LLM-authored `fetch('/api/internal-admin')` calls do not carry the user's PacketAgent session cookie.

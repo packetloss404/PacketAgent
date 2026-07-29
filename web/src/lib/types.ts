@@ -1895,6 +1895,8 @@ export interface SandboxRuntimeInfo {
 export interface SandboxStatus {
   driver: SandboxDriver;
   available: boolean;
+  executionClass: "isolated" | "trusted-host-only";
+  untrustedCodeSupported: boolean;
   runtimes: SandboxRuntimeInfo[];
   note?: string;
 }

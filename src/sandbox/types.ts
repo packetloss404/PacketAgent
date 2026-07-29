@@ -53,6 +53,8 @@ export interface SandboxRuntimeView {
 export interface SandboxStatusView {
   driver: SandboxDriver;
   available: boolean;
+  executionClass: "isolated" | "trusted-host-only";
+  untrustedCodeSupported: boolean;
   runtimes: SandboxRuntimeView[];
   note?: string;
 }

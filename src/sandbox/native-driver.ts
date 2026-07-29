@@ -1,12 +1,11 @@
 /**
  * Native (no-isolation) sandbox driver.
  *
- * This is a fallback for hosts that do not have Docker available. It runs the
+ * This is an explicitly enabled trusted-host diagnostics driver. It runs the
  * supplied command via `child_process.spawn({ shell: true })` on the host
  * directly. There is NO isolation: filesystem, network, env, and process
- * trees are all shared with the host. This is clearly insecure and is only
- * intended for development boxes that opt in via PACKETAGENT_SANDBOX_DRIVER=native
- * or by simply having no Docker installed.
+ * trees are all shared with the host. SandboxService refuses this driver for
+ * untrusted/generated/Worker execution even when the operator opt-in is set.
  */
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
@@ -56,10 +55,10 @@ function forceKill(child: ChildProcessWithoutNullStreams): void {
 }
 
 const NATIVE_RUNTIMES: SandboxRuntimeDescriptor[] = [
-  { id: "host", ready: true, description: "host shell (no isolation)" },
-  { id: "node-20", ready: true, description: "host node (no isolation)" },
-  { id: "python-3.11", ready: true, description: "host python (no isolation)" },
-  { id: "ubuntu-22", ready: true, description: "host shell (no isolation)" },
+  { id: "host", ready: true, description: "trusted host shell (no isolation)" },
+  { id: "node-20", ready: true, description: "trusted host node (no isolation)" },
+  { id: "python-3.11", ready: true, description: "trusted host python (no isolation)" },
+  { id: "ubuntu-22", ready: true, description: "trusted host shell (no isolation)" },
 ];
 
 export interface NativeDriverDeps {

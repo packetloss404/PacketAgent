@@ -61,8 +61,10 @@ schema-change characterization, reference-only generated DDL, and a real
 stopped-service SQLite backup/restore proof. R5.1 now makes generated
 TypeScript/Vite validation mandatory through a lockfile-addressed,
 network-disabled Docker image and fails closed when isolation is unavailable.
-Resume at R5.2 supported non-Docker behavior and removal of `node:vm` as a
-security boundary in
+R5.2 defines the non-Docker contract: there is no supported untrusted fallback;
+native host execution is explicit owner/admin trusted diagnostics only, and
+production `node:vm` imports are prohibited. Resume at R5.3 consolidated
+sandbox resource/filesystem/environment/egress bounds in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r5---sandbox-egress-and-preview-isolation).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

@@ -31,7 +31,7 @@ The following implemented subsystems are exercised by tests. Most are inherited 
 - **Provider-agnostic router** (`src/providers/router.ts`). Route-key -> provider/model dispatch, six real BYOK clients, one canonical provider/model/policy catalog, workspace-vault-aware readiness, native or conditional structured responses, bounded malformed-tool correction, `ledger.ts` cost recording, and an always-present `stub` fallback so the loop runs without keys.
 - **Tool-using agent loop** (`src/tools/agent-loop.ts`). Provider-routed, cost-ledger-wrapped, registered tool execution with tool-result feedback, abort signals, and capped turns. Tool registry/executor and read/write/browser builtins under `src/tools/`.
 - **Real Playwright browser runtime** (`src/tools/browser-runtime.ts`). Headless chromium, per-run page sessions, screenshot artifacts to `data/artifacts/<runId>`, graceful shutdown on SIGINT/SIGTERM.
-- **Command sandbox** (`src/sandbox/`). A driver abstraction with a Docker driver (`--network=none`, CPU/memory/PID caps, dropped capabilities, no-new-privileges, non-root user, read-only rootfs) and a native child-process fallback for explicitly opted-in interactive development. Autonomous Workers refuse the native fallback.
+- **Command sandbox** (`src/sandbox/`). A driver abstraction with a Docker driver (`--network=none`, CPU/memory/PID caps, dropped capabilities, no-new-privileges, non-root user, read-only rootfs). Docker is the only supported untrusted-code driver. The native child process is a separately gated owner/admin trusted-host diagnostic path, not a sandbox or fallback; generated apps and autonomous Workers refuse it.
 - **AES-256-GCM secrets vault** (`src/security/vault.ts`). PBKDF2 100k iterations, auth-tag validation, masking, and a production `MASTER_KEY` enforcement guard. Backs the Integrations secret store.
 - **Three explicit persistence authorities** (`src/store/`, `src/repositories/`, `src/db/`). JSON is a contributor-only whole document; SQLite stores promoted collections in dedicated tables and the remainder in `app_records` inside one transaction; managed Postgres stores one advisory-lock-protected normalized document. Staged `db:backfill-*` / `db:verify-*` commands cover SQLite promotion and managed cutover; this is not live SQLite/Postgres dual-write replication.
 - **Distributed job scheduler** (`src/jobs/`). Persisted queue with five-field cron, exponential retry, and dead-letter - plus three leader-election strategies for multi-node coordination: a file TTL lock (`scheduler-lock.ts`), an HTTP coordinator (`scheduler-http-coordinator.ts`), and a noop, selected via `scheduler-leader-selection.ts`. Registers cron, metrics-snapshot, alert evaluate/deliver, workspace-scoped Worker retention, and canonical `worker.run` job types; shutdown releases claimed work instead of reporting false success.
@@ -228,7 +228,7 @@ A first-class sandbox runtime ships under `/api/app/sandbox/*` with a `/sandbox`
 view in the workbench. It powers ad-hoc command execution and the required
 app-builder TypeScript/Vite validation pipeline before publish handoff.
 
-- **Drivers.** `docker` (default) runs `docker run --rm -i --network=none --cpus --memory --read-only --tmpfs /tmp` against runtimes `node-20`, `python-3.11`, `ubuntu-22`, and the internal `codegen-node-22` validator. A `native` host-process fallback is available and clearly marked **insecure** for interactive use; required generated-code validation rejects it.
+- **Drivers.** `docker` (default) runs `docker run --rm -i --network=none --cpus --memory --read-only --tmpfs /tmp` against runtimes `node-20`, `python-3.11`, `ubuntu-22`, and the internal `codegen-node-22` validator. Docker is the only untrusted-code boundary. An explicitly opted-in `native` host process is available only to owners/admins for trusted-host diagnostics; ordinary sandbox calls, generated-code validation, and Workers reject it.
 - **Endpoints.** `GET /status`, `GET /runtimes`, `POST /exec`, `GET /exec`, `GET /exec/:id`, `POST /exec/:id/cancel`, `GET /exec/:id/stream` (SSE).
 - **Workbench UI.** Status panel, runtime readiness, command composer, exec history, and a live log viewer with stdout / stderr tabs and follow-tail. The Builder also gains a per-app Sandbox tab.
 - **Generated-code validation.** Draft apply, change apply, preview refresh, and
@@ -326,7 +326,8 @@ Common environment variables:
 | `PACKETAGENT_MANAGED_DATABASE_ADAPTER`            | _unset_                   | Set to `postgres` when enabling the managed adapter.                                                                                                                                                  |
 | `PACKETAGENT_TRUST_PROXY`                         | `false`                   | Trust `X-Forwarded-Host` / `X-Forwarded-For` from a known proxy.                                                                                                                                      |
 | `PACKETAGENT_RATE_LIMIT_KEY_SALT`                 | _unset_                   | Salt for hashed rate-limit bucket IDs. Set in production.                                                                                                                                             |
-| `PACKETAGENT_SANDBOX_DRIVER`                      | `auto`                    | `docker`, `native`, or `auto`.                                                                                                                                                                        |
+| `PACKETAGENT_SANDBOX_DRIVER`                      | `auto`                    | `docker`, `native`, or `auto`. `native` is never an untrusted-code fallback.                                                                                                                          |
+| `PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX`       | `false`                   | Allow owner/admin trusted-host diagnostics when the selected driver is `native`. This provides no isolation and is rejected by generated-code and Worker paths.                                       |
 | `PACKETAGENT_SANDBOX_DEFAULT_RUNTIME`             | `node-20`                 | Default container image.                                                                                                                                                                              |
 | `PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS`          | `30000`                   | Per-exec timeout.                                                                                                                                                                                     |
 | `PACKETAGENT_SANDBOX_MEMORY_MB`                   | `512`                     | Container memory limit.                                                                                                                                                                               |
@@ -406,9 +407,11 @@ Generated `web/dist/` is gitignored; rebuild locally rather than committing it.
 - **Preview is local.** Builder preview routes serve generated source files from disk through PacketAgent. They are not public deployments unless you configure and validate a public URL.
 - **Publish is a verified local handoff, not managed hosting.** PacketAgent emits and integrity-checks the standalone package and provides a Docker certification command. Operators still run the long-lived service and configure DNS, TLS, reverse proxy, VPN, backups, and public networking.
 - **Secure generated-code validation requires Docker.** Interactive sandbox
-  commands may use the explicitly insecure native driver on a trusted
-  development host, but generated TypeScript/Vite validation requires Docker
-  and fails closed when it is unavailable.
+  commands may use the explicitly insecure native driver only as owner/admin
+  trusted-host diagnostics, but it is not a security fallback. Generated
+  TypeScript/Vite validation and Workers require Docker and fail closed when it
+  is unavailable. PacketAgent does not use `node:vm` or claim Deno permissions
+  alone isolate arbitrary untrusted code.
 - **Self-host is the category, not a step toward hosted.** PacketAgent is not pursuing parity with Replit, v0, Bolt, Lovable, or anything.com. Hosted-only capabilities (free public subdomain, pre-wired OAuth, managed App Store submission) are inventoried in [CLOUD.md](CLOUD.md) and intentionally out of scope.
 
 ### SQLite mode
@@ -431,10 +434,12 @@ Node/Vite/SQLite service, expose exact health/identity/schema-policy evidence,
 support verified reverse-proxy/VPN reachability, and prove same-schema
 persistence plus stopped-service backup/restore. R5.1 also requires real
 network-disabled Docker validation for generated TypeScript/Vite and removes
-the old synthetic-success path. Active remaining work resumes at R5.2
-non-Docker isolation truth in `BACKLOG.md`.
+the old synthetic-success path. R5.2 makes Docker the sole untrusted-code
+driver, restricts native host execution to explicit owner/admin diagnostics,
+and permanently guards against `node:vm`. Active remaining work resumes at
+R5.3 boundary-limit enforcement in `BACKLOG.md`.
 
-The exact resume point is R5.2 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+The exact resume point is R5.3 in [BACKLOG.md](BACKLOG.md), the sole ledger for
 the conditional live W10 check and all remaining R5-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.

@@ -20,7 +20,8 @@ If you want the strategic background on what self-host _intentionally_ gives up 
 - **Docker.** Required for secure generated-code validation and for running
   generated apps from the publish handoff. Without Docker, the interactive
   sandbox can use an explicitly enabled `native` host-process driver that is
-  clearly marked **insecure**, but Builder validation fails closed.
+  clearly marked **insecure** for owner/admin trusted-host diagnostics only;
+  it is not an untrusted-code fallback, and Builder validation fails closed.
 
 ---
 
@@ -509,6 +510,9 @@ The sandbox runtime defaults to `docker`. If Docker is not installed or not runn
 
 - The workbench Sandbox panel will show `Docker not available`.
 - You can switch to the `native` host-process driver with `PACKETAGENT_SANDBOX_DRIVER=native` plus `PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX=true`. **This runs sandbox commands as the host user with no isolation.** Only do this on a trusted dev machine.
+- Only workspace owners/admins may use that native diagnostic path. Ordinary
+  untrusted service calls, generated-code validation, and Workers still refuse
+  it.
 - Generated-app `tsc`/Vite validation does not use that insecure fallback and
   will report a blocked failure until Docker is available.
 - For production, install Docker Desktop (macOS/Windows) or `docker-ce` (Linux), confirm `docker ps` works for your user, and restart PacketAgent.

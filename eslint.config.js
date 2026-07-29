@@ -77,6 +77,38 @@ export default tseslint.config(
     languageOptions: {
       globals: { ...globals.node },
     },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "node:vm",
+              message:
+                "PacketAgent forbids node:vm as an untrusted-code boundary; use the isolated sandbox service.",
+            },
+            {
+              name: "vm",
+              message:
+                "PacketAgent forbids node:vm as an untrusted-code boundary; use the isolated sandbox service.",
+            },
+          ],
+        },
+      ],
+      "no-restricted-modules": [
+        "error",
+        {
+          name: "node:vm",
+          message:
+            "PacketAgent forbids node:vm as an untrusted-code boundary; use the isolated sandbox service.",
+        },
+        {
+          name: "vm",
+          message:
+            "PacketAgent forbids node:vm as an untrusted-code boundary; use the isolated sandbox service.",
+        },
+      ],
+    },
   },
 
   // React frontend: browser globals + react-hooks/react-refresh rules.

@@ -875,9 +875,13 @@ Optional: open `/builder` and re-run an app draft. The provider readiness sectio
 1. Visit `/sandbox`.
 2. Confirm the status panel shows the active driver. With Docker running it
    reports `docker`; without Docker it reports the sandbox unavailable unless
-   the operator explicitly enabled the insecure interactive native driver.
+   the operator explicitly enabled the insecure native trusted-host driver.
+   Native status must say `trusted-host-only` and untrusted code unsupported.
 3. List sandbox runtimes. Pick a ready runtime in the composer.
-4. Run `echo hello sandbox` with working directory `/workspace`. Confirm the run appears in the executions table with status `success` and exit code `0`, and that stdout shows `hello sandbox` in the selected exec panel.
+4. With Docker, run `echo hello sandbox` with working directory `/workspace`.
+   Confirm the run appears with status `success`, exit code `0`, and expected
+   stdout. With native selected, confirm a member is refused and only an
+   owner/admin can run the explicitly trusted diagnostic.
 5. Run a long sleep (`sleep 30`) and click cancel. Confirm the run transitions to `canceled`.
 6. Filter the executions table by `failed` and `success` to confirm filters work.
 

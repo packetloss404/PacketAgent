@@ -139,6 +139,40 @@ test("sandbox routes: POST /exec rejects users without member role", async () =>
   assert.equal(response.status, 403);
 });
 
+test("sandbox routes: native trusted-host diagnostics require owner or admin", async () => {
+  resetStoreForTests();
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
+  mutateStore((data) => {
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
+    assert.ok(membership);
+    membership.role = "member";
+  });
+  let started = false;
+  const store = createInMemoryStore();
+  const driver = createMockDriver(() => {
+    started = true;
+  });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "native",
+    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+  });
+  const app = createTestApp(service);
+
+  const response = await app.request("/api/app/sandbox/exec", {
+    method: "POST",
+    headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
+    body: JSON.stringify({ command: "echo should-not-run" }),
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(started, false);
+});
+
 test("sandbox routes: POST /exec returns running record on happy path", async () => {
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });

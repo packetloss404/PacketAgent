@@ -71,7 +71,12 @@ export function createSandboxRoutes(deps: SandboxRouteDeps = {}): Hono {
       if (!body.command || typeof body.command !== "string" || body.command.trim().length === 0) {
         throw badRequest("command is required");
       }
-      const exec = await resolveService().startExec({
+      const service = resolveService();
+      const driver = await service.resolveDriver();
+      if (driver.id === "native") {
+        await requirePrivateWorkspaceRoleAsync(c, "admin");
+      }
+      const request = {
         workspaceId: ctx.workspace.id,
         command: body.command,
         ...(typeof body.appId === "string" ? { appId: body.appId } : {}),
@@ -83,7 +88,11 @@ export function createSandboxRoutes(deps: SandboxRouteDeps = {}): Hono {
           : {}),
         ...(typeof body.timeoutMs === "number" ? { timeoutMs: body.timeoutMs } : {}),
         ...(typeof body.stdin === "string" ? { stdin: body.stdin } : {}),
-      });
+      };
+      const exec =
+        driver.id === "native"
+          ? await service.startTrustedHostExec(request)
+          : await service.startExec(request);
       return c.json({ exec }, 201);
     } catch (error) {
       return errorResponse(c, error);

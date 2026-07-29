@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R5.2 fail-closed non-Docker execution truth
+
+- Defined Docker as PacketAgent's only supported untrusted-code driver. There
+  is no implicit native or Deno-only security fallback when Docker is absent.
+- Split native host execution into an explicit trusted diagnostic service path;
+  it still requires the operator opt-in and now also requires workspace
+  owner/admin authorization. Ordinary sandbox calls, smoke batches, generated
+  validation, and canonical Workers fail closed before the native driver
+  starts.
+- Added `executionClass` and `untrustedCodeSupported` to sandbox status and
+  surfaced `trusted-host-only`/untrusted-blocked state in the workbench,
+  including a disabled composer for non-admin native users.
+- Added an ESLint production-import ban and source-inventory test for
+  `node:vm`, following Node's explicit warning that it is not a security
+  mechanism. Recorded why Deno permissions alone do not meet the arbitrary
+  untrusted-code boundary.
+- Typecheck, zero-warning lint, formatting, production web build, 32 web
+  tests, 25 focused tests, the real Docker validator, and 1,586 API tests pass
+  (1,583 passed with three intentional live interoperability skips).
+- Resume at R5.3 consolidated resource, filesystem, environment, timeout, and
+  egress limits.
+
 ### 2026-07-29 - R5.1 required generated-code sandbox validation
 
 - Retired `PACKETAGENT_SANDBOX_SMOKE_ENABLED` and removed every

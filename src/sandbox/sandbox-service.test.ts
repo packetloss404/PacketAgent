@@ -153,7 +153,10 @@ test("sandbox service: happy path stdout exit 0 → success", async () => {
     forcedDriver: "native",
     env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
   });
-  const exec = await service.startExec({ workspaceId: "alpha", command: "echo hello" });
+  const exec = await service.startTrustedHostExec({
+    workspaceId: "alpha",
+    command: "echo hello",
+  });
   const final = await service.waitForExec(exec.id);
   assert.equal(final?.status, "success");
   assert.equal(final?.exitCode, 0);
@@ -177,7 +180,10 @@ test("sandbox service: cancel stops the exec and reports canceled", async () => 
     forcedDriver: "native",
     env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
   });
-  const exec = await service.startExec({ workspaceId: "alpha", command: "sleep 60" });
+  const exec = await service.startTrustedHostExec({
+    workspaceId: "alpha",
+    command: "sleep 60",
+  });
   await new Promise((resolve) => setTimeout(resolve, 20));
   const canceled = await service.cancelExec("alpha", exec.id);
   assert.equal(canceled?.status, "canceled");
@@ -209,7 +215,7 @@ test("sandbox service: enforces driver timeout via timeout exit message", async 
     forcedDriver: "native",
     env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
   });
-  const exec = await service.startExec({
+  const exec = await service.startTrustedHostExec({
     workspaceId: "alpha",
     command: "sleep 99",
     timeoutMs: 50,
@@ -232,7 +238,27 @@ test("sandbox service: status reflects native driver insecure note", async () =>
   const status = await service.getStatus();
   assert.equal(status.driver, "native");
   assert.equal(status.available, true);
+  assert.equal(status.executionClass, "trusted-host-only");
+  assert.equal(status.untrustedCodeSupported, false);
   assert.match(status.note ?? "", /no isolation/i);
+});
+
+test("sandbox service: native driver always fails closed for untrusted execution", async () => {
+  const store = createInMemoryStore();
+  const driver = createMockDriver({ behavior: () => {} });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "native",
+    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+  });
+
+  await assert.rejects(
+    () => service.startExec({ workspaceId: "alpha", command: "echo unsafe" }),
+    /untrusted execution requires Docker/,
+  );
+  assert.equal(driver.startedSpecs.length, 0);
 });
 
 test("sandbox service: blocks native driver in production by default", async () => {
@@ -284,6 +310,7 @@ test("sandbox service: allows explicit insecure native opt-in in production", as
 test("sandbox service: runSmokeBatch aggregates pass when all items succeed", async () => {
   const store = createInMemoryStore();
   const driver = createMockDriver({
+    id: "docker",
     behavior: (handle) => {
       handle.emitter.emit("chunk", { stream: "stdout", data: "ok\n" });
       handle.emitter.emit("exit", { exitCode: 0, signal: null });
@@ -293,8 +320,7 @@ test("sandbox service: runSmokeBatch aggregates pass when all items succeed", as
     store,
     dockerDriver: driver,
     nativeDriver: driver,
-    forcedDriver: "native",
-    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+    forcedDriver: "docker",
   });
   const result = await service.runSmokeBatch("alpha", [
     { name: "route /a", command: "echo a" },
@@ -311,6 +337,7 @@ test("sandbox service: runSmokeBatch reports fail when any item exits non-zero",
   const store = createInMemoryStore();
   let count = 0;
   const driver = createMockDriver({
+    id: "docker",
     behavior: (handle) => {
       const exitCode = count++ === 0 ? 0 : 1;
       handle.emitter.emit("chunk", { stream: "stdout", data: "x" });
@@ -321,8 +348,7 @@ test("sandbox service: runSmokeBatch reports fail when any item exits non-zero",
     store,
     dockerDriver: driver,
     nativeDriver: driver,
-    forcedDriver: "native",
-    env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
+    forcedDriver: "docker",
   });
   const result = await service.runSmokeBatch("alpha", [
     { name: "first", command: "echo ok" },
@@ -350,7 +376,10 @@ test("sandbox service: stdout/stderr previews are bounded to ~16KB", async () =>
     forcedDriver: "native",
     env: { PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX: "true" },
   });
-  const exec = await service.startExec({ workspaceId: "alpha", command: "spew" });
+  const exec = await service.startTrustedHostExec({
+    workspaceId: "alpha",
+    command: "spew",
+  });
   const final = await service.waitForExec(exec.id);
   assert.ok(final?.stdoutPreview);
   assert.ok((final?.stdoutPreview?.length ?? 0) <= 16 * 1024);

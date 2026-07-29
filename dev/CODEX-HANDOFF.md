@@ -667,13 +667,27 @@ phase result and fails closed when validation is blocked. The uninjected
 `npm run verify:codegen-sandbox` proof passes. Typecheck, zero-warning lint,
 formatting, production web build, 32 web tests, 62 focused tests, and the
 1,583-test API suite pass (1,580 passed with three intentional live
-interoperability skips). Implementation and research evidence are recorded in
+interoperability skips).
+
+R5.2 is also complete. Source inventory found no active `node:vm` execution
+path, and a lint restriction plus repository test now keep it absent.
+PacketAgent deliberately has no non-Docker untrusted-code fallback: official
+Deno guidance calls for OS/VM defense in depth for arbitrary untrusted code,
+so a Deno subprocess alone would overclaim isolation. Ordinary sandbox service
+calls always refuse native execution. The explicitly opted-in native driver is
+available only through a separate owner/admin trusted-host diagnostic path,
+and status/API/UI expose that it has no isolation and cannot run untrusted
+code. Workers and generated validation continue to require Docker. Typecheck,
+zero-warning lint, formatting, production web build, 32 web tests, 25 focused
+tests, the real Docker validator, and 1,586 API tests pass (1,583 passed with
+three intentional live interoperability skips).
+Implementation and research evidence are recorded in
 [`r5-sandbox-isolation.md`](r5-sandbox-isolation.md).
 
-The exact next slice is R5.2 under
+The exact next slice is R5.3 under
 [`R5 - sandbox, egress, and preview isolation`](../BACKLOG.md#r5---sandbox-egress-and-preview-isolation):
-define supported fail-closed non-Docker behavior and remove `node:vm` as a
-security boundary.
+consolidate and adversarially prove CPU, memory, process, timeout, filesystem,
+environment, and egress limits at the sandbox boundary.
 After each gate passes, continue through R5-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
