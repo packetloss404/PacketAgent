@@ -375,6 +375,14 @@ lint, production build, 30 web tests, and 1,552 API tests (1,548 passed with 4
 intentional live-probe skips). Resume at R3's file-tree repair, iteration,
 progress, review, and export slice.
 
+R3.1 is complete. Generated-app validation failures are classified into
+deterministic module-graph, type-contract, JSX, entry/config, styling, runtime
+API, or generic families. Repair prompts prioritize the files with the most
+diagnostics, cap diagnostic and source bytes, strip terminal control
+sequences, give family-specific instructions, and retain the existing
+two-repair/repeated-signature stop bounds. Resume at R3's deterministic
+legacy-draft conversion and canonical file-tree iteration slice.
+
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is

@@ -38,12 +38,8 @@ import {
 import { providerGenerationPolicy } from "../providers/catalog.js";
 import type { LLMProvider, ProviderStreamChunk, ProviderToolDef } from "../providers/types.js";
 import { validateWorkspacePath } from "./path-validator.js";
-import {
-  validateFileTree,
-  type ValidateOptions,
-  type ValidationError,
-  type ValidationResult,
-} from "./validate.js";
+import { validateFileTree, type ValidateOptions, type ValidationResult } from "./validate.js";
+import { buildValidationRepairGoal } from "./repair-strategy.js";
 
 // =============================================================================
 // Public types
@@ -189,7 +185,6 @@ export const MAX_FILES_PER_WRITE_CHUNK = 8;
  */
 const CHUNK_WRITE_THRESHOLD = 10;
 const DEFAULT_VALIDATION_FIX_ATTEMPTS = 2;
-const REPAIR_PROMPT_FILE_BUDGET_BYTES = 60_000;
 
 // =============================================================================
 // Tool definition
@@ -717,57 +712,4 @@ function normalizeValidationMessage(message: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 500);
-}
-
-function buildValidationRepairGoal(
-  originalGoal: string,
-  files: GeneratedFile[],
-  validation: ValidationResult,
-  attempt: number,
-): string {
-  const renderedFiles = renderFilesForRepairPrompt(files, REPAIR_PROMPT_FILE_BUDGET_BYTES);
-  return [
-    "Repair the generated Vite + React app file tree.",
-    "",
-    `Original user goal: ${originalGoal}`,
-    `Repair attempt: ${attempt}`,
-    "",
-    "The previous file tree failed validation. Return a COMPLETE corrected file tree using `write_file` calls.",
-    "Keep the app's intended behavior, but fix the TypeScript/build errors. Do not explain instead of writing files.",
-    "",
-    "Validation errors:",
-    ...validation.errors.map(formatValidationErrorForPrompt),
-    "",
-    "Current file tree:",
-    renderedFiles,
-  ].join("\n");
-}
-
-function formatValidationErrorForPrompt(error: ValidationError): string {
-  const location = `${error.file}${error.line ? `:${error.line}` : ""}${error.column ? `:${error.column}` : ""}`;
-  return `- [${error.phase}] ${location}: ${error.message}`;
-}
-
-function renderFilesForRepairPrompt(files: GeneratedFile[], budgetBytes: number): string {
-  const chunks: string[] = [];
-  let used = 0;
-  for (const file of files) {
-    const header = `\n--- ${file.path}\n\`\`\`\n`;
-    const footer = "\n```\n";
-    const remaining = budgetBytes - used - Buffer.byteLength(header) - Buffer.byteLength(footer);
-    if (remaining <= 0) {
-      chunks.push(
-        `\n... ${files.length - chunks.length} more file(s) omitted due to prompt budget.\n`,
-      );
-      break;
-    }
-    const contentBytes = Buffer.byteLength(file.content);
-    const content =
-      contentBytes > remaining
-        ? `${file.content.slice(0, Math.max(0, remaining))}\n... truncated ...`
-        : file.content;
-    chunks.push(`${header}${content}${footer}`);
-    used += Buffer.byteLength(chunks[chunks.length - 1] ?? "");
-  }
-  return chunks.join("");
 }

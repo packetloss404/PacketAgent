@@ -279,7 +279,7 @@ Status: complete as of 2026-07-29. Resume at R3.
 
 Status: active.
 
-- [ ] Add targeted bounded repair prompts from real failure clusters.
+- [x] Add targeted bounded repair prompts from real failure clusters.
 - [ ] Move legacy-template iteration to the file-tree path or a deterministic
       one-time conversion.
 - [ ] Stream per-file plan/write/validate progress.

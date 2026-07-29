@@ -1060,7 +1060,8 @@ focused and repository-wide gates. Design and research evidence live in
 
 Status: active.
 
-1. Collect real failure clusters and add targeted, bounded repair prompts.
+1. [Complete 2026-07-29] Classify concrete TypeScript/Vite failure clusters
+   and add targeted, diagnostic- and file-budget-bounded repair prompts.
 2. Move legacy-template iteration onto the file-tree path or provide a
    deterministic one-time conversion.
 3. Stream per-file plan/write/validate progress to the Files view.

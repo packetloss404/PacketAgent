@@ -103,7 +103,7 @@ The generated app must look like a polished, production-grade product on first r
 
 Tool semantics: \`write_file\`
 -----------------------------
-The \`write_file\` tool accepts \`{ path: string, contents: string }\` and writes one file into the workspace. The host validates \`path\` and will reject anything that escapes the workspace, contains \`..\`, uses a reserved Windows device name, or contains a NUL byte / colon. Always pass workspace-relative POSIX paths (e.g. \`src/App.tsx\`, never \`./src/App.tsx\`, \`/src/App.tsx\`, or \`src\\App.tsx\`). Emit one tool call per file - never bundle multiple files into a single call.
+The \`write_file\` tool accepts \`{ path: string, content: string }\` and writes one file into the workspace. The host validates \`path\` and will reject anything that escapes the workspace, contains \`..\`, uses a reserved Windows device name, or contains a NUL byte / colon. Always pass workspace-relative POSIX paths (e.g. \`src/App.tsx\`, never \`./src/App.tsx\`, \`/src/App.tsx\`, or \`src\\App.tsx\`). Emit one tool call per file - never bundle multiple files into a single call.
 
 Phase 1 output (plan phase)
 ---------------------------
