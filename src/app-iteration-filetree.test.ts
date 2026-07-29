@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   applyAppIterationViaFileTree,
   buildFileTreeIterationGoal,
+  canonicalizeIterationFileTree,
   diffFileTrees,
   shouldUseFileTreeIteration,
   type AppIterationFileTreeOptions,
@@ -14,7 +15,7 @@ import type { ValidateOptions, ValidationResult } from "./codegen/validate.js";
 // shouldUseFileTreeIteration — pure helper
 // ---------------------------------------------------------------------------
 
-test("shouldUseFileTreeIteration: true only when flag + source + non-empty files", () => {
+test("shouldUseFileTreeIteration: accepts canonical and convertible legacy bundles", () => {
   const files: GeneratedFile[] = [{ path: "src/App.tsx", content: "x" }];
 
   // Happy path.
@@ -29,11 +30,10 @@ test("shouldUseFileTreeIteration: true only when flag + source + non-empty files
     false,
   );
 
-  // Wrong source — "llm" (structured tool) path.
-  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: "llm", files }), false);
+  // Structured-tool and template sources use the explicit conversion seam.
+  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: "llm", files }), true);
 
-  // Wrong source — "template" path.
-  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: "template", files }), false);
+  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: "template", files }), true);
 
   // Right source, undefined files.
   assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: "llm-filetree" }), false);
@@ -44,8 +44,57 @@ test("shouldUseFileTreeIteration: true only when flag + source + non-empty files
     false,
   );
 
-  // Source undefined.
-  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: undefined, files }), false);
+  // Historical source-less checkpoints are converted explicitly as unknown.
+  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: undefined, files }), true);
+});
+
+test("canonicalizeIterationFileTree normalizes paths and records one-time provenance", () => {
+  assert.deepEqual(
+    canonicalizeIterationFileTree({
+      flagOn: true,
+      draftSource: "template",
+      files: [{ path: "src\\App.tsx", content: "app" }],
+    }),
+    {
+      source: "llm-filetree",
+      convertedFrom: "template",
+      files: [{ path: "src/App.tsx", content: "app" }],
+    },
+  );
+
+  assert.deepEqual(
+    canonicalizeIterationFileTree({
+      flagOn: true,
+      draftSource: "llm-filetree",
+      files: [{ path: "src/App.tsx", content: "app" }],
+    }),
+    {
+      source: "llm-filetree",
+      files: [{ path: "src/App.tsx", content: "app" }],
+    },
+  );
+});
+
+test("canonicalizeIterationFileTree rejects unsafe and case-colliding bundles", () => {
+  assert.equal(
+    canonicalizeIterationFileTree({
+      flagOn: true,
+      draftSource: "template",
+      files: [{ path: "../escape.ts", content: "bad" }],
+    }),
+    null,
+  );
+  assert.equal(
+    canonicalizeIterationFileTree({
+      flagOn: true,
+      draftSource: "template",
+      files: [
+        { path: "src/App.tsx", content: "one" },
+        { path: "SRC/app.tsx", content: "two" },
+      ],
+    }),
+    null,
+  );
 });
 
 // ---------------------------------------------------------------------------

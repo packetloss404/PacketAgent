@@ -1340,6 +1340,9 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
       afterSha256?: string;
     }>;
     sourceFiles?: Array<{ path: string; sha256: string }>;
+    fileTree?: Array<{ path: string; content: string }>;
+    draftSource?: string;
+    logs?: Array<{ message?: string }>;
     draft?: { app?: { pages?: Array<{ route: string; purpose: string; actions: string[] }> } };
     preview?: { status?: string };
     rollback?: { checkpointId?: string };
@@ -1371,6 +1374,11 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
       (file) => file.path === "src/App.tsx" && file.sha256 !== initialSourceSha,
     ),
   );
+  assert.equal(iteration.draftSource, "llm-filetree");
+  assert.ok(
+    iteration.fileTree?.some((file) => file.path === "src/App.tsx" && file.content.length > 0),
+  );
+  assert.ok(iteration.logs?.some((entry) => entry.message?.includes("canonical file-tree path")));
   assert.ok(
     iteration.draft?.app?.pages?.some(
       (page) => page.route === "/book" && page.purpose.includes("Iteration request"),
@@ -1403,6 +1411,7 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
     };
     sourceDiffFiles?: Array<{ path: string; beforeSha256?: string; afterSha256?: string }>;
     sourceFiles?: Array<{ path: string; sha256: string }>;
+    draftSource?: string;
     smoke?: { status?: string };
     workspace?: {
       path?: string;
@@ -1415,6 +1424,7 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
   assert.equal(appliedIteration.applied, true);
   assert.equal(appliedIteration.diff?.status, "applied");
   assert.equal(appliedIteration.smoke?.status, "pass");
+  assert.equal(appliedIteration.draftSource, "llm-filetree");
   assert.match(appliedIteration.previewUrl ?? "", /\/builder\/preview\/alpha\//);
   assert.notEqual(appliedIteration.checkpoint?.id, applied.checkpoint.id);
   assert.ok(
@@ -1430,6 +1440,11 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
   assert.equal(appliedIteration.workspace?.manifest?.checkpointId, appliedIteration.checkpoint?.id);
   assert.ok(appliedIteration.workspace?.checkpointPath);
   assert.ok(existsSync(join(appliedIteration.workspace.checkpointPath, "src", "App.tsx")));
+  const convertedRecord = loadStore().generatedApps?.find((entry) => entry.id === applied.app.id);
+  const convertedCheckpoint = convertedRecord?.checkpoints?.find(
+    (checkpoint) => checkpoint.id === appliedIteration.checkpoint?.id,
+  );
+  assert.equal(convertedCheckpoint?.codegenSource, "llm-filetree");
   assert.ok(appliedIteration.workspace?.manifest?.path);
   assert.ok(existsSync(appliedIteration.workspace.manifest.path));
 

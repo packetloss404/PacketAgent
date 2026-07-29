@@ -383,6 +383,14 @@ sequences, give family-specific instructions, and retain the existing
 two-repair/repeated-signature stop bounds. Resume at R3's deterministic
 legacy-draft conversion and canonical file-tree iteration slice.
 
+R3.2 is complete. Legacy template, structured-draft, and historical
+source-less checkpoints reuse their persisted deterministic source bundle
+through an explicit path-normalizing, case-collision-rejecting conversion seam.
+Model-backed iteration consumes that tree when ready; deterministic fallback
+still returns a reviewed full tree, and applying it persists the next
+checkpoint as `llm-filetree`. The legacy generation kill switch remains an
+explicit opt-out. Resume at R3's per-file plan/write/validate stream.
+
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is

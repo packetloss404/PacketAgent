@@ -1062,8 +1062,9 @@ Status: active.
 
 1. [Complete 2026-07-29] Classify concrete TypeScript/Vite failure clusters
    and add targeted, diagnostic- and file-budget-bounded repair prompts.
-2. Move legacy-template iteration onto the file-tree path or provide a
-   deterministic one-time conversion.
+2. [Complete 2026-07-29] Normalize persisted legacy source bundles through a
+   path-safe, collision-safe one-time conversion; applied iteration checkpoints
+   become canonical `llm-filetree` even when model authoring falls back.
 3. Stream per-file plan/write/validate progress to the Files view.
 4. Add file-level changed/unchanged/new/deleted review and targeted
    route/entity/component regeneration.

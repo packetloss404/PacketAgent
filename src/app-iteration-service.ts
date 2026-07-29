@@ -13,6 +13,7 @@ import {
   type AuthorAppResult,
   type GeneratedFile,
 } from "./codegen/llm-author.js";
+import { validateWorkspacePath } from "./codegen/path-validator.js";
 import { validateFileTree, type ValidationResult } from "./codegen/validate.js";
 
 export type AppIterationTargetKind = "page" | "api" | "data" | "auth" | "config";
@@ -1289,24 +1290,60 @@ export interface AppIterationFileTreeResult {
   validationErrors?: string[];
 }
 
+export interface CanonicalIterationFileTree {
+  source: "llm-filetree";
+  files: GeneratedFile[];
+  convertedFrom?: "llm" | "template" | "unknown";
+}
+
+/**
+ * Normalize an existing generated-app artifact into the file-tree iteration
+ * contract. Legacy template/structured-draft artifacts already persist their
+ * deterministic source bundle; this is the explicit one-time conversion seam
+ * that lets the next applied checkpoint become `llm-filetree` without
+ * reconstructing hidden source from the projection.
+ */
+export function canonicalizeIterationFileTree(input: {
+  flagOn: boolean;
+  draftSource: string | undefined;
+  files?: GeneratedFile[] | undefined;
+}): CanonicalIterationFileTree | null {
+  if (!input.flagOn || !Array.isArray(input.files) || input.files.length === 0) return null;
+  const seen = new Set<string>();
+  const files: GeneratedFile[] = [];
+  for (const file of input.files) {
+    if (!file || typeof file.path !== "string" || typeof file.content !== "string") return null;
+    const checked = validateWorkspacePath(file.path);
+    if (!checked.ok || !checked.normalized) return null;
+    const collisionKey = checked.normalized.toLocaleLowerCase("en-US");
+    if (seen.has(collisionKey)) return null;
+    seen.add(collisionKey);
+    files.push({ path: checked.normalized, content: file.content });
+  }
+
+  if (input.draftSource === "llm-filetree") {
+    return { source: "llm-filetree", files };
+  }
+  const convertedFrom =
+    input.draftSource === "llm" || input.draftSource === "template" ? input.draftSource : "unknown";
+  return { source: "llm-filetree", files, convertedFrom };
+}
+
 /**
  * Returns true when the HTTP route layer should use the file-tree iteration
- * path. The three required conditions are:
+ * path. Legacy template/structured-draft source is accepted when its persisted
+ * deterministic file bundle can be normalized by the conversion seam.
+ * The three required conditions are:
  *   1. The file-tree path has not been disabled by the legacy escape hatch.
- *   2. The draft being iterated was generated via the file-tree path (so the
- *      caller has the canonical file tree, not just a derived `AppDraft`).
- *   3. The caller actually passes a non-empty `files` array alongside the
- *      draft. Without that we have nothing to diff against.
+ *   2. The caller passes a non-empty, path-safe, collision-free file bundle.
+ *   3. The source is canonical already or is converted explicitly on apply.
  */
 export function shouldUseFileTreeIteration(input: {
   flagOn: boolean;
   draftSource: string | undefined;
   files?: GeneratedFile[] | undefined;
 }): boolean {
-  if (!input.flagOn) return false;
-  if (input.draftSource !== "llm-filetree") return false;
-  if (!Array.isArray(input.files) || input.files.length === 0) return false;
-  return true;
+  return canonicalizeIterationFileTree(input) !== null;
 }
 
 /**

@@ -23,7 +23,7 @@ import {
   applyAppIterationViaFileTree,
   applyAppIterationViaLLM,
   buildAppIterationPlan,
-  shouldUseFileTreeIteration,
+  canonicalizeIterationFileTree,
   type AppIterationChangeRequest,
   type AppIterationDiffHunk,
   type AppIterationLLMResult,
@@ -502,19 +502,23 @@ async function runAppIterationCore(
     },
   });
 
-  const fileTreeInput = fileTreeForIteration(body, record, previousCheckpoint);
-  if (
-    shouldUseFileTreeIteration({
-      flagOn: process.env.PACKETAGENT_LEGACY_TEMPLATES !== "1",
-      draftSource: fileTreeInput.source,
-      files: fileTreeInput.files,
-    })
-  ) {
+  const fileTreeInput = fileTreeForIteration(
+    body,
+    record,
+    previousCheckpoint,
+    previousArtifact.files,
+  );
+  const canonicalFileTree = canonicalizeIterationFileTree({
+    flagOn: process.env.PACKETAGENT_LEGACY_TEMPLATES !== "1",
+    draftSource: fileTreeInput.source,
+    files: fileTreeInput.files,
+  });
+  if (canonicalFileTree && integrationReadiness.providers.readyCount > 0) {
     await onStep?.("Updating generated file tree");
     let fileTreeResult: Awaited<ReturnType<typeof applyAppIterationViaFileTree>> | null = null;
     try {
       fileTreeResult = await applyAppIterationViaFileTree(
-        fileTreeInput.files!,
+        canonicalFileTree.files,
         changeText,
         {
           workspaceId: context.workspace.id,
@@ -580,6 +584,14 @@ async function runAppIterationCore(
             "info",
             `File-tree iteration via ${fileTreeResult.model}: ${fileTreeResult.changedSummary}`,
           ),
+          ...(canonicalFileTree.convertedFrom
+            ? [
+                routeLog(
+                  "info",
+                  `Converted the ${canonicalFileTree.convertedFrom} source bundle to the canonical file-tree path.`,
+                ),
+              ]
+            : []),
         ],
         snapshot,
         tools,
@@ -626,6 +638,9 @@ async function runAppIterationCore(
     draft: candidateDraft,
   });
   const sourceDiffFiles = diffGeneratedAppSourceFiles(previousArtifact, candidateArtifact);
+  const convertedFallbackFiles = canonicalFileTree
+    ? generatedFilesFromSourceRecords(candidateArtifact.files)
+    : undefined;
   const snapshot = buildAppPreviewSnapshotMetadata({
     workspaceId: context.workspace.id,
     appId: sourceAppId,
@@ -665,6 +680,14 @@ async function runAppIterationCore(
       ...(llmResult
         ? [routeLog("info", `LLM iteration via ${llmResult.model}: ${llmResult.changedSummary}`)]
         : []),
+      ...(canonicalFileTree?.convertedFrom
+        ? [
+            routeLog(
+              "info",
+              `Converted the ${canonicalFileTree.convertedFrom} source bundle to the canonical file-tree path after deterministic iteration.`,
+            ),
+          ]
+        : []),
     ],
     snapshot,
     tools,
@@ -672,6 +695,8 @@ async function runAppIterationCore(
     sourceFiles: candidateArtifact.files,
     artifact: candidateArtifact,
     llmResult,
+    fileTree: convertedFallbackFiles,
+    draftSource: canonicalFileTree ? "llm-filetree" : undefined,
   });
 }
 
@@ -1847,6 +1872,7 @@ function fileTreeForIteration(
   body: AppIterationRouteRequest,
   record: GeneratedAppRecordWithRuntime | undefined,
   checkpoint: GeneratedAppCheckpointWithRuntime | null,
+  fallbackFiles: GeneratedAppSourceFileRecord[],
 ): { source?: AppDraftSource; files?: GeneratedFile[] } {
   const bodyFiles = generatedFilesFromUnknown(body.fileTree);
   if (bodyFiles?.length) {
@@ -1854,13 +1880,13 @@ function fileTreeForIteration(
   }
 
   const source = body.draftSource ?? checkpoint?.codegenSource ?? record?.codegenSource;
-  if (source !== "llm-filetree") return { source };
-
   const recordFiles = checkpoint?.sourceFiles?.length
     ? checkpoint.sourceFiles
     : checkpoint?.id === record?.checkpointId && record?.sourceFiles?.length
       ? record.sourceFiles
-      : record?.sourceFiles;
+      : record?.sourceFiles?.length
+        ? record.sourceFiles
+        : fallbackFiles;
   return { source, files: generatedFilesFromSourceRecords(recordFiles) };
 }
 
