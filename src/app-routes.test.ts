@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { strFromU8, unzipSync } from "fflate";
 import { SESSION_COOKIE_NAME } from "./auth-utils";
 import { appRoutes, setHostInfoSourcesForTests } from "./app-routes";
+import { setGeneratedAppFileTreeValidatorForTests } from "./app-routes/builder-core.js";
 import { shutdownDefaultGeneratedAppRuntimeProcessPool } from "./generated-app-runtime/server.js";
 import { login } from "./packetagent-services";
 import { upsertApiKey } from "./security/api-key-store.js";
@@ -23,6 +24,19 @@ import {
   type GeneratedAppRecord,
   type PacketAgentData,
 } from "./packetagent-store";
+
+const passingGeneratedAppValidator: NonNullable<
+  Parameters<typeof setGeneratedAppFileTreeValidatorForTests>[0]
+> = async () => ({
+  ok: true,
+  source: "real",
+  errors: [],
+  warnings: [],
+  durationMs: 7,
+  phases: { typecheck: "passed", build: "passed" },
+});
+
+setGeneratedAppFileTreeValidatorForTests(passingGeneratedAppValidator);
 
 const STORE_ENV_KEYS = [
   "PACKETAGENT_STORE",
@@ -1307,69 +1321,58 @@ test("generated app preview route resolves by actual app id or slug", async () =
   assert.equal(publishState.appId, applied.app.id);
 });
 
-// The sandbox smoke driver spawns the host shell (cmd.exe on Windows, /bin/sh elsewhere)
-// via an absolute path. On Windows hosts the Node test runner sometimes cannot resolve
-// %SystemRoot%\system32\cmd.exe (spawn ENOENT), which makes this test fail for reasons
-// unrelated to the route under test. Skip cleanly when the host can't satisfy the
-// prerequisite instead of reporting a hard failure.
-const sandboxSmokeSkipReason = (() => {
-  if (process.platform !== "win32") return null;
-  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT;
-  if (!systemRoot) {
-    return "Windows host without %SystemRoot% set; cannot spawn cmd.exe for sandbox smoke";
-  }
-  const cmdPath = join(systemRoot, "System32", "cmd.exe");
-  if (!existsSync(cmdPath)) {
-    return `Windows host cmd.exe not reachable at ${cmdPath}; sandbox smoke driver cannot spawn it`;
-  }
-  // Even when cmd.exe exists on disk, Node's spawn frequently fails with ENOENT for the
-  // absolute path the sandbox driver constructs inside this test harness. Treat Windows
-  // as unsupported for this scenario until the driver gains a portable shell strategy.
-  return "Sandbox smoke driver cannot reliably spawn cmd.exe in the Node test environment on Windows";
-})();
-
-test(
-  "builder app-draft/apply runs smoke through the sandbox when PACKETAGENT_SANDBOX_SMOKE_ENABLED=1",
-  { skip: sandboxSmokeSkipReason ?? false },
-  async () => {
+test("builder app-draft/apply fails closed when required sandbox validation is blocked", async () => {
+  setGeneratedAppFileTreeValidatorForTests(async () => ({
+    ok: false,
+    source: "blocked",
+    errors: [
+      {
+        file: "<sandbox>",
+        message: "Docker unavailable",
+        severity: "error",
+        phase: "typecheck",
+      },
+    ],
+    warnings: [],
+    durationMs: 3,
+    phases: { typecheck: "skipped", build: "skipped" },
+  }));
+  try {
     resetStoreForTests();
-    const original = process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED;
-    process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED = "1";
-    try {
-      const app = createTestApp();
-      const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
-      const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
+    const app = createTestApp();
+    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
+    const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
-      const draftResponse = await app.request("/api/app/builder/app-draft", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ prompt: "Build a public booking app." }),
-      });
-      const draftBody = (await draftResponse.json()) as { draft?: unknown };
+    const draftResponse = await app.request("/api/app/builder/app-draft", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ prompt: "Build a public booking app." }),
+    });
+    const draftBody = (await draftResponse.json()) as { draft?: unknown };
 
-      const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ draft: draftBody.draft, runSmoke: true }),
-      });
-      const applyBody = (await applyResponse.json()) as {
-        smokeBuild?: {
-          status?: string;
-          message?: string;
-          checks?: Array<{ name?: string; detail?: string }>;
-        };
+    const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ draft: draftBody.draft, runSmoke: true }),
+    });
+    const applyBody = (await applyResponse.json()) as {
+      smokeBuild?: {
+        status?: string;
+        message?: string;
+        blockers?: string[];
       };
+    };
 
-      assert.equal(applyResponse.status, 201);
-      assert.match(applyBody.smokeBuild?.message ?? "", /verified via sandbox/);
-      const firstCheckDetail = applyBody.smokeBuild?.checks?.[0]?.detail ?? "";
-      assert.match(firstCheckDetail, /sandbox: exit/);
-    } finally {
-      if (original === undefined) delete process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED;
-      else process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED = original;
-    }
-  },
-);
+    assert.equal(applyResponse.status, 201);
+    assert.equal(applyBody.smokeBuild?.status, "fail");
+    assert.match(applyBody.smokeBuild?.message ?? "", /blocked/);
+    assert.ok(
+      applyBody.smokeBuild?.blockers?.some((blocker) => blocker.includes("Docker unavailable")),
+    );
+  } finally {
+    setGeneratedAppFileTreeValidatorForTests(passingGeneratedAppValidator);
+  }
+});
 
 test("builder app iteration can generate a diff, apply it, and rollback checkpoints", async () => {
   resetStoreForTests();

@@ -1126,8 +1126,15 @@ live interoperability skips).
 
 ### R5 - Sandbox, egress, and preview isolation
 
-1. Make real sandboxed `tsc` and Vite validation the default; remove synthetic
-   success.
+Status: in progress. R5.1 completed on 2026-07-29. Resume at R5.2.
+
+1. [Complete 2026-07-29] Make real sandboxed `tsc` and Vite validation the
+   default; remove synthetic success. The required validator uses a
+   Dockerfile/lockfile-addressed Node 22 image, a read-only generated-source
+   mount, an ephemeral writable workspace, no container network, real
+   TypeScript/Vite exit codes, and fail-closed blocked results. Builder smoke
+   consumes the same result. `npm run verify:codegen-sandbox` is the
+   uninjected proof.
 2. Default to a fail-closed isolated driver for untrusted code and define the
    supported non-Docker fallback. Remove `node:vm` as a security boundary.
 3. Enforce CPU, memory, process, timeout, filesystem, environment, and egress
@@ -1141,6 +1148,9 @@ live interoperability skips).
 
 Gate: untrusted generated code cannot inherit host secrets/session cookies,
 reach undeclared networks, or escape declared resource limits.
+
+R5 research, implementation decisions, and cumulative gate evidence live in
+[`r5-sandbox-isolation.md`](r5-sandbox-isolation.md).
 
 ### R6 - Agent authoring and execution depth
 

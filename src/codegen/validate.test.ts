@@ -9,10 +9,6 @@ import {
 
 const SAMPLE_FILES = [{ path: "src/index.ts", content: "export const answer: number = 42;\n" }];
 
-function smokeEnv(): NodeJS.ProcessEnv {
-  return { PACKETAGENT_SANDBOX_SMOKE_ENABLED: "1" };
-}
-
 function silencingConsoleWarn(): { restore: () => void; messages: string[] } {
   const original = console.warn;
   const messages: string[] = [];
@@ -27,22 +23,19 @@ function silencingConsoleWarn(): { restore: () => void; messages: string[] } {
   };
 }
 
-test("returns skipped when smoke env is unset", async () => {
-  const guard = silencingConsoleWarn();
-  try {
-    const result = await validateFileTree(SAMPLE_FILES, { env: {} });
-    assert.equal(result.ok, true);
-    assert.equal(result.source, "skipped");
-    assert.deepEqual(result.errors, []);
-    assert.deepEqual(result.warnings, []);
-    assert.equal(result.durationMs, 0);
-    assert.ok(
-      guard.messages.some((m) => m.includes("[codegen-validate]")),
-      "expected a [codegen-validate] warn log",
-    );
-  } finally {
-    guard.restore();
-  }
+test("runs required validation by default without an opt-in environment flag", async () => {
+  const calls: string[] = [];
+  const result = await validateFileTree(SAMPLE_FILES, {
+    runner: async ({ command }) => {
+      calls.push(command);
+      return { exitCode: 0, stdout: "", stderr: "" };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.source, "real");
+  assert.deepEqual(result.phases, { typecheck: "passed", build: "passed" });
+  assert.equal(calls.length, 2);
 });
 
 test("returns ok=true when the runner reports clean stderr and exit 0", async () => {
@@ -52,7 +45,6 @@ test("returns ok=true when the runner reports clean stderr and exit 0", async ()
     stderr: "",
   });
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.source, "real");
@@ -74,7 +66,6 @@ test("parses tsc diagnostics into ValidationError[] with line/column", async () 
     stderr: "",
   });
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.source, "real");
@@ -108,7 +99,6 @@ test("parses tsc output also when it arrives on stderr", async () => {
     stderr: "src/x.ts(1,1): error TS9999: bad.\n",
   });
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.ok, false);
@@ -123,7 +113,6 @@ test("non-zero exit with no parseable diagnostics surfaces a synthetic error", a
     stderr: "something went sideways\n",
   });
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.ok, false);
@@ -132,21 +121,21 @@ test("non-zero exit with no parseable diagnostics surfaces a synthetic error", a
   assert.match(result.errors[0]!.message, /tsc exited with code 1/);
 });
 
-test("returns skipped (no propagation) when the runner throws", async () => {
+test("fails closed when the required sandbox runner throws", async () => {
   const guard = silencingConsoleWarn();
   try {
     const runner: ValidationRunner = async () => {
       throw new Error("spawn ENOENT");
     };
     const result = await validateFileTree(SAMPLE_FILES, {
-      env: smokeEnv(),
       runner,
     });
-    assert.equal(result.source, "skipped");
-    assert.equal(result.ok, true);
-    assert.deepEqual(result.errors, []);
+    assert.equal(result.source, "blocked");
+    assert.equal(result.ok, false);
+    assert.equal(result.errors.length, 1);
+    assert.match(result.errors[0]?.message ?? "", /could not start: spawn ENOENT/);
     assert.ok(
-      guard.messages.some((m) => m.includes("sandbox spawn failed")),
+      guard.messages.some((m) => m.includes("required sandbox typecheck failed to start")),
       "expected a spawn-failure warn log",
     );
   } finally {
@@ -162,7 +151,6 @@ test("timeout path returns the expected error shape", async () => {
     timedOut: true,
   });
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
     timeoutMs: 60000,
   });
@@ -191,7 +179,6 @@ test("writes the file tree into a temp workspace the runner can see", async () =
     return { exitCode: 0, stdout: "", stderr: "" };
   };
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.ok, true);
@@ -211,7 +198,7 @@ test("respects a generator-provided tsconfig.json instead of writing a default",
     assert.equal(content, userTsconfig);
     return { exitCode: 0, stdout: "", stderr: "" };
   };
-  const result = await validateFileTree(files, { env: smokeEnv(), runner });
+  const result = await validateFileTree(files, { runner });
   assert.equal(result.ok, true);
 });
 
@@ -227,10 +214,7 @@ test("rejects file-tree entries that try to escape the workspace", async () => {
     // The implementation throws inside writeTree, which the validator does
     // NOT swallow (path-traversal is a programmer error, not a sandbox spawn
     // failure). So we expect rejection.
-    await assert.rejects(
-      () => validateFileTree(escaping, { env: smokeEnv(), runner }),
-      /escapes workspace/,
-    );
+    await assert.rejects(() => validateFileTree(escaping, { runner }), /escapes workspace/);
   } finally {
     guard.restore();
   }
@@ -256,7 +240,7 @@ test("rejects hardened-validator vectors in the file tree", async () => {
     ];
     for (const { path, label } of vectors) {
       await assert.rejects(
-        () => validateFileTree([{ path, content: "" }], { env: smokeEnv(), runner }),
+        () => validateFileTree([{ path, content: "" }], { runner }),
         label,
         `expected rejection for vector ${JSON.stringify(path)}`,
       );
@@ -295,7 +279,6 @@ test("tsc passes + vite build passes: both phases run and result is ok", async (
     return { exitCode: 0, stdout: "", stderr: "" };
   };
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.ok, true);
@@ -323,7 +306,6 @@ test("tsc passes + vite build fails: build error is reported with phase=build", 
     };
   };
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.ok, false);
@@ -349,7 +331,6 @@ test("tsc fails: build phase is skipped and runner is invoked exactly once", asy
     };
   };
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.ok, false);
@@ -384,7 +365,6 @@ test("vite build success with non-empty stdout: no errors bubble up", async () =
     };
   };
   const result = await validateFileTree(SAMPLE_FILES, {
-    env: smokeEnv(),
     runner,
   });
   assert.equal(result.ok, true);

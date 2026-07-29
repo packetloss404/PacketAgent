@@ -23,6 +23,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
+import { isAbsolute, resolve } from "node:path";
 import type {
   SandboxChunkListener,
   SandboxDriver,
@@ -49,6 +50,10 @@ interface RuntimeImageMap {
 
 const RUNTIME_IMAGES: RuntimeImageMap = {
   "node-20": { image: "node:20-alpine", description: "Node.js 20 (alpine)" },
+  "codegen-node-22": {
+    image: "packetagent-codegen-validator:local",
+    description: "PacketAgent TypeScript/Vite validator (Node.js 22)",
+  },
   "python-3.11": { image: "python:3.11-alpine", description: "Python 3.11 (alpine)" },
   "ubuntu-22": { image: "ubuntu:22.04", description: "Ubuntu 22.04" },
 };
@@ -97,6 +102,7 @@ export function createDockerDriver(deps: DockerDriverDeps = {}): SandboxDriver {
       const containerName = `packetagent-sandbox-${randomUUID()}`;
       const memoryMb = Math.max(64, Math.floor(spec.memoryLimitMb ?? 512));
       const cpus = Math.max(1, Number(spec.cpus ?? 1));
+      const image = validatedImage(spec.image ?? runtimeEntry.image);
 
       const args: string[] = [
         "run",
@@ -114,15 +120,18 @@ export function createDockerDriver(deps: DockerDriverDeps = {}): SandboxDriver {
         "--read-only",
         "--tmpfs",
         "/tmp",
-        "-w",
-        spec.workingDir,
       ];
+
+      for (const mount of spec.mounts ?? []) {
+        args.push("--mount", validatedBindMount(mount));
+      }
+      args.push("-w", spec.workingDir);
 
       for (const [key, value] of Object.entries(spec.env ?? {})) {
         args.push("-e", `${key}=${value}`);
       }
 
-      args.push(runtimeEntry.image, "sh", "-c", spec.command);
+      args.push(image, "sh", "-c", spec.command);
 
       const child = spawnFn("docker", args, {
         stdio: ["pipe", "pipe", "pipe"],
@@ -249,6 +258,35 @@ export function createDockerDriver(deps: DockerDriverDeps = {}): SandboxDriver {
       };
     },
   };
+}
+
+function validatedImage(value: string): string {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._/@:-]{0,255}$/.test(value)) {
+    throw new Error("sandbox: invalid trusted image override");
+  }
+  return value;
+}
+
+function validatedBindMount(mount: { source: string; target: string; readOnly?: boolean }): string {
+  if (
+    !isAbsolute(mount.source) ||
+    mount.source.includes("\0") ||
+    mount.source.includes(",") ||
+    !mount.target.startsWith("/") ||
+    mount.target.includes("\0") ||
+    mount.target.includes(",") ||
+    mount.target.split("/").includes("..") ||
+    mount.target === "/var/run/docker.sock"
+  ) {
+    throw new Error("sandbox: invalid trusted bind mount");
+  }
+  const source = resolve(mount.source);
+  return [
+    "type=bind",
+    `source=${source}`,
+    `target=${mount.target}`,
+    ...(mount.readOnly ? ["readonly"] : []),
+  ].join(",");
 }
 
 async function probeDocker(spawnFn: DockerSpawn): Promise<boolean> {

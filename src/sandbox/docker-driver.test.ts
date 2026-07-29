@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import type { ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createDockerDriver } from "./docker-driver.js";
@@ -38,6 +40,8 @@ test("Docker sandbox applies isolation flags and scrubs the Docker CLI environme
     timeoutMs: 1_000,
     memoryLimitMb: 256,
     cpus: 1,
+    image: "packetagent-codegen-validator:abc123",
+    mounts: [{ source: join(tmpdir(), "generated-input"), target: "/input", readOnly: true }],
   });
 
   for (const expected of [
@@ -52,6 +56,10 @@ test("Docker sandbox applies isolation flags and scrubs the Docker CLI environme
     assert.ok(capturedArgs.includes(expected), `missing ${expected}`);
   }
   assert.equal(capturedArgs.includes("-e"), false);
+  assert.ok(capturedArgs.includes("packetagent-codegen-validator:abc123"));
+  const mountIndex = capturedArgs.indexOf("--mount");
+  assert.ok(mountIndex >= 0);
+  assert.match(capturedArgs[mountIndex + 1] ?? "", /target=\/input,readonly$/);
   assert.equal(capturedOptions.shell, false);
   const env = capturedOptions.env as NodeJS.ProcessEnv;
   const allowed = new Set([

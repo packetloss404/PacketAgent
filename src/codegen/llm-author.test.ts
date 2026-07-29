@@ -775,7 +775,7 @@ test("authorAndValidateAppViaLLM: repairs once after validation failure", async 
   });
 });
 
-test("authorAndValidateAppViaLLM: reports skipped validation without claiming success", async () => {
+test("authorAndValidateAppViaLLM: fails closed when required validation is blocked", async () => {
   const progress: CodegenProgressEvent[] = [];
   const result = await authorAndValidateAppViaLLM(
     "Build a tiny app.",
@@ -789,9 +789,16 @@ test("authorAndValidateAppViaLLM: reports skipped validation without claiming su
         source: "llm",
       }),
       validateFn: async () => ({
-        ok: true,
-        source: "skipped",
-        errors: [],
+        ok: false,
+        source: "blocked",
+        errors: [
+          {
+            file: "<sandbox>",
+            message: "Docker unavailable",
+            severity: "error",
+            phase: "typecheck",
+          },
+        ],
         warnings: [],
         durationMs: 0,
         phases: { typecheck: "skipped", build: "skipped" },
@@ -804,11 +811,13 @@ test("authorAndValidateAppViaLLM: reports skipped validation without claiming su
   );
 
   assert.ok(result);
-  assert.equal(result.validation.source, "skipped");
+  assert.equal(result.validation.source, "blocked");
+  assert.equal(result.validation.ok, false);
+  assert.equal(result.stoppedReason, "validation-blocked");
   assert.ok(
     progress.some(
       (event) =>
-        event.phase === "validate" && event.path === "src/App.tsx" && event.status === "skipped",
+        event.phase === "validate" && event.path === "src/App.tsx" && event.status === "failed",
     ),
   );
   assert.equal(

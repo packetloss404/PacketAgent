@@ -60,6 +60,15 @@ export interface SandboxExecRequest {
   env?: Record<string, string>;
   timeoutMs?: number;
   stdin?: string;
+  /** Internal-only: reject execution unless this driver is selected. */
+  requiredDriver?: SandboxDriverId;
+  /** Internal-only trusted image and bind-mount overrides. */
+  image?: string;
+  mounts?: ReadonlyArray<{
+    source: string;
+    target: string;
+    readOnly?: boolean;
+  }>;
 }
 
 export type AggregateSmokeStatus = "pass" | "fail" | "warn";
@@ -242,6 +251,11 @@ export class SandboxService {
    */
   async startExec(request: SandboxExecRequest): Promise<SandboxExecRecord> {
     const driver = await this.resolveDriver();
+    if (request.requiredDriver && driver.id !== request.requiredDriver) {
+      throw new Error(
+        `sandbox: execution requires ${request.requiredDriver}; selected driver is ${driver.id}`,
+      );
+    }
     const now = this.nowFn().toISOString();
     const id = randomUUID();
     const runtime = request.runtime ?? this.defaultRuntime();
@@ -291,6 +305,8 @@ export class SandboxService {
         timeoutMs,
         memoryLimitMb: memoryMb,
         cpus,
+        ...(request.image ? { image: request.image } : {}),
+        ...(request.mounts ? { mounts: request.mounts } : {}),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

@@ -341,7 +341,9 @@ Status: complete as of 2026-07-29. Resume at R5.
 
 ### R5 - Sandbox, egress, and preview isolation
 
-- [ ] Make real sandboxed TypeScript and Vite validation the default and remove
+Status: in progress. R5.1 is complete as of 2026-07-29. Resume at R5.2.
+
+- [x] Make real sandboxed TypeScript and Vite validation the default and remove
       synthetic success.
 - [ ] Define a fail-closed isolated non-Docker fallback and remove `node:vm` as
       a security boundary.
@@ -354,6 +356,20 @@ Status: complete as of 2026-07-29. Resume at R5.
       no-new-privileges, and process limits.
 - Gate: untrusted generated code cannot inherit secrets or sessions, reach
   undeclared networks, or escape resource bounds.
+- R5.1 result: generated-source validation is required by default and can no
+  longer return skipped success. PacketAgent builds a lockfile/Dockerfile-
+  addressed local Node 22 validator image, mounts generated input read-only,
+  copies it into an ephemeral workspace, and runs real `tsc --noEmit` followed
+  by `vite build` with Docker networking disabled. Builder smoke consumes those
+  phase results and fails closed when Docker, image preparation, or execution
+  is unavailable. `npm run verify:codegen-sandbox` proves the uninjected path.
+  Design and verification evidence live in
+  [`dev/r5-sandbox-isolation.md`](dev/r5-sandbox-isolation.md). Typecheck,
+  zero-warning lint, formatting, production web build, 32 web tests, 62
+  focused tests, the real Docker verifier, and 1,583 API tests pass (1,580
+  passed with three intentional live interoperability skips). Resume at R5.2
+  fail-closed non-Docker behavior and removal of `node:vm` as a security
+  boundary.
 
 ### R6 - Agent authoring and execution depth
 
@@ -420,7 +436,10 @@ These capabilities were implemented before or during the TaskLoom foundation and
 - **`AppDraft` projection over a file tree.** `src/codegen/derived-draft.ts` reads `package.json`, `src/pages/*`, `src/api/*`, and `src/data/*` / `src/schema/*` so the Files tab, Smoke tab, and publish flow keep working unchanged.
 - **File-tree iteration parity.** `src/app-iteration-service.ts` re-runs the orchestrator on an iteration-shaped prompt for file-tree drafts and diffs the new tree against the prior one. Falls back to the regex pipeline for legacy-template drafts.
 - **Chunked planning for large apps.** Plans with more than 10 files are batched across multiple LLM rounds (chunks of up to 8 files each) with early-stop when a chunk returns nothing.
-- **Vite-build validation alongside tsc.** `src/codegen/validate.ts` runs `tsc --noEmit` and then `vite build`; diagnostics are tagged with `phase: "typecheck" | "build"`. Both phases are gated on `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`.
+- **Vite-build validation alongside tsc.** `src/codegen/validate.ts` runs
+  `tsc --noEmit` and then `vite build`; diagnostics are tagged with
+  `phase: "typecheck" | "build"`. R5.1 made both phases mandatory through the
+  Docker validator and retired the opt-in smoke flag.
 - **Inline error UX in the Builder chat thread.** Validation errors from the file-tree path render inline as a warn-toned card with a "Fix these errors" button that triggers an iteration using the errors as the prompt.
 - **Agent tool catalog adapters.** Six runtime tools are registered: `http_fetch`, `slack_post_webhook`, `github_api`, `email_send`, `sql_query`, and `shell_for_agent`, each with deterministic unit coverage and agent-builder recommendation hooks.
 - **Agent tool launch approval UX.** Tool-enabled manual agent runs now return a signed, expiring capability approval request before execution. The agent editor shows Launch / Edit tools / Cancel, Launch replays the run with the approved tool set, and the backend verifies the token against workspace, agent, trigger, inputs, and registered tools.
@@ -555,8 +574,11 @@ _Findings from a 2026-07-17 code audit, preserved for later._
 
 - **[med/M]** server.ts:436 /data/artifacts/\* is not tenant-scoped: when serving is enabled, any reachable caller can read any workspace's artifacts
   - Fix: In the `/data/artifacts/*` middleware in src/server.ts (~L430-440), before serveStatic require a valid session/preview token and resolve the on-disk path against the requesting workspace's artifact subdir (scope root to ./data/artifacts/<workspaceId>), rejecting cross-workspace reads. Route is default-OFF (artifactServingEnabled()), so only bites multi-user deploys that opt in.
-- **[low/L]** tsc+vite-build validation and multi-round auto-repair are gated behind PACKETAGENT_SANDBOX_SMOKE_ENABLED=1 (default off), so smoke/validation returns a synthetic 'pass' by default
-  - Fix: Confirmed at src/app-routes/builder-core.ts:3041 (returns synthetic when flag!=1) and src/codegen/validate.ts:97 (SMOKE_ENV_VAR gate). Deliberate opt-in pending a provisioned sandbox driver; blockers already surface the fallback. To close: provision/wire a default sandbox driver so real smoke runs without the flag. Intended behavior, not a defect.
+- **[resolved R5.1]** Generated `tsc` plus Vite validation previously returned a
+  synthetic pass unless `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`.
+  - Resolution: the flag is retired. A lockfile-addressed Docker validator now
+    runs by default, and unavailable isolation produces `source: "blocked"`
+    with `ok: false`.
 - **[low/M]** email_send has no default SMTP transport: returns 'SMTP adapter is not configured' unless an adapterFactory is injected
   - Fix: src/tools/email-sql.ts:165 returns config error when options.adapterFactory is absent; SMTP*\* env parsing exists but no default transport. To close, add a default nodemailer-backed adapterFactory built from parsed SMTP*\* config. Deliberate BYO-adapter DI design; email just doesn't work out-of-box.
 - **[low/L]** Tool approval tokens are whole-tool-scoped; resource/verb-scoped approvals (e.g. http.fetch:GET:api.github.com) not supported

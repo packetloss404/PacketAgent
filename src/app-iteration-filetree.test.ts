@@ -269,11 +269,11 @@ function makeValidateFn(
 
 const VALID_OK: ValidationResult = {
   ok: true,
-  source: "skipped",
+  source: "real",
   errors: [],
   warnings: [],
   durationMs: 0,
-  phases: { typecheck: "skipped", build: "skipped" },
+  phases: { typecheck: "passed", build: "passed" },
 };
 
 test("applyAppIterationViaFileTree: happy path diffs old vs new tree", async () => {

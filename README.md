@@ -224,12 +224,20 @@ Every template is editable; instantiate one and tune the instructions, tools, sc
 
 ## Sandboxed code execution
 
-A first-class sandbox runtime ships under `/api/app/sandbox/*` with a `/sandbox` view in the workbench. It powers ad-hoc command execution and (opt-in) the app-builder smoke pipeline that verifies generated apps before publish handoff.
+A first-class sandbox runtime ships under `/api/app/sandbox/*` with a `/sandbox`
+view in the workbench. It powers ad-hoc command execution and the required
+app-builder TypeScript/Vite validation pipeline before publish handoff.
 
-- **Drivers.** `docker` (default) runs `docker run --rm -i --network=none --cpus --memory --read-only --tmpfs /tmp` against runtimes `node-20`, `python-3.11`, `ubuntu-22`. A `native` host-process fallback is available and clearly marked **insecure** in the UI; it does cross-platform process-tree termination (`taskkill` on Windows, SIGKILL elsewhere) with timeout-forced kill.
+- **Drivers.** `docker` (default) runs `docker run --rm -i --network=none --cpus --memory --read-only --tmpfs /tmp` against runtimes `node-20`, `python-3.11`, `ubuntu-22`, and the internal `codegen-node-22` validator. A `native` host-process fallback is available and clearly marked **insecure** for interactive use; required generated-code validation rejects it.
 - **Endpoints.** `GET /status`, `GET /runtimes`, `POST /exec`, `GET /exec`, `GET /exec/:id`, `POST /exec/:id/cancel`, `GET /exec/:id/stream` (SSE).
 - **Workbench UI.** Status panel, runtime readiness, command composer, exec history, and a live log viewer with stdout / stderr tabs and follow-tail. The Builder also gains a per-app Sandbox tab.
-- **Smoke integration.** With `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`, draft-apply, change-apply, and preview-refresh route every smoke check through the sandbox. Per-check details get `sandbox: exit N  |  Mms` appended and the message is suffixed with `(verified via sandbox  |  driver=...)`. Off by default - enable once Docker is available.
+- **Generated-code validation.** Draft apply, change apply, preview refresh, and
+  file-tree authoring require real `tsc --noEmit` and Vite results. PacketAgent
+  builds a Dockerfile/lockfile-addressed local validator image on first use,
+  mounts generated source read-only, copies it to an ephemeral workspace, and
+  disables container networking. Missing Docker or image/execution failure is
+  reported as blocked failure, never success. Run
+  `npm run verify:codegen-sandbox` to prove the real local path.
 
 ## Generated-app runtime
 
@@ -323,7 +331,6 @@ Common environment variables:
 | `PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS`          | `30000`                   | Per-exec timeout.                                                                                                                                                                                     |
 | `PACKETAGENT_SANDBOX_MEMORY_MB`                   | `512`                     | Container memory limit.                                                                                                                                                                               |
 | `PACKETAGENT_SANDBOX_CPUS`                        | `1`                       | Container CPU limit.                                                                                                                                                                                  |
-| `PACKETAGENT_SANDBOX_SMOKE_ENABLED`               | `0`                       | Route builder smoke checks through the sandbox. Also gates the file-tree validator's `tsc --noEmit` and `vite build` phases.                                                                          |
 | `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` | `4`                       | Maximum warm generated-app child processes per PacketAgent server. Values are clamped to `1-64`; an idle least-recently-used process is evicted at the limit.                                         |
 | `PACKETAGENT_GENERATED_APP_BIND_ADDRESS`          | `127.0.0.1`               | Host address used by a generated publish package's Compose port mapping. Set `0.0.0.0` only for deliberate, protected direct LAN exposure.                                                            |
 | `PACKETAGENT_GENERATED_APP_PORT`                  | `8787`                    | Host port used by a generated publish package. The container always listens on `8080`.                                                                                                                |
@@ -389,12 +396,19 @@ Generated `web/dist/` is gitignored; rebuild locally rather than committing it.
 ## Known limits
 
 - **The canonical runtime and Packet-side handoff/control adapters pass their local gates; live product interoperability is not certified.** W1-W5 provide versioned Worker records, lifecycle routes, durable trigger intake, bounded execution, immutable full-state checkpoints, scheduler recovery, and mutation effect receipts across JSON, SQLite, and managed Postgres. W6 compiles version-bound verb/resource grants, rejects deployment broadening, normalizes and authorizes each operation, resolves only declared opaque credentials, pins public network destinations, denies redirects, requires isolated no-network Docker command execution, atomically reserves provider cost and externally billable actions across rolling workspace/deployment windows, and prevents direct registered-handler bypass. W7 persists and executes exact attention/control state, exposes concise independently authorized operator routes, and closes restart/callback/control/activation races without later work. W8 persists versioned evidence and artifact provenance, rebuilds deterministic cumulative rollups, applies bounded redaction/retention with deletion evidence, and exposes the consolidated server-side operations read model, cursor APIs, resumable SSE, and accessible canonical Worker workbench. W9 defines strict digest-bound WorkerPackage v1 bytes, optional DSSE verification, authenticated workspace-bound PacketADE actors, durable local-policy receipts, the receipt-bound deployment/control API, reconnectable PacketADE events with explicit acknowledgements, and a passing disconnect/restart contract gate. W10 adds the durable notification outbox, encrypted pinned-network PacketChat delivery with exact-binding read-only callbacks, encrypted HTTPS-only PacketPhone delivery with role-bounded durable single-use W7 controls, and a local certification matrix covering race orderings, restart, replay, credential rotation, and audited dead-letter redrive. The registered live PacketChat and PacketPhone probes have not run because no external configuration is present.
-- **File-tree codegen is an inherited secondary capability.** With a BYOK key, the LLM authors files through `write_file`, validates with `tsc` and Vite when real sandbox validation is enabled, and can make up to two bounded repair passes. Legacy template-shaped drafts still use their older iteration path.
+- **File-tree codegen is an inherited secondary capability.** With a BYOK key,
+  the LLM authors files through `write_file`, requires isolated `tsc` and Vite
+  validation, and can make up to two bounded repair passes. If Docker-backed
+  validation cannot run, authoring stops with a blocked result. Legacy
+  template-shaped drafts still use their older iteration path.
 - **Per-app SQLite has an explicit reset/reseed schema policy.** PacketAgent previews use the supervised per-app SQLite runtime. Standalone publish packages use the same CRUD/storage semantics inside their own container and named volume. Same-schema restarts preserve records; a schema-signature change clears and reseeds that app's records. Runtime health/readiness declares `schemaChangePolicy: "reset-and-reseed"`, generated SQL is labeled reference DDL rather than an executed migration, and the runbook includes a verified stopped-service backup/restore path. Automatic data-preserving schema migration is not implemented or claimed. Legacy template/source artifacts and older saved drafts can still contain sql.js/jsdelivr browser persistence.
 - **Outbound Worker tools fail closed when a hardened dependency is unavailable.** `http_fetch`, `slack_post_webhook`, and `github_api` use Worker-scoped credential and pinned-network ports; `run_command` and `shell_for_agent` use the Docker-only execution port. Worker browser, email, and SQL calls are refused until equivalent hardened drivers are implemented. Approval tokens remain on the inherited Agent path, and legacy interactive Agent adapters retain their existing configuration behavior.
 - **Preview is local.** Builder preview routes serve generated source files from disk through PacketAgent. They are not public deployments unless you configure and validate a public URL.
 - **Publish is a verified local handoff, not managed hosting.** PacketAgent emits and integrity-checks the standalone package and provides a Docker certification command. Operators still run the long-lived service and configure DNS, TLS, reverse proxy, VPN, backups, and public networking.
-- **Sandbox smoke is opt-in.** Docker-backed smoke checks require Docker and `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`; otherwise statuses should remain explicit about pending, blocked, or fallback checks.
+- **Secure generated-code validation requires Docker.** Interactive sandbox
+  commands may use the explicitly insecure native driver on a trusted
+  development host, but generated TypeScript/Vite validation requires Docker
+  and fails closed when it is unavailable.
 - **Self-host is the category, not a step toward hosted.** PacketAgent is not pursuing parity with Replit, v0, Bolt, Lovable, or anything.com. Hosted-only capabilities (free public subdomain, pre-wired OAuth, managed App Store submission) are inventoried in [CLOUD.md](CLOUD.md) and intentionally out of scope.
 
 ### SQLite mode
@@ -415,10 +429,15 @@ The inherited generated-app R4 gate is also complete: packages are
 checkpoint-bound and integrity-checked, run as one hardened standalone
 Node/Vite/SQLite service, expose exact health/identity/schema-policy evidence,
 support verified reverse-proxy/VPN reachability, and prove same-schema
-persistence plus stopped-service backup/restore. Active remaining work begins
-at the R5 sandbox/isolation gate in `BACKLOG.md`.
+persistence plus stopped-service backup/restore. R5.1 also requires real
+network-disabled Docker validation for generated TypeScript/Vite and removes
+the old synthetic-success path. Active remaining work resumes at R5.2
+non-Docker isolation truth in `BACKLOG.md`.
 
-The exact resume point is R1 in [BACKLOG.md](BACKLOG.md), the sole ledger for the conditional live W10 check and all remaining R1-R8 work. New Codex projects should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived Phase 3 or legacy handoff documents.
+The exact resume point is R5.2 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+the conditional live W10 check and all remaining R5-R8 work. New Codex projects
+should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
+Phase 3 or legacy handoff documents.
 
 For current product changes, see [CHANGELOG.md](CHANGELOG.md). The repository is
 published at `git@github.com:packetloss404/PacketAgent.git`; a website, issue

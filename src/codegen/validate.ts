@@ -12,14 +12,11 @@
  *
  * Each diagnostic is tagged with the phase that produced it, and the
  * `ValidationResult.phases` summary lets the caller see which phase ran and
- * which failed. The same `PACKETAGENT_SANDBOX_SMOKE_ENABLED` env gate controls
- * both phases — when it is off, both phases short-circuit to "skipped".
- *
- * The validator is gated on the same env switch as the sandbox smoke pipeline
- * (`PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`). When the gate is off, or when the
- * sandbox cannot be spawned (e.g. the Windows ENOENT issue documented in
- * sandbox notes), `validateFileTree` returns `{ ok: true, source: "skipped" }`
- * so the surrounding codegen flow never blocks on a missing sandbox.
+ * which failed. Validation is required by default. The generated tree is
+ * mounted read-only into a short-lived, network-disabled Docker container;
+ * the trusted validator toolchain is copied from an image derived from
+ * PacketAgent's lockfile. Missing Docker/image preparation or command spawn
+ * failures return a fail-closed `source: "blocked"` result.
  *
  * Tests inject `options.runner` to avoid spawning a real sandbox. The runner
  * is invoked once per phase; tests can disambiguate by inspecting the
@@ -29,9 +26,8 @@
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
 import { getDefaultSandboxService } from "../sandbox/sandbox-service.js";
+import { ensureCodegenValidationImage } from "./validation-image.js";
 import { validateWorkspacePath } from "./path-validator.js";
 
 export interface GeneratedFile {
@@ -56,8 +52,8 @@ export type PhaseStatus = "passed" | "failed" | "skipped";
 
 export interface ValidationResult {
   ok: boolean;
-  /** "skipped" when the sandbox gate is off or the sandbox is unavailable. */
-  source: "real" | "skipped";
+  /** "blocked" means required isolated validation could not run. */
+  source: "real" | "blocked";
   errors: ValidationError[];
   warnings: ValidationError[];
   durationMs: number;
@@ -90,12 +86,9 @@ export interface ValidateOptions {
   timeoutMs?: number;
   /** Test-only override. When omitted, uses the real sandbox service. */
   runner?: ValidationRunner;
-  /** Test-only override. When omitted, reads `process.env`. */
-  env?: NodeJS.ProcessEnv;
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000;
-const SMOKE_ENV_VAR = "PACKETAGENT_SANDBOX_SMOKE_ENABLED";
 const LOG_PREFIX = "[codegen-validate]";
 
 /**
@@ -124,14 +117,25 @@ function emptyPhases(): ValidationResult["phases"] {
   return { typecheck: "skipped", build: "skipped" };
 }
 
-function skipped(durationMs = 0): ValidationResult {
+function blocked(
+  message: string,
+  durationMs = 0,
+  phase: ValidationPhase = "typecheck",
+): ValidationResult {
   return {
-    ok: true,
-    source: "skipped",
-    errors: [],
+    ok: false,
+    source: "blocked",
+    errors: [
+      {
+        file: "<sandbox>",
+        message,
+        severity: "error",
+        phase,
+      },
+    ],
     warnings: [],
     durationMs,
-    phases: emptyPhases(),
+    phases: phase === "build" ? { typecheck: "passed", build: "skipped" } : emptyPhases(),
   };
 }
 
@@ -318,13 +322,25 @@ function genericViteError(
  */
 function createDefaultRunner(): ValidationRunner {
   return async ({ workspaceDir, command, timeoutMs, signal }) => {
+    const image = await ensureCodegenValidationImage();
     const sandbox = getDefaultSandboxService();
     const workspaceId = `codegen-validate-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const started = await sandbox.startExec({
       workspaceId,
-      command,
-      workingDir: workspaceDir,
+      command: [
+        "rm -rf /tmp/work",
+        "mkdir -p /tmp/work",
+        "cp -R /input/. /tmp/work/",
+        "ln -s /opt/packetagent/node_modules /tmp/work/node_modules",
+        "cd /tmp/work",
+        command,
+      ].join(" && "),
+      runtime: "codegen-node-22",
+      workingDir: "/tmp",
       timeoutMs,
+      requiredDriver: "docker",
+      image,
+      mounts: [{ source: workspaceDir, target: "/input", readOnly: true }],
     });
     let canceled = false;
     const onAbort = (): void => {
@@ -351,70 +367,15 @@ function createDefaultRunner(): ValidationRunner {
   };
 }
 
-/**
- * Resolve the absolute path of the locally-installed tsc binary by walking up
- * from this module location. Returns null when the package is not installed
- * (which is the typical sandbox-spawn-failure path we should treat as
- * "skipped").
- */
-function resolveTscBinary(): string | null {
-  try {
-    const requireFn = createRequire(import.meta.url);
-    // typescript/package.json is the safest resolve target; the bin sits at a
-    // known relative location.
-    const pkgJsonPath = requireFn.resolve("typescript/package.json");
-    return join(dirname(pkgJsonPath), "bin", "tsc");
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Resolve the absolute path of the locally-installed vite binary. Mirrors
- * `resolveTscBinary`: returns null when vite isn't installed so the caller
- * can treat that case as "skipped".
- */
-function resolveViteBinary(): string | null {
-  try {
-    const requireFn = createRequire(import.meta.url);
-    const pkgJsonPath = requireFn.resolve("vite/package.json");
-    return join(dirname(pkgJsonPath), "bin", "vite.js");
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Build the shell command used to invoke tsc. Quoting handles spaces in paths
- * on Windows.
- */
-function buildTscCommand(tscBinary: string): string {
-  const quoted = JSON.stringify(tscBinary);
-  // tsc as a JS file → invoke with node. `-p .` picks up the tsconfig we
-  // either wrote or that the generated tree already provided.
-  return `node ${quoted} --noEmit -p tsconfig.json`;
-}
-
-/**
- * Build the shell command used to invoke vite build.
- */
-function buildViteCommand(viteBinary: string): string {
-  const quoted = JSON.stringify(viteBinary);
-  return `node ${quoted} build`;
-}
+const CONTAINER_TSC_COMMAND =
+  "node /opt/packetagent/node_modules/typescript/bin/tsc --noEmit -p tsconfig.json";
+const CONTAINER_VITE_COMMAND =
+  "node /opt/packetagent/node_modules/vite/bin/vite.js build --configLoader runner";
 
 export async function validateFileTree(
   files: GeneratedFile[],
   options: ValidateOptions = {},
 ): Promise<ValidationResult> {
-  const env = options.env ?? process.env;
-  if (env[SMOKE_ENV_VAR] !== "1") {
-    console.warn(
-      `${LOG_PREFIX} sandbox smoke gate ${SMOKE_ENV_VAR} is not "1"; returning skipped result`,
-    );
-    return skipped();
-  }
-
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const runner = options.runner ?? createDefaultRunner();
   const started = Date.now();
@@ -430,18 +391,7 @@ export async function validateFileTree(
     await writeTree(workspaceDir, treeWithConfig);
 
     // ----- Phase 1: typecheck -----
-    let tscCommand: string;
-    if (options.runner) {
-      // Tests provide their own runner; the command string is opaque to them.
-      tscCommand = "tsc --noEmit -p tsconfig.json";
-    } else {
-      const tscBinary = resolveTscBinary();
-      if (!tscBinary) {
-        console.warn(`${LOG_PREFIX} could not resolve typescript binary; returning skipped result`);
-        return skipped(Date.now() - started);
-      }
-      tscCommand = buildTscCommand(tscBinary);
-    }
+    const tscCommand = options.runner ? "tsc --noEmit -p tsconfig.json" : CONTAINER_TSC_COMMAND;
 
     let tscResult: RunnerResult;
     try {
@@ -454,8 +404,11 @@ export async function validateFileTree(
       tscResult = await runner(runArgs);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`${LOG_PREFIX} sandbox spawn failed: ${message}; returning skipped result`);
-      return skipped(Date.now() - started);
+      console.warn(`${LOG_PREFIX} required sandbox typecheck failed to start: ${message}`);
+      return blocked(
+        `required sandbox typecheck could not start: ${message}`,
+        Date.now() - started,
+      );
     }
 
     if (tscResult.timedOut) {
@@ -511,22 +464,7 @@ export async function validateFileTree(
     }
 
     // ----- Phase 2: vite build -----
-    let viteCommand: string;
-    if (options.runner) {
-      viteCommand = "vite build";
-    } else {
-      const viteBinary = resolveViteBinary();
-      if (!viteBinary) {
-        console.warn(`${LOG_PREFIX} could not resolve vite binary; returning skipped result`);
-        // tsc already passed, but we couldn't even attempt the build. Treat
-        // this as overall skipped so the caller doesn't silently get a
-        // build-skipped pass under the "real" source. The contract for the
-        // pre-gate paths is symmetric: when we can't run the pipeline at
-        // all, return the standard skipped() result.
-        return skipped(Date.now() - started);
-      }
-      viteCommand = buildViteCommand(viteBinary);
-    }
+    const viteCommand = options.runner ? "vite build" : CONTAINER_VITE_COMMAND;
 
     let viteResult: RunnerResult;
     try {
@@ -539,8 +477,12 @@ export async function validateFileTree(
       viteResult = await runner(runArgs);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`${LOG_PREFIX} vite sandbox spawn failed: ${message}; returning skipped result`);
-      return skipped(Date.now() - started);
+      console.warn(`${LOG_PREFIX} required sandbox Vite build failed to start: ${message}`);
+      return blocked(
+        `required sandbox Vite build could not start after typecheck passed: ${message}`,
+        Date.now() - started,
+        "build",
+      );
     }
 
     const durationMs = Date.now() - started;
@@ -604,7 +546,4 @@ export const __internal = {
   parseTscOutput,
   parseViteOutput,
   hasRootTsconfig,
-  resolveTscBinary,
-  resolveViteBinary,
-  fileURLToPath,
 };

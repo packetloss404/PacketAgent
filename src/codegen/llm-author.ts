@@ -117,7 +117,11 @@ export interface AuthorAndValidateAppOptions extends AuthorAppOptions {
 export interface AuthorAndValidateAppResult extends AuthorAppResult {
   validation: ValidationResult;
   repairAttempts: number;
-  stoppedReason?: "max-attempts" | "repeated-errors" | "repair-author-failed";
+  stoppedReason?:
+    | "max-attempts"
+    | "repeated-errors"
+    | "repair-author-failed"
+    | "validation-blocked";
 }
 
 // =============================================================================
@@ -733,8 +737,11 @@ export async function authorAndValidateAppViaLLM(
     }
     const validation = await runValidation(validate, result.files, validateOptions);
     await emitValidationResults(validationProgressOptions, result.files, validation);
-    if (validation.ok || validation.source !== "real" || validation.errors.length === 0) {
+    if (validation.ok || validation.errors.length === 0) {
       return { ...result, validation, repairAttempts };
+    }
+    if (validation.source === "blocked") {
+      return { ...result, validation, repairAttempts, stoppedReason: "validation-blocked" };
     }
 
     const signature = validationErrorSignature(validation);
@@ -841,7 +848,7 @@ async function emitValidationResults(
     const errorCount = errorCounts.get(file.path) ?? 0;
     await emitProgress(options, {
       phase: "validate",
-      status: validation.source === "skipped" ? "skipped" : errorCount > 0 ? "failed" : "completed",
+      status: validation.source === "blocked" ? "failed" : errorCount > 0 ? "failed" : "completed",
       path: file.path,
       completed,
       total: files.length,

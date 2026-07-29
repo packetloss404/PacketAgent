@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **R4 - generated-app runtime and self-host publish**. Repository/session state
+Current active loop: **R5 - sandbox, egress, and preview isolation**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -58,8 +58,11 @@ loopback-by-default port binding, sealed Caddy/nginx/Tailscale examples, and
 bounded DNS/TCP/TLS/HTTP reachability bound to exact package identity. R4.5
 closes the loop with one visible `reset-and-reseed` policy, same-schema and
 schema-change characterization, reference-only generated DDL, and a real
-stopped-service SQLite backup/restore proof. Resume at R5.1 real sandboxed
-TypeScript/Vite validation in
+stopped-service SQLite backup/restore proof. R5.1 now makes generated
+TypeScript/Vite validation mandatory through a lockfile-addressed,
+network-disabled Docker image and fails closed when isolation is unavailable.
+Resume at R5.2 supported non-Docker behavior and removal of `node:vm` as a
+security boundary in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r5---sandbox-egress-and-preview-isolation).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

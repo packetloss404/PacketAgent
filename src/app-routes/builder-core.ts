@@ -38,6 +38,7 @@ import {
 import { deriveDraftFromFiles } from "../codegen/derived-draft.js";
 import type { GeneratedFile } from "../codegen/llm-author.js";
 import { planGeneratedAppPackageInstall } from "../codegen/package-plan.js";
+import { validateFileTree, type ValidationResult } from "../codegen/validate.js";
 import { buildGeneratedAppWorkspaceExport } from "../codegen/workspace-export.js";
 import { derivePreviewRefreshState } from "../app-preview-iteration.js";
 import { inspectAppIterationTools } from "../app-iteration-tools.js";
@@ -110,6 +111,15 @@ import {
 } from "./shared.js";
 
 type AppBuilderCheckStatus = "pending" | "pass" | "warn" | "fail";
+type GeneratedAppFileTreeValidator = typeof validateFileTree;
+let generatedAppFileTreeValidator: GeneratedAppFileTreeValidator = validateFileTree;
+
+export function setGeneratedAppFileTreeValidatorForTests(
+  validator?: GeneratedAppFileTreeValidator,
+): void {
+  generatedAppFileTreeValidator = validator ?? validateFileTree;
+}
+
 export type AppBuilderDraftContract = ReturnType<typeof buildAppBuilderDraft>;
 type AppDraftSource = "llm" | "template" | "llm-filetree";
 type GeneratedAppCheckpointWithRuntime = GeneratedAppCheckpointRecord & {
@@ -3906,16 +3916,8 @@ function buildAppSmokeStatus(
 }
 
 /**
- * Wraps `buildAppSmokeStatusFromDraft` with a real sandbox-isolated probe when
- * the caller asked for runSmoke=true and the sandbox driver is available.
- *
- * Each individual smoke check is verified by running a deterministic probe in
- * the sandbox (one quick `node -e` per check). Real exit codes drive the
- * per-check pass/fail status, with stdout/stderr previews captured in `detail`.
- *
- * If the sandbox is unavailable or a probe throws, we fall back to the
- * synthetic pass result and append a blocker noting the fallback so the UI
- * surfaces the degraded state.
+ * Runs required generated-source validation through the isolated Docker
+ * validator. No unavailable/disabled path is converted into success.
  */
 async function runAppSmokeViaSandbox(
   draft: AppBuilderDraftContract,
@@ -3923,90 +3925,72 @@ async function runAppSmokeViaSandbox(
   runSmoke: boolean,
   options: { appId?: string; checkpointId?: string } = {},
 ) {
-  const synthetic = buildAppSmokeStatusFromDraft(draft, context, runSmoke);
-  if (!runSmoke) return synthetic;
-  // Sandbox-backed smoke is opt-in: flip PACKETAGENT_SANDBOX_SMOKE_ENABLED=1 once
-  // a sandbox driver is provisioned in the deployment. Defaults off so existing
-  // builds and the test environment keep using the synthetic readiness path.
-  if (process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED !== "1") return synthetic;
+  const baseline = buildAppSmokeStatusFromDraft(draft, context, runSmoke);
+  if (!runSmoke) return baseline;
 
-  let sandboxService;
+  let validation: ValidationResult;
   try {
-    sandboxService = (await import("../sandbox/sandbox-service.js")).getDefaultSandboxService();
-  } catch {
-    return synthetic;
-  }
-
-  let status;
-  try {
-    status = await sandboxService.getStatus();
-  } catch {
-    return {
-      ...synthetic,
-      blockers: [
-        ...synthetic.blockers,
-        "Sandbox driver unavailable; smoke checks ran in fallback mode.",
-      ],
-    };
-  }
-  if (!status.available) {
-    return {
-      ...synthetic,
-      blockers: [
-        ...synthetic.blockers,
-        `Sandbox driver "${status.driver}" reports unavailable; smoke ran in fallback mode.`,
-      ],
-    };
-  }
-
-  const items = synthetic.checks.map((check, index) => ({
-    name: check.name,
-    command: `node -e "console.log(JSON.stringify({check:${JSON.stringify(check.name)},idx:${index},ok:true})); process.exit(0)"`,
-    appId: options.appId,
-    checkpointId: options.checkpointId,
-    timeoutMs: 15_000,
-  }));
-
-  let batch;
-  try {
-    batch = await sandboxService.runSmokeBatch(context.workspace.id, items);
+    const artifact = buildGeneratedAppRuntimeArtifact({
+      appId: options.appId ?? draft.app.slug ?? stableAppId(draft.app.name),
+      workspaceId: context.workspace.id,
+      checkpointId: options.checkpointId ?? "draft-validation",
+      draft,
+    });
+    validation = await generatedAppFileTreeValidator(
+      artifact.files.map((file) => ({ path: file.path, content: file.content })),
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      ...synthetic,
-      blockers: [
-        ...synthetic.blockers,
-        `Sandbox smoke batch failed: ${message}; reverted to fallback.`,
-      ],
+      status: "fail" as const,
+      message: "Required generated-app sandbox validation could not run.",
+      checks: baseline.checks.map((check) => ({
+        ...check,
+        status: "fail" as const,
+        detail: `${check.detail} · validation unavailable`,
+      })),
+      blockers: [`Required sandbox validation failed closed: ${message}`],
     };
   }
 
-  const checks = synthetic.checks.map((check, index) => {
-    const result = batch.items[index];
-    if (!result) return check;
-    const realStatus: AppBuilderCheckStatus =
-      result.status === "pass" ? "pass" : result.status === "timeout" ? "warn" : "fail";
-    const sandboxNote = result.errorMessage
-      ? `sandbox: ${result.errorMessage}`
-      : `sandbox: exit ${result.exitCode ?? "?"}${result.durationMs !== undefined ? ` · ${result.durationMs}ms` : ""}`;
-    return { ...check, status: realStatus, detail: `${check.detail} · ${sandboxNote}` };
-  });
+  const phaseStatus = (phase: "typecheck" | "build"): AppBuilderCheckStatus => {
+    const status = validation.phases[phase];
+    return status === "passed" ? "pass" : status === "failed" ? "fail" : "warn";
+  };
+  const validationStatus: AppBuilderCheckStatus = validation.ok ? "pass" : "fail";
+  const phaseChecks = [
+    {
+      name: "TypeScript typecheck",
+      status: phaseStatus("typecheck"),
+      detail: `tsc --noEmit via required isolated validator · ${validation.phases.typecheck}`,
+    },
+    {
+      name: "Vite production build",
+      status: phaseStatus("build"),
+      detail: `vite build via required isolated validator · ${validation.phases.build}`,
+    },
+  ];
+  const contractChecks = baseline.checks.map((check) => ({
+    ...check,
+    status: validationStatus,
+    detail: `${check.detail} · generated contract included in the validated build; live HTTP reachability is a separate check`,
+  }));
+  const blockers = validation.errors
+    .slice(0, 20)
+    .map(
+      (error) =>
+        `${error.phase} ${error.file}${error.line ? `:${error.line}${error.column ? `:${error.column}` : ""}` : ""}: ${error.message}`,
+    );
 
-  const aggregateStatus: AppBuilderCheckStatus =
-    batch.status === "pass" ? "pass" : batch.status === "warn" ? "warn" : "fail";
-  const newBlockers = [...synthetic.blockers];
-  for (const item of batch.items) {
-    if (item.status !== "pass") {
-      const detail = item.errorMessage ?? `${item.name}: exit ${item.exitCode ?? "?"}`;
-      newBlockers.push(`Sandbox smoke ${item.status}: ${detail}`);
-    }
-  }
-  const messageSuffix = ` (verified via sandbox · driver=${status.driver})`;
   return {
-    status: aggregateStatus,
-    message: synthetic.message + messageSuffix,
-    checks,
-    blockers: newBlockers,
+    status: validationStatus,
+    message: validation.ok
+      ? `TypeScript and Vite passed required isolated sandbox validation in ${validation.durationMs}ms.`
+      : validation.source === "blocked"
+        ? "Required isolated TypeScript/Vite validation was blocked; no success was recorded."
+        : `Generated TypeScript/Vite validation failed with ${validation.errors.length} error(s).`,
+    checks: [...phaseChecks, ...contractChecks],
+    blockers,
   };
 }
 

@@ -2,8 +2,9 @@
 
 PacketAgent runs as a Node application. This guide takes an existing checkout
 through local startup, provider configuration, storage, sandboxing, and
-production serving. It documents the inherited workbench that exists today;
-the crash-resumable autonomous Worker lifecycle is still W1-W8 roadmap work.
+production serving. It documents the inherited workbench and canonical Worker
+runtime that exist today; remaining release work is tracked only in
+[`../BACKLOG.md`](../BACKLOG.md).
 
 If you want the strategic background on what self-host _intentionally_ gives up versus hosted competitors, see [CLOUD.md](../CLOUD.md).
 
@@ -16,7 +17,10 @@ If you want the strategic background on what self-host _intentionally_ gives up 
 - **OS.** Linux, macOS, or Windows. Tested on Ubuntu 22.04+, macOS 13+, and Windows 11 with PowerShell 7+. WSL2 is also supported and recommended on Windows for the Docker sandbox path.
 - **Disk.** ~500 MB for `node_modules`, plus space for generated app workspaces and SQLite data under `data/`. Budget at least 2 GB free.
 - **Memory.** ~512 MB resident for the API process, ~512 MB for the Vite dev server, plus whatever the sandbox uses when active.
-- **Docker** (optional but recommended). Required for the secure sandbox runtime and for running generated apps from the publish handoff. Without Docker, the sandbox falls back to a `native` host-process driver that is clearly marked **insecure** in the UI.
+- **Docker.** Required for secure generated-code validation and for running
+  generated apps from the publish handoff. Without Docker, the interactive
+  sandbox can use an explicitly enabled `native` host-process driver that is
+  clearly marked **insecure**, but Builder validation fails closed.
 
 ---
 
@@ -505,6 +509,8 @@ The sandbox runtime defaults to `docker`. If Docker is not installed or not runn
 
 - The workbench Sandbox panel will show `Docker not available`.
 - You can switch to the `native` host-process driver with `PACKETAGENT_SANDBOX_DRIVER=native` plus `PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX=true`. **This runs sandbox commands as the host user with no isolation.** Only do this on a trusted dev machine.
+- Generated-app `tsc`/Vite validation does not use that insecure fallback and
+  will report a blocked failure until Docker is available.
 - For production, install Docker Desktop (macOS/Windows) or `docker-ce` (Linux), confirm `docker ps` works for your user, and restart PacketAgent.
 
 ### Reset everything

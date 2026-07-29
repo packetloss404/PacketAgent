@@ -659,10 +659,21 @@ without duplicate jobs, and compacted source evidence fails closed. Opt-in live
 PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
-The exact next slice is R5.1 under
+R5.1 is complete. Generated-source validation no longer has an opt-in or
+skipped-success path: a Dockerfile/lockfile-addressed Node 22 image runs real
+`tsc --noEmit` and Vite builds against a read-only input mount and ephemeral
+writable workspace with networking disabled. Builder smoke consumes the same
+phase result and fails closed when validation is blocked. The uninjected
+`npm run verify:codegen-sandbox` proof passes. Typecheck, zero-warning lint,
+formatting, production web build, 32 web tests, 62 focused tests, and the
+1,583-test API suite pass (1,580 passed with three intentional live
+interoperability skips). Implementation and research evidence are recorded in
+[`r5-sandbox-isolation.md`](r5-sandbox-isolation.md).
+
+The exact next slice is R5.2 under
 [`R5 - sandbox, egress, and preview isolation`](../BACKLOG.md#r5---sandbox-egress-and-preview-isolation):
-make real sandboxed TypeScript and Vite validation the default and remove
-synthetic success.
+define supported fail-closed non-Docker behavior and remove `node:vm` as a
+security boundary.
 After each gate passes, continue through R5-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and

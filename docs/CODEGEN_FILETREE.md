@@ -29,9 +29,10 @@ When `generateAppDraftWithLLM` is asked to author an app, the flow is:
    first, then `vite build`. Diagnostics are tagged with
    `phase: "typecheck" | "build"`. When tsc fails the build step is
    skipped (typecheck errors will dominate, and the build would just
-   re-report them). Both phases are gated on
-   `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`; with the gate off the validator
-   returns `{ ok: true, source: "skipped" }`.
+   re-report them). Both phases are required. PacketAgent runs them in a
+   network-disabled Docker container using a lockfile-addressed validator
+   image and read-only generated-source mount. If isolated validation cannot
+   start, the result is `{ ok: false, source: "blocked" }`.
 4. **Project to `AppDraft`.** `deriveDraftFromFiles(files, prompt,
 summary)` walks the tree (`package.json` for the app name,
    `src/pages/*` for pages, `src/api/*` for API routes,
@@ -80,10 +81,6 @@ pipeline.
 - **`PACKETAGENT_FILETREE_CODEGEN=1`** (legacy no-op) - preserved for
   back-compat. File-tree codegen is now the default, so this flag has
   no effect; installs that already set it can leave it in place.
-- **`PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`** - gates both validation
-  phases. With the gate on, the validator runs `tsc --noEmit` and then
-  `vite build` in the sandbox. With the gate off, the validator
-  short-circuits with `{ ok: true, source: "skipped" }`.
 - **BYOK key envs** - file-tree codegen requires a configured provider
   key. Any one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
   `GOOGLE_API_KEY` / `GEMINI_API_KEY`, `OPENROUTER_API_KEY`,
@@ -97,6 +94,9 @@ pipeline.
 - **Repair is bounded.** Real validation failures can trigger up to two
   automatic repair passes. Repeated error signatures, exhausted attempts, or
   author failure stop the loop and surface phase-tagged validation errors.
+- **Docker isolation is required.** A missing Docker daemon or validator-image
+  failure stops authoring as `validation-blocked`; it does not consume repair
+  attempts or become a successful draft.
 - **Iteration on legacy-template drafts still uses the regex
   pipeline.** Drafts where `source === "template"` or `source === "llm"`
   do not get the new file-tree iteration path. Only `"llm-filetree"`

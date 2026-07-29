@@ -881,12 +881,17 @@ Optional: open `/builder` and re-run an app draft. The provider readiness sectio
 5. Run a long sleep (`sleep 30`) and click cancel. Confirm the run transitions to `canceled`.
 6. Filter the executions table by `failed` and `success` to confirm filters work.
 
-Optional smoke integration:
+Required generated-code validation:
 
-1. Stop the dev server.
-2. Set `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1` and restart.
-3. Sign in and apply an app draft from `/builder` with smoke checks enabled.
-4. Verify the smoke section names the sandbox driver. If the sandbox is unavailable, confirm fallback smoke status is explicit and actionable.
+1. Ensure Docker is running and `docker ps` succeeds for the current user.
+2. Run `npm run verify:codegen-sandbox`. The first run builds the
+   Dockerfile/lockfile-addressed local validator image; later runs reuse it.
+3. Confirm the JSON result has `ok: true`, `source: "real"`, and both
+   `typecheck` and `build` set to `passed`.
+4. Sign in and apply an app draft from `/builder` with smoke checks enabled.
+   Verify the smoke section includes the real TypeScript and Vite phases.
+5. Stop Docker and repeat. Confirm Builder reports blocked failure; it must not
+   return pass or use the insecure native driver.
 
 ## Operations Sanity
 

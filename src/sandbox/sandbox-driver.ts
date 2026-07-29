@@ -29,6 +29,14 @@ export interface SandboxStartSpec {
   timeoutMs: number;
   memoryLimitMb?: number;
   cpus?: number;
+  /** Trusted internal image override. Public sandbox routes do not expose it. */
+  image?: string;
+  /** Trusted internal bind mounts. Public sandbox routes do not expose them. */
+  mounts?: ReadonlyArray<{
+    source: string;
+    target: string;
+    readOnly?: boolean;
+  }>;
 }
 
 export interface SandboxHandle {

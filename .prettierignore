@@ -12,6 +12,8 @@ coverage
 
 # Lockfiles and generated artifacts
 package-lock.json
+.dockerignore
+*.Dockerfile
 
 # Logs
 *.log

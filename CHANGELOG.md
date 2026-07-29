@@ -6,6 +6,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R5.1 required generated-code sandbox validation
+
+- Retired `PACKETAGENT_SANDBOX_SMOKE_ENABLED` and removed every
+  skipped/synthetic-success path from generated TypeScript/Vite validation.
+- Added a Dockerfile/lockfile-addressed Node 22 validator image, a trusted
+  internal runtime/mount contract, read-only generated-source input, an
+  ephemeral writable workspace, network denial, scrubbed Docker CLI
+  environment, and bounded image preparation.
+- Builder smoke now validates the concrete generated runtime with real
+  `tsc --noEmit` and Vite exit codes. Missing Docker, image preparation, or
+  execution fails closed and LLM authoring stops without spending repair turns
+  on infrastructure failure.
+- Added `npm run verify:codegen-sandbox`; its uninjected Docker path passes both
+  phases. Typecheck, zero-warning lint, formatting, production web build, 32
+  web tests, 62 focused tests, and 1,583 API tests pass (1,580 passed with three
+  intentional live interoperability skips). Resume at R5.2 non-Docker
+  isolation truth and removal of `node:vm` as a security boundary.
+
 ### 2026-07-29 - R4.5 generated-app schema and backup truth
 
 - Declared one `reset-and-reseed` schema-change policy across preview health,
