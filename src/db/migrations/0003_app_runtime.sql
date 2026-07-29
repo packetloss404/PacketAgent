@@ -255,7 +255,7 @@ create table if not exists providers (
   created_at text not null,
   updated_at text not null,
   foreign key (workspace_id) references workspaces (id) on delete cascade,
-  check (kind in ('openai', 'anthropic', 'azure_openai', 'ollama', 'custom')),
+  check (kind in ('openai', 'anthropic', 'minimax', 'azure_openai', 'ollama', 'gemini', 'openrouter', 'custom')),
   check (api_key_configured in (0, 1)),
   check (status in ('connected', 'missing_key', 'disabled'))
 );

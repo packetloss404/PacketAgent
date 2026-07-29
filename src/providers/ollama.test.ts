@@ -6,6 +6,7 @@ import {
   resolveLocalLlmApiFormat,
   resolveLocalLlmBaseURL,
   resolveLocalLlmModel,
+  resolveLocalStructuredOutputMode,
 } from "./ollama.js";
 
 // =============================================================================
@@ -139,6 +140,15 @@ test("resolveLocalLlmApiFormat: unknown values fall back to ollama (no crash)", 
   });
 });
 
+test("resolveLocalStructuredOutputMode defaults to auto and supports an explicit off switch", () => {
+  withEnv({ LOCAL_LLM_STRUCTURED_OUTPUTS: undefined }, () => {
+    assert.equal(resolveLocalStructuredOutputMode(), "auto");
+  });
+  withEnv({ LOCAL_LLM_STRUCTURED_OUTPUTS: "OFF" }, () => {
+    assert.equal(resolveLocalStructuredOutputMode(), "off");
+  });
+});
+
 test("call() with apiFormat=openai posts to /v1/chat/completions with OpenAI payload", async () => {
   const { fetchFn, captured } = captureFetch(() =>
     jsonResponse({
@@ -180,6 +190,95 @@ test("call() with apiFormat=openai posts to /v1/chat/completions with OpenAI pay
   assert.equal(result.providerName, "ollama");
   assert.equal(result.usage.promptTokens, 5);
   assert.equal(result.usage.completionTokens, 4);
+});
+
+test("vLLM requests use structured_outputs JSON schema", async () => {
+  const { fetchFn, captured } = captureFetch(() =>
+    jsonResponse({
+      id: "x1",
+      model: "qwen",
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: '{"ok":true}' },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1 },
+    }),
+  );
+  const provider = new OllamaProvider({
+    baseURL: "http://gpu-box:8000",
+    apiFormat: "openai",
+    fetchFn,
+  });
+  const schema = {
+    type: "object",
+    properties: { ok: { type: "boolean" } },
+    required: ["ok"],
+  };
+  await provider.call({
+    model: "qwen",
+    workspaceId: "ws-1",
+    routeKey: "workflow.draft",
+    messages: [{ role: "user", content: "return JSON" }],
+    structuredOutput: { name: "result", schema },
+  });
+  assert.deepEqual((captured[0].body as { structured_outputs?: unknown }).structured_outputs, {
+    json: schema,
+  });
+});
+
+test("vLLM structured decoding falls back once to schema-prompted JSON", async () => {
+  const captured: CapturedRequest[] = [];
+  let calls = 0;
+  const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+    captured.push({
+      url: url.toString(),
+      method: String(init?.method ?? "GET"),
+      headers: (init?.headers ?? {}) as Record<string, string>,
+      body: JSON.parse(String(init?.body)) as unknown,
+    });
+    calls++;
+    if (calls === 1)
+      return jsonResponse({ error: "unsupported structured_outputs" }, { status: 400 });
+    return jsonResponse({
+      id: "x2",
+      model: "qwen",
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: '{"ok":true}' },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 2, completion_tokens: 2 },
+    });
+  }) as unknown as typeof fetch;
+  const provider = new OllamaProvider({
+    baseURL: "http://generic-openai-server:8000",
+    apiFormat: "openai",
+    fetchFn,
+  });
+  const result = await provider.call({
+    model: "qwen",
+    workspaceId: "ws-1",
+    routeKey: "workflow.draft",
+    messages: [{ role: "user", content: "return JSON" }],
+    structuredOutput: {
+      name: "result",
+      schema: { type: "object", properties: { ok: { type: "boolean" } } },
+    },
+  });
+  assert.equal(result.content, '{"ok":true}');
+  assert.equal(captured.length, 2);
+  assert.ok("structured_outputs" in (captured[0].body as Record<string, unknown>));
+  assert.equal("structured_outputs" in (captured[1].body as Record<string, unknown>), false);
+  const fallbackMessages = (
+    captured[1].body as { messages: Array<{ role: string; content: string }> }
+  ).messages;
+  assert.equal(fallbackMessages[0].role, "system");
+  assert.match(fallbackMessages[0].content, /Return only valid JSON matching this JSON Schema/);
 });
 
 test("call() with apiFormat=ollama posts to /api/chat (default backwards-compat path)", async () => {

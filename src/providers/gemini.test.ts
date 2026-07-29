@@ -115,6 +115,46 @@ test("call() sets Authorization: Bearer <key> and POSTs to /chat/completions", a
   assert.equal(result.providerName, "gemini");
 });
 
+test("call() sends a strict JSON schema through Gemini's OpenAI compatibility layer", async () => {
+  const { fetchFn, captured } = captureFetch(() =>
+    jsonResponse({
+      id: "g1",
+      model: "gemini-2.5-flash",
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: '{"ok":true}' },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    }),
+  );
+  const provider = new GeminiProvider({
+    apiKeyResolver: async () => "key",
+    fetchFn,
+  });
+  await provider.call({
+    model: "gemini-2.5-flash",
+    workspaceId: "ws-1",
+    routeKey: "workflow.draft",
+    messages: [{ role: "user", content: "return JSON" }],
+    structuredOutput: {
+      name: "result",
+      schema: { type: "object", properties: { ok: { type: "boolean" } } },
+    },
+  });
+  const body = captured[0].body as {
+    response_format?: {
+      type: string;
+      json_schema: { name: string; strict: boolean };
+    };
+  };
+  assert.equal(body.response_format?.type, "json_schema");
+  assert.equal(body.response_format?.json_schema.name, "result");
+  assert.equal(body.response_format?.json_schema.strict, true);
+});
+
 // ---------------------------------------------------------------------------
 // (b) text deltas reach the emit callback
 // ---------------------------------------------------------------------------
@@ -276,10 +316,10 @@ test("stream() aggregates split tool_call argument deltas into a parsed object",
 });
 
 // ---------------------------------------------------------------------------
-// (d) on missing key the provider isn't registered
+// (d) registration is credential-agnostic so workspace vault keys can work
 // ---------------------------------------------------------------------------
 
-test("registerDefaultProviders skips gemini when no GOOGLE_API_KEY / GEMINI_API_KEY is set", () => {
+test("registerDefaultProviders registers Gemini without env keys for vault-only workspaces", () => {
   const originalGoogle = process.env.GOOGLE_API_KEY;
   const originalGemini = process.env.GEMINI_API_KEY;
   delete process.env.GOOGLE_API_KEY;
@@ -291,8 +331,8 @@ test("registerDefaultProviders skips gemini when no GOOGLE_API_KEY / GEMINI_API_
     const router = getDefaultRouter();
     assert.equal(
       router.has("gemini"),
-      false,
-      "gemini should NOT be registered when env keys are absent",
+      true,
+      "gemini should be registered before a workspace credential is resolved",
     );
     assert.equal(readGeminiEnvKey(), undefined);
   } finally {

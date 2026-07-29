@@ -6,7 +6,12 @@ import type {
   ProviderStreamChunk,
 } from "./types.js";
 import { StubProvider } from "./stub.js";
-import { GEMINI_DEFAULT_MODELS, readGeminiEnvKey } from "./gemini.js";
+import { readGeminiEnvKey } from "./gemini.js";
+import {
+  providerGenerationPolicy,
+  providerModel,
+  type ProviderGenerationPolicy,
+} from "./catalog.js";
 
 export interface ProviderRoute {
   provider: ProviderName;
@@ -14,23 +19,35 @@ export interface ProviderRoute {
 }
 
 export const DEFAULT_ROUTES: Record<string, ProviderRoute> = {
-  "workflow.draft": { provider: "anthropic", model: "claude-opus-4-7" },
-  "workflow.brief_rewrite": { provider: "anthropic", model: "claude-sonnet-4-6" },
-  "workflow.plan_mode": { provider: "anthropic", model: "claude-opus-4-7" },
-  "agent.summary": { provider: "openai", model: "gpt-4o-mini" },
-  "agent.reasoning": { provider: "anthropic", model: "claude-opus-4-7" },
-  "code.generation": { provider: "minimax", model: "abab6.5-chat" },
-  "local.dev": { provider: "ollama", model: "llama3.2" },
+  "workflow.draft": { provider: "anthropic", model: providerModel("anthropic", "smart") },
+  "workflow.brief_rewrite": {
+    provider: "anthropic",
+    model: providerModel("anthropic", "fast"),
+  },
+  "workflow.plan_mode": { provider: "anthropic", model: providerModel("anthropic", "smart") },
+  "agent.summary": { provider: "openai", model: providerModel("openai", "fast") },
+  "agent.reasoning": { provider: "anthropic", model: providerModel("anthropic", "smart") },
+  "code.generation": { provider: "minimax", model: providerModel("minimax", "smart") },
+  "local.dev": { provider: "ollama", model: providerModel("ollama", "fast") },
   // Gemini BYOK presets — used when the caller selects `provider: "gemini"` or
   // when the user only has GOOGLE_API_KEY / GEMINI_API_KEY configured.
-  "gemini.cheap": { provider: "gemini", model: GEMINI_DEFAULT_MODELS.cheap },
-  "gemini.fast": { provider: "gemini", model: GEMINI_DEFAULT_MODELS.fast },
-  "gemini.smart": { provider: "gemini", model: GEMINI_DEFAULT_MODELS.smart },
+  "gemini.cheap": { provider: "gemini", model: providerModel("gemini", "cheap") },
+  "gemini.fast": { provider: "gemini", model: providerModel("gemini", "fast") },
+  "gemini.smart": { provider: "gemini", model: providerModel("gemini", "smart") },
   // OpenRouter presets: when a user only has an OPENROUTER_API_KEY they still
   // get usable defaults for the cheap/fast/smart tiers via OpenRouter's proxy.
-  "byok.openrouter.cheap": { provider: "openrouter", model: "qwen/qwen3-coder" },
-  "byok.openrouter.fast": { provider: "openrouter", model: "anthropic/claude-haiku-4-5" },
-  "byok.openrouter.smart": { provider: "openrouter", model: "anthropic/claude-sonnet-4-6" },
+  "byok.openrouter.cheap": {
+    provider: "openrouter",
+    model: providerModel("openrouter", "cheap"),
+  },
+  "byok.openrouter.fast": {
+    provider: "openrouter",
+    model: providerModel("openrouter", "fast"),
+  },
+  "byok.openrouter.smart": {
+    provider: "openrouter",
+    model: providerModel("openrouter", "smart"),
+  },
 };
 
 /**
@@ -130,6 +147,10 @@ export class ProviderRouter {
    */
   get(name: ProviderName): LLMProvider | undefined {
     return this.providers.get(name);
+  }
+
+  policy(name: ProviderName): ProviderGenerationPolicy {
+    return providerGenerationPolicy(name);
   }
 }
 

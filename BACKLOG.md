@@ -226,7 +226,7 @@ is recorded in these checklists.
 
 ### R1 - Repository health and historical finding re-audit
 
-Status: complete as of 2026-07-29. Resume at R2.
+Status: complete as of 2026-07-29.
 
 Supporting finding-by-finding evidence is maintained in
 [`dev/r1-repository-health-audit.md`](dev/r1-repository-health-audit.md).
@@ -261,17 +261,23 @@ while recording the single unreachable React Router RSC exception.
 
 ### R2 - Provider policy and key parity
 
-Status: active.
+Status: complete as of 2026-07-29. Resume at R3.
 
-- [ ] Add per-provider generation policy and capability metadata.
-- [ ] Add vLLM structured decoding/XGrammar with tested fallback.
-- [ ] Add one bounded malformed-tool-input correction attempt.
-- [ ] Add Gemini and OpenRouter vault-key parity.
-- [ ] Consolidate provider/model catalogs and readiness reporting.
-- Gate: every supported provider follows one tested policy contract and every
-  hosted provider key can use the vault.
+- [x] Add per-provider generation policy and capability metadata.
+- [x] Add vLLM structured decoding/XGrammar with tested fallback.
+- [x] Add one bounded malformed-tool-input correction attempt.
+- [x] Add Gemini and OpenRouter vault-key parity.
+- [x] Consolidate provider/model catalogs and readiness reporting.
+- Gate: passed 2026-07-29. Every runtime provider has one tested catalog and
+  generation-policy contract; vLLM constrained decoding has one bounded
+  compatibility fallback; malformed tool input can be corrected once without
+  execution; and every hosted provider key can use the encrypted workspace
+  vault. Typecheck, lint, formatting, production build, 30 web tests, and the
+  1,552-test API suite are green.
 
 ### R3 - File-tree generation depth
+
+Status: active.
 
 - [ ] Add targeted bounded repair prompts from real failure clusters.
 - [ ] Move legacy-template iteration to the file-tree path or a deterministic

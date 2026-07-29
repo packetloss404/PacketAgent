@@ -8,6 +8,7 @@ import { SESSION_COOKIE_NAME } from "./auth-utils";
 import { appRoutes, setHostInfoSourcesForTests } from "./app-routes";
 import { shutdownDefaultGeneratedAppRuntimeProcessPool } from "./generated-app-runtime/server.js";
 import { login } from "./packetagent-services";
+import { upsertApiKey } from "./security/api-key-store.js";
 import {
   clearStoreCacheForTests,
   createSeedStore,
@@ -268,6 +269,40 @@ test("model routing presets route exposes safe workspace-scoped presets", async 
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(aliasResponse.status, 200);
+});
+
+test("builder provider status reports vault-only capability readiness without secrets", async () => {
+  resetStoreForTests();
+  const app = createTestApp();
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
+  upsertApiKey({
+    workspaceId: "alpha",
+    provider: "openrouter",
+    label: "OpenRouter",
+    value: "openrouter-status-secret",
+  });
+
+  const response = await app.request("/api/app/builder/providers/status", {
+    headers: authHeaders(alpha.cookieValue),
+  });
+  const body = (await response.json()) as {
+    availableProviders?: string[];
+    providers?: Array<{
+      provider: string;
+      ready: boolean;
+      credentialSource: string;
+      capabilities: { vaultKey: boolean; structuredOutput: string };
+    }>;
+  };
+
+  assert.equal(response.status, 200);
+  assert.ok(body.availableProviders?.includes("openrouter"));
+  const openrouter = body.providers?.find((entry) => entry.provider === "openrouter");
+  assert.equal(openrouter?.ready, true);
+  assert.equal(openrouter?.credentialSource, "workspace_vault");
+  assert.equal(openrouter?.capabilities.vaultKey, true);
+  assert.equal(openrouter?.capabilities.structuredOutput, "conditional");
+  assert.equal(JSON.stringify(body).includes("openrouter-status-secret"), false);
 });
 
 test("integration marketplace route exposes cards, readiness, config, and test payloads without secrets", async (t) => {

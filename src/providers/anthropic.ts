@@ -10,6 +10,7 @@ import type {
   ProviderToolDef,
   ProviderUsage,
 } from "./types.js";
+import { parseToolInput } from "./tool-input.js";
 
 interface AnthropicMessageBlock {
   type: "text" | "tool_use" | "tool_result";
@@ -40,6 +41,12 @@ interface AnthropicCreateParams {
   tools?: { name: string; description: string; input_schema: Record<string, unknown> }[];
   temperature?: number;
   stream?: boolean;
+  output_config?: {
+    format: {
+      type: "json_schema";
+      schema: Record<string, unknown>;
+    };
+  };
 }
 
 interface AnthropicCreateResponse {
@@ -210,6 +217,13 @@ export class AnthropicProvider implements LLMProvider {
       ...(system !== undefined ? { system } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
+      ...(opts.structuredOutput
+        ? {
+            output_config: {
+              format: { type: "json_schema" as const, schema: opts.structuredOutput.schema },
+            },
+          }
+        : {}),
     };
     const response = await client.messages.create(params, { signal: opts.signal });
     const text: string[] = [];
@@ -220,7 +234,7 @@ export class AnthropicProvider implements LLMProvider {
         toolCalls.push({
           id: block.id,
           name: block.name,
-          input: (block.input ?? {}) as Record<string, unknown>,
+          ...parseToolInput(block.input),
         });
       }
     }
@@ -252,6 +266,13 @@ export class AnthropicProvider implements LLMProvider {
       ...(system !== undefined ? { system } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
+      ...(opts.structuredOutput
+        ? {
+            output_config: {
+              format: { type: "json_schema" as const, schema: opts.structuredOutput.schema },
+            },
+          }
+        : {}),
     };
 
     let stream: AsyncIterable<AnthropicStreamEvent>;
@@ -317,13 +338,13 @@ export class AnthropicProvider implements LLMProvider {
         if (event.type === "content_block_stop" && typeof event.index === "number") {
           const tool = partialTools.get(event.index);
           if (tool) {
-            let parsed: Record<string, unknown> = {};
-            try {
-              parsed = tool.jsonAccum ? JSON.parse(tool.jsonAccum) : {};
-            } catch {
-              parsed = {};
-            }
-            yield { toolCall: { id: tool.id, name: tool.name, input: parsed } };
+            yield {
+              toolCall: {
+                id: tool.id,
+                name: tool.name,
+                ...parseToolInput(tool.jsonAccum),
+              },
+            };
             partialTools.delete(event.index);
           }
           continue;

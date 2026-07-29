@@ -9,6 +9,7 @@ import type {
   ProviderToolDef,
   ProviderUsage,
 } from "./types.js";
+import { parseToolInput } from "./tool-input.js";
 
 export const MINIMAX_DEFAULT_BASE_URL = "https://api.minimaxi.chat/v1";
 
@@ -184,13 +185,11 @@ export class MiniMaxProvider implements LLMProvider {
     const toolCalls: ProviderToolCall[] = [];
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
-        let parsed: Record<string, unknown> = {};
-        try {
-          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
-        } catch {
-          parsed = {};
-        }
-        toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
+        toolCalls.push({
+          id: tc.id,
+          name: tc.function.name,
+          ...parseToolInput(tc.function.arguments),
+        });
       }
     }
     return {
@@ -294,13 +293,13 @@ export class MiniMaxProvider implements LLMProvider {
             if (choice?.finish_reason && partials.size > 0) {
               for (const slot of partials.values()) {
                 if (!slot.id || !slot.name) continue;
-                let parsedArgs: Record<string, unknown> = {};
-                try {
-                  parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
-                } catch {
-                  parsedArgs = {};
-                }
-                yield { toolCall: { id: slot.id, name: slot.name, input: parsedArgs } };
+                yield {
+                  toolCall: {
+                    id: slot.id,
+                    name: slot.name,
+                    ...parseToolInput(slot.argsAccum),
+                  },
+                };
               }
               partials.clear();
             }

@@ -560,6 +560,7 @@ export type ProviderKind =
   | "azure_openai"
   | "ollama"
   | "gemini"
+  | "openrouter"
   | "custom";
 export type ProviderStatus = "connected" | "missing_key" | "disabled";
 

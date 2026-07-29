@@ -2,7 +2,11 @@ import type { AnthropicClientFactory } from "../providers/anthropic.js";
 import type { LLMProvider, ProviderStreamChunk } from "../providers/types.js";
 import { getDefaultRouter } from "../providers/router.js";
 import { registerDefaultProviders } from "../providers/bootstrap.js";
-import { resolvePresetToProviderModel, type ModelPreset } from "../providers/preset-resolver.js";
+import {
+  resolvePresetToProviderModel,
+  vaultProviderNamesForWorkspace,
+  type ModelPreset,
+} from "../providers/preset-resolver.js";
 import {
   APP_BUILDER_SYSTEM_PROMPT,
   APP_BUILDER_TOOL_DESCRIPTION,
@@ -128,8 +132,10 @@ export async function generateAppDraftViaLLM(
   } else {
     // Default runtime path: resolve preset → (provider, model) via the router.
     registerDefaultProviders();
+    const workspaceId = options.workspaceId ?? "app-builder";
     const resolved = resolvePresetToProviderModel(options.preset as ModelPreset | undefined, {
       ...(options.model ? { modelOverride: options.model } : {}),
+      vaultProviders: await vaultProviderNamesForWorkspace(workspaceId),
     });
     if (!resolved) return null;
     const router = getDefaultRouter();
@@ -139,57 +145,80 @@ export async function generateAppDraftViaLLM(
     model = resolved.model;
   }
 
-  let stream: AsyncIterable<ProviderStreamChunk>;
-  try {
-    stream = provider.stream({
-      model,
-      workspaceId: options.workspaceId ?? "app-builder",
-      routeKey: "workflow.draft",
-      maxTokens: 4096,
-      temperature: 0.2,
-      ...(options.signal ? { signal: options.signal } : {}),
-      messages: [
-        // System message is large + reused; provider adapters that support
-        // prompt-caching will attach cache_control automatically.
-        { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
-        { role: "user", content: trimmed },
-      ],
-      tools: [
-        {
-          name: APP_BUILDER_TOOL_NAME,
-          description: APP_BUILDER_TOOL_DESCRIPTION,
-          inputSchema: APP_BUILDER_TOOL_INPUT_SCHEMA,
-        },
-      ],
-    });
-  } catch (error) {
-    console.warn(`[app-builder-llm] stream init failed: ${(error as Error).message}`);
-    return null;
-  }
-
   let toolInput: Record<string, unknown> | null = null;
   let proseLength = 0;
-  try {
-    for await (const chunk of stream) {
-      if (chunk.error) {
-        console.warn(`[app-builder-llm] stream error: ${chunk.error}`);
-        return null;
-      }
-      if (chunk.delta && emit) {
-        try {
-          await emit(chunk.delta);
-        } catch {
-          /* emit must not break generation */
-        }
-        proseLength += chunk.delta.length;
-      }
-      if (chunk.toolCall && chunk.toolCall.name === APP_BUILDER_TOOL_NAME) {
-        toolInput = chunk.toolCall.input ?? {};
-      }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let stream: AsyncIterable<ProviderStreamChunk>;
+    const correction =
+      attempt === 1
+        ? {
+            role: "user" as const,
+            content: [
+              `Your previous ${APP_BUILDER_TOOL_NAME} call had malformed JSON arguments.`,
+              "This is the single correction attempt.",
+              "Call the tool again with one valid JSON object matching its schema.",
+            ].join(" "),
+          }
+        : null;
+    try {
+      stream = provider.stream({
+        model,
+        workspaceId: options.workspaceId ?? "app-builder",
+        routeKey: "workflow.draft",
+        maxTokens: 4096,
+        temperature: 0.2,
+        ...(options.signal ? { signal: options.signal } : {}),
+        messages: [
+          // System message is large + reused; provider adapters that support
+          // prompt-caching will attach cache_control automatically.
+          { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
+          { role: "user", content: trimmed },
+          ...(correction ? [correction] : []),
+        ],
+        tools: [
+          {
+            name: APP_BUILDER_TOOL_NAME,
+            description: APP_BUILDER_TOOL_DESCRIPTION,
+            inputSchema: APP_BUILDER_TOOL_INPUT_SCHEMA,
+          },
+        ],
+      });
+    } catch (error) {
+      console.warn(`[app-builder-llm] stream init failed: ${(error as Error).message}`);
+      return null;
     }
-  } catch (error) {
-    console.warn(`[app-builder-llm] stream consume failed: ${(error as Error).message}`);
-    return null;
+
+    let malformedInput = false;
+    try {
+      for await (const chunk of stream) {
+        if (chunk.error) {
+          console.warn(`[app-builder-llm] stream error: ${chunk.error}`);
+          return null;
+        }
+        if (chunk.delta && emit) {
+          try {
+            await emit(chunk.delta);
+          } catch {
+            /* emit must not break generation */
+          }
+          proseLength += chunk.delta.length;
+        }
+        if (chunk.toolCall && chunk.toolCall.name === APP_BUILDER_TOOL_NAME) {
+          if (chunk.toolCall.inputError) malformedInput = true;
+          else toolInput = chunk.toolCall.input ?? {};
+        }
+      }
+    } catch (error) {
+      console.warn(`[app-builder-llm] stream consume failed: ${(error as Error).message}`);
+      return null;
+    }
+
+    if (!malformedInput) break;
+    toolInput = null;
+    if (attempt === 1) {
+      console.warn("[app-builder-llm] malformed tool input after one correction attempt");
+      return null;
+    }
   }
 
   if (!toolInput) {

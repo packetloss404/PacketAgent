@@ -58,6 +58,42 @@ test("call() maps system messages and returns content + cost", async () => {
   assert.ok(Math.abs(result.usage.costUsd - expectedCost) < 1e-9);
 });
 
+test("call() maps the canonical structured-output contract to output_config", async () => {
+  let receivedParams: Record<string, unknown> = {};
+  const provider = new AnthropicProvider({
+    apiKeyResolver: async () => "test-key",
+    clientFactory: () =>
+      fakeClient({
+        create: (async (params: Record<string, unknown>) => {
+          receivedParams = params;
+          return {
+            id: "msg_1",
+            content: [{ type: "text", text: '{"ok":true}' }],
+            stop_reason: "end_turn",
+            usage: { input_tokens: 1, output_tokens: 1 },
+            model: "claude-sonnet-4-6",
+          };
+        }) as unknown as AnthropicCreate,
+      }),
+  });
+  const schema = {
+    type: "object",
+    properties: { ok: { type: "boolean" } },
+    required: ["ok"],
+    additionalProperties: false,
+  };
+  await provider.call({
+    model: "claude-sonnet-4-6",
+    workspaceId: "ws-1",
+    routeKey: "workflow.draft",
+    messages: [{ role: "user", content: "return JSON" }],
+    structuredOutput: { name: "result", schema },
+  });
+  assert.deepEqual(receivedParams.output_config, {
+    format: { type: "json_schema", schema },
+  });
+});
+
 test("call() returns toolCalls for tool_use blocks", async () => {
   const provider = new AnthropicProvider({
     apiKeyResolver: async () => "test-key",

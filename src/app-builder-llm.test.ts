@@ -6,6 +6,12 @@ import {
   modelForPreset,
 } from "./app-builder-service.js";
 import type { AnthropicClient, AnthropicClientFactory } from "./providers/anthropic.js";
+import type {
+  LLMProvider,
+  ProviderCallOptions,
+  ProviderCallResult,
+  ProviderStreamChunk,
+} from "./providers/types.js";
 
 type AnthropicStream = NonNullable<AnthropicClient["messages"]["stream"]>;
 
@@ -243,4 +249,88 @@ test("generateAppDraftViaLLM returns null when the model never calls the tool", 
     clientFactory: factory,
   });
   assert.equal(draft, null);
+});
+
+test("generateAppDraftViaLLM retries malformed tool JSON exactly once", async () => {
+  let calls = 0;
+  let correctionPrompt = "";
+  const provider: LLMProvider = {
+    name: "anthropic",
+    async call(_opts: ProviderCallOptions): Promise<ProviderCallResult> {
+      throw new Error("not used");
+    },
+    async *stream(opts: ProviderCallOptions): AsyncIterable<ProviderStreamChunk> {
+      calls++;
+      if (calls === 1) {
+        yield {
+          toolCall: {
+            id: "bad",
+            name: "submit_app_draft",
+            input: {},
+            inputError: "malformed_json",
+          },
+        };
+      } else {
+        correctionPrompt = opts.messages.at(-1)?.content ?? "";
+        yield {
+          toolCall: {
+            id: "fixed",
+            name: "submit_app_draft",
+            input: SAMPLE_TOOL_INPUT,
+          },
+        };
+      }
+      yield {
+        done: true,
+        usage: { promptTokens: 1, completionTokens: 1, costUsd: 0 },
+      };
+    },
+    async models() {
+      return [];
+    },
+  };
+
+  const draft = await generateAppDraftViaLLM(
+    "Build a CRM for boutique sales teams to track leads and deals.",
+    { provider },
+  );
+  assert.ok(draft);
+  assert.equal(calls, 2);
+  assert.match(correctionPrompt, /single correction attempt/);
+  assert.equal(draft.appName, "Boutique CRM");
+});
+
+test("generateAppDraftViaLLM stops after the one malformed-input correction", async () => {
+  let calls = 0;
+  const provider: LLMProvider = {
+    name: "anthropic",
+    async call(_opts: ProviderCallOptions): Promise<ProviderCallResult> {
+      throw new Error("not used");
+    },
+    async *stream(): AsyncIterable<ProviderStreamChunk> {
+      calls++;
+      yield {
+        toolCall: {
+          id: `bad-${calls}`,
+          name: "submit_app_draft",
+          input: {},
+          inputError: "malformed_json",
+        },
+      };
+      yield {
+        done: true,
+        usage: { promptTokens: 1, completionTokens: 1, costUsd: 0 },
+      };
+    },
+    async models() {
+      return [];
+    },
+  };
+
+  const draft = await generateAppDraftViaLLM(
+    "Build a CRM for boutique sales teams to track leads and deals.",
+    { provider },
+  );
+  assert.equal(draft, null);
+  assert.equal(calls, 2);
 });

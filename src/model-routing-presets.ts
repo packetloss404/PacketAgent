@@ -1,9 +1,19 @@
 import type { IntegrationReadinessSummary } from "./packetagent-services.js";
 import type { ApiKeyProvider, ProviderKind, ProviderRecord } from "./packetagent-store.js";
+import {
+  DEFAULT_PROVIDER_NAMES,
+  DEFAULT_PROVIDER_PRIORITY,
+  PROVIDER_CATALOG,
+  providerModel,
+} from "./providers/catalog.js";
 
 export type ModelRoutingPresetId = "fast" | "smart" | "cheap" | "local";
 export type ModelRoutingProviderKind = ProviderKind | "stub";
-export type ModelRoutingChoiceSource = "workspace_provider" | "env_hint" | "fallback";
+export type ModelRoutingChoiceSource =
+  | "workspace_provider"
+  | "workspace_vault"
+  | "env_hint"
+  | "fallback";
 
 export interface ModelRoutingChoice {
   provider: ModelRoutingProviderKind;
@@ -30,6 +40,7 @@ export interface ModelRoutingPresetInput {
   providers: ProviderRecord[];
   readiness?: IntegrationReadinessSummary;
   env?: Record<string, string | undefined>;
+  vaultProviders?: ApiKeyProvider[];
 }
 
 export interface ModelRoutingPresetSurface {
@@ -52,50 +63,36 @@ interface ProviderDefinition {
   keyEnv: string[];
   modelEnv: string[];
   requiredEnv: string[];
+  requiredAnyEnv?: string[];
 }
 
+const RUNTIME_PROVIDERS = Object.fromEntries(
+  DEFAULT_PROVIDER_NAMES.map((provider) => {
+    const entry = PROVIDER_CATALOG[provider];
+    return [
+      provider,
+      {
+        provider,
+        defaultModel: providerModel(provider, "fast"),
+        keyEnv: [...entry.credentialEnv],
+        modelEnv: [...entry.modelEnv],
+        requiredEnv: [],
+        ...(entry.configurationEnv.length > 0
+          ? { requiredAnyEnv: [...entry.configurationEnv] }
+          : {}),
+      } satisfies ProviderDefinition,
+    ];
+  }),
+) as unknown as Record<(typeof DEFAULT_PROVIDER_NAMES)[number], ProviderDefinition>;
+
 const PROVIDERS: Record<ProviderKind, ProviderDefinition> = {
-  openai: {
-    provider: "openai",
-    defaultModel: "gpt-4o-mini",
-    keyEnv: ["OPENAI_API_KEY"],
-    modelEnv: ["OPENAI_MODEL", "PACKETAGENT_OPENAI_MODEL"],
-    requiredEnv: ["OPENAI_API_KEY"],
-  },
-  anthropic: {
-    provider: "anthropic",
-    defaultModel: "claude-3-5-sonnet-latest",
-    keyEnv: ["ANTHROPIC_API_KEY"],
-    modelEnv: ["ANTHROPIC_MODEL", "PACKETAGENT_ANTHROPIC_MODEL"],
-    requiredEnv: ["ANTHROPIC_API_KEY"],
-  },
-  minimax: {
-    provider: "minimax",
-    defaultModel: "abab6.5-chat",
-    keyEnv: ["MINIMAX_API_KEY"],
-    modelEnv: ["MINIMAX_MODEL", "PACKETAGENT_MINIMAX_MODEL"],
-    requiredEnv: ["MINIMAX_API_KEY"],
-  },
+  ...RUNTIME_PROVIDERS,
   azure_openai: {
     provider: "azure_openai",
     defaultModel: "gpt-4o-mini",
     keyEnv: ["AZURE_OPENAI_API_KEY"],
     modelEnv: ["AZURE_OPENAI_DEPLOYMENT", "AZURE_OPENAI_MODEL"],
     requiredEnv: ["AZURE_OPENAI_API_KEY"],
-  },
-  ollama: {
-    provider: "ollama",
-    defaultModel: "llama3.2",
-    keyEnv: [],
-    modelEnv: ["OLLAMA_MODEL", "PACKETAGENT_OLLAMA_MODEL"],
-    requiredEnv: ["OLLAMA_BASE_URL"],
-  },
-  gemini: {
-    provider: "gemini",
-    defaultModel: "gemini-2.0-flash-exp",
-    keyEnv: ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
-    modelEnv: ["GEMINI_MODEL", "PACKETAGENT_GEMINI_MODEL"],
-    requiredEnv: ["GOOGLE_API_KEY"],
   },
   custom: {
     provider: "custom",
@@ -117,35 +114,40 @@ const PRESETS: Array<{
     id: "fast",
     label: "Fast",
     goal: "Low-latency drafts, summaries, and interactive agent turns.",
-    preference: ["openai", "gemini", "azure_openai", "minimax", "anthropic", "ollama", "custom"],
+    preference: [...DEFAULT_PROVIDER_PRIORITY.fast, "azure_openai", "custom"] as ProviderKind[],
     envHints: ["PACKETAGENT_MODEL_PRESET_FAST", "PACKETAGENT_FAST_MODEL"],
   },
   {
     id: "smart",
     label: "Smart",
     goal: "Heavier reasoning, review, and planning work where quality matters most.",
-    preference: ["anthropic", "gemini", "openai", "azure_openai", "minimax", "custom", "ollama"],
+    preference: [...DEFAULT_PROVIDER_PRIORITY.smart, "azure_openai", "custom"] as ProviderKind[],
     envHints: ["PACKETAGENT_MODEL_PRESET_SMART", "PACKETAGENT_SMART_MODEL"],
   },
   {
     id: "cheap",
     label: "Cheap",
     goal: "High-volume background work with cost-aware hosted fallbacks.",
-    preference: ["gemini", "openai", "minimax", "ollama", "azure_openai", "anthropic", "custom"],
+    preference: [...DEFAULT_PROVIDER_PRIORITY.cheap, "azure_openai", "custom"] as ProviderKind[],
     envHints: ["PACKETAGENT_MODEL_PRESET_CHEAP", "PACKETAGENT_CHEAP_MODEL"],
   },
   {
     id: "local",
     label: "Local",
     goal: "Private local development first, with hosted providers only as fallback.",
-    preference: ["ollama", "openai", "anthropic", "gemini", "minimax", "azure_openai", "custom"],
+    preference: [
+      ...DEFAULT_PROVIDER_PRIORITY.local,
+      ...DEFAULT_PROVIDER_PRIORITY.fast.filter((provider) => provider !== "ollama"),
+      "azure_openai",
+      "custom",
+    ] as ProviderKind[],
     envHints: ["PACKETAGENT_MODEL_PRESET_LOCAL", "PACKETAGENT_LOCAL_MODEL"],
   },
 ];
 
 const STUB_CHOICE: ModelRoutingChoice = {
   provider: "stub",
-  model: "stub-small",
+  model: providerModel("stub", "fast"),
   source: "fallback",
   ready: true,
   blockers: [],
@@ -182,15 +184,27 @@ function buildPreset(
   candidates: Candidate[],
   env: Record<string, string | undefined>,
 ): ModelRoutingPreset {
-  const override = resolvePresetOverride(preset, candidates, env);
-  const primary = override ?? choosePrimary(preset.preference, candidates);
-  const fallbacks = fallbackChoices(preset.preference, candidates, primary);
+  const presetCandidates = candidates.map((candidate) => candidateForPreset(candidate, preset.id));
+  const override = resolvePresetOverride(preset, presetCandidates, env);
+  const primary = override ?? choosePrimary(preset.preference, presetCandidates);
+  const fallbacks = fallbackChoices(preset.preference, presetCandidates, primary);
   return {
     id: preset.id,
     label: preset.label,
     goal: preset.goal,
     primary,
     fallbacks,
+  };
+}
+
+function candidateForPreset(candidate: Candidate, preset: ModelRoutingPresetId): Candidate {
+  if (candidate.source === "workspace_provider") return candidate;
+  const definition = PROVIDERS[candidate.provider];
+  if (definition.modelEnv.some((name) => candidate.envHints.includes(name))) return candidate;
+  if (!(candidate.provider in PROVIDER_CATALOG)) return candidate;
+  return {
+    ...candidate,
+    model: providerModel(candidate.provider as keyof typeof PROVIDER_CATALOG, preset),
   };
 }
 
@@ -287,10 +301,16 @@ function buildCandidates(
     candidateFromProvider(provider, input.readiness, env),
   );
   const candidateKinds = new Set(candidates.map((candidate) => candidate.provider));
+  const vaultProviders = new Set(input.vaultProviders ?? []);
 
   for (const definition of Object.values(PROVIDERS)) {
     if (candidateKinds.has(definition.provider)) continue;
-    const envCandidate = candidateFromEnv(definition, env, input.readiness);
+    const envCandidate = candidateFromConfiguration(
+      definition,
+      env,
+      input.readiness,
+      vaultProviders,
+    );
     if (envCandidate) candidates.push(envCandidate);
   }
 
@@ -321,21 +341,31 @@ function candidateFromProvider(
   };
 }
 
-function candidateFromEnv(
+function candidateFromConfiguration(
   definition: ProviderDefinition,
   env: Record<string, string | undefined>,
   readiness: IntegrationReadinessSummary | undefined,
+  vaultProviders: ReadonlySet<ApiKeyProvider>,
 ): Candidate | null {
+  const hasVaultKey =
+    isApiKeyProvider(definition.provider) && vaultProviders.has(definition.provider);
   const hasAnyEnvHint = [
     ...definition.requiredEnv,
+    ...(definition.requiredAnyEnv ?? []),
     ...definition.keyEnv,
     ...definition.modelEnv,
   ].some((name) => hasValue(env[name]));
-  if (!hasAnyEnvHint) return null;
+  if (!hasAnyEnvHint && !hasVaultKey) return null;
 
-  const hasRequired = definition.requiredEnv.every((name) => hasValue(env[name]));
+  const hasRequired =
+    definition.requiredEnv.every((name) => hasValue(env[name])) &&
+    (!definition.requiredAnyEnv ||
+      definition.requiredAnyEnv.length === 0 ||
+      definition.requiredAnyEnv.some((name) => hasValue(env[name])));
   const hasKey =
-    definition.keyEnv.length === 0 || definition.keyEnv.some((name) => hasValue(env[name]));
+    definition.keyEnv.length === 0 ||
+    definition.keyEnv.some((name) => hasValue(env[name])) ||
+    hasVaultKey;
   const hasUsableEnv = hasRequired && hasKey;
   const missingProvider = isApiKeyProvider(definition.provider)
     ? (readiness?.providers.missingProviderKinds.includes(definition.provider) ?? false)
@@ -346,18 +376,27 @@ function candidateFromEnv(
   return {
     provider: definition.provider,
     model: model.value ?? definition.defaultModel,
-    source: "env_hint",
+    source: hasVaultKey ? "workspace_vault" : "env_hint",
     ready: hasUsableEnv,
     blockers: hasUsableEnv
       ? []
       : definition.requiredEnv
           .filter((name) => !hasValue(env[name]))
-          .map((name) => `Set ${name} or add a workspace provider.`),
+          .map((name) => `Set ${name} or add a workspace provider.`)
+          .concat(
+            definition.requiredAnyEnv &&
+              !definition.requiredAnyEnv.some((name) => hasValue(env[name]))
+              ? [`Set one of ${definition.requiredAnyEnv.join(", ")} or add a workspace provider.`]
+              : [],
+          ),
     reason: hasUsableEnv
-      ? `${definition.provider} can be inferred from configured environment hints.`
+      ? hasVaultKey
+        ? `${definition.provider} can use an encrypted workspace vault key.`
+        : `${definition.provider} can be inferred from configured environment hints.`
       : `${definition.provider} has model hints but still needs runtime configuration.`,
     envHints: [
       ...definition.requiredEnv.filter((name) => hasValue(env[name])),
+      ...(definition.requiredAnyEnv ?? []).filter((name) => hasValue(env[name])),
       ...definition.keyEnv.filter((name) => hasValue(env[name])),
       ...(model.name ? [model.name] : []),
     ],
@@ -401,9 +440,9 @@ function providerBlockers(
 ): string[] {
   if (provider.status === "disabled") return [`Enable ${provider.name}.`];
   if (provider.kind === "ollama")
-    return hasValue(env.OLLAMA_BASE_URL) || provider.baseUrl
+    return hasValue(env.LOCAL_LLM_BASE_URL) || hasValue(env.OLLAMA_BASE_URL) || provider.baseUrl
       ? []
-      : ["Set OLLAMA_BASE_URL or add an Ollama base URL."];
+      : ["Set LOCAL_LLM_BASE_URL, OLLAMA_BASE_URL, or add a local LLM base URL."];
   if (provider.kind === "custom")
     return hasValue(env.CUSTOM_PROVIDER_BASE_URL) || provider.baseUrl
       ? []
@@ -446,19 +485,18 @@ function isProviderKind(value: string): value is ProviderKind {
     value === "azure_openai" ||
     value === "ollama" ||
     value === "gemini" ||
+    value === "openrouter" ||
     value === "custom"
   );
 }
 
 function isApiKeyProvider(value: ProviderKind): value is ProviderKind & ApiKeyProvider {
-  // Narrows to ApiKeyProvider values that are also valid ProviderKinds. Note
-  // "openrouter" is an ApiKeyProvider but not a ProviderKind (no workspace
-  // provider record kind yet), so it's intentionally excluded here.
   return (
     value === "openai" ||
     value === "anthropic" ||
     value === "minimax" ||
     value === "ollama" ||
-    value === "gemini"
+    value === "gemini" ||
+    value === "openrouter"
   );
 }

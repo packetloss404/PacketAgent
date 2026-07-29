@@ -75,11 +75,11 @@ If you want to drive the builder with an LLM, configure one of the six provider 
 
 You can configure keys two ways:
 
-1. **Per-workspace in the workbench** for Anthropic, OpenAI, and MiniMax.
+1. **Per-workspace in the workbench** for Anthropic, OpenAI, Gemini,
+   OpenRouter, and MiniMax.
    Open **Admin -> Integrations** and paste the key. Supported provider keys are
    stored in the encrypted secrets vault (AES-256-GCM at rest), never logged,
-   and sent only to the selected provider. Gemini and OpenRouter do not yet
-   have vault enum support and must use environment variables.
+   and sent only to the selected provider.
 2. **As environment variables at startup** (useful for headless installs or Docker Compose). Copy `.env.example` to `.env` and set the variables below.
 
 Configure **only the providers you actually use**. You do not need all of them.
@@ -113,7 +113,7 @@ GOOGLE_API_KEY=...
 GEMINI_API_KEY=...
 ```
 
-Either env name is accepted. Get a key at https://aistudio.google.com/app/apikey. The Gemini adapter speaks Google's OpenAI-compatible endpoint, so it slots into the router with the same shape as OpenAI. Preset picks: `fast` / `cheap` -> `gemini-2.5-flash`, `smart` -> `gemini-2.5-pro`. Gemini is registered only when one of the two env vars is present (no vault path yet).
+Either env name is accepted. Get a key at https://aistudio.google.com/app/apikey. The Gemini adapter speaks Google's OpenAI-compatible endpoint, so it slots into the router with the same shape as OpenAI. Preset picks: `fast` / `cheap` -> `gemini-2.5-flash`, `smart` -> `gemini-2.5-pro`. A workspace-vault key is equivalent to either environment key for readiness and request-time resolution.
 
 ### Option D - OpenRouter
 
@@ -122,7 +122,7 @@ Either env name is accepted. Get a key at https://aistudio.google.com/app/apikey
 OPENROUTER_API_KEY=sk-or-...
 ```
 
-Get a key at https://openrouter.ai/keys. OpenRouter is a model marketplace that exposes Anthropic, Google, Mistral, DeepSeek, and others behind a single OpenAI-compatible endpoint. Preset picks: `fast` / `cheap` -> `google/gemini-2.5-flash`, `smart` -> `anthropic/claude-sonnet-4`. OpenRouter is first on the default `cheap` walk because its marketplace pricing tends to undercut direct provider keys. Registered only when the env var is present.
+Get a key at https://openrouter.ai/keys. OpenRouter is a model marketplace that exposes Anthropic, Google, Mistral, DeepSeek, and others behind a single OpenAI-compatible endpoint. Preset picks: `fast` -> `anthropic/claude-haiku-4-5`, `smart` -> `anthropic/claude-sonnet-4-6`, `cheap` -> `qwen/qwen3-coder`. OpenRouter is first on the default `cheap` walk. A workspace-vault key is equivalent to the environment key for readiness and request-time resolution.
 
 ### Option E - MiniMax
 
@@ -137,14 +137,15 @@ Configured the same way as Anthropic / OpenAI. Useful when you want a non-Anthro
 
 The "ollama" provider is intentionally generic: it can talk to **any OpenAI-compatible local LLM server**, on `localhost` or on a separate machine on your LAN (think: a beefy GPU box). It is registered unconditionally - but it is **not the default** for hosted presets. Anthropic / OpenAI / Gemini / OpenRouter take precedence unless you (a) explicitly request the `local` preset, or (b) set `PACKETAGENT_PROVIDER_PRIORITY=ollama,...`.
 
-Three env vars control where requests go and how they're shaped:
+Five env vars control where requests go and how they're shaped:
 
-| Env var                | Default                  | Purpose                                                                                                                                                        |
-| ---------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LOCAL_LLM_BASE_URL`   | unset                    | Base URL of the local LLM server. Takes precedence over `OLLAMA_BASE_URL`. Use this for non-Ollama servers (vLLM, LM Studio, llama.cpp) - it documents intent. |
-| `OLLAMA_BASE_URL`      | `http://localhost:11434` | Legacy synonym for `LOCAL_LLM_BASE_URL`. Honored when `LOCAL_LLM_BASE_URL` is unset.                                                                           |
-| `LOCAL_LLM_API_FORMAT` | `ollama`                 | Either `ollama` (native `/api/chat`) or `openai` (`/v1/chat/completions`). Set to `openai` for vLLM, LM Studio, and llama.cpp's OpenAI-compat server.          |
-| `LOCAL_LLM_MODEL`      | unset                    | Overrides the per-call model name. Useful when the remote server only loads one specific model.                                                                |
+| Env var                        | Default                  | Purpose                                                                                                                                                        |
+| ------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LOCAL_LLM_BASE_URL`           | unset                    | Base URL of the local LLM server. Takes precedence over `OLLAMA_BASE_URL`. Use this for non-Ollama servers (vLLM, LM Studio, llama.cpp) - it documents intent. |
+| `OLLAMA_BASE_URL`              | `http://localhost:11434` | Legacy synonym for `LOCAL_LLM_BASE_URL`. Honored when `LOCAL_LLM_BASE_URL` is unset.                                                                           |
+| `LOCAL_LLM_API_FORMAT`         | `ollama`                 | Either `ollama` (native `/api/chat`) or `openai` (`/v1/chat/completions`). Set to `openai` for vLLM, LM Studio, and llama.cpp's OpenAI-compat server.          |
+| `LOCAL_LLM_MODEL`              | unset                    | Overrides the per-call model name. Useful when the remote server only loads one specific model.                                                                |
+| `LOCAL_LLM_STRUCTURED_OUTPUTS` | `auto`                   | `auto` sends vLLM's `structured_outputs` JSON Schema and permits one bounded prompt fallback on HTTP 400/404/422. `off` uses the prompt fallback directly.     |
 
 **Recipe 1: Local Ollama (zero config).** No env needed; PacketAgent hits `http://localhost:11434` by default.
 
@@ -169,6 +170,7 @@ Run Ollama on the GPU box with `OLLAMA_HOST=0.0.0.0:11434 ollama serve` so it bi
 LOCAL_LLM_BASE_URL=http://gpu-box:8000
 LOCAL_LLM_API_FORMAT=openai
 LOCAL_LLM_MODEL=qwen2.5-coder-32b-instruct
+LOCAL_LLM_STRUCTURED_OUTPUTS=auto
 ```
 
 Start vLLM with e.g. `vllm serve Qwen/Qwen2.5-Coder-32B-Instruct --host 0.0.0.0 --port 8000`. `LOCAL_LLM_MODEL` is required because vLLM only serves the one model that was loaded at startup, and its OpenAI-compat layer matches model names strictly.
@@ -238,7 +240,7 @@ curl -s --cookie-jar /tmp/jar --cookie /tmp/jar \
   http://localhost:8484/api/app/builder/providers/status
 ```
 
-(Authenticate first; the endpoint requires a signed-in viewer.) The response contains a `presets` map keyed by preset name, an `availableProviders` array of providers with credentials, and the active `priority` override string (or `null` if unset). No secrets are included.
+(Authenticate first; the endpoint requires a signed-in viewer.) The response contains a `presets` map keyed by preset name, an `availableProviders` array of providers with credentials, public capability/generation metadata and credential source for every provider, and the active `priority` override string (or `null` if unset). No secrets are included.
 
 ---
 

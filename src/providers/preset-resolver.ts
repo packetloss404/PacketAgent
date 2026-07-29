@@ -26,16 +26,36 @@
 // callers fall back to their template-only path.
 // =============================================================================
 
-import type { ProviderName } from "./types.js";
 import { getDefaultRouter, type ProviderRouter } from "./router.js";
+import { listApiKeysForWorkspaceAsync } from "../security/api-key-store.js";
+import {
+  DEFAULT_PROVIDER_NAMES,
+  DEFAULT_PROVIDER_PRIORITY,
+  PROVIDER_CATALOG,
+  providerEnvHasCredentials,
+  providerModel,
+  type ModelPreset,
+} from "./catalog.js";
+import type { ProviderName } from "./types.js";
 
-export type ModelPreset = "fast" | "smart" | "cheap" | "local";
+export type { ModelPreset } from "./catalog.js";
 
 export interface ResolvedPreset {
   provider: ProviderName;
   model: string;
   /** True when the provider is local (no per-token cost). */
   local: boolean;
+}
+
+export interface ProviderReadinessEntry {
+  provider: ProviderName;
+  label: string;
+  registered: boolean;
+  ready: boolean;
+  credentialSource: "environment" | "workspace_vault" | "local" | "none";
+  defaultModels: (typeof PROVIDER_CATALOG)[ProviderName]["defaultModels"];
+  capabilities: (typeof PROVIDER_CATALOG)[ProviderName]["capabilities"];
+  generation: (typeof PROVIDER_CATALOG)[ProviderName]["generation"];
 }
 
 export interface ResolvePresetOptions {
@@ -47,103 +67,35 @@ export interface ResolvePresetOptions {
   modelOverride?: string;
   /** Forces a specific provider regardless of preset/priority. */
   providerOverride?: ProviderName;
-}
-
-// Per-preset model picks for each provider. When a provider doesn't have a
-// natural match for a preset (e.g. Ollama has no "smart" model out of the box)
-// we still return its default so the preset stays functional.
-const PRESET_MODELS: Record<ProviderName, Record<ModelPreset, string>> = {
-  anthropic: {
-    fast: "claude-sonnet-4-6",
-    smart: "claude-opus-4-7",
-    cheap: "claude-haiku-4-5-20251001",
-    local: "claude-haiku-4-5-20251001",
-  },
-  openai: {
-    fast: "gpt-4o-mini",
-    smart: "gpt-4o",
-    cheap: "gpt-4o-mini",
-    local: "gpt-4o-mini",
-  },
-  minimax: {
-    fast: "abab6.5-chat",
-    smart: "abab6.5-chat",
-    cheap: "abab6.5-chat",
-    local: "abab6.5-chat",
-  },
-  // Ollama / generic-local defaults. These names assume a local Ollama tag
-  // catalog; when pointing at vLLM / LM Studio / llama.cpp the model name
-  // probably doesn't match what's loaded — set LOCAL_LLM_MODEL to override
-  // every local call to a single specific model.
-  ollama: {
-    fast: "llama3.2",
-    smart: "qwen2.5-coder:32b",
-    cheap: "qwen2.5-coder:7b",
-    local: "qwen2.5-coder:32b",
-  },
-  gemini: {
-    fast: "gemini-2.5-flash",
-    smart: "gemini-2.5-pro",
-    cheap: "gemini-2.5-flash",
-    local: "gemini-2.5-flash",
-  },
-  openrouter: {
-    // OpenRouter is a marketplace; default to a cheap-but-capable pick.
-    fast: "google/gemini-2.5-flash",
-    smart: "anthropic/claude-sonnet-4",
-    cheap: "google/gemini-2.5-flash",
-    local: "google/gemini-2.5-flash",
-  },
-  stub: { fast: "stub-small", smart: "stub-small", cheap: "stub-small", local: "stub-small" },
-};
-
-// Default priority lists per preset. The resolver walks each list and picks the
-// first provider that (a) is registered and (b) has a configured key.
-const DEFAULT_PRIORITY: Record<ModelPreset, ProviderName[]> = {
-  cheap: ["openrouter", "gemini", "openai", "anthropic", "ollama"],
-  fast: ["anthropic", "openai", "gemini", "openrouter", "ollama"],
-  smart: ["anthropic", "openai", "gemini", "openrouter", "ollama"],
-  local: ["ollama"],
-};
-
-const LOCAL_PROVIDERS: ReadonlySet<ProviderName> = new Set(["ollama"]);
-
-function envKeyName(provider: ProviderName): string | null {
-  switch (provider) {
-    case "anthropic":
-      return "ANTHROPIC_API_KEY";
-    case "openai":
-      return "OPENAI_API_KEY";
-    case "minimax":
-      return "MINIMAX_API_KEY";
-    case "gemini":
-      return "GEMINI_API_KEY";
-    case "openrouter":
-      return "OPENROUTER_API_KEY";
-    case "ollama":
-      return null; // local; no key required
-    case "stub":
-      return null;
-  }
+  /** Pure/test override for the providers with a usable workspace vault key. */
+  vaultProviders?: Iterable<ProviderName>;
 }
 
 /**
- * Returns true when the given provider is "usable" — either it has an env key,
- * or it is a local provider that doesn't require one.
- *
- * Note: this is an env-only check. Vault-only keys (per-workspace) are not
- * detected here; the resolver is meant to give callers a server-wide signal
- * about what is configured, not what a specific workspace can use.
+ * Returns true when the provider has a process credential, a workspace vault
+ * credential, or is a local provider that does not require a key.
  */
 export function providerHasCredentials(
   provider: ProviderName,
   env: NodeJS.ProcessEnv = process.env,
+  vaultProviders: Iterable<ProviderName> = [],
 ): boolean {
-  if (provider === "ollama") return true; // assume reachable; ollama provider degrades gracefully
-  const key = envKeyName(provider);
-  if (!key) return false;
-  const value = env[key];
-  return typeof value === "string" && value.trim().length > 0;
+  if (new Set(vaultProviders).has(provider)) return true;
+  return providerEnvHasCredentials(provider, env);
+}
+
+export async function vaultProviderNamesForWorkspace(workspaceId: string): Promise<ProviderName[]> {
+  try {
+    return [
+      ...new Set(
+        (await listApiKeysForWorkspaceAsync(workspaceId))
+          .map((record) => record.provider as ProviderName)
+          .filter((provider) => PROVIDER_CATALOG[provider]?.capabilities.vaultKey),
+      ),
+    ];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -154,12 +106,43 @@ export function providerHasCredentials(
 export function availableProviders(opts: ResolvePresetOptions = {}): ProviderName[] {
   const router = opts.router ?? getDefaultRouter();
   const env = opts.env ?? process.env;
+  const vaultProviders = effectiveVaultProviders(opts);
   const registered = new Set(router.registeredProviders());
   const out: ProviderName[] = [];
   for (const provider of registered) {
-    if (providerHasCredentials(provider, env)) out.push(provider);
+    if (providerHasCredentials(provider, env, vaultProviders)) out.push(provider);
   }
   return out;
+}
+
+export function providerReadinessSnapshot(
+  opts: ResolvePresetOptions = {},
+): ProviderReadinessEntry[] {
+  const router = opts.router ?? getDefaultRouter();
+  const env = opts.env ?? process.env;
+  const vaultProviders = new Set(effectiveVaultProviders(opts));
+  const registered = new Set(router.registeredProviders());
+  return DEFAULT_PROVIDER_NAMES.map((provider) => {
+    const entry = PROVIDER_CATALOG[provider];
+    const credentialSource =
+      entry.locality === "local"
+        ? "local"
+        : vaultProviders.has(provider)
+          ? "workspace_vault"
+          : providerEnvHasCredentials(provider, env)
+            ? "environment"
+            : "none";
+    return {
+      provider,
+      label: entry.label,
+      registered: registered.has(provider),
+      ready: registered.has(provider) && credentialSource !== "none",
+      credentialSource,
+      defaultModels: entry.defaultModels,
+      capabilities: entry.capabilities,
+      generation: entry.generation,
+    };
+  });
 }
 
 function parsePriorityOverride(env: NodeJS.ProcessEnv): ProviderName[] | null {
@@ -200,32 +183,33 @@ export function resolvePresetToProviderModel(
 ): ResolvedPreset | null {
   const env = options.env ?? process.env;
   const router = options.router ?? getDefaultRouter();
+  const vaultProviders = effectiveVaultProviders(options);
   const effectivePreset: ModelPreset = preset ?? "fast";
 
   // Explicit provider override short-circuits the priority walk.
   if (options.providerOverride) {
     const provider = options.providerOverride;
-    if (!providerHasCredentials(provider, env)) return null;
+    if (!providerHasCredentials(provider, env, vaultProviders)) return null;
     const model =
       options.modelOverride && options.modelOverride.trim().length > 0
         ? options.modelOverride.trim()
-        : PRESET_MODELS[provider][effectivePreset];
-    return { provider, model, local: LOCAL_PROVIDERS.has(provider) };
+        : providerModel(provider, effectivePreset);
+    return { provider, model, local: PROVIDER_CATALOG[provider].locality === "local" };
   }
 
   const registered = new Set(router.registeredProviders());
   const override = parsePriorityOverride(env);
-  const candidates = override ?? DEFAULT_PRIORITY[effectivePreset];
+  const candidates = override ?? DEFAULT_PROVIDER_PRIORITY[effectivePreset];
 
   for (const provider of candidates) {
     if (!registered.has(provider)) continue;
-    if (!providerHasCredentials(provider, env)) continue;
-    if (effectivePreset === "local" && !LOCAL_PROVIDERS.has(provider)) continue;
+    if (!providerHasCredentials(provider, env, vaultProviders)) continue;
+    if (effectivePreset === "local" && PROVIDER_CATALOG[provider].locality !== "local") continue;
     const model =
       options.modelOverride && options.modelOverride.trim().length > 0
         ? options.modelOverride.trim()
-        : PRESET_MODELS[provider][effectivePreset];
-    return { provider, model, local: LOCAL_PROVIDERS.has(provider) };
+        : providerModel(provider, effectivePreset);
+    return { provider, model, local: PROVIDER_CATALOG[provider].locality === "local" };
   }
 
   return null;
@@ -245,4 +229,8 @@ export function snapshotPresetResolutions(
     cheap: resolvePresetToProviderModel("cheap", options),
     local: resolvePresetToProviderModel("local", options),
   };
+}
+
+function effectiveVaultProviders(options: ResolvePresetOptions): Iterable<ProviderName> {
+  return options.vaultProviders ?? [];
 }

@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **R2 - provider policy and key parity**. Repository/session state
+Current active loop: **R3 - file-tree generation depth**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -40,8 +40,12 @@ role-bounded approve/reject/pause/stop/revoke controls, exact-binding signed
 POST callbacks, and durable one-use consumption through W7. W10.4 now closes
 the local remote-control gate with fake-endpoint contracts, local/remote race
 orderings, restart/replay/credential-rotation checks, and audited bounded
-dead-letter redrive. R1 repository health is complete; resume at R2 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#r2---provider-policy-and-key-parity).
+dead-letter redrive. R1 repository health is complete. R2 now centralizes
+provider/model/capability policy, maps native and conditional structured
+responses, bounds vLLM compatibility fallback and malformed-tool correction,
+adds Gemini/OpenRouter workspace-vault parity, and exposes secret-free
+readiness. Resume at R3 in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#r3---file-tree-generation-depth).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,
 validates SQLite migration/restore integrity and foreign keys, rejects corrupt

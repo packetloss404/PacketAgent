@@ -35,8 +35,8 @@ test("model routing presets pick fast, smart, cheap, and local primaries with fa
   });
 
   assert.equal(surface.version, "phase-72-lane-4");
-  assert.equal(surface.presets.fast.primary.provider, "openai");
-  assert.equal(surface.presets.fast.primary.model, "gpt-4.1-mini");
+  assert.equal(surface.presets.fast.primary.provider, "anthropic");
+  assert.equal(surface.presets.fast.primary.model, "claude-3-5-sonnet-latest");
   assert.equal(surface.presets.smart.primary.provider, "anthropic");
   assert.equal(surface.presets.cheap.primary.provider, "openai");
   assert.equal(surface.presets.local.primary.provider, "ollama");
@@ -128,6 +128,30 @@ test("model routing presets can infer local routing from env hints alone", () =>
     "OLLAMA_BASE_URL",
     "OLLAMA_MODEL",
   ]);
+});
+
+test("model routing presets include vault-only OpenRouter without exposing key material", () => {
+  const surface = buildModelRoutingPresets({
+    workspaceId: "alpha",
+    readiness: {
+      ...readiness,
+      status: "needs_setup",
+      providers: {
+        configuredCount: 0,
+        readyCount: 0,
+        missingProviderKinds: ["openai", "anthropic", "minimax", "ollama", "gemini", "openrouter"],
+        missingApiKeys: [],
+      },
+    },
+    providers: [],
+    vaultProviders: ["openrouter"],
+  });
+
+  assert.equal(surface.presets.cheap.primary.provider, "openrouter");
+  assert.equal(surface.presets.cheap.primary.model, "qwen/qwen3-coder");
+  assert.equal(surface.presets.cheap.primary.source, "workspace_vault");
+  assert.equal(surface.presets.cheap.primary.ready, true);
+  assert.deepEqual(surface.presets.cheap.primary.envHints, []);
 });
 
 function provider(

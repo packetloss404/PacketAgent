@@ -96,6 +96,8 @@ export type ProviderKind =
   | "minimax"
   | "azure_openai"
   | "ollama"
+  | "gemini"
+  | "openrouter"
   | "custom";
 export type ProviderStatus = "connected" | "missing_key" | "disabled";
 export type AgentRunStatus = "queued" | "running" | "success" | "failed" | "canceled";
@@ -151,7 +153,7 @@ export type BuilderModelPresetId = "fast" | "smart" | "cheap" | "local";
 export interface BuilderModelRoutingChoice {
   provider: ProviderKind | "stub";
   model: string;
-  source: "workspace_provider" | "env_hint" | "fallback";
+  source: "workspace_provider" | "workspace_vault" | "env_hint" | "fallback";
   ready: boolean;
   blockers: string[];
   reason: string;
@@ -189,6 +191,32 @@ export interface BuilderProviderResolution {
 export interface BuilderProviderStatusPayload {
   presets: Record<BuilderModelPresetId, BuilderProviderResolution | null>;
   availableProviders: BuilderProviderName[];
+  providers: Array<{
+    provider: BuilderProviderName;
+    label: string;
+    registered: boolean;
+    ready: boolean;
+    credentialSource: "environment" | "workspace_vault" | "local" | "none";
+    defaultModels: Record<BuilderModelPresetId, string>;
+    capabilities: {
+      streaming: boolean;
+      toolUse: "native" | "conditional" | "deterministic";
+      structuredOutput: "native" | "conditional" | "none";
+      structuredOutputTransport:
+        | "response_format"
+        | "output_config"
+        | "vllm_structured_outputs"
+        | "none";
+      vaultKey: boolean;
+      liveModelDiscovery: boolean;
+    };
+    generation: {
+      fileWriteMode: "multi_file_per_turn" | "single_file_per_turn";
+      iterationMode: "single_turn" | "multi_turn";
+      malformedToolInputCorrectionAttempts: 1;
+      structuredOutputFallback: "best_effort_json";
+    };
+  }>;
   /** Raw PACKETAGENT_PROVIDER_PRIORITY env value, or null if unset. */
   priority: string | null;
 }
@@ -1650,7 +1678,13 @@ export interface PublicDashboardPayload {
   }>;
 }
 
-export type ApiKeyProviderName = "anthropic" | "openai" | "minimax" | "ollama";
+export type ApiKeyProviderName =
+  | "anthropic"
+  | "openai"
+  | "openrouter"
+  | "minimax"
+  | "ollama"
+  | "gemini";
 
 export interface MaskedApiKey {
   id: string;

@@ -52,6 +52,71 @@ const PLAN_MODE_SYSTEM_PROMPT = `You are a senior product engineer in Plan Mode.
 
 Order items so each step's dependencies appear earlier. Do not include any prose or code fences outside the JSON object.`;
 
+const WORKFLOW_DRAFT_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    brief: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        summary: { type: "string" },
+        problem: { type: "string" },
+        outcome: { type: "string" },
+        customers: { type: "array", items: { type: "string" } },
+        metrics: { type: "array", items: { type: "string" } },
+      },
+      required: ["summary", "problem", "outcome", "customers", "metrics"],
+    },
+    requirements: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          summary: { type: "string" },
+          priority: { type: "string", enum: ["must", "should", "could"] },
+        },
+        required: ["summary", "priority"],
+      },
+    },
+    planItems: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          summary: { type: "string" },
+          status: { type: "string", enum: ["todo"] },
+        },
+        required: ["summary", "status"],
+      },
+    },
+  },
+  required: ["brief", "requirements", "planItems"],
+};
+
+const PLAN_MODE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    planItems: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          summary: { type: "string" },
+          status: { type: "string", enum: ["todo", "doing", "done"] },
+        },
+        required: ["summary", "status"],
+      },
+    },
+    rationale: { type: "string" },
+  },
+  required: ["planItems", "rationale"],
+};
+
 export function extractJson(content: string): unknown {
   const trimmed = content.trim();
   const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -157,6 +222,11 @@ export async function llmDraftWorkflow(input: LlmDraftInput): Promise<LlmDraftRe
           workspaceId: input.workspaceId,
           routeKey: "workflow.draft",
           messages,
+          structuredOutput: {
+            name: "workflow_draft",
+            schema: WORKFLOW_DRAFT_SCHEMA,
+            strict: true,
+          },
           temperature: 0.2,
           maxTokens: 2048,
         }),
@@ -231,6 +301,11 @@ export async function llmPlanMode(context: WorkflowContext): Promise<PlanModeRes
           workspaceId: context.workspace.id,
           routeKey: "workflow.plan_mode",
           messages,
+          structuredOutput: {
+            name: "workflow_plan",
+            schema: PLAN_MODE_SCHEMA,
+            strict: true,
+          },
           temperature: 0.2,
           maxTokens: 2048,
         }),

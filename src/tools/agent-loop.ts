@@ -6,6 +6,8 @@ import type {
   ProviderName,
   ProviderToolDef,
 } from "../providers/types.js";
+import { providerGenerationPolicy } from "../providers/catalog.js";
+import { malformedToolCalls } from "../providers/tool-input.js";
 import { getDefaultToolRegistry } from "./registry.js";
 import { executeTool } from "./executor.js";
 import type { ToolCallRecord, ToolDefinition } from "./types.js";
@@ -66,6 +68,8 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
   let modelUsed = route.model;
   let finishReason: AgentLoopResult["finishReason"] = "stop";
   let turnsUsed = 0;
+  let malformedCorrections = 0;
+  const generationPolicy = providerGenerationPolicy(route.provider);
 
   for (let turn = 0; turn < maxTurns; turn++) {
     turnsUsed = turn + 1;
@@ -100,6 +104,44 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
 
     if (callResult.content) {
       messages.push({ role: "assistant", content: callResult.content });
+    }
+
+    const malformed = malformedToolCalls(callResult.toolCalls);
+    if (malformed.length > 0) {
+      if (malformedCorrections < generationPolicy.malformedToolInputCorrectionAttempts) {
+        malformedCorrections++;
+        messages.push({
+          role: "user",
+          content: [
+            "Your previous tool call had malformed JSON arguments.",
+            "Make one corrected tool call using a JSON object that matches the tool schema.",
+            `Invalid tool calls: ${malformed.map((toolCall) => toolCall.name).join(", ")}.`,
+          ].join(" "),
+        });
+        continue;
+      }
+
+      const timestamp = new Date().toISOString();
+      for (const toolCall of malformed) {
+        toolCalls.push({
+          id: toolCall.id,
+          toolName: toolCall.name,
+          input: toolCall.input,
+          error: `tool "${toolCall.name}" returned malformed input after one correction attempt`,
+          durationMs: 0,
+          startedAt: timestamp,
+          completedAt: timestamp,
+          status: "error",
+        });
+      }
+      return {
+        finalContent: callResult.content,
+        toolCalls,
+        modelUsed,
+        costUsd: totalCost,
+        turnsUsed,
+        finishReason: "error",
+      };
     }
 
     if (

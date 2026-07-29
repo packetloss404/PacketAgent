@@ -102,3 +102,26 @@ test("async api key operations round-trip through async store access", async () 
   assert.equal(await removeApiKeyForWorkspaceAsync(masked.id, "alpha"), true);
   assert.equal(await resolveApiKeyAsync("alpha", "openai"), null);
 });
+
+test("Gemini and OpenRouter vault keys store and resolve with full parity", async () => {
+  resetStoreForTests();
+  await upsertApiKeyAsync({
+    workspaceId: "alpha",
+    provider: "gemini",
+    label: "Gemini",
+    value: "gemini-vault-secret",
+  });
+  await upsertApiKeyAsync({
+    workspaceId: "alpha",
+    provider: "openrouter",
+    label: "OpenRouter",
+    value: "openrouter-vault-secret",
+  });
+
+  assert.equal(await resolveApiKeyAsync("alpha", "gemini"), "gemini-vault-secret");
+  assert.equal(await resolveApiKeyAsync("alpha", "openrouter"), "openrouter-vault-secret");
+  const masked = await listApiKeysForWorkspaceAsync("alpha");
+  assert.ok(masked.some((entry) => entry.provider === "gemini"));
+  assert.ok(masked.some((entry) => entry.provider === "openrouter"));
+  assert.equal(JSON.stringify(masked).includes("vault-secret"), false);
+});

@@ -1,7 +1,11 @@
 import type { LLMProvider, ProviderStreamChunk } from "./providers/types.js";
 import { getDefaultRouter, type ProviderRouter } from "./providers/router.js";
 import { registerDefaultProviders } from "./providers/bootstrap.js";
-import { resolvePresetToProviderModel, type ModelPreset } from "./providers/preset-resolver.js";
+import {
+  resolvePresetToProviderModel,
+  vaultProviderNamesForWorkspace,
+  type ModelPreset,
+} from "./providers/preset-resolver.js";
 import {
   authorAndValidateAppViaLLM,
   authorAppViaLLM,
@@ -1135,7 +1139,9 @@ export async function applyAppIterationViaLLM(
     // providers (Anthropic, OpenAI, Minimax, OpenRouter, Gemini, Ollama) drive
     // the iteration LLM, not just Anthropic.
     registerDefaultProviders();
-    const resolved = resolvePresetToProviderModel(options.preset as ModelPreset | undefined);
+    const resolved = resolvePresetToProviderModel(options.preset as ModelPreset | undefined, {
+      vaultProviders: await vaultProviderNamesForWorkspace(options.workspaceId),
+    });
     if (!resolved) return null;
     const router = getDefaultRouter();
     const candidate = router.get(resolved.provider);

@@ -6,6 +6,7 @@ import { useApiData } from "../useApiData";
 import { useWorkbench } from "../workbench-state";
 import { api } from "@/lib/api";
 import { canManageWorkspaceRole } from "@/lib/roles";
+import type { ApiKeyProviderName } from "@/lib/types";
 
 type Tab = "members" | "invitations" | "shares" | "keys" | "workspace" | "audit" | "advanced";
 
@@ -525,6 +526,28 @@ function KeysTab({
   canManageWorkspace: boolean;
 }) {
   const list = data ?? [];
+  const [provider, setProvider] = useState<ApiKeyProviderName>("openai");
+  const [label, setLabel] = useState("");
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const saveKey = async () => {
+    if (!canManageWorkspace || !label.trim() || !value) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.createApiKey({ provider, label: label.trim(), value });
+      setLabel("");
+      setValue("");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", marginBottom: 14 }}>
@@ -533,10 +556,85 @@ function KeysTab({
         </h1>
         <span className="mono muted" style={{ marginLeft: "auto", fontSize: 11 }}>
           {canManageWorkspace
-            ? "Key creation is not available in this view yet."
+            ? "Encrypted at rest; values are never returned after save."
             : "Admin role required to manage API keys."}
         </span>
       </div>
+      {canManageWorkspace && (
+        <form
+          className="card"
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "minmax(150px, 0.7fr) minmax(180px, 1fr) minmax(240px, 1.5fr) auto",
+            gap: 10,
+            padding: 14,
+            marginBottom: 14,
+            alignItems: "end",
+          }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveKey();
+          }}
+        >
+          <label>
+            <span className="label">Provider</span>
+            <select
+              className="field"
+              value={provider}
+              onChange={(event) => setProvider(event.target.value as ApiKeyProviderName)}
+            >
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="minimax">MiniMax</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="ollama">Local endpoint key</option>
+            </select>
+          </label>
+          <label>
+            <span className="label">Label</span>
+            <input
+              className="field"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              placeholder="Default"
+              required
+            />
+          </label>
+          <label>
+            <span className="label">Key</span>
+            <input
+              className="field mono"
+              type="password"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              autoComplete="off"
+              placeholder="Paste provider key"
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={saving || !label.trim() || !value}
+          >
+            {saving ? "Saving…" : "Store key"}
+          </button>
+          {error && (
+            <span
+              className="mono"
+              style={{
+                gridColumn: "1 / -1",
+                color: "var(--danger)",
+                fontSize: 11.5,
+              }}
+            >
+              ERR · {error}
+            </span>
+          )}
+        </form>
+      )}
       {loading && <div className="muted">Loading…</div>}
       <div className="card" style={{ overflow: "hidden" }}>
         <table className="tbl">

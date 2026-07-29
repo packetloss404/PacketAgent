@@ -9,6 +9,8 @@ import type {
   ProviderToolDef,
   ProviderUsage,
 } from "./types.js";
+import { parseToolInput } from "./tool-input.js";
+import { PROVIDER_CATALOG } from "./catalog.js";
 
 /**
  * Gemini provider — talks to Google's OpenAI-compatible endpoint.
@@ -34,11 +36,7 @@ export const GEMINI_MODEL_PRICING: Record<string, { input: number; output: numbe
   "gemini-1.5-flash": { input: 0.075, output: 0.3 },
 };
 
-export const GEMINI_DEFAULT_MODELS = {
-  cheap: "gemini-2.0-flash-exp",
-  fast: "gemini-2.0-flash-exp",
-  smart: "gemini-2.5-pro",
-} as const;
+export const GEMINI_DEFAULT_MODELS = PROVIDER_CATALOG.gemini.defaultModels;
 
 interface GeminiChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -61,6 +59,15 @@ interface GeminiChatRequest {
   temperature?: number;
   stream?: boolean;
   stream_options?: { include_usage?: boolean };
+  response_format?: {
+    type: "json_schema";
+    json_schema: {
+      name: string;
+      description?: string;
+      schema: Record<string, unknown>;
+      strict: boolean;
+    };
+  };
 }
 
 interface GeminiChatChoice {
@@ -186,6 +193,21 @@ export class GeminiProvider implements LLMProvider {
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
+      ...(opts.structuredOutput
+        ? {
+            response_format: {
+              type: "json_schema" as const,
+              json_schema: {
+                name: opts.structuredOutput.name,
+                ...(opts.structuredOutput.description
+                  ? { description: opts.structuredOutput.description }
+                  : {}),
+                schema: opts.structuredOutput.schema,
+                strict: opts.structuredOutput.strict ?? true,
+              },
+            },
+          }
+        : {}),
       ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}),
     };
   }
@@ -224,13 +246,11 @@ export class GeminiProvider implements LLMProvider {
     const toolCalls: ProviderToolCall[] = [];
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
-        let parsed: Record<string, unknown> = {};
-        try {
-          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
-        } catch {
-          parsed = {};
-        }
-        toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
+        toolCalls.push({
+          id: tc.id,
+          name: tc.function.name,
+          ...parseToolInput(tc.function.arguments),
+        });
       }
     }
     const usage = json.usage;
@@ -286,13 +306,13 @@ export class GeminiProvider implements LLMProvider {
     const flushPartials = function* (this: void): Generator<ProviderStreamChunk> {
       for (const slot of partials.values()) {
         if (!slot.id || !slot.name) continue;
-        let parsed: Record<string, unknown> = {};
-        try {
-          parsed = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
-        } catch {
-          parsed = {};
-        }
-        yield { toolCall: { id: slot.id, name: slot.name, input: parsed } };
+        yield {
+          toolCall: {
+            id: slot.id,
+            name: slot.name,
+            ...parseToolInput(slot.argsAccum),
+          },
+        };
       }
       partials.clear();
     };

@@ -1320,7 +1320,8 @@ function providerNameForKind(kind: ProviderKind): ProviderName | null {
     kind === "anthropic" ||
     kind === "minimax" ||
     kind === "ollama" ||
-    kind === "gemini"
+    kind === "gemini" ||
+    kind === "openrouter"
   )
     return kind;
   return null;
@@ -3870,7 +3871,16 @@ function normalizeProviderInput(input: ProviderInput) {
   if (defaultModel.length < 2) throw httpError(400, "default model is required");
   const kind =
     input.kind &&
-    ["openai", "anthropic", "minimax", "azure_openai", "ollama", "custom"].includes(input.kind)
+    [
+      "openai",
+      "anthropic",
+      "minimax",
+      "azure_openai",
+      "ollama",
+      "gemini",
+      "openrouter",
+      "custom",
+    ].includes(input.kind)
       ? input.kind
       : "custom";
   const apiKeyConfigured = Boolean(input.apiKeyConfigured);

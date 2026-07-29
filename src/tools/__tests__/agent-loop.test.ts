@@ -122,6 +122,105 @@ test("loop executes tool calls and returns final answer", async () => {
   assert.equal(result.turnsUsed, 2);
 });
 
+test("loop makes exactly one correction attempt for malformed tool input", async () => {
+  resetStoreForTests();
+  resetDefaultToolRegistryForTests();
+  resetDefaultRouterForTests();
+  getDefaultToolRegistry().register(echoTool);
+  const router = new ProviderRouter();
+  router.register(
+    "anthropic",
+    scriptedProvider([
+      {
+        content: "",
+        finishReason: "tool_use",
+        toolCalls: [
+          {
+            id: "bad-call",
+            name: "echo_tool",
+            input: {},
+            inputError: "malformed_json",
+          },
+        ],
+        usage: { promptTokens: 5, completionTokens: 2, costUsd: 0.001 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic",
+      },
+      {
+        content: "",
+        finishReason: "tool_use",
+        toolCalls: [{ id: "fixed-call", name: "echo_tool", input: { text: "fixed" } }],
+        usage: { promptTokens: 6, completionTokens: 2, costUsd: 0.001 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic",
+      },
+      {
+        content: "Corrected.",
+        finishReason: "stop",
+        usage: { promptTokens: 8, completionTokens: 1, costUsd: 0.001 },
+        model: "claude-opus-4-7",
+        providerName: "anthropic",
+      },
+    ]),
+  );
+  setDefaultRouter(router);
+
+  const result = await runAgentLoop({
+    workspaceId: "alpha",
+    userId: "user-1",
+    routeKey: "agent.reasoning",
+    systemPrompt: "you are a helper",
+    userPrompt: "echo fixed",
+    toolNames: ["echo_tool"],
+  });
+
+  assert.equal(result.finishReason, "stop");
+  assert.equal(result.turnsUsed, 3);
+  assert.equal(result.toolCalls.length, 1);
+  assert.equal(result.toolCalls[0].id, "fixed-call");
+  assert.deepEqual(result.toolCalls[0].output, { echo: "fixed" });
+});
+
+test("loop never executes a second malformed tool call", async () => {
+  resetStoreForTests();
+  resetDefaultToolRegistryForTests();
+  resetDefaultRouterForTests();
+  getDefaultToolRegistry().register(echoTool);
+  const malformed = (id: string): ProviderCallResult => ({
+    content: "",
+    finishReason: "tool_use",
+    toolCalls: [
+      {
+        id,
+        name: "echo_tool",
+        input: {},
+        inputError: "malformed_json",
+      },
+    ],
+    usage: { promptTokens: 1, completionTokens: 1, costUsd: 0 },
+    model: "claude-opus-4-7",
+    providerName: "anthropic",
+  });
+  const router = new ProviderRouter();
+  router.register("anthropic", scriptedProvider([malformed("bad-1"), malformed("bad-2")]));
+  setDefaultRouter(router);
+
+  const result = await runAgentLoop({
+    workspaceId: "alpha",
+    userId: "user-1",
+    routeKey: "agent.reasoning",
+    systemPrompt: "you are a helper",
+    userPrompt: "echo fixed",
+    toolNames: ["echo_tool"],
+  });
+
+  assert.equal(result.finishReason, "error");
+  assert.equal(result.turnsUsed, 2);
+  assert.equal(result.toolCalls.length, 1);
+  assert.equal(result.toolCalls[0].status, "error");
+  assert.match(result.toolCalls[0].error ?? "", /after one correction attempt/);
+});
+
 test("loop terminates with max_turns when model keeps calling tools", async () => {
   resetStoreForTests();
   resetDefaultToolRegistryForTests();

@@ -173,6 +173,13 @@ Prompt-to-app generation remains a supported secondary capability.
   accepted package receipt. Forward updates and rollbacks preserve locally
   narrowed grants. Migration `0024` and workspace export pass JSON, SQLite,
   and managed-Postgres parity.
+- Completed R1's repository-health gate with clean typecheck, lint,
+  formatting, production build, web tests, migration recovery, and API tests.
+- Completed R2's canonical provider/model/policy catalog, native and
+  conditional structured-response mapping, one bounded vLLM compatibility
+  fallback, one non-executing malformed-tool correction, Gemini/OpenRouter
+  vault parity, expanded provider-kind persistence, and secret-free
+  workspace-aware readiness.
 
 ## Current implementation truth
 
@@ -273,6 +280,9 @@ Implemented substrate:
 - agent definitions and capped tool-use runs;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
+- canonical provider/model/capability and generation policy, workspace-vault
+  keys for every hosted provider, structured-response mapping, one bounded
+  malformed-tool correction, and secret-free readiness reporting;
 - tool approvals, encrypted secrets, RBAC, audit, sandbox, and Playwright;
 - outbound HTTP, Slack, GitHub, email, SQL, and scoped shell tool adapters;
 - bounded app-code validation repair, per-app SQLite runtime, and supervised
@@ -291,9 +301,9 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R2 - provider policy and key parity** in
-[`../BACKLOG.md#r2---provider-policy-and-key-parity`](../BACKLOG.md#r2---provider-policy-and-key-parity).
-`BACKLOG.md` is the single ledger for every remaining W10 and R1-R8 task.
+Continue **R3 - file-tree generation depth** in
+[`../BACKLOG.md#r3---file-tree-generation-depth`](../BACKLOG.md#r3---file-tree-generation-depth).
+`BACKLOG.md` is the single ledger for every remaining R3-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
 active work absent from the backlog.
 
@@ -350,7 +360,20 @@ R1 is complete. All 326 inherited Prettier files are formatted, ESLint is
 clean, and all 123 native React buttons declare an explicit type. The full
 closure gate passes typecheck, formatting, lint, production build, 30 web
 tests, and 1,525 API tests (1,521 passed with 4 intentional live-probe skips).
-Resume at R2's provider-policy inventory and contract slice.
+
+R2 is complete. [`r2-provider-policy.md`](r2-provider-policy.md) records the
+official research and implemented contract. A single catalog now drives
+provider names, model defaults, capabilities, environment lookup, vault
+eligibility, readiness, and hosted/local generation behavior. Provider
+adapters map explicit workflow schemas to native or conditional structured
+response transports; vLLM makes at most one prompt fallback after an
+unsupported-field response. Malformed tool arguments never execute and receive
+one correction turn. Gemini/OpenRouter keys now use the same encrypted
+workspace-vault flow as the other hosted providers, including JSON, SQLite, and
+managed-Postgres boundaries. The full closure gate passes typecheck, formatting,
+lint, production build, 30 web tests, and 1,552 API tests (1,548 passed with 4
+intentional live-probe skips). Resume at R3's file-tree repair, iteration,
+progress, review, and export slice.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -502,8 +525,8 @@ PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
 The exact next slice is
-[`R2 - provider policy and key parity`](../BACKLOG.md#r2---provider-policy-and-key-parity).
-After each gate passes, continue through R1-R8 using that backlog's unchecked
+[`R3 - file-tree generation depth`](../BACKLOG.md#r3---file-tree-generation-depth).
+After each gate passes, continue through R3-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
 must not be resumed independently.
@@ -534,9 +557,15 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,521 passed, 4 intentionally skipped live probes, 0
+- `npm run test:api` - 1,548 passed, 4 intentionally skipped live probes, 0
   failed
 - `npm run test:web` - 30 passed, 0 failed
+- focused R2 canonical catalog, provider request mappings, vLLM constrained
+  decoding and one fallback, malformed tool-input correction bound,
+  local single-file authoring, Gemini/OpenRouter vault storage and request-time
+  resolution, secret-free workspace readiness, provider-kind migration, and
+  route/storage parity checks - 245 passed, 1 intentional Windows sandbox
+  skip, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
   approval-required checkpointing, exact one-time/run grant consumption,
@@ -659,6 +688,6 @@ Expected branch: `codex/packetagent-foundation`.
 Expected remotes: PacketAgent `origin` and the read-only historical
 `taskloom-source`.
 
-Expected status after the latest pushed R1 checkpoint: clean. Stop if the active folder is
+Expected status after the latest pushed R2 checkpoint: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

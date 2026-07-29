@@ -10,6 +10,7 @@ import type {
   ProviderToolDef,
   ProviderUsage,
 } from "./types.js";
+import { parseToolInput } from "./tool-input.js";
 
 interface OpenAIChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -31,6 +32,15 @@ interface OpenAIChatParams {
   max_tokens?: number;
   temperature?: number;
   stream?: boolean;
+  response_format?: {
+    type: "json_schema";
+    json_schema: {
+      name: string;
+      description?: string;
+      schema: Record<string, unknown>;
+      strict: boolean;
+    };
+  };
 }
 
 interface OpenAIChatChoice {
@@ -113,6 +123,21 @@ function mapTools(tools: ProviderToolDef[] | undefined): OpenAIToolDef[] | undef
   }));
 }
 
+function mapStructuredOutput(
+  structuredOutput: ProviderCallOptions["structuredOutput"],
+): OpenAIChatParams["response_format"] {
+  if (!structuredOutput) return undefined;
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: structuredOutput.name,
+      ...(structuredOutput.description ? { description: structuredOutput.description } : {}),
+      schema: structuredOutput.schema,
+      strict: structuredOutput.strict ?? true,
+    },
+  };
+}
+
 function mapFinishReason(
   reason: OpenAIChatChoice["finish_reason"],
 ): ProviderCallResult["finishReason"] {
@@ -178,19 +203,20 @@ export class OpenAIProvider implements LLMProvider {
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
+      ...(opts.structuredOutput
+        ? { response_format: mapStructuredOutput(opts.structuredOutput) }
+        : {}),
     };
     const response = await client.chat.completions.create(params, { signal: opts.signal });
     const choice = response.choices[0];
     const toolCalls: ProviderToolCall[] = [];
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
-        let parsed: Record<string, unknown> = {};
-        try {
-          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
-        } catch {
-          parsed = {};
-        }
-        toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
+        toolCalls.push({
+          id: tc.id,
+          name: tc.function.name,
+          ...parseToolInput(tc.function.arguments),
+        });
       }
     }
     const usage = response.usage;
@@ -220,6 +246,9 @@ export class OpenAIProvider implements LLMProvider {
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
+      ...(opts.structuredOutput
+        ? { response_format: mapStructuredOutput(opts.structuredOutput) }
+        : {}),
     };
 
     let stream: AsyncIterable<OpenAIChatStreamChunk>;
@@ -263,13 +292,13 @@ export class OpenAIProvider implements LLMProvider {
         if (choice.finish_reason && partials.size > 0) {
           for (const slot of partials.values()) {
             if (!slot.id || !slot.name) continue;
-            let parsed: Record<string, unknown> = {};
-            try {
-              parsed = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
-            } catch {
-              parsed = {};
-            }
-            yield { toolCall: { id: slot.id, name: slot.name, input: parsed } };
+            yield {
+              toolCall: {
+                id: slot.id,
+                name: slot.name,
+                ...parseToolInput(slot.argsAccum),
+              },
+            };
           }
           partials.clear();
         }

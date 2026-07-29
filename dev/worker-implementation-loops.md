@@ -1014,7 +1014,7 @@ pulled forward only after the backlog records that change.
 
 ### R1 - Repository health and historical finding re-audit
 
-Status: complete as of 2026-07-29. Resume at R2.
+Status: complete as of 2026-07-29.
 
 1. Re-run every still-relevant finding from `REPO_REVIEW.md` against current
    code; close stale items with evidence instead of copying old line numbers.
@@ -1037,7 +1037,7 @@ to a named later loop; CI/test/build truth and migration recovery are green.
 
 ### R2 - Provider policy and key parity
 
-Status: active.
+Status: complete as of 2026-07-29. Resume at R3.
 
 1. Add per-provider generation policy and capability metadata.
 2. Add vLLM structured decoding/XGrammar with tested fallback.
@@ -1048,7 +1048,17 @@ Status: active.
 Gate: every supported provider follows one tested policy contract and every
 hosted provider key can be stored and resolved through the vault.
 
+Gate result: passed. The canonical catalog now drives model defaults,
+capability/readiness metadata, hosted-versus-local generation, and the single
+malformed-input correction limit. Native/conditional structured-response
+mapping, vLLM's one compatibility fallback, Gemini/OpenRouter vault parity,
+provider-kind migration integrity, and secret-free status reporting pass the
+focused and repository-wide gates. Design and research evidence live in
+[`r2-provider-policy.md`](r2-provider-policy.md).
+
 ### R3 - File-tree generation depth
+
+Status: active.
 
 1. Collect real failure clusters and add targeted, bounded repair prompts.
 2. Move legacy-template iteration onto the file-tree path or provide a
@@ -1157,19 +1167,19 @@ requires an explicit owner decision.
 
 ## Historical plan reconciliation
 
-| Historical source                   | Current disposition                                                                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 3 Track A, BYOK               | Core router/adapters shipped; remaining provider policy, structured decoding, correction retry, and vault parity are R2.                          |
-| Phase 3 Track B, file tree          | Core authoring, validation, projection, iteration, and bounded repair shipped; remaining work is R3.                                              |
-| Phase 3 Track C, app runtime        | Per-app SQLite/runtime shipped; health, publish integrity, and preview isolation are R4/R5.                                                       |
-| Phase 3 Track D, agent path         | Six tools, approval UX, Builder parity, and trace view shipped; resource-scoped enforcement is W6, SMTP/template/evaluation/import-export are R6. |
-| Phase 3 Track E and Security        | Worker-bound capability, credential, environment, egress, and sandbox enforcement is W6; generated-code sandboxing and preview isolation are R5.  |
-| Repo Review Phase 1                 | Many foundation items shipped; all claims are re-audited and remaining correctness/security work closes in R1/R5/R8.                              |
-| Repo Review Phase 2                 | Lint/format/docs work began in PA0; baseline closure and configuration cleanup are R1.                                                            |
-| Repo Review Phase 3                 | Persistence end-state and module decomposition require current evidence; they are R1/R7, not license for a rewrite.                               |
-| Repo Review Phase 4                 | Runtime policy blockers are W6; remaining production/container/backup/e2e work is R1/R5/R8.                                                       |
-| Agent playbook sprints              | Historical feature plan is substantially shipped; Worker observability/control integration continues in W7/W8/R6.                                 |
-| High-numbered `PhaseNN` code labels | Historical implementation labels only. Re-audit in R1 before renaming or deleting; they do not create roadmap work by themselves.                 |
+| Historical source                   | Current disposition                                                                                                                                              |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 3 Track A, BYOK               | Complete in R2: canonical provider policy/catalog, structured decoding with bounded fallback, malformed-input correction, vault parity, and readiness reporting. |
+| Phase 3 Track B, file tree          | Core authoring, validation, projection, iteration, and bounded repair shipped; remaining work is R3.                                                             |
+| Phase 3 Track C, app runtime        | Per-app SQLite/runtime shipped; health, publish integrity, and preview isolation are R4/R5.                                                                      |
+| Phase 3 Track D, agent path         | Six tools, approval UX, Builder parity, and trace view shipped; resource-scoped enforcement is W6, SMTP/template/evaluation/import-export are R6.                |
+| Phase 3 Track E and Security        | Worker-bound capability, credential, environment, egress, and sandbox enforcement is W6; generated-code sandboxing and preview isolation are R5.                 |
+| Repo Review Phase 1                 | Many foundation items shipped; all claims are re-audited and remaining correctness/security work closes in R1/R5/R8.                                             |
+| Repo Review Phase 2                 | Lint/format/docs work began in PA0; baseline closure and configuration cleanup are R1.                                                                           |
+| Repo Review Phase 3                 | Persistence end-state and module decomposition require current evidence; they are R1/R7, not license for a rewrite.                                              |
+| Repo Review Phase 4                 | Runtime policy blockers are W6; remaining production/container/backup/e2e work is R1/R5/R8.                                                                      |
+| Agent playbook sprints              | Historical feature plan is substantially shipped; Worker observability/control integration continues in W7/W8/R6.                                                |
+| High-numbered `PhaseNN` code labels | Historical implementation labels only. Re-audit in R1 before renaming or deleting; they do not create roadmap work by themselves.                                |
 
 ## Verification matrix
 

@@ -20,10 +20,18 @@ export interface ProviderToolDef {
   inputSchema: Record<string, unknown>;
 }
 
+export interface ProviderStructuredOutput {
+  name: string;
+  description?: string;
+  schema: Record<string, unknown>;
+  strict?: boolean;
+}
+
 export interface ProviderCallOptions {
   model: string;
   messages: ProviderMessage[];
   tools?: ProviderToolDef[];
+  structuredOutput?: ProviderStructuredOutput;
   maxTokens?: number;
   temperature?: number;
   signal?: AbortSignal;
@@ -41,6 +49,7 @@ export interface ProviderToolCall {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  inputError?: "malformed_json" | "not_an_object";
 }
 
 export interface ProviderCallResult {

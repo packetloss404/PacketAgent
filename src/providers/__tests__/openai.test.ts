@@ -51,6 +51,59 @@ test("call() maps roles correctly and returns content + cost", async () => {
   assert.ok(Math.abs(result.usage.costUsd - expected) < 1e-9);
 });
 
+test("call() maps the canonical structured-output contract to response_format", async () => {
+  let captured: Record<string, unknown> = {};
+  const provider = new OpenAIProvider({
+    apiKeyResolver: async () => "k",
+    clientFactory: () =>
+      fakeClient({
+        create: (async (params: Record<string, unknown>) => {
+          captured = params;
+          return {
+            id: "c1",
+            model: "gpt-4o-mini",
+            choices: [
+              {
+                index: 0,
+                message: { role: "assistant", content: '{"ok":true}' },
+                finish_reason: "stop",
+              },
+            ],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          };
+        }) as unknown as Create,
+      }),
+  });
+  await provider.call({
+    model: "gpt-4o-mini",
+    workspaceId: "ws-1",
+    routeKey: "workflow.draft",
+    messages: [{ role: "user", content: "return JSON" }],
+    structuredOutput: {
+      name: "result",
+      schema: {
+        type: "object",
+        properties: { ok: { type: "boolean" } },
+        required: ["ok"],
+        additionalProperties: false,
+      },
+    },
+  });
+  assert.deepEqual(captured.response_format, {
+    type: "json_schema",
+    json_schema: {
+      name: "result",
+      schema: {
+        type: "object",
+        properties: { ok: { type: "boolean" } },
+        required: ["ok"],
+        additionalProperties: false,
+      },
+      strict: true,
+    },
+  });
+});
+
 test("call() maps tool_calls in response", async () => {
   const provider = new OpenAIProvider({
     apiKeyResolver: async () => "k",

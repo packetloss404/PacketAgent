@@ -68,6 +68,43 @@ test("openrouter: call() sends bearer auth + HTTP-Referer + X-Title attribution 
   assert.ok(Math.abs(res.usage.costUsd - expected) < 1e-9);
 });
 
+test("openrouter: structured outputs require a compatible routed endpoint", async () => {
+  let capturedBody: Record<string, unknown> = {};
+  const provider = new OpenRouterProvider({
+    apiKeyResolver: async () => "or-key",
+    fetchFn: (async (_url: string | URL, init?: RequestInit) => {
+      capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return fakeResponse({
+        id: "c1",
+        model: "openai/gpt-4o-mini",
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: '{"ok":true}' },
+            finish_reason: "stop",
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      });
+    }) as unknown as typeof fetch,
+  });
+  await provider.call({
+    model: "openai/gpt-4o-mini",
+    workspaceId: "w",
+    routeKey: "workflow.draft",
+    messages: [{ role: "user", content: "return JSON" }],
+    structuredOutput: {
+      name: "result",
+      schema: { type: "object", properties: { ok: { type: "boolean" } } },
+    },
+  });
+  assert.deepEqual(capturedBody.provider, { require_parameters: true });
+  assert.equal(
+    (capturedBody.response_format as { type?: string } | undefined)?.type,
+    "json_schema",
+  );
+});
+
 test("openrouter: env-overridden attribution headers reach the request", async () => {
   let headers: Record<string, string> = {};
   const provider = new OpenRouterProvider({
@@ -246,7 +283,7 @@ test("openrouter: apiKeyResolver null falls back to env, both null throws", asyn
   else process.env.OPENROUTER_API_KEY = original;
 });
 
-test("openrouter: not registered by registerDefaultProviders when OPENROUTER_API_KEY is absent", () => {
+test("openrouter: registered without env key for vault-only workspaces", () => {
   const original = process.env.OPENROUTER_API_KEY;
   delete process.env.OPENROUTER_API_KEY;
   resetDefaultRouterForTests();
@@ -256,8 +293,8 @@ test("openrouter: not registered by registerDefaultProviders when OPENROUTER_API
     const router = getDefaultRouter();
     assert.equal(
       router.has("openrouter"),
-      false,
-      "openrouter should not be registered without an API key",
+      true,
+      "openrouter should be registered before a workspace credential is resolved",
     );
   } finally {
     resetDefaultRouterForTests();

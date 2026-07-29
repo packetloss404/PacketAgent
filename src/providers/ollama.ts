@@ -8,6 +8,7 @@ import type {
   ProviderToolCall,
   ProviderToolDef,
 } from "./types.js";
+import { parseToolInput } from "./tool-input.js";
 
 // =============================================================================
 // Local / self-hosted LLM provider.
@@ -36,6 +37,7 @@ import type {
 export const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434";
 
 export type LocalLLMApiFormat = "ollama" | "openai";
+export type LocalStructuredOutputMode = "auto" | "off";
 
 /**
  * Returns the effective base URL to talk to, applying the LOCAL_LLM_BASE_URL →
@@ -63,6 +65,16 @@ export function resolveLocalLlmApiFormat(env: NodeJS.ProcessEnv = process.env): 
   const lower = raw.trim().toLowerCase();
   if (lower === "openai") return "openai";
   return "ollama";
+}
+
+export function resolveLocalStructuredOutputMode(
+  env: NodeJS.ProcessEnv = process.env,
+): LocalStructuredOutputMode {
+  return String(env.LOCAL_LLM_STRUCTURED_OUTPUTS ?? "")
+    .trim()
+    .toLowerCase() === "off"
+    ? "off"
+    : "auto";
 }
 
 /**
@@ -156,6 +168,7 @@ interface OpenAICompatChatRequest {
   max_tokens?: number;
   temperature?: number;
   stream?: boolean;
+  structured_outputs?: { json: Record<string, unknown> };
 }
 
 interface OpenAICompatChatResponse {
@@ -240,6 +253,8 @@ export interface OllamaProviderOptions {
   apiFormat?: LocalLLMApiFormat;
   /** Overrides the env-derived model. Mostly for tests. */
   modelOverride?: string;
+  /** Enables vLLM structured_outputs with one best-effort fallback. */
+  structuredOutputMode?: LocalStructuredOutputMode;
 }
 
 export class OllamaProvider implements LLMProvider {
@@ -250,6 +265,7 @@ export class OllamaProvider implements LLMProvider {
   private modelsCache: { value: string[]; at: number } | null = null;
   private apiFormat: LocalLLMApiFormat;
   private modelOverride: string | undefined;
+  private structuredOutputMode: LocalStructuredOutputMode;
 
   constructor(opts: OllamaProviderOptions = {}) {
     this.baseURL = opts.baseURL ?? resolveLocalLlmBaseURL();
@@ -257,6 +273,7 @@ export class OllamaProvider implements LLMProvider {
     this.modelsCacheMs = opts.modelsCacheMs ?? 60_000;
     this.apiFormat = opts.apiFormat ?? resolveLocalLlmApiFormat();
     this.modelOverride = opts.modelOverride ?? process.env.LOCAL_LLM_MODEL;
+    this.structuredOutputMode = opts.structuredOutputMode ?? resolveLocalStructuredOutputMode();
     if (this.modelOverride !== undefined && this.modelOverride.trim().length === 0) {
       this.modelOverride = undefined;
     }
@@ -271,6 +288,9 @@ export class OllamaProvider implements LLMProvider {
   }
   getModelOverride(): string | undefined {
     return this.modelOverride;
+  }
+  getStructuredOutputMode(): LocalStructuredOutputMode {
+    return this.structuredOutputMode;
   }
 
   private effectiveModel(model: string): string {
@@ -334,7 +354,7 @@ export class OllamaProvider implements LLMProvider {
         toolCalls.push({
           id: `ollama-${toolCalls.length}`,
           name: tc.function.name,
-          input: tc.function.arguments,
+          ...parseToolInput(tc.function.arguments),
         });
       }
     }
@@ -424,7 +444,7 @@ export class OllamaProvider implements LLMProvider {
                 toolCall: {
                   id: `ollama-${tc.function.name}`,
                   name: tc.function.name,
-                  input: tc.function.arguments,
+                  ...parseToolInput(tc.function.arguments),
                 },
               };
             }
@@ -447,23 +467,84 @@ export class OllamaProvider implements LLMProvider {
   // OpenAI-compatible path (vLLM / LM Studio / llama.cpp server / etc.)
   // -------------------------------------------------------------------------
 
-  private async callOpenAI(opts: ProviderCallOptions): Promise<ProviderCallResult> {
-    const body: OpenAICompatChatRequest = {
+  private buildOpenAIRequest(
+    opts: ProviderCallOptions,
+    stream: boolean,
+    structured: boolean,
+  ): OpenAICompatChatRequest {
+    const fallbackPrompt =
+      opts.structuredOutput && !structured
+        ? {
+            role: "system" as const,
+            content: [
+              "Return only valid JSON matching this JSON Schema.",
+              JSON.stringify(opts.structuredOutput.schema).slice(0, 12_000),
+            ].join("\n"),
+          }
+        : null;
+    return {
       model: this.effectiveModel(opts.model),
-      messages: mapOpenAIMessages(opts.messages),
-      stream: false,
+      messages: mapOpenAIMessages(
+        fallbackPrompt ? [fallbackPrompt, ...opts.messages] : opts.messages,
+      ),
+      stream,
       ...(opts.tools ? { tools: mapOpenAITools(opts.tools) } : {}),
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(structured && opts.structuredOutput
+        ? { structured_outputs: { json: opts.structuredOutput.schema } }
+        : {}),
     };
+  }
+
+  private shouldUseStructuredOutput(opts: ProviderCallOptions): boolean {
+    return Boolean(opts.structuredOutput && this.structuredOutputMode === "auto");
+  }
+
+  private canFallbackStructuredOutput(status: number): boolean {
+    return status === 400 || status === 404 || status === 422;
+  }
+
+  private async fetchOpenAI(
+    opts: ProviderCallOptions,
+    stream: boolean,
+  ): Promise<{ body: OpenAICompatChatRequest; response: Response }> {
+    const structured = this.shouldUseStructuredOutput(opts);
+    let body = this.buildOpenAIRequest(opts, stream, structured);
+    let response = await this.fetchFn(`${this.baseURL}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(stream ? { accept: "text/event-stream" } : {}),
+      },
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+    if (!structured || !this.canFallbackStructuredOutput(response.status)) {
+      return { body, response };
+    }
+
+    await response.body?.cancel().catch(() => undefined);
+    body = this.buildOpenAIRequest(opts, stream, false);
+    response = await this.fetchFn(`${this.baseURL}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(stream ? { accept: "text/event-stream" } : {}),
+      },
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+    return { body, response };
+  }
+
+  private async callOpenAI(opts: ProviderCallOptions): Promise<ProviderCallResult> {
+    let body: OpenAICompatChatRequest;
     let res: Response;
     try {
-      res = await this.fetchFn(`${this.baseURL}/v1/chat/completions`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-        signal: opts.signal,
-      });
+      const request = await this.fetchOpenAI(opts, false);
+      body = request.body;
+      res = request.response;
     } catch (error) {
       throw new Error(
         `ollama: connection failed (is the local LLM server running at ${this.baseURL}?): ${(error as Error).message}`,
@@ -478,13 +559,11 @@ export class OllamaProvider implements LLMProvider {
     const toolCalls: ProviderToolCall[] = [];
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
-        let parsed: Record<string, unknown> = {};
-        try {
-          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
-        } catch {
-          parsed = {};
-        }
-        toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
+        toolCalls.push({
+          id: tc.id,
+          name: tc.function.name,
+          ...parseToolInput(tc.function.arguments),
+        });
       }
     }
     return {
@@ -502,22 +581,9 @@ export class OllamaProvider implements LLMProvider {
   }
 
   private async *streamOpenAI(opts: ProviderCallOptions): AsyncIterable<ProviderStreamChunk> {
-    const body: OpenAICompatChatRequest = {
-      model: this.effectiveModel(opts.model),
-      messages: mapOpenAIMessages(opts.messages),
-      stream: true,
-      ...(opts.tools ? { tools: mapOpenAITools(opts.tools) } : {}),
-      ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
-      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
-    };
     let res: Response;
     try {
-      res = await this.fetchFn(`${this.baseURL}/v1/chat/completions`, {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "text/event-stream" },
-        body: JSON.stringify(body),
-        signal: opts.signal,
-      });
+      res = (await this.fetchOpenAI(opts, true)).response;
     } catch (error) {
       yield {
         error: `ollama: connection failed (is the local LLM server running at ${this.baseURL}?): ${(error as Error).message}`,
@@ -591,13 +657,13 @@ export class OllamaProvider implements LLMProvider {
           if (choice.finish_reason && partials.size > 0) {
             for (const slot of partials.values()) {
               if (!slot.id || !slot.name) continue;
-              let parsedArgs: Record<string, unknown> = {};
-              try {
-                parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
-              } catch {
-                parsedArgs = {};
-              }
-              yield { toolCall: { id: slot.id, name: slot.name, input: parsedArgs } };
+              yield {
+                toolCall: {
+                  id: slot.id,
+                  name: slot.name,
+                  ...parseToolInput(slot.argsAccum),
+                },
+              };
             }
             partials.clear();
           }

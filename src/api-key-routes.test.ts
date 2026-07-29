@@ -69,3 +69,34 @@ test("api key deletion is scoped to the authenticated workspace", async () => {
   assert.deepEqual(await response.json(), { error: "api key not found" });
   assert.ok(listApiKeysForWorkspace("beta").some((key) => key.id === betaKey.id));
 });
+
+test("admins can store Gemini and OpenRouter keys through the workspace vault API", async () => {
+  resetStoreForTests();
+  const app = createTestApp();
+  const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
+
+  for (const provider of ["gemini", "openrouter"] as const) {
+    const response = await app.request("/api/app/api-keys", {
+      method: "POST",
+      headers: {
+        ...authHeaders(alpha.cookieValue),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        provider,
+        label: `${provider} default`,
+        value: `${provider}-secret`,
+      }),
+    });
+    assert.equal(response.status, 201);
+    const body = (await response.json()) as {
+      apiKey: { provider: string; masked: string };
+    };
+    assert.equal(body.apiKey.provider, provider);
+    assert.equal(body.apiKey.masked.includes(`${provider}-secret`), false);
+  }
+
+  const keys = listApiKeysForWorkspace("alpha");
+  assert.ok(keys.some((entry) => entry.provider === "gemini"));
+  assert.ok(keys.some((entry) => entry.provider === "openrouter"));
+});

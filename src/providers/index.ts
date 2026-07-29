@@ -1,4 +1,5 @@
 export * from "./types.js";
+export * from "./catalog.js";
 export { StubProvider } from "./stub.js";
 export {
   ProviderRouter,

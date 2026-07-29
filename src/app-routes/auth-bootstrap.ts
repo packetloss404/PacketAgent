@@ -111,14 +111,21 @@ async function builderProviderStatus(c: Context) {
     // Lazy-import to avoid a circular dep between app-routes and provider
     // bootstrap (which itself imports route-adjacent modules in some setups).
     const { registerDefaultProviders } = await import("../providers/bootstrap.js");
-    const { snapshotPresetResolutions, availableProviders } =
-      await import("../providers/preset-resolver.js");
+    const {
+      snapshotPresetResolutions,
+      availableProviders,
+      providerReadinessSnapshot,
+      vaultProviderNamesForWorkspace,
+    } = await import("../providers/preset-resolver.js");
     registerDefaultProviders();
-    const snapshot = snapshotPresetResolutions();
-    const available = availableProviders();
+    const vaultProviders = await vaultProviderNamesForWorkspace(context.workspace.id);
+    const providerOptions = { vaultProviders };
+    const snapshot = snapshotPresetResolutions(providerOptions);
+    const available = availableProviders(providerOptions);
     return c.json({
       presets: snapshot,
       availableProviders: available,
+      providers: providerReadinessSnapshot(providerOptions),
       priority: process.env.PACKETAGENT_PROVIDER_PRIORITY ?? null,
     });
   } catch (error) {
@@ -138,6 +145,9 @@ async function modelRoutingPresets(c: Context) {
         providers: data.providers,
         readiness,
         env: process.env,
+        vaultProviders: data.apiKeys
+          .filter((entry) => entry.workspaceId === context.workspace.id)
+          .map((entry) => entry.provider),
       }),
     });
   } catch (error) {
@@ -203,6 +213,12 @@ async function workspaceIntegrationSandboxEnv(
     env.OPENAI_API_KEY = env.OPENAI_API_KEY ?? "workspace-vault-key";
   if (apiKeyProviders.has("anthropic"))
     env.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY ?? "workspace-vault-key";
+  if (apiKeyProviders.has("minimax"))
+    env.MINIMAX_API_KEY = env.MINIMAX_API_KEY ?? "workspace-vault-key";
+  if (apiKeyProviders.has("gemini"))
+    env.GEMINI_API_KEY = env.GEMINI_API_KEY ?? "workspace-vault-key";
+  if (apiKeyProviders.has("openrouter"))
+    env.OPENROUTER_API_KEY = env.OPENROUTER_API_KEY ?? "workspace-vault-key";
   if (apiKeyProviders.has("ollama"))
     env.OLLAMA_BASE_URL = env.OLLAMA_BASE_URL ?? "workspace-vault-key";
 
@@ -213,6 +229,12 @@ async function workspaceIntegrationSandboxEnv(
       env.OPENAI_API_KEY = env.OPENAI_API_KEY ?? "workspace-provider-key";
     if (provider.kind === "anthropic" && provider.apiKeyConfigured)
       env.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY ?? "workspace-provider-key";
+    if (provider.kind === "minimax" && provider.apiKeyConfigured)
+      env.MINIMAX_API_KEY = env.MINIMAX_API_KEY ?? "workspace-provider-key";
+    if (provider.kind === "gemini" && provider.apiKeyConfigured)
+      env.GEMINI_API_KEY = env.GEMINI_API_KEY ?? "workspace-provider-key";
+    if (provider.kind === "openrouter" && provider.apiKeyConfigured)
+      env.OPENROUTER_API_KEY = env.OPENROUTER_API_KEY ?? "workspace-provider-key";
     if (provider.kind === "ollama")
       env.OLLAMA_BASE_URL = provider.baseUrl ?? env.OLLAMA_BASE_URL ?? "http://localhost:11434";
     if (provider.kind === "custom") {

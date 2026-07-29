@@ -6,6 +6,32 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R2 provider policy and key parity
+
+- Added one canonical catalog for provider identity, model presets,
+  environment lookup, capability metadata, workspace-vault eligibility,
+  readiness, and hosted-versus-local generation policy.
+- Mapped explicit workflow JSON Schemas to Anthropic `output_config`, strict
+  OpenAI/Gemini/OpenRouter `response_format`, and current vLLM
+  `structured_outputs` requests. Unsupported vLLM fields get one bounded,
+  schema-prompted fallback.
+- Preserved typed malformed-tool-input failures across every adapter, prevented
+  invalid calls from executing, and allowed exactly one correction turn in the
+  agent and Builder draft loops.
+- Applied the catalog's local policy to file-tree authoring so local models
+  write one planned file per turn while hosted providers retain bounded
+  multi-file rounds.
+- Added Gemini and OpenRouter to the encrypted workspace key form, runtime key
+  resolver, integration readiness, provider types, SQLite migration, and
+  JSON/SQLite/managed-Postgres parity tests.
+- Expanded the provider status response with public capability, generation,
+  readiness, and credential-source metadata without returning key material.
+- Recorded the researched contract and conservative conditional-capability
+  decisions in `dev/r2-provider-policy.md`.
+- Closed R2 with clean typecheck, lint, formatting, production web build, 30
+  web tests, and the 1,552-test API gate (1,548 passed, 4 intentional live
+  Packet-product probes skipped).
+
 ### 2026-07-29 - R1 persistence authority and dependency security
 
 - Defined the current control-plane authority for JSON, promoted/record-row

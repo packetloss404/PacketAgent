@@ -610,6 +610,41 @@ test("authorAppViaLLM: preset routes through the registered provider", async () 
   assert.equal(provider.calls[0]?.model, "qwen2.5-coder:32b");
 });
 
+test("authorAppViaLLM: local provider policy writes one file per turn", async () => {
+  const plan = makePlan(3);
+  const provider = new MockProvider({
+    name: "ollama",
+    turns: [
+      [
+        { delta: planJson(plan) },
+        { done: true, usage: { promptTokens: 1, completionTokens: 1, costUsd: 0 } },
+      ],
+      writeCallsForPaths([plan[0]!.path]),
+      writeCallsForPaths([plan[1]!.path]),
+      writeCallsForPaths([plan[2]!.path]),
+    ],
+  });
+  const router = makeRouterWithProvider(provider);
+  const result = await authorAppViaLLM(
+    "local three-file app",
+    { workspaceId: "w", preset: "local", router, resolvePrompts: fixedPrompts },
+    () => {},
+  );
+
+  assert.ok(result);
+  assert.equal(result.files.length, 3);
+  assert.equal(provider.calls.length, 4);
+  for (let index = 0; index < plan.length; index++) {
+    const prompt = provider.calls[index + 1]?.messages.find(
+      (message) => message.role === "user",
+    )?.content;
+    assert.match(String(prompt), new RegExp(plan[index]!.path.replace(/\./g, "\\.")));
+    for (const other of plan.filter((_, otherIndex) => otherIndex !== index)) {
+      assert.equal(String(prompt).includes(other.path), false);
+    }
+  }
+});
+
 test("authorAndValidateAppViaLLM: repairs once after validation failure", async () => {
   await withFakeAnthropicKey(async () => {
     const initialPlan = [{ path: "src/App.tsx", purpose: "broken root" }];

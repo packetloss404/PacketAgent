@@ -30,7 +30,12 @@
 // =============================================================================
 
 import { getDefaultRouter, type ProviderRouter } from "../providers/router.js";
-import { resolvePresetToProviderModel, type ModelPreset } from "../providers/preset-resolver.js";
+import {
+  resolvePresetToProviderModel,
+  vaultProviderNamesForWorkspace,
+  type ModelPreset,
+} from "../providers/preset-resolver.js";
+import { providerGenerationPolicy } from "../providers/catalog.js";
 import type { LLMProvider, ProviderStreamChunk, ProviderToolDef } from "../providers/types.js";
 import { validateWorkspacePath } from "./path-validator.js";
 import {
@@ -269,10 +274,11 @@ interface ResolvedProvider {
   model: string;
 }
 
-function resolveProvider(options: AuthorAppOptions): ResolvedProvider | null {
+async function resolveProvider(options: AuthorAppOptions): Promise<ResolvedProvider | null> {
   const router = options.router ?? getDefaultRouter();
   const resolved = resolvePresetToProviderModel(options.preset as ModelPreset | undefined, {
     router,
+    vaultProviders: await vaultProviderNamesForWorkspace(options.workspaceId),
   });
   if (!resolved) return null;
   const provider = router.get(resolved.provider);
@@ -491,10 +497,11 @@ async function runWritePhaseChunked(
   resolved: ResolvedProvider,
   options: AuthorAppOptions,
   emit: (chunk: string) => void | Promise<void>,
+  maxFilesPerChunk = MAX_FILES_PER_WRITE_CHUNK,
 ): Promise<WritePhaseResult | null> {
   const chunks: PlannedFile[][] = [];
-  for (let i = 0; i < plan.length; i += MAX_FILES_PER_WRITE_CHUNK) {
-    chunks.push(plan.slice(i, i + MAX_FILES_PER_WRITE_CHUNK));
+  for (let i = 0; i < plan.length; i += maxFilesPerChunk) {
+    chunks.push(plan.slice(i, i + maxFilesPerChunk));
   }
 
   const accumulated: GeneratedFile[] = [];
@@ -541,7 +548,7 @@ export async function authorAppViaLLM(
   const trimmed = (userGoal ?? "").trim();
   if (trimmed.length === 0) return null;
 
-  const resolved = resolveProvider(options);
+  const resolved = await resolveProvider(options);
   if (!resolved) {
     console.warn(`[llm-author] no provider resolved for preset=${options.preset ?? "fast"}`);
     return null;
@@ -560,10 +567,13 @@ export async function authorAppViaLLM(
   // Phase 2: write. For plans up to CHUNK_WRITE_THRESHOLD files we run a
   // single write round (preserving small-app latency). Larger plans are
   // chunked across multiple rounds so we don't blow past maxTokens.
+  const generationPolicy = providerGenerationPolicy(resolved.provider.name);
   const writeResult =
-    planResult.plan.length > CHUNK_WRITE_THRESHOLD
-      ? await runWritePhaseChunked(planResult.plan, prompts, resolved, options, emit)
-      : await runWritePhase(planResult.plan, prompts, resolved, options, emit);
+    generationPolicy.fileWriteMode === "single_file_per_turn"
+      ? await runWritePhaseChunked(planResult.plan, prompts, resolved, options, emit, 1)
+      : planResult.plan.length > CHUNK_WRITE_THRESHOLD
+        ? await runWritePhaseChunked(planResult.plan, prompts, resolved, options, emit)
+        : await runWritePhase(planResult.plan, prompts, resolved, options, emit);
   if (!writeResult) return null;
   if (writeResult.files.length === 0) {
     console.warn(`[llm-author] model emitted zero write_file calls`);

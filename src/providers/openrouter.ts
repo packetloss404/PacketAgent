@@ -9,6 +9,7 @@ import type {
   ProviderToolDef,
   ProviderUsage,
 } from "./types.js";
+import { parseToolInput } from "./tool-input.js";
 
 // OpenRouter (https://openrouter.ai) is a meta-provider that proxies ~200 models
 // behind a single OpenAI-compatible Chat Completions API. We hit it over HTTP
@@ -52,6 +53,16 @@ interface OpenRouterChatRequest {
   max_tokens?: number;
   temperature?: number;
   stream?: boolean;
+  response_format?: {
+    type: "json_schema";
+    json_schema: {
+      name: string;
+      description?: string;
+      schema: Record<string, unknown>;
+      strict: boolean;
+    };
+  };
+  provider?: { require_parameters: true };
 }
 
 interface OpenRouterChatChoice {
@@ -196,6 +207,22 @@ export class OpenRouterProvider implements LLMProvider {
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
+      ...(opts.structuredOutput
+        ? {
+            response_format: {
+              type: "json_schema" as const,
+              json_schema: {
+                name: opts.structuredOutput.name,
+                ...(opts.structuredOutput.description
+                  ? { description: opts.structuredOutput.description }
+                  : {}),
+                schema: opts.structuredOutput.schema,
+                strict: opts.structuredOutput.strict ?? true,
+              },
+            },
+            provider: { require_parameters: true as const },
+          }
+        : {}),
     };
     const res = await this.fetchFn(`${this.baseURL}/chat/completions`, {
       method: "POST",
@@ -217,13 +244,11 @@ export class OpenRouterProvider implements LLMProvider {
     const toolCalls: ProviderToolCall[] = [];
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
-        let parsed: Record<string, unknown> = {};
-        try {
-          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
-        } catch {
-          parsed = {};
-        }
-        toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
+        toolCalls.push({
+          id: tc.id,
+          name: tc.function.name,
+          ...parseToolInput(tc.function.arguments),
+        });
       }
     }
     return {
@@ -256,6 +281,22 @@ export class OpenRouterProvider implements LLMProvider {
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
+      ...(opts.structuredOutput
+        ? {
+            response_format: {
+              type: "json_schema" as const,
+              json_schema: {
+                name: opts.structuredOutput.name,
+                ...(opts.structuredOutput.description
+                  ? { description: opts.structuredOutput.description }
+                  : {}),
+                schema: opts.structuredOutput.schema,
+                strict: opts.structuredOutput.strict ?? true,
+              },
+            },
+            provider: { require_parameters: true as const },
+          }
+        : {}),
     };
 
     let res: Response;
@@ -331,13 +372,13 @@ export class OpenRouterProvider implements LLMProvider {
             if (choice?.finish_reason && partials.size > 0) {
               for (const slot of partials.values()) {
                 if (!slot.id || !slot.name) continue;
-                let parsedArgs: Record<string, unknown> = {};
-                try {
-                  parsedArgs = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
-                } catch {
-                  parsedArgs = {};
-                }
-                yield { toolCall: { id: slot.id, name: slot.name, input: parsedArgs } };
+                yield {
+                  toolCall: {
+                    id: slot.id,
+                    name: slot.name,
+                    ...parseToolInput(slot.argsAccum),
+                  },
+                };
               }
               partials.clear();
             }
