@@ -792,7 +792,7 @@ test("authorAndValidateAppViaLLM: reports skipped validation without claiming su
         ok: true,
         source: "skipped",
         errors: [],
-        warnings: ["Sandbox unavailable."],
+        warnings: [],
         durationMs: 0,
         phases: { typecheck: "skipped", build: "skipped" },
       }),

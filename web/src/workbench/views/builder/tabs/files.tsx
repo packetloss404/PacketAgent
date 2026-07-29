@@ -3,6 +3,7 @@ import type {
   AppBuilderDraft,
   AppBuilderFileProgress,
   AppBuilderIterationDiffFile,
+  AppBuilderIterationFileReview,
   AppBuilderIterationResult,
   AppBuilderSourceFileSummary,
   AppBuilderWorkspaceSummary,
@@ -105,12 +106,23 @@ export function FilesTab({
   workspace: AppBuilderWorkspaceSummary | null;
   progress?: AppBuilderFileProgress[];
 }) {
-  const files = useMemo<AppBuilderIterationDiffFile[]>(() => iteration?.files ?? [], [iteration]);
+  const [reviewFilter, setReviewFilter] = useState<"all" | "changed" | "unchanged">("all");
+  const files = useMemo<Array<AppBuilderIterationDiffFile | AppBuilderIterationFileReview>>(() => {
+    const review = iteration?.fileReview;
+    const candidates = review && review.length > 0 ? review : (iteration?.files ?? []);
+    if (reviewFilter === "unchanged") {
+      return candidates.filter((file) => file.changeType === "unchanged");
+    }
+    if (reviewFilter === "changed") {
+      return candidates.filter((file) => file.changeType !== "unchanged");
+    }
+    return candidates;
+  }, [iteration, reviewFilter]);
   const [selected, setSelected] = useState<number>(0);
   if (progress.length > 0) {
     return <FileGenerationProgress progress={progress} />;
   }
-  if (files.length === 0) {
+  if (files.length === 0 && !iteration?.fileReview) {
     return (
       <div style={{ padding: 22 }}>
         <div className="card" style={{ padding: 18 }}>
@@ -182,7 +194,15 @@ export function FilesTab({
       </div>
     );
   }
-  const current = files[selected]!;
+  const selectedIndex = Math.min(selected, Math.max(0, files.length - 1));
+  const current = files[selectedIndex];
+  const reviewCounts = iteration?.fileReview
+    ? {
+        all: iteration.fileReview.length,
+        changed: iteration.fileReview.filter((file) => file.changeType !== "unchanged").length,
+        unchanged: iteration.fileReview.filter((file) => file.changeType === "unchanged").length,
+      }
+    : null;
   return (
     <div
       style={{
@@ -194,6 +214,36 @@ export function FilesTab({
       }}
     >
       <div className="card" style={{ overflow: "auto" }}>
+        {reviewCounts && (
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              padding: "10px 12px",
+              borderBottom: "1px solid var(--line)",
+            }}
+          >
+            {(["all", "changed", "unchanged"] as const).map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                className="btn btn-sm"
+                aria-pressed={reviewFilter === filter}
+                onClick={() => {
+                  setReviewFilter(filter);
+                  setSelected(0);
+                }}
+              >
+                {filter} · {reviewCounts[filter]}
+              </button>
+            ))}
+          </div>
+        )}
+        {files.length === 0 && (
+          <div className="muted" style={{ padding: 14 }}>
+            No files match this review filter.
+          </div>
+        )}
         {files.map((f, i) => (
           <div
             key={i}
@@ -205,7 +255,7 @@ export function FilesTab({
               alignItems: "center",
               gap: 8,
               cursor: "pointer",
-              background: selected === i ? "var(--bg-elev)" : "transparent",
+              background: selectedIndex === i ? "var(--bg-elev)" : "transparent",
             }}
           >
             <span
@@ -218,7 +268,9 @@ export function FilesTab({
                     ? "var(--green)"
                     : f.changeType === "modified"
                       ? "var(--warn)"
-                      : "var(--danger)",
+                      : f.changeType === "unchanged"
+                        ? "var(--silver-500)"
+                        : "var(--danger)",
               }}
             >
               {f.changeType === "added"
@@ -227,7 +279,9 @@ export function FilesTab({
                   ? "M"
                   : f.changeType === "deleted"
                     ? "D"
-                    : "R"}
+                    : f.changeType === "unchanged"
+                      ? "U"
+                      : "R"}
             </span>
             <span
               className="mono"
@@ -245,35 +299,41 @@ export function FilesTab({
           </div>
         ))}
       </div>
-      <div
-        className="card"
-        style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
-      >
-        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--line)" }}>
-          <div className="mono" style={{ fontSize: 12, color: "var(--silver-100)" }}>
-            {current.path}
-          </div>
-          <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-            {current.summary}
-          </div>
-        </div>
-        <pre
-          className="mono"
-          style={{
-            margin: 0,
-            padding: 14,
-            fontSize: 11.5,
-            lineHeight: 1.6,
-            background: "var(--ink)",
-            color: "var(--silver-200)",
-            overflow: "auto",
-            flex: 1,
-            whiteSpace: "pre",
-          }}
+      {current ? (
+        <div
+          className="card"
+          style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
         >
-          {current.diff}
-        </pre>
-      </div>
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--line)" }}>
+            <div className="mono" style={{ fontSize: 12, color: "var(--silver-100)" }}>
+              {current.path}
+            </div>
+            <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+              {current.summary}
+            </div>
+          </div>
+          <pre
+            className="mono"
+            style={{
+              margin: 0,
+              padding: 14,
+              fontSize: 11.5,
+              lineHeight: 1.6,
+              background: "var(--ink)",
+              color: "var(--silver-200)",
+              overflow: "auto",
+              flex: 1,
+              whiteSpace: "pre",
+            }}
+          >
+            {current.diff}
+          </pre>
+        </div>
+      ) : (
+        <div className="card muted" style={{ padding: 18 }}>
+          Select a review filter with matching files.
+        </div>
+      )}
     </div>
   );
 }

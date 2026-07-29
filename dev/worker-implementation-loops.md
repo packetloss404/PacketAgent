@@ -1068,8 +1068,10 @@ Status: active.
 3. [Complete 2026-07-29] Stream typed, attempt-aware per-file
    plan/write/validate progress through the authoring loop, SSE routes, and
    Files view; sandbox-skipped validation remains explicitly `skipped`.
-4. Add file-level changed/unchanged/new/deleted review and targeted
-   route/entity/component regeneration.
+4. [Complete 2026-07-29] Add digest-backed file-level
+   changed/unchanged/new/deleted review and scope page, route, entity, and
+   component regeneration so unrelated model mutations are restored before
+   validation.
 5. Add sandboxed package-install planning and workspace export as zip or
    git-ready files.
 

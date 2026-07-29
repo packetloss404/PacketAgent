@@ -283,7 +283,7 @@ Status: active.
 - [x] Move legacy-template iteration to the file-tree path or a deterministic
       one-time conversion.
 - [x] Stream per-file plan/write/validate progress.
-- [ ] Add file-level change review and targeted route/entity/component
+- [x] Add file-level change review and targeted route/entity/component
       regeneration.
 - [ ] Add sandboxed package planning and workspace export as zip or git-ready
       files.
@@ -414,9 +414,9 @@ The router, preset resolver, and six adapters are present. What remains:
 The orchestrator, default-on flip, path validator, derived-draft projection,
 canonical legacy conversion, targeted bounded repair, per-file
 plan/write/validate streaming, iteration parity, chunked planning, Vite-build
-validation, and inline error UX are present. The remaining R3 work is the
-file-level change review/targeted-regeneration slice and sandboxed package
-planning plus export.
+validation, file-level changed/unchanged review, targeted regeneration, and
+inline error UX are present. The remaining R3 work is sandboxed package
+planning plus zip/git-ready export.
 
 ### Generated-app persistence and runtime
 

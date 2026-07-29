@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { LLMProvider, ProviderStreamChunk } from "./providers/types.js";
 import { getDefaultRouter, type ProviderRouter } from "./providers/router.js";
 import { registerDefaultProviders } from "./providers/bootstrap.js";
@@ -46,6 +47,27 @@ export interface AppIterationLLMResult {
   }>;
   prose: string;
   model: string;
+}
+
+export type AppIterationFileReviewChangeType = "added" | "modified" | "deleted" | "unchanged";
+
+export interface AppIterationFileReview {
+  path: string;
+  changeType: AppIterationFileReviewChangeType;
+  summary: string;
+  diff: string;
+  beforeSha256?: string;
+  afterSha256?: string;
+  beforeSize?: number;
+  afterSize?: number;
+}
+
+export interface AppIterationFileTreeTarget {
+  kind: "app" | "page" | "api" | "data" | "component" | "auth" | "config";
+  key?: string;
+  path?: string;
+  name?: string;
+  selector?: string;
 }
 
 const PRESET_TO_MODEL: Record<AppIterationPresetId, string> = {
@@ -1267,6 +1289,8 @@ export interface AppIterationFileTreeOptions {
   workspaceId: string;
   preset?: AppIterationPresetId;
   signal?: AbortSignal;
+  /** Optional regeneration boundary; changes outside it are restored. */
+  target?: AppIterationFileTreeTarget;
   /** Per-file plan/write/validate progress for streaming operator surfaces. */
   onFileProgress?: CodegenProgressEmit;
   /** Optional override of the registered router (for tests). */
@@ -1290,6 +1314,10 @@ export interface AppIterationFileTreeResult {
   model: string;
   /** Full new file tree, for derived-draft projection by callers. */
   newFiles: GeneratedFile[];
+  /** Full added/modified/deleted/unchanged review of the candidate tree. */
+  reviewFiles: AppIterationFileReview[];
+  /** Model-proposed paths restored because they were outside the target. */
+  outOfScopePaths: string[];
   /** Populated when the validator reported issues. */
   validationErrors?: string[];
 }
@@ -1360,7 +1388,11 @@ export function shouldUseFileTreeIteration(input: {
  * the longest files are replaced with a short summary line (path + byte count)
  * to keep the prompt within a sensible token budget.
  */
-export function buildFileTreeIterationGoal(files: GeneratedFile[], changeRequest: string): string {
+export function buildFileTreeIterationGoal(
+  files: GeneratedFile[],
+  changeRequest: string,
+  target?: AppIterationFileTreeTarget,
+): string {
   const safe = Array.isArray(files)
     ? files.filter((f) => f && typeof f.path === "string" && typeof f.content === "string")
     : [];
@@ -1394,6 +1426,18 @@ export function buildFileTreeIterationGoal(files: GeneratedFile[], changeRequest
   sections.push("");
   sections.push("User change request:");
   sections.push(changeRequest.trim() || "(no change requested)");
+  if (target && target.kind !== "app") {
+    sections.push("");
+    sections.push("Targeted regeneration boundary:");
+    sections.push(`- kind: ${target.kind}`);
+    if (target.path) sections.push(`- route/path: ${target.path}`);
+    if (target.name) sections.push(`- name: ${target.name}`);
+    if (target.selector) sections.push(`- selected component: ${target.selector}`);
+    sections.push(
+      "Change only files that implement this target or a directly required shared component. " +
+        "Preserve every unrelated file byte-for-byte.",
+    );
+  }
   sections.push("");
   sections.push(
     "Re-emit the FULL new file tree via `write_file` tool calls. Any file " +
@@ -1459,6 +1503,148 @@ export function diffFileTrees(
   return entries;
 }
 
+/** Build a stable, complete review without mixing unchanged files into apply. */
+export function reviewFileTrees(
+  oldFiles: GeneratedFile[],
+  newFiles: GeneratedFile[],
+): AppIterationFileReview[] {
+  const oldByPath = generatedFileContentMap(oldFiles);
+  const newByPath = generatedFileContentMap(newFiles);
+  const paths = [...new Set([...oldByPath.keys(), ...newByPath.keys()])].sort((a, b) =>
+    a.localeCompare(b),
+  );
+
+  return paths.map((path) => {
+    const before = oldByPath.get(path);
+    const after = newByPath.get(path);
+    const changeType: AppIterationFileReviewChangeType =
+      before === undefined
+        ? "added"
+        : after === undefined
+          ? "deleted"
+          : before === after
+            ? "unchanged"
+            : "modified";
+    return {
+      path,
+      changeType,
+      summary:
+        changeType === "unchanged"
+          ? `Unchanged ${path}`
+          : changeType === "added"
+            ? `Added ${path}`
+            : changeType === "deleted"
+              ? `Removed ${path}`
+              : `Modified ${path}`,
+      diff:
+        changeType === "unchanged"
+          ? "No content changes."
+          : buildSimpleDiff(before ?? "", after ?? ""),
+      ...(before !== undefined
+        ? { beforeSha256: fileContentSha256(before), beforeSize: Buffer.byteLength(before) }
+        : {}),
+      ...(after !== undefined
+        ? { afterSha256: fileContentSha256(after), afterSize: Buffer.byteLength(after) }
+        : {}),
+    };
+  });
+}
+
+export interface ScopedFileTreeResult {
+  files: GeneratedFile[];
+  outOfScopePaths: string[];
+}
+
+/**
+ * Keep the selected target's proposed changes and restore every unrelated
+ * path from the current tree. Whole-app requests retain the complete proposal.
+ */
+export function scopeGeneratedFileTree(
+  currentFiles: GeneratedFile[],
+  proposedFiles: GeneratedFile[],
+  target?: AppIterationFileTreeTarget,
+): ScopedFileTreeResult {
+  if (!target || target.kind === "app") {
+    return { files: proposedFiles.map((file) => ({ ...file })), outOfScopePaths: [] };
+  }
+
+  const currentByPath = generatedFileContentMap(currentFiles);
+  const proposedByPath = generatedFileContentMap(proposedFiles);
+  const paths = [...new Set([...currentByPath.keys(), ...proposedByPath.keys()])].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  const files: GeneratedFile[] = [];
+  const outOfScopePaths: string[] = [];
+
+  for (const path of paths) {
+    const before = currentByPath.get(path);
+    const proposed = proposedByPath.get(path);
+    const changed = before !== proposed;
+    const inScope = filePathMatchesIterationTarget(path, target);
+    if (changed && !inScope) outOfScopePaths.push(path);
+    const content = inScope ? proposed : before;
+    if (content !== undefined) files.push({ path, content });
+  }
+
+  return { files, outOfScopePaths };
+}
+
+function generatedFileContentMap(files: GeneratedFile[]): Map<string, string> {
+  const byPath = new Map<string, string>();
+  for (const file of files) {
+    if (file && typeof file.path === "string" && typeof file.content === "string") {
+      byPath.set(file.path, file.content);
+    }
+  }
+  return byPath;
+}
+
+function fileContentSha256(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+function filePathMatchesIterationTarget(
+  filePath: string,
+  target: AppIterationFileTreeTarget,
+): boolean {
+  const path = filePath.replaceAll("\\", "/").toLowerCase();
+  const targetTokens = [target.path, target.name, target.key]
+    .flatMap((value) =>
+      String(value ?? "")
+        .toLowerCase()
+        .split(/[^a-z0-9]+/),
+    )
+    .filter((token) => token.length >= 3 && !["api", "app", "page", "route"].includes(token));
+  const matchesToken =
+    targetTokens.length === 0 || targetTokens.some((token) => path.includes(token));
+
+  if (target.kind === "page") {
+    return (
+      path === "src/app.tsx" ||
+      (path.includes("/pages/") && matchesToken) ||
+      path.includes("/components/")
+    );
+  }
+  if (target.kind === "component") {
+    return path.includes("/components/") || (path.includes("/pages/") && matchesToken);
+  }
+  if (target.kind === "api") return path.includes("/api/") && matchesToken;
+  if (target.kind === "data") {
+    return (
+      (path.includes("/data/") || path.includes("/schema/") || path.includes("/model")) &&
+      matchesToken
+    );
+  }
+  if (target.kind === "auth") return path.includes("auth") || path.includes("permission");
+  return (
+    path === "package.json" ||
+    path.includes("config") ||
+    path.includes(".env") ||
+    path.includes("vite.") ||
+    path.includes("tsconfig")
+  );
+}
+
 /** Produce a short unified-diff-style snippet. Not byte-perfect; informational. */
 function buildSimpleDiff(before: string, after: string): string {
   const beforeLines = before.split(/\r?\n/);
@@ -1506,7 +1692,7 @@ export async function applyAppIterationViaFileTree(
   const noopEmit = async (_: string) => {};
   const emitFn = emit ?? noopEmit;
 
-  const userGoal = buildFileTreeIterationGoal(currentFiles, trimmedRequest);
+  const userGoal = buildFileTreeIterationGoal(currentFiles, trimmedRequest, options.target);
 
   const authorOptions: AuthorAppOptions = { workspaceId: options.workspaceId };
   if (options.preset) authorOptions.preset = options.preset;
@@ -1533,9 +1719,34 @@ export async function applyAppIterationViaFileTree(
     return null;
   }
 
-  const validation = result.validation;
+  const scoped = scopeGeneratedFileTree(currentFiles, result.files, options.target);
+  let validation = result.validation;
+  if (scoped.outOfScopePaths.length > 0) {
+    try {
+      validation = await validate(scoped.files, {
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
+    } catch (error) {
+      validation = {
+        ok: false,
+        source: "real",
+        errors: [
+          {
+            file: "<validator>",
+            message: error instanceof Error ? error.message : String(error),
+            severity: "error",
+            phase: "typecheck",
+          },
+        ],
+        warnings: [],
+        durationMs: 0,
+        phases: { typecheck: "failed", build: "skipped" },
+      };
+    }
+  }
 
-  const diffEntries = diffFileTrees(currentFiles, result.files);
+  const diffEntries = diffFileTrees(currentFiles, scoped.files);
+  const reviewFiles = reviewFileTrees(currentFiles, scoped.files);
 
   const model = resolveIterationModel(options.preset);
 
@@ -1551,7 +1762,9 @@ export async function applyAppIterationViaFileTree(
     files: diffEntries,
     prose: result.summary ?? "",
     model,
-    newFiles: result.files,
+    newFiles: scoped.files,
+    reviewFiles,
+    outOfScopePaths: scoped.outOfScopePaths,
   };
   if (validationErrors) out.validationErrors = validationErrors;
   return out;

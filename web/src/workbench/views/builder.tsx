@@ -364,9 +364,9 @@ export function BuilderView() {
       ? {
           ...baseTarget,
           id: `${baseTarget.id}:element:${stableTargetKey(selectedElement.selector)}`,
-          kind: "page",
+          kind: "component",
           label: `${baseTarget.label} -> ${selectedElement.selector}`,
-          path: selectedElement.selector,
+          selector: selectedElement.selector,
         }
       : baseTarget;
     const composedPrompt = selectedElement

@@ -800,6 +800,7 @@ export interface AppBuilderApproveResult {
 export type AppBuilderIterationTargetKind =
   | "app"
   | "page"
+  | "component"
   | "data_entity"
   | "api_route"
   | "auth"
@@ -821,6 +822,7 @@ export interface AppBuilderIterationTarget {
   kind: AppBuilderIterationTargetKind;
   label: string;
   path?: string;
+  selector?: string;
 }
 
 export interface AppBuilderIterationDiffFile {
@@ -836,6 +838,13 @@ export interface AppBuilderIterationDiffFile {
   role?: string;
 }
 
+export interface AppBuilderIterationFileReview extends Omit<
+  AppBuilderIterationDiffFile,
+  "changeType"
+> {
+  changeType: AppBuilderIterationFileChangeType | "unchanged";
+}
+
 export interface AppBuilderIterationResult {
   id: string;
   appId?: string;
@@ -845,6 +854,7 @@ export interface AppBuilderIterationResult {
   summary: string;
   status: AppBuilderIterationDiffStatus;
   files: AppBuilderIterationDiffFile[];
+  fileReview?: AppBuilderIterationFileReview[];
   sourceDiffFiles?: AppBuilderIterationDiffFile[];
   sourceFiles?: AppBuilderSourceFileSummary[];
   fileTree?: AppBuilderGeneratedFile[];

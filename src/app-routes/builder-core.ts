@@ -26,7 +26,9 @@ import {
   canonicalizeIterationFileTree,
   type AppIterationChangeRequest,
   type AppIterationDiffHunk,
+  type AppIterationFileReview,
   type AppIterationFileTreeOptions,
+  type AppIterationFileTreeTarget,
   type AppIterationLLMResult,
   type AppIterationPlan,
   type AppIterationPresetId,
@@ -140,6 +142,7 @@ interface GeneratedAppWorkspaceSummary {
 type AppBuilderIterationTargetKind =
   | "app"
   | "page"
+  | "component"
   | "data_entity"
   | "api_route"
   | "auth"
@@ -155,6 +158,7 @@ interface AppBuilderIterationTarget {
   kind: AppBuilderIterationTargetKind;
   label: string;
   path?: string;
+  selector?: string;
 }
 
 interface AppIterationRouteRequest {
@@ -224,6 +228,7 @@ interface AppIterationRouteResult {
   summary: string;
   status: AppBuilderIterationDiffStatus;
   files: AppIterationDiffFile[];
+  fileReview?: AppIterationFileReview[];
   sourceDiffFiles?: AppIterationDiffFile[];
   sourceFiles?: ReturnType<typeof summarizeGeneratedAppSourceFiles>;
   fileTree?: GeneratedFile[];
@@ -525,6 +530,7 @@ async function runAppIterationCore(
         {
           workspaceId: context.workspace.id,
           preset: body.preset as AppIterationPresetId | undefined,
+          target: appIterationFileTreeTarget(body.target),
           ...(onFileProgress ? { onFileProgress } : {}),
         },
         onProse
@@ -587,6 +593,14 @@ async function runAppIterationCore(
             "info",
             `File-tree iteration via ${fileTreeResult.model}: ${fileTreeResult.changedSummary}`,
           ),
+          ...(fileTreeResult.outOfScopePaths.length > 0
+            ? [
+                routeLog(
+                  "info",
+                  `Restored ${fileTreeResult.outOfScopePaths.length} out-of-scope model change${fileTreeResult.outOfScopePaths.length === 1 ? "" : "s"} before review.`,
+                ),
+              ]
+            : []),
           ...(canonicalFileTree.convertedFrom
             ? [
                 routeLog(
@@ -602,6 +616,7 @@ async function runAppIterationCore(
         sourceFiles: candidateArtifact.files,
         artifact: candidateArtifact,
         llmResult: fileTreeResult,
+        fileReview: fileTreeResult.reviewFiles,
         validationErrors: fileTreeResult.validationErrors,
         fileTree: fileTreeResult.newFiles,
         draftSource: "llm-filetree",
@@ -2727,6 +2742,7 @@ function appIterationResponse(input: {
   snapshot: ReturnType<typeof buildAppPreviewSnapshotMetadata>;
   tools: ReturnType<typeof inspectAppIterationTools>;
   sourceDiffFiles?: AppIterationDiffFile[];
+  fileReview?: AppIterationFileReview[];
   sourceFiles?: GeneratedAppSourceFileRecord[];
   artifact?: GeneratedAppRuntimeArtifactRecord;
   llmResult?: AppIterationLLMResult | null;
@@ -2785,6 +2801,7 @@ function appIterationResponse(input: {
       mergeIterationDiffFiles(input.plan.diffHunks.map(diffFileFromHunk), llmFiles),
       input.sourceDiffFiles ?? [],
     ),
+    fileReview: input.fileReview,
     sourceDiffFiles: input.sourceDiffFiles ?? [],
     sourceFiles: summarizeGeneratedAppSourceFiles(input.sourceFiles ?? []),
     fileTree: input.fileTree,
@@ -2825,18 +2842,45 @@ function appIterationTargetForService(
       ? "api"
       : target.kind === "data_entity"
         ? "data"
-        : target.kind === "app" ||
-            target.kind === "smoke" ||
-            target.kind === "file" ||
-            target.kind === "agent" ||
-            target.kind === "tool"
-          ? "config"
-          : target.kind;
+        : target.kind === "component"
+          ? "page"
+          : target.kind === "app" ||
+              target.kind === "smoke" ||
+              target.kind === "file" ||
+              target.kind === "agent" ||
+              target.kind === "tool"
+            ? "config"
+            : target.kind;
   return {
     kind: kind as AppIterationTargetInput["kind"],
     key: target.id,
     path: target.path,
     name: target.label,
+  };
+}
+
+function appIterationFileTreeTarget(
+  target: AppBuilderIterationTarget | undefined,
+): AppIterationFileTreeTarget {
+  if (!target) return { kind: "app" };
+  const kind =
+    target.kind === "api_route"
+      ? "api"
+      : target.kind === "data_entity"
+        ? "data"
+        : target.kind === "component"
+          ? "component"
+          : target.kind === "page" || target.kind === "auth" || target.kind === "config"
+            ? target.kind
+            : target.kind === "app"
+              ? "app"
+              : "config";
+  return {
+    kind,
+    key: target.id,
+    path: target.path,
+    name: target.label,
+    selector: target.selector,
   };
 }
 

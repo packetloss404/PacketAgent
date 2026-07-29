@@ -398,8 +398,19 @@ iteration, preserves repair-pass identity, and distinguishes failed,
 completed, queued, and sandbox-skipped validation without overstating the
 quality gate. Progress callbacks are observational and cannot break
 generation. Focused backend/UI coverage passes 69 backend tests (68 passed,
-one intentional Windows sandbox skip) and two UI tests. Resume at R3's
-file-level review and targeted route/entity/component regeneration slice.
+one intentional Windows sandbox skip) and two UI tests.
+
+R3.4 is complete. File-tree iteration responses carry a separate, sorted
+added/modified/deleted/unchanged review with before/after SHA-256 and byte-size
+evidence, while the apply list remains changes-only. The Source view can
+filter all, changed, and unchanged files. Page, API-route, data-entity, and
+selected-component requests include an explicit model boundary; any proposed
+mutation outside that boundary is restored from the current tree and the
+resulting scoped tree is validated before review. Selected preview elements
+now travel as component targets with both their page route and CSS selector.
+The focused R3.4 gate passes typecheck, lint, 24 backend tests, and the two
+progress reducer tests. Resume at R3's sandboxed package planning and
+zip/git-ready export slice.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
