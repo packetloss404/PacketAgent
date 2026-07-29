@@ -1121,12 +1121,42 @@ export interface AppPublishArtifactManifestEntry {
   kind: "source" | "build_output" | "generated_bundle" | "manifest" | "config";
   required: boolean;
   description: string;
+  mediaType?: string;
+  size?: number;
+  sha256?: string;
 }
 
 export interface AppPublishArtifactManifest {
   fileName: "publish-artifacts.json" | string;
   packageId: string;
   entries: AppPublishArtifactManifestEntry[];
+  schemaVersion?: "packetagent.generated-app-artifact-manifest/v2";
+  generatedAt?: string;
+  subject?: {
+    workspaceId: string;
+    appId: string;
+    checkpointId: string;
+  };
+  staticAssets?: {
+    status: "pass" | "fail";
+    entrypoint: string;
+    references: Array<{
+      sourcePath: string;
+      targetPath: string;
+      attribute: "src" | "href" | "poster" | "srcset" | "css-url";
+    }>;
+    issues: Array<{ code: string; path: string; message: string }>;
+  };
+  integrity?: {
+    canonicalization: "packetagent.generated-app-artifact-manifest-canonical-json/v1";
+    algorithm: "sha256";
+    digest: string;
+    signature?: {
+      algorithm: "hmac-sha256";
+      keyId: string;
+      value: string;
+    };
+  };
 }
 
 export interface AppPublishDockerComposeExport {
@@ -1183,9 +1213,18 @@ export interface AppPublishChecklistItem {
 }
 
 export interface AppPublishValidationFailure {
-  stage: "build" | "health" | "smoke" | "url";
+  stage: "build" | "artifact" | "health" | "smoke" | "url";
   message: string;
   action: string;
+}
+
+export interface GeneratedAppPublishArtifactVerification {
+  status: "verified" | "invalid";
+  checksumVerified: boolean;
+  signatureStatus: "unsigned" | "verified" | "unverifiable" | "invalid";
+  checkedFiles: number;
+  checkedBytes: number;
+  issues: Array<{ code: string; path: string; message: string }>;
 }
 
 export interface AppPublishValidation {
@@ -1193,6 +1232,10 @@ export interface AppPublishValidation {
   status: "pending" | "ready" | "blocked";
   canPublish: boolean;
   productionBuild?: Record<string, unknown>;
+  artifactPresence?: {
+    integrity?: GeneratedAppPublishArtifactVerification;
+    [key: string]: unknown;
+  };
   healthCheck?: Record<string, unknown>;
   smokeCheck?: Record<string, unknown>;
   validatedUrl?: Record<string, unknown>;
@@ -1308,6 +1351,15 @@ export interface AppBuilderPublishResult {
 export interface AppBuilderPublishRollbackResult {
   rolledBack: boolean;
   state: AppBuilderPublishState;
+}
+
+export interface GeneratedAppPublishIntegrityPayload {
+  appId: string;
+  publishId: string;
+  checkpointId: string;
+  localPublishPath: string;
+  manifest: AppPublishArtifactManifest;
+  verification: GeneratedAppPublishArtifactVerification;
 }
 
 export interface AgentPromptPlanItem {

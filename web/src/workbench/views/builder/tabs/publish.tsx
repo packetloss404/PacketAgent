@@ -34,6 +34,7 @@ export function PublishTab({
   }
   const readiness = state.readiness;
   const handoffUrl = state.publishedUrl ?? readiness.urlHandoff.privateUrl;
+  const artifactIntegrity = state.validation?.artifactPresence?.integrity;
   return (
     <div style={{ padding: 22, maxWidth: 900 }}>
       <div className="kicker">Publish · {state.status}</div>
@@ -109,6 +110,34 @@ export function PublishTab({
           </span>
         </div>
       </div>
+
+      {artifactIntegrity && (
+        <div className="card" style={{ padding: 14, marginBottom: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 8,
+            }}
+          >
+            <div className="kicker">Artifact integrity</div>
+            <span className={`pill ${artifactIntegrity.status === "verified" ? "good" : "danger"}`}>
+              {artifactIntegrity.status}
+            </span>
+          </div>
+          <div className="mono muted" style={{ fontSize: 11.5 }}>
+            {artifactIntegrity.checkedFiles} files · {artifactIntegrity.checkedBytes} bytes ·
+            signature {artifactIntegrity.signatureStatus}
+          </div>
+          {artifactIntegrity.issues[0] && (
+            <div style={{ color: "var(--danger)", fontSize: 11.5, marginTop: 8 }} role="status">
+              {artifactIntegrity.issues[0].path}: {artifactIntegrity.issues[0].message}
+            </div>
+          )}
+        </div>
+      )}
 
       {state.nextActions.length > 0 && (
         <div className="card" style={{ padding: 14, marginBottom: 14 }}>

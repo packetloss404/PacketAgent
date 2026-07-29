@@ -48,7 +48,10 @@ readiness. R3 now closes canonical file-tree repair, conversion, live progress,
 digest-backed review, targeted regeneration, plan-only package policy, and
 git-ready export. R4.1 adds authenticated aggregate/per-app runtime health,
 bounded crash visibility and operational counters, a Builder surface, and a
-documented 1-64-process supervised warm-pool limit. Resume at R4.2 in
+documented 1-64-process supervised warm-pool limit. R4.2 adds checkpoint-bound
+artifact manifest v2 sealing, per-file and canonical checksums, optional HMAC
+signing, bounded HTML/CSS static-asset validation, tamper/substitution checks,
+and authenticated re-verification. Resume at R4.3 in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r4---generated-app-runtime-and-self-host-publish).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

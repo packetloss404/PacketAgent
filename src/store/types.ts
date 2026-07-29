@@ -418,12 +418,50 @@ export interface GeneratedAppPublishArtifactManifestEntry {
   kind: "source" | "build_output" | "generated_bundle" | "manifest" | "config";
   required: boolean;
   description: string;
+  mediaType?: string;
+  size?: number;
+  sha256?: string;
+}
+
+export interface GeneratedAppPublishStaticAssetReference {
+  sourcePath: string;
+  targetPath: string;
+  attribute: "src" | "href" | "poster" | "srcset" | "css-url";
+}
+
+export interface GeneratedAppPublishManifestIssue {
+  code: string;
+  path: string;
+  message: string;
 }
 
 export interface GeneratedAppPublishArtifactManifest {
   fileName: "publish-artifacts.json";
   packageId: string;
   entries: GeneratedAppPublishArtifactManifestEntry[];
+  schemaVersion?: "packetagent.generated-app-artifact-manifest/v2";
+  generatedAt?: string;
+  subject?: {
+    workspaceId: string;
+    appId: string;
+    checkpointId: string;
+  };
+  staticAssets?: {
+    status: "pass" | "fail";
+    entrypoint: string;
+    references: GeneratedAppPublishStaticAssetReference[];
+    issues: GeneratedAppPublishManifestIssue[];
+  };
+  integrity?: {
+    canonicalization: "packetagent.generated-app-artifact-manifest-canonical-json/v1";
+    algorithm: "sha256";
+    digest: string;
+    signature?: {
+      algorithm: "hmac-sha256";
+      keyId: string;
+      value: string;
+    };
+  };
 }
 
 export interface GeneratedAppPublishRollbackCommand {

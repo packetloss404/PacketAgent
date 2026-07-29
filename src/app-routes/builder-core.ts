@@ -1,6 +1,6 @@
 import { type Context, type Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import {
   generateAppDraftFromPrompt,
@@ -70,6 +70,13 @@ import {
   type GeneratedAppSourceFileRecord,
   type GeneratedAppSourceFileSummary,
 } from "../generated-app-runtime.js";
+import {
+  GENERATED_APP_ARTIFACT_MANIFEST_FILE_NAME,
+  sealGeneratedAppPublishArtifactManifest,
+  verifyGeneratedAppPublishArtifactManifest,
+  type GeneratedAppPublishArtifactFile,
+  type GeneratedAppPublishArtifactVerification,
+} from "../generated-app-publish-integrity.js";
 import {
   approveAgentBuilderDraftAsync,
   generateAgentBuilderDraftAsync,
@@ -1354,7 +1361,7 @@ async function prepareGeneratedAppPublish(c: Context) {
     if (!record) throw httpRouteError(404, "generated app not found");
     const checkpoint = checkpointForPublish(record, body.checkpointId);
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const { validation, integrations } = await buildPublishPreflight(
+    const { validation, integrations, artifactManifest } = await buildPublishPreflight(
       context,
       record,
       checkpoint,
@@ -1377,6 +1384,7 @@ async function prepareGeneratedAppPublish(c: Context) {
       publicBaseUrl: body.publicBaseUrl,
       privateBaseUrl: body.privateBaseUrl,
       runtimeEnv: publishRuntimeEnv(),
+      artifactManifest,
       previousPublish,
       createdByUserId: context.user.id,
     });
@@ -1417,7 +1425,7 @@ async function getGeneratedAppPublishState(c: Context) {
     if (!record) throw httpRouteError(404, "generated app not found");
     const checkpoint = checkpointForPublish(record, body.checkpointId);
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const { validation, integrations } = await buildPublishPreflight(
+    const { validation, integrations, artifactManifest } = await buildPublishPreflight(
       context,
       record,
       checkpoint,
@@ -1435,6 +1443,7 @@ async function getGeneratedAppPublishState(c: Context) {
       smokeStatus: checkpoint.smokeStatus ?? record.smokeStatus,
       visibility: body.visibility,
       runtimeEnv: publishRuntimeEnv(),
+      artifactManifest,
       previousPublish: currentPublishedRecord(record),
       createdByUserId: context.user.id,
     });
@@ -1463,6 +1472,37 @@ async function listAppPublishHistory(c: Context) {
       history: orderGeneratedAppPublishHistory(record.publishHistory ?? []),
       currentPublishId: record.currentPublishId,
       rollbackToPrevious: latestPublishRollbackCommand(record),
+    });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+}
+
+async function getGeneratedAppPublishIntegrity(c: Context) {
+  try {
+    const context = await requireAuthenticatedContextAsync(c);
+    await requireWorkspacePermission(context, "viewWorkspace");
+    const record = await findGeneratedAppRecord(context, c.req.param("appId"));
+    if (!record) throw httpRouteError(404, "generated app not found");
+    const requestedPublishId = c.req.query("publishId")?.trim();
+    const publish = requestedPublishId
+      ? (record.publishHistory ?? []).find((entry) => entry.id === requestedPublishId)
+      : currentPublishedRecord(record);
+    if (!publish) throw httpRouteError(404, "generated app publish not found");
+    const materialized = readMaterializedGeneratedAppPublishWorkspace(publish.localPublishPath, {
+      workspaceId: context.workspace.id,
+      appId: record.id,
+      checkpointId: publish.checkpointId,
+    });
+    if (!materialized) throw httpRouteError(404, "generated app publish manifest not found");
+    c.header("Cache-Control", "private, no-store");
+    return c.json({
+      appId: record.id,
+      publishId: publish.id,
+      checkpointId: publish.checkpointId,
+      localPublishPath: publish.localPublishPath,
+      manifest: materialized.manifest,
+      verification: materialized.verification,
     });
   } catch (error) {
     return errorResponse(c, error);
@@ -1514,7 +1554,7 @@ async function publishGeneratedApp(c: Context) {
     if (!record) throw httpRouteError(404, "generated app not found");
     const checkpoint = checkpointForPublish(record, body.checkpointId);
     if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const { validation, integrations } = await buildPublishPreflight(
+    const { validation, integrations, artifactManifest } = await buildPublishPreflight(
       context,
       record,
       checkpoint,
@@ -1544,6 +1584,7 @@ async function publishGeneratedApp(c: Context) {
       publicBaseUrl: body.publicBaseUrl,
       privateBaseUrl: body.privateBaseUrl,
       runtimeEnv: publishRuntimeEnv(),
+      artifactManifest,
     });
     const saved = await mutateStoreAsync((data) => {
       data.generatedApps ??= [];
@@ -2402,13 +2443,29 @@ async function buildPublishPreflight(
     privateBaseUrl: body.privateBaseUrl,
     runtimeEnv: env,
   });
+  let artifactManifest = readiness.publishArtifactManifest;
+  let artifactIntegrity: GeneratedAppPublishArtifactVerification | undefined;
   if (options.materializeWorkspace) {
-    materializeGeneratedAppPublishWorkspace(
+    const materialized = materializeGeneratedAppPublishWorkspace(
       record,
       checkpoint,
       readiness.localPublishPath,
       readiness.publishArtifactManifest,
     );
+    if (materialized) {
+      artifactManifest = materialized.manifest;
+      artifactIntegrity = materialized.verification;
+    }
+  } else {
+    const materialized = readMaterializedGeneratedAppPublishWorkspace(readiness.localPublishPath, {
+      workspaceId: record.workspaceId,
+      appId: record.id,
+      checkpointId: checkpoint.id,
+    });
+    if (materialized) {
+      artifactManifest = materialized.manifest;
+      artifactIntegrity = materialized.verification;
+    }
   }
   const privateUrl = generatedAppPublishUrlForBase(readiness.urlHandoff.privateUrl, {
     appId: record.id,
@@ -2436,6 +2493,7 @@ async function buildPublishPreflight(
         readiness.localPublishPath,
         buildStatus,
       ),
+      integrity: artifactIntegrity,
     },
     health,
     smoke: {
@@ -2476,7 +2534,7 @@ async function buildPublishPreflight(
     },
   });
 
-  return { validation, integrations };
+  return { validation, integrations, artifactManifest };
 }
 
 function materializeGeneratedAppPublishWorkspace(
@@ -2484,22 +2542,21 @@ function materializeGeneratedAppPublishWorkspace(
   checkpoint: GeneratedAppCheckpointWithRuntime,
   localPublishPath: string,
   artifactManifest: GeneratedAppPublishRecord["artifactManifest"],
-) {
+):
+  | {
+      manifest: GeneratedAppPublishRecord["artifactManifest"];
+      verification: GeneratedAppPublishArtifactVerification;
+    }
+  | undefined {
   const artifact = checkpoint.runtimeArtifact ?? record.runtimeArtifact;
   if (!artifact?.files.length) return;
 
   const publishRoot = resolve(process.cwd(), localPublishPath);
   const bundleRoot = safePublishPath(publishRoot, "bundle");
+  rmSync(bundleRoot, { recursive: true, force: true });
   mkdirSync(bundleRoot, { recursive: true });
 
-  for (const file of artifact.files) {
-    writeTextArtifact(
-      safePublishPath(bundleRoot, normalizeSourceFilePath(file.path)),
-      file.content,
-    );
-  }
-
-  writeJsonArtifact(safePublishPath(publishRoot, "app-manifest.json"), {
+  const appManifest = {
     appId: record.id,
     workspaceId: record.workspaceId,
     checkpointId: checkpoint.id,
@@ -2514,8 +2571,8 @@ function materializeGeneratedAppPublishWorkspace(
       sha256: file.sha256,
       role: file.role,
     })),
-  });
-  writeJsonArtifact(safePublishPath(publishRoot, "runtime-config.json"), {
+  };
+  const runtimeConfig = {
     runtime: "packetagent-generated-app-preview",
     workspaceId: record.workspaceId,
     appId: record.id,
@@ -2523,8 +2580,114 @@ function materializeGeneratedAppPublishWorkspace(
     route: `/api/app/generated-apps/${encodeURIComponent(record.id)}/preview?checkpointId=${encodeURIComponent(checkpoint.id)}`,
     bundlePath: `${localPublishPath}/bundle`,
     entrypoint: artifact.entrypoint,
+  };
+  const files: GeneratedAppPublishArtifactFile[] = [
+    ...artifact.files.map((file) => ({
+      path: `bundle/${normalizeSourceFilePath(file.path)}`,
+      content: file.content,
+      kind: "generated_bundle" as const,
+      description: `Generated app ${file.role} file.`,
+      mediaType: file.contentType,
+    })),
+    {
+      path: "app-manifest.json",
+      content: jsonArtifactContent(appManifest),
+      kind: "manifest",
+      description: "Generated app identity, entrypoint, and source file map.",
+      mediaType: "application/json; charset=utf-8",
+    },
+    {
+      path: "runtime-config.json",
+      content: jsonArtifactContent(runtimeConfig),
+      kind: "config",
+      description: "PacketAgent generated-app runtime configuration.",
+      mediaType: "application/json; charset=utf-8",
+    },
+  ];
+  for (const file of files) {
+    writeTextArtifact(
+      safePublishPath(publishRoot, normalizeSourceFilePath(file.path)),
+      typeof file.content === "string" ? file.content : Buffer.from(file.content),
+    );
+  }
+  const manifest = sealGeneratedAppPublishArtifactManifest({
+    packageId: artifactManifest.packageId,
+    workspaceId: record.workspaceId,
+    appId: record.id,
+    checkpointId: checkpoint.id,
+    generatedAt: artifact.renderedAt,
+    entrypoint: `bundle/${normalizeSourceFilePath(artifact.entrypoint)}`,
+    files,
+    signing: generatedAppPublishManifestSigningConfig(),
   });
-  writeJsonArtifact(safePublishPath(publishRoot, artifactManifest.fileName), artifactManifest);
+  writeJsonArtifact(
+    safePublishPath(publishRoot, GENERATED_APP_ARTIFACT_MANIFEST_FILE_NAME),
+    manifest,
+  );
+  return {
+    manifest,
+    verification: verifyGeneratedAppPublishArtifactManifest(manifest, {
+      rootPath: publishRoot,
+      signingKey: generatedAppPublishManifestSigningKey(),
+      expectedSubject: {
+        workspaceId: record.workspaceId,
+        appId: record.id,
+        checkpointId: checkpoint.id,
+      },
+    }),
+  };
+}
+
+function readMaterializedGeneratedAppPublishWorkspace(
+  localPublishPath: string,
+  expectedSubject?: { workspaceId: string; appId: string; checkpointId: string },
+):
+  | {
+      manifest: GeneratedAppPublishRecord["artifactManifest"];
+      verification: GeneratedAppPublishArtifactVerification;
+    }
+  | undefined {
+  const publishRoot = resolve(process.cwd(), localPublishPath);
+  const manifestPath = safePublishPath(publishRoot, GENERATED_APP_ARTIFACT_MANIFEST_FILE_NAME);
+  if (!existsSync(manifestPath)) return undefined;
+  try {
+    if (statSync(manifestPath).size > 5 * 1024 * 1024) {
+      throw new Error("publish artifact manifest exceeds the read limit");
+    }
+    const manifest = JSON.parse(
+      readFileSync(manifestPath, "utf8"),
+    ) as GeneratedAppPublishRecord["artifactManifest"];
+    return {
+      manifest,
+      verification: verifyGeneratedAppPublishArtifactManifest(manifest, {
+        rootPath: publishRoot,
+        signingKey: generatedAppPublishManifestSigningKey(),
+        expectedSubject,
+      }),
+    };
+  } catch {
+    return {
+      manifest: {
+        fileName: GENERATED_APP_ARTIFACT_MANIFEST_FILE_NAME,
+        packageId: "invalid",
+        entries: [],
+      },
+      verification: {
+        status: "invalid",
+        checksumVerified: false,
+        signatureStatus: "unsigned",
+        checkedFiles: 0,
+        checkedBytes: 0,
+        issues: [
+          {
+            code: "manifest.read.invalid",
+            path: GENERATED_APP_ARTIFACT_MANIFEST_FILE_NAME,
+            message: "The publish artifact manifest could not be parsed or verified.",
+          },
+        ],
+      },
+    };
+  }
 }
 
 function publishArtifactObservations(
@@ -2643,12 +2806,16 @@ function publishArtifactDiskStats(path: string): { present: boolean; bytes?: num
 }
 
 function writeJsonArtifact(path: string, value: unknown) {
-  writeTextArtifact(path, `${JSON.stringify(value, null, 2)}\n`);
+  writeTextArtifact(path, jsonArtifactContent(value));
 }
 
-function writeTextArtifact(path: string, content: string) {
+function jsonArtifactContent(value: unknown): string {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function writeTextArtifact(path: string, content: string | Uint8Array) {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content, "utf8");
+  writeFileSync(path, content);
 }
 
 function safePublishPath(root: string, path: string) {
@@ -2662,6 +2829,20 @@ function safePublishPath(root: string, path: string) {
 
 function normalizeSourceFilePath(path: string) {
   return path.replace(/\\/g, "/").replace(/^\/+/, "");
+}
+
+function generatedAppPublishManifestSigningKey(): string | undefined {
+  const value = process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY;
+  return value && value.trim() ? value : undefined;
+}
+
+function generatedAppPublishManifestSigningConfig(): { key: string; keyId: string } | undefined {
+  const key = generatedAppPublishManifestSigningKey();
+  if (!key) return undefined;
+  const keyId =
+    process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID?.trim().slice(0, 128) ||
+    "packetagent-local";
+  return { key, keyId };
 }
 
 async function localPublishHealthObservation() {
@@ -4145,6 +4326,9 @@ export function registerBuilderRoutes(app: Hono): void {
   app.get("/app/builder/publish/history", async (c) => listAppPublishHistory(c));
   app.get("/app/builder/publishes", async (c) => listAppPublishHistory(c));
   app.get("/app/builder/publishes/history", async (c) => listAppPublishHistory(c));
+  app.get("/app/generated-apps/:appId/publish/integrity", async (c) =>
+    getGeneratedAppPublishIntegrity(c),
+  );
   app.get("/app/builder/publish/docker-compose", async (c) => exportGeneratedAppDockerCompose(c));
   app.get("/app/builder/publishes/docker-compose", async (c) => exportGeneratedAppDockerCompose(c));
   app.post("/app/builder/publish", async (c) => publishGeneratedApp(c));

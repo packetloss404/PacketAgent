@@ -88,6 +88,7 @@ import type {
   SandboxExecRequest,
   SandboxExecStatus,
   GeneratedAppRuntimeHealth,
+  GeneratedAppPublishIntegrityPayload,
   WorkerAttentionView,
   WorkerOperationsHealth,
   WorkerOperationsPageInfo,
@@ -381,6 +382,14 @@ export const api = {
     const query = params.toString();
     return downloadBinary(
       `/api/app/generated-apps/${encodeURIComponent(input.appId)}/export${query ? `?${query}` : ""}`,
+    );
+  },
+  getGeneratedAppPublishIntegrity: (input: { appId: string; publishId?: string }) => {
+    const params = new URLSearchParams();
+    if (input.publishId) params.set("publishId", input.publishId);
+    const query = params.toString();
+    return j<GeneratedAppPublishIntegrityPayload>(
+      `/api/app/generated-apps/${encodeURIComponent(input.appId)}/publish/integrity${query ? `?${query}` : ""}`,
     );
   },
   createPreviewToken: (appId: string, options: { ttlSeconds?: number } = {}) => {

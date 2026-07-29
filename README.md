@@ -249,6 +249,20 @@ remains `degraded` in health for five minutes. The same per-app health is
 visible in the Builder's Sandbox tab. Reading health does not start an idle
 runtime.
 
+Generated-app publish materialization writes `publish-artifacts.json` using
+`packetagent.generated-app-artifact-manifest/v2`. It binds the workspace, app,
+and immutable checkpoint; records every exported file's relative path, media
+type, byte count, and SHA-256; validates local HTML and CSS asset references;
+rejects missing, modified, extra, traversing, or symlinked files; and seals the
+canonical manifest subject with its own SHA-256 digest. Set a
+32-byte-or-longer `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY` to add an optional
+HMAC-SHA256 authenticity check and
+`PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID` to label the non-secret key. The
+key is never written to the manifest. Authenticated viewers can re-check the
+current publish at
+`GET /api/app/generated-apps/:appId/publish/integrity`; the Builder Publish tab
+shows the same file/byte totals and signature state.
+
 ## Configuration
 
 Common environment variables:
@@ -270,6 +284,8 @@ Common environment variables:
 | `PACKETAGENT_SANDBOX_CPUS`                        | `1`                       | Container CPU limit.                                                                                                                                                                                  |
 | `PACKETAGENT_SANDBOX_SMOKE_ENABLED`               | `0`                       | Route builder smoke checks through the sandbox. Also gates the file-tree validator's `tsc --noEmit` and `vite build` phases.                                                                          |
 | `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` | `4`                       | Maximum warm generated-app child processes per PacketAgent server. Values are clamped to `1-64`; an idle least-recently-used process is evicted at the limit.                                         |
+| `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY`        | _unset_                   | Optional HMAC-SHA256 key for generated-app manifest authenticity; must be at least 32 bytes. Per-file and canonical-manifest SHA-256 verification is always enabled.                                  |
+| `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID`     | `packetagent-local`       | Non-secret label recorded with an optional publish-manifest signature.                                                                                                                                |
 | `PACKETAGENT_ARTIFACT_SERVING_ENABLED`            | `false`                   | Opt in to artifact-file serving. Reads still require an authenticated viewer in the workspace that owns the exact run ID in the URL.                                                                  |
 | `PACKETAGENT_LEGACY_TEMPLATES`                    | _unset_                   | Set to `1` to force the legacy template path and skip the file-tree codegen orchestrator entirely. The previous opt-in flag `PACKETAGENT_FILETREE_CODEGEN=1` is preserved as a no-op for back-compat. |
 | `PACKETAGENT_PROVIDER_PRIORITY`                   | _unset_                   | Comma-separated provider override (e.g. `ollama,openrouter,anthropic`). Applied to every preset; first registered provider with a configured key wins.                                                |

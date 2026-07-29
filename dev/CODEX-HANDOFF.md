@@ -441,7 +441,23 @@ least-recently-used idle process. One failed request is retried, recent
 failures remain degraded for five minutes, and the Builder Sandbox tab exposes
 the per-app view. The focused gate passes typecheck, zero-warning lint, 48
 backend tests (47 passed with one intentional Windows sandbox skip), and the
-web gate. Resume at R4.2 artifact and static-asset integrity.
+web gate.
+
+R4.2 is complete. New publish materializations use
+`packetagent.generated-app-artifact-manifest/v2`: the canonical manifest
+subject binds workspace/app/checkpoint identity plus sorted file path, media
+type, byte-size, and SHA-256 records; local HTML/CSS references must resolve;
+missing, modified, unexpected, traversing, symlinked, substituted, or
+over-limit packages fail closed. The manifest carries a required canonical
+SHA-256 and can carry an optional HMAC-SHA256 signature from a 32-byte minimum
+environment key that never enters the artifact. Authenticated workspace-
+scoped re-verification and the Builder Publish status expose bounded,
+secret-free results. Legacy list-only records remain readable but cannot pass
+the v2 verifier. Research and implementation decisions are in
+[`r4-generated-app-publish.md`](r4-generated-app-publish.md). The closure gate
+passes typecheck, zero-warning lint, formatting, production web build, 32 web
+tests, and 68 focused backend tests (67 passed with one intentional Windows
+sandbox skip). Resume at R4.3 verified local Docker Compose execution.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -592,10 +608,10 @@ without duplicate jobs, and compacted source evidence fails closed. Opt-in live
 PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
-The exact next slice is R4.2 under
+The exact next slice is R4.3 under
 [`R4 - generated-app runtime and self-host publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish):
-add static-asset validation plus digest-verifiable artifact manifests and
-health metadata.
+turn the current compose guidance into an actually generated, started, probed,
+and stopped local Docker Compose path.
 After each gate passes, continue through R4-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and

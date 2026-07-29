@@ -263,6 +263,39 @@ docker compose up
 
 The generated app exposes its own health endpoint and serves on its own port (defined in the generated `docker-compose.yml`). Open the port shown in the publish handoff panel - by default it's a free port allocated at generation time, not a hard-coded one.
 
+### Verify the publish package
+
+New publish materializations contain
+`packetagent.generated-app-artifact-manifest/v2` in
+`publish-artifacts.json`. Before handoff, PacketAgent verifies every listed
+file's byte count and SHA-256, the canonical manifest digest, the workspace/app/
+checkpoint binding, and local assets referenced by HTML `src`/`href`/`srcset`/
+`poster` attributes and CSS `url(...)` values. Missing, modified, unexpected,
+traversing, or symlinked files block the integrity gate. Verification is
+bounded to 1,000 files and 25 MiB.
+
+After publishing, an authenticated viewer can re-check the exact current
+package without rewriting it:
+
+```bash
+curl -s --cookie /tmp/jar \
+  http://localhost:8484/api/app/generated-apps/<app-id>/publish/integrity
+```
+
+The response is `verified` only when the manifest and disk agree. Checksums are
+always enabled. To add an authenticity check, configure a secret of at least
+32 bytes before starting PacketAgent:
+
+```bash
+PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY=<long-random-secret>
+PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID=home-server-2026
+```
+
+Only the HMAC-SHA256 result and non-secret key ID enter the package. Keep the
+same key available when re-verifying a signed manifest; PacketAgent treats a
+signed package without its verification key as unverifiable rather than
+silently downgrading it to checksum-only.
+
 **To deploy to your own infrastructure:**
 
 The generated bundle is a normal Node app. You can:

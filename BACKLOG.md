@@ -301,7 +301,7 @@ Status: active.
 
 - [x] Add runtime health, metrics, crash visibility, and documented pool
       limits.
-- [ ] Add health endpoints, static-asset manifest validation, and
+- [x] Add health endpoints, static-asset manifest validation, and
       signed/checksummed artifact manifests.
 - [ ] Turn publish handoff into a verified local Docker Compose run path.
 - [ ] Add reverse-proxy/VPN examples and public-URL reachability verification.
@@ -433,6 +433,11 @@ planning plus zip/git-ready export.
   and eviction metrics without starting idle runtimes. The documented warm
   pool defaults to four supervised child processes, clamps configuration to
   1-64, and evicts the least-recently-used idle process.
+- Shipped: publish artifact manifest v2 binds immutable app/checkpoint identity,
+  per-file bytes and SHA-256, a bounded HTML/CSS asset graph, and a canonical
+  manifest digest with optional HMAC authenticity. Authenticated
+  re-verification rejects tampering, substitution, unexpected files, unsafe
+  paths, and symlinks.
 - Remaining: carry the separate-origin preview/CSRF hardening item from the
   security backlog.
 
@@ -479,11 +484,12 @@ planning plus zip/git-ready export.
 
 ### Self-host publish
 
-- Turn publish handoff into a clearer "run this generated app" path for local Docker Compose.
-- Add generated app health endpoint and static asset manifest validation.
-- Add signed or checksum-based artifact manifest verification for exported bundles.
-- Document reverse-proxy examples for local network / VPN deployment.
-- Add a minimal "public URL configured" check that verifies the configured URL actually reaches the published app.
+- Shipped: generated-app process health endpoints, bounded static-asset
+  validation, checksum-sealed artifact manifest v2, optional HMAC authenticity,
+  and authenticated package re-verification.
+- Remaining: turn publish handoff into a verified local Docker Compose run,
+  document reverse-proxy examples for local network / VPN deployment, and
+  verify that a configured public URL reaches the intended published app.
 
 ### Quality bar
 

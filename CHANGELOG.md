@@ -6,6 +6,25 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R4.2 generated-app artifact integrity
+
+- Added generated-app artifact manifest v2 with workspace/app/checkpoint
+  subject binding, sorted per-file media type, byte count, and SHA-256
+  evidence plus a canonical manifest digest.
+- Added bounded HTML/CSS static-asset graph validation and fail-closed missing,
+  modified, unexpected, traversing, symlinked, oversized, and substituted
+  package checks.
+- Added optional HMAC-SHA256 manifest authenticity using a 32-byte minimum
+  environment key; only the HMAC and non-secret key ID enter the artifact.
+- Added authenticated, workspace-scoped publish re-verification and Builder
+  file/byte/signature status while retaining read compatibility for legacy
+  list-only manifests.
+- Recorded the standards research, compatibility posture, and R4.3 handoff in
+  `dev/r4-generated-app-publish.md`.
+- Closed R4.2 with clean typecheck, zero-warning lint, formatting, production
+  web build, 32 web tests, and 68 focused backend tests (67 passed, one
+  intentional Windows sandbox skip).
+
 ### 2026-07-29 - R4.1 generated-app runtime operations
 
 - Added authenticated workspace aggregate and owned-app generated-runtime

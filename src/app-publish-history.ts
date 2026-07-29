@@ -5,6 +5,7 @@ import {
 } from "./app-publish-readiness.js";
 import type {
   GeneratedAppDockerComposeExportPayload,
+  GeneratedAppPublishArtifactManifest,
   GeneratedAppPublishRecord,
   GeneratedAppPublishRollbackCommand,
   GeneratedAppPublishRollbackResult,
@@ -24,6 +25,7 @@ export interface GeneratedAppPublishRecordInput extends AppPublishReadinessInput
   buildStatus?: string;
   smokeStatus?: string;
   previousPublish?: GeneratedAppPublishRecord | null;
+  artifactManifest?: GeneratedAppPublishArtifactManifest;
   createdByUserId: string;
   createdAt?: string;
 }
@@ -80,8 +82,9 @@ export function buildGeneratedAppPublishRecord(
     manifestPath: `${readiness.localPublishPath}/${readiness.publishArtifactManifest.fileName}`,
     bundlePath: `${readiness.localPublishPath}/bundle`,
   });
+  const artifactManifest = input.artifactManifest ?? readiness.publishArtifactManifest;
   const artifactPaths = uniqueSorted([
-    ...readiness.packaging.artifactPaths,
+    ...artifactManifest.entries.map((entry) => entry.path),
     `${readiness.localPublishPath}/${dockerComposeExport.fileName}`,
   ]);
   const status: GeneratedAppPublishStatus = publishReady(input.buildStatus, input.smokeStatus)
@@ -103,8 +106,8 @@ export function buildGeneratedAppPublishRecord(
     buildStatus: cleanString(input.buildStatus) || undefined,
     smokeStatus: cleanString(input.smokeStatus) || undefined,
     dockerComposeExport,
-    artifactManifest: readiness.publishArtifactManifest,
-    manifest: readiness.publishArtifactManifest,
+    artifactManifest,
+    manifest: artifactManifest,
     artifactPaths,
     logs: publishLogs({
       createdAt,

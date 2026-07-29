@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { Hono } from "hono";
@@ -1799,10 +1799,21 @@ test("builder canonical changes routes validate target app and expose preview, f
 test("builder publish creates self-hosted history, compose export, logs, and rollback result", async (t) => {
   resetStoreForTests();
   const previousSmtpUrl = process.env.SMTP_URL;
+  const previousManifestSigningKey = process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY;
+  const previousManifestSigningKeyId = process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID;
   process.env.SMTP_URL = "smtp://localhost";
+  process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY =
+    "packetagent-route-test-publish-signing-key-32-bytes";
+  process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID = "route-test-key";
   t.after(() => {
     if (previousSmtpUrl === undefined) delete process.env.SMTP_URL;
     else process.env.SMTP_URL = previousSmtpUrl;
+    if (previousManifestSigningKey === undefined)
+      delete process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY;
+    else process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY = previousManifestSigningKey;
+    if (previousManifestSigningKeyId === undefined)
+      delete process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID;
+    else process.env.PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID = previousManifestSigningKeyId;
   });
   const app = createTestApp();
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
@@ -1848,7 +1859,22 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
       workspacePath?: string;
       privateUrl?: string;
       logs: unknown[];
-      manifest?: { fileName?: string };
+      manifest?: {
+        fileName?: string;
+        schemaVersion?: string;
+        staticAssets?: { status?: string; references?: unknown[] };
+        integrity?: { digest?: string; signature?: { keyId?: string } };
+        entries?: Array<{ path?: string; size?: number; sha256?: string }>;
+      };
+    };
+    validation?: {
+      artifactPresence?: {
+        integrity?: {
+          status?: string;
+          checksumVerified?: boolean;
+          checkedFiles?: number;
+        };
+      };
     };
     dockerComposeExport?: { yaml?: string; services?: string[] };
     history?: Array<{ id?: string; workspacePath?: string; manifest?: { fileName?: string } }>;
@@ -1863,6 +1889,24 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   );
   assert.equal(firstPublish.publish?.workspacePath, firstPublish.publish?.localPublishPath);
   assert.equal(firstPublish.publish?.manifest?.fileName, "publish-artifacts.json");
+  assert.equal(
+    firstPublish.publish?.manifest?.schemaVersion,
+    "packetagent.generated-app-artifact-manifest/v2",
+  );
+  assert.match(firstPublish.publish?.manifest?.integrity?.digest ?? "", /^sha256:[a-f0-9]{64}$/);
+  assert.equal(firstPublish.publish?.manifest?.integrity?.signature?.keyId, "route-test-key");
+  assert.equal(firstPublish.publish?.manifest?.staticAssets?.status, "pass");
+  assert.ok((firstPublish.publish?.manifest?.staticAssets?.references?.length ?? 0) >= 1);
+  assert.ok(
+    firstPublish.publish?.manifest?.entries?.every(
+      (entry) =>
+        typeof entry.size === "number" &&
+        entry.size >= 0 &&
+        /^[a-f0-9]{64}$/.test(entry.sha256 ?? ""),
+    ),
+  );
+  assert.equal(firstPublish.validation?.artifactPresence?.integrity?.status, "verified");
+  assert.equal(firstPublish.validation?.artifactPresence?.integrity?.checksumVerified, true);
   assert.ok(
     firstPublish.history?.some(
       (entry) =>
@@ -1878,6 +1922,60 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   assert.match(firstPublish.dockerComposeExport?.yaml ?? "", /packetagent-app:/);
   assert.ok(firstPublish.dockerComposeExport?.services?.includes("packetagent-app"));
   assert.ok((firstPublish.publish?.logs.length ?? 0) >= 3);
+
+  const integrityResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/publish/integrity`,
+    { headers },
+  );
+  const integrity = (await integrityResponse.json()) as {
+    publishId?: string;
+    verification?: {
+      status?: string;
+      checksumVerified?: boolean;
+      signatureStatus?: string;
+      issues?: unknown[];
+    };
+  };
+  assert.equal(integrityResponse.status, 200);
+  assert.equal(integrity.publishId, firstPublish.publish?.id);
+  assert.equal(integrity.verification?.status, "verified");
+  assert.equal(integrity.verification?.checksumVerified, true);
+  assert.equal(integrity.verification?.signatureStatus, "verified");
+  assert.deepEqual(integrity.verification?.issues, []);
+  const beta = login({ email: "beta@packetagent.local", password: "demo12345" });
+  const crossWorkspaceIntegrityResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/publish/integrity`,
+    { headers: authHeaders(beta.cookieValue) },
+  );
+  assert.equal(crossWorkspaceIntegrityResponse.status, 404);
+
+  const publishedEntrypoint = resolve(
+    process.cwd(),
+    firstPublish.publish?.localPublishPath ?? "",
+    "bundle",
+    "index.html",
+  );
+  const originalEntrypoint = readFileSync(publishedEntrypoint, "utf8");
+  writeFileSync(publishedEntrypoint, `${originalEntrypoint}\n<!-- tampered -->\n`, "utf8");
+  const tamperedIntegrityResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/publish/integrity`,
+    { headers },
+  );
+  const tamperedIntegrity = (await tamperedIntegrityResponse.json()) as {
+    verification?: {
+      status?: string;
+      issues?: Array<{ code?: string; path?: string }>;
+    };
+  };
+  assert.equal(tamperedIntegrityResponse.status, 200);
+  assert.equal(tamperedIntegrity.verification?.status, "invalid");
+  assert.ok(
+    tamperedIntegrity.verification?.issues?.some(
+      (issue) =>
+        issue.code === "manifest.entry.digest_mismatch" && issue.path === "bundle/index.html",
+    ),
+  );
+  writeFileSync(publishedEntrypoint, originalEntrypoint, "utf8");
 
   const privatePreviewUrl =
     new URL(firstPublish.publish?.privateUrl ?? "http://localhost/").pathname +

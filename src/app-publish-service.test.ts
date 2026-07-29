@@ -251,3 +251,39 @@ test("derivePublishArtifactStatus records manifest details for concrete bundle h
     2048,
   );
 });
+
+test("publish validation blocks a failed artifact checksum and reports the first bounded issue", () => {
+  const validation = buildAppPublishValidation({
+    build: { phase: "passed" },
+    artifacts: {
+      ...READY_ARTIFACTS,
+      integrity: {
+        status: "invalid",
+        checksumVerified: true,
+        signatureStatus: "unsigned",
+        checkedFiles: 2,
+        checkedBytes: 128,
+        issues: [
+          {
+            code: "manifest.entry.digest_mismatch",
+            path: "bundle/index.html",
+            message: "Artifact SHA-256 does not match the manifest.",
+          },
+        ],
+      },
+    },
+    health: {
+      live: { statusCode: 200, bodyStatus: "live" },
+      ready: { statusCode: 200, bodyStatus: "ready" },
+    },
+    smoke: {
+      checks: [{ id: "page:/", label: "Open home", status: "pass" }],
+    },
+    url: { url: "http://localhost:8484/app/alpha/ops-board", visibility: "private" },
+  });
+
+  assert.equal(validation.status, "blocked");
+  assert.equal(validation.artifactPresence.status, "fail");
+  assert.equal(validation.artifactPresence.integrity?.status, "invalid");
+  assert.match(validation.artifactPresence.failures[0]?.message ?? "", /bundle\/index\.html/);
+});

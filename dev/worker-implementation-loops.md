@@ -1095,8 +1095,8 @@ Status: active.
 
 1. [Complete 2026-07-29] Add per-app runtime health, metrics, crash visibility,
    and documented process-pool limits.
-2. Add health endpoints, static-asset manifest validation, and signed/checksum
-   artifact manifests.
+2. [Complete 2026-07-29] Add health endpoints, static-asset manifest validation,
+   and signed/checksum artifact manifests.
 3. Turn publish handoff into a verified local Docker Compose run path.
 4. Add reverse-proxy/VPN examples and a public-URL reachability check.
 5. Preserve schema/data migration truth; do not imply automatic migration when

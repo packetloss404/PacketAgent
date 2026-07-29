@@ -1,4 +1,5 @@
 import { redactSensitiveString } from "./security/redaction.js";
+import type { GeneratedAppPublishArtifactVerification } from "./generated-app-publish-integrity.js";
 
 export type AppPublishValidationStage = "build" | "artifact" | "health" | "smoke" | "url";
 export type AppPublishValidationStatus = "pending" | "ready" | "blocked";
@@ -57,6 +58,7 @@ export interface PublishArtifactValidationInput {
   expectedArtifacts?: string[];
   artifacts?: PublishArtifactObservation[];
   manifestPath?: string;
+  integrity?: GeneratedAppPublishArtifactVerification;
 }
 
 export interface PublishArtifactStatus {
@@ -66,6 +68,7 @@ export interface PublishArtifactStatus {
   expectedArtifacts: string[];
   observedArtifacts: PublishArtifactObservation[];
   missingArtifacts: string[];
+  integrity?: GeneratedAppPublishArtifactVerification;
   message: string;
   failures: AppPublishFailure[];
 }
@@ -269,6 +272,7 @@ export function derivePublishArtifactStatus(
       expectedArtifacts,
       observedArtifacts,
       missingArtifacts: [],
+      integrity: input.integrity,
       message: "Publish artifact validation is waiting on the production build.",
       failures: [],
     };
@@ -299,6 +303,17 @@ export function derivePublishArtifactStatus(
     });
   }
 
+  if (input.integrity?.status === "invalid") {
+    const firstIssue = input.integrity.issues[0];
+    failures.push({
+      stage: "artifact",
+      message: firstIssue
+        ? `Publish artifact integrity failed: ${firstIssue.path} ${firstIssue.message}`
+        : "Publish artifact integrity verification failed.",
+      action: `Regenerate ${manifestPath} from the immutable checkpoint and retry verification.`,
+    });
+  }
+
   const status: PublishArtifactStatus["status"] = failures.length > 0 ? "fail" : "pass";
 
   return {
@@ -308,9 +323,12 @@ export function derivePublishArtifactStatus(
     expectedArtifacts,
     observedArtifacts,
     missingArtifacts,
+    integrity: input.integrity,
     message:
       status === "pass"
-        ? `Publish artifact manifest ${manifestPath} includes ${observedArtifacts.length} observed artifact${observedArtifacts.length === 1 ? "" : "s"}.`
+        ? input.integrity?.status === "verified"
+          ? `Publish artifact manifest ${manifestPath} verified ${input.integrity.checkedFiles} files and ${input.integrity.checkedBytes} bytes.`
+          : `Publish artifact manifest ${manifestPath} includes ${observedArtifacts.length} observed artifact${observedArtifacts.length === 1 ? "" : "s"}.`
         : "Publish artifact validation is blocked.",
     failures,
   };
@@ -505,6 +523,7 @@ export function buildAppPublishValidation(
       expectedArtifacts: input.artifacts?.expectedArtifacts ?? productionBuild.expectedArtifacts,
       artifacts: input.artifacts?.artifacts,
       manifestPath: input.artifacts?.manifestPath,
+      integrity: input.artifacts?.integrity,
     },
     productionBuild,
   );
