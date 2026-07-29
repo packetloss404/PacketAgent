@@ -1472,10 +1472,11 @@ export const PHASE_71_INTEGRATIONS: Phase71IntegrationDefinition[] = [
     ],
     flows: [
       "Persist generated records through the configured database runtime.",
-      "Include migration, seed, and CRUD setup notes for deployment.",
+      "Include storage, seed, CRUD, and truthful schema-change notes for deployment.",
     ],
     setupGuidance: [
       "Set DATABASE_URL, PACKETAGENT_DATABASE_URL, or PACKETAGENT_MANAGED_DATABASE_URL for persistent database-backed features.",
+      "Only claim automatic migrations when the selected runtime executes them; the current generated SQLite runtime resets and reseeds on schema changes.",
     ],
   },
 ];

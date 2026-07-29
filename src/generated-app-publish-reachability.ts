@@ -15,7 +15,8 @@ export type GeneratedAppReachabilityFailureCode =
   | "http_status_failed"
   | "response_too_large"
   | "response_invalid"
-  | "identity_mismatch";
+  | "identity_mismatch"
+  | "policy_mismatch";
 
 export interface GeneratedAppReachabilityStep {
   id: "url" | "dns" | "transport" | "liveness" | "readiness" | "app-root";
@@ -40,6 +41,7 @@ interface RuntimeConfig {
   appId: string;
   workspaceId: string;
   checkpointId: string;
+  schemaChangePolicy: "reset-and-reseed";
 }
 
 const STEP_TIMEOUT_MS = 5_000;
@@ -112,7 +114,13 @@ export async function verifyGeneratedAppReachability(
           "Reachable service identity does not match this publish package.",
         );
       }
-      return `GET /health/ready matched app ${config.appId} checkpoint ${config.checkpointId}.`;
+      if (response.body.schemaChangePolicy !== config.schemaChangePolicy) {
+        throw new ReachabilityError(
+          "policy_mismatch",
+          "Reachable service did not report the package's reset-and-reseed schema policy.",
+        );
+      }
+      return `GET /health/ready matched app ${config.appId} checkpoint ${config.checkpointId} and reset-and-reseed policy.`;
     });
     await runStep(steps, "app-root", async () => {
       const response = await fetchBounded(url, "text/html");
@@ -341,6 +349,9 @@ function readRuntimeConfig(publishRoot: string): RuntimeConfig {
     if (typeof config[field] !== "string" || !config[field].trim()) {
       throw new Error(`runtime config is missing ${field}`);
     }
+  }
+  if (config.schemaChangePolicy !== "reset-and-reseed") {
+    throw new Error("runtime config must declare reset-and-reseed schema changes");
   }
   return config;
 }

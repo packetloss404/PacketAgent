@@ -1902,6 +1902,7 @@ export interface SandboxStatus {
 export interface GeneratedAppRuntimeHealth {
   status: "idle" | "healthy" | "degraded";
   observedAt: string;
+  schemaChangePolicy: "reset-and-reseed";
   maxProcesses: number;
   processCount: number;
   activeRequests: number;

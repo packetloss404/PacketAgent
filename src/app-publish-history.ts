@@ -189,6 +189,7 @@ export function buildDockerComposeExport(input: {
     "Run docker compose -f docker-compose.publish.yml config --quiet.",
     "Run docker compose -f docker-compose.publish.yml up --build --wait --wait-timeout 180.",
     "Probe /health/live, /health/ready, the app root, and generated CRUD before handoff.",
+    "Use the generated RUNBOOK.md stopped-service backup/restore before a schema-changing checkpoint.",
     `After configuring DNS/TLS or VPN routing, run npm run verify:generated-app-reachability -- ${input.localPublishPath} ${input.publicUrl}.`,
     "Run docker compose -f docker-compose.publish.yml down --remove-orphans when finished.",
   ];

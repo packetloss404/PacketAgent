@@ -237,7 +237,38 @@ docker compose -f docker-compose.publish.yml down --remove-orphans
 The \`generated-app-data\` volume keeps SQLite data across ordinary restarts.
 Add \`--volumes\` only when you intentionally want to erase that local data.
 
-## Runtime and migration truth
+## Offline backup and restore
+
+Stop the service first. Closing the last SQLite connection checkpoints WAL
+content into \`runtime.sqlite\`, so the backup is one consistent database file.
+Keep backups outside this sealed publish directory:
+
+\`\`\`bash
+mkdir -p ../generated-app-backups
+docker compose -f docker-compose.publish.yml stop generated-app
+docker compose -f docker-compose.publish.yml run --rm --no-deps \\
+  --volume "$PWD/../generated-app-backups:/backup" generated-app \\
+  node --input-type=module --eval \\
+  "import { copyFileSync } from 'node:fs'; copyFileSync('/app/data/runtime.sqlite', '/backup/${input.checkpointId}-runtime.sqlite')"
+docker compose -f docker-compose.publish.yml start --wait
+\`\`\`
+
+To restore that exact checkpoint, stop the service, copy the selected backup
+back into the named volume, restart, and rerun reachability verification:
+
+\`\`\`bash
+docker compose -f docker-compose.publish.yml stop generated-app
+docker compose -f docker-compose.publish.yml run --rm --no-deps \\
+  --volume "$PWD/../generated-app-backups:/backup:ro" generated-app \\
+  node --input-type=module --eval \\
+  "import { copyFileSync } from 'node:fs'; copyFileSync('/backup/${input.checkpointId}-runtime.sqlite', '/app/data/runtime.sqlite')"
+docker compose -f docker-compose.publish.yml start --wait
+\`\`\`
+
+The Docker certification command runs this same stopped-service backup/restore
+round trip against a temporary external directory and removes its test data.
+
+## Runtime and schema-change truth
 
 - The final image contains built static assets, the small Node runtime, runtime
   config, and the generated schema model. It does not contain source
@@ -246,10 +277,11 @@ Add \`--volumes\` only when you intentionally want to erase that local data.
   The Vite compile step runs with Docker build networking disabled.
 - The container runs as the unprivileged \`node\` user with a read-only root
   filesystem. Only the named SQLite volume and bounded \`/tmp\` tmpfs are writable.
-- A schema-signature change currently clears and reseeds this app's SQLite
-  records. Export or back up the volume before replacing the package with a
-  schema-changing checkpoint. Additive, data-preserving migrations remain an
-  explicit backlog item.
+- The declared policy is \`reset-and-reseed\`: ordinary same-schema restarts
+  preserve records, while a schema-signature change clears and reseeds this
+  app's SQLite records. Back up the volume before replacing the package with a
+  schema-changing checkpoint. Automatic data-preserving migration is not
+  implemented or claimed.
 - The default bridge network permits outbound traffic. Connector-specific
   egress restrictions are enforced by PacketAgent's Worker runtime, not this
   standalone generated-app compose package.

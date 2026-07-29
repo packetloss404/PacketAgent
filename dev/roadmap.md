@@ -55,9 +55,12 @@ and authenticated re-verification. R4.3 adds the actual standalone
 Node/Vite/SQLite publish image, hardened single-service Compose contract, and
 bounded Docker build/health/CRUD/restart-persistence verifier. R4.4 adds
 loopback-by-default port binding, sealed Caddy/nginx/Tailscale examples, and
-bounded DNS/TCP/TLS/HTTP reachability bound to exact package identity. Resume
-at R4.5 migration-truth reconciliation in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#r4---generated-app-runtime-and-self-host-publish).
+bounded DNS/TCP/TLS/HTTP reachability bound to exact package identity. R4.5
+closes the loop with one visible `reset-and-reseed` policy, same-schema and
+schema-change characterization, reference-only generated DDL, and a real
+stopped-service SQLite backup/restore proof. Resume at R5.1 real sandboxed
+TypeScript/Vite validation in
+[`worker-implementation-loops.md`](worker-implementation-loops.md#r5---sandbox-egress-and-preview-isolation).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,
 validates SQLite migration/restore integrity and foreign keys, rejects corrupt

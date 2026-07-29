@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:net";
-import { basename, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, join, resolve } from "node:path";
 import type { GeneratedAppRuntimeModel, RuntimeSchemaEntity } from "./generated-app-runtime.js";
 import { GENERATED_APP_PUBLISH_COMPOSE_FILE } from "./generated-app-publish-package.js";
 import { verifyGeneratedAppReachability } from "./generated-app-publish-reachability.js";
@@ -30,6 +31,7 @@ interface RuntimeConfig {
   workspaceId: string;
   appId: string;
   checkpointId: string;
+  schemaChangePolicy: "reset-and-reseed";
 }
 
 interface CommandResult {
@@ -59,6 +61,8 @@ export async function verifyGeneratedAppPublishPackage(
   const startedAt = new Date().toISOString();
   const steps: GeneratedAppPublishVerificationStep[] = [];
   let cleanup: GeneratedAppPublishVerificationResult["cleanup"] = "pass";
+  const backupRoot = mkdtempSync(join(tmpdir(), "packetagent-generated-app-backup-"));
+  const backupPath = "/backup/runtime.sqlite";
   const composeArgs = ["compose", "-p", projectName, "-f", GENERATED_APP_PUBLISH_COMPOSE_FILE];
   const env = {
     ...process.env,
@@ -108,10 +112,14 @@ export async function verifyGeneratedAppPublishPackage(
     });
     await probeStep(steps, "health-ready", async () => {
       const body = await fetchJson(`${baseUrl}/health/ready`);
-      if (body.status !== "ready" || body.checkpointId !== config.checkpointId) {
-        throw new Error("readiness identity did not match the package checkpoint");
+      if (
+        body.status !== "ready" ||
+        body.checkpointId !== config.checkpointId ||
+        body.schemaChangePolicy !== config.schemaChangePolicy
+      ) {
+        throw new Error("readiness identity or schema-change policy did not match the package");
       }
-      return "GET /health/ready returned the expected checkpoint.";
+      return "GET /health/ready returned the expected checkpoint and reset/reseed policy.";
     });
     await probeStep(steps, "static-root", async () => {
       const response = await fetchWithTimeout(`${baseUrl}/`);
@@ -124,6 +132,26 @@ export async function verifyGeneratedAppPublishPackage(
 
     const createdId = await verifyCrud(steps, baseUrl, config.appId, model);
     await commandStep(steps, "compose-stop", publishRoot, env, [...composeArgs, "stop"], 60_000);
+    await commandStep(
+      steps,
+      "sqlite-offline-backup",
+      publishRoot,
+      env,
+      [
+        ...composeArgs,
+        "run",
+        "--rm",
+        "--no-deps",
+        "--volume",
+        `${backupRoot}:/backup`,
+        "generated-app",
+        "node",
+        "--input-type=module",
+        "--eval",
+        `import { copyFileSync } from "node:fs"; copyFileSync("/app/data/runtime.sqlite", "${backupPath}")`,
+      ],
+      60_000,
+    );
     await commandStep(steps, "compose-restart-wait", publishRoot, env, [
       ...composeArgs,
       "start",
@@ -151,6 +179,52 @@ export async function verifyGeneratedAppPublishPackage(
       if (!response.ok) throw new Error(`DELETE returned ${response.status}`);
       return "Generated CRUD archive completed.";
     });
+    await commandStep(
+      steps,
+      "compose-stop-before-restore",
+      publishRoot,
+      env,
+      [...composeArgs, "stop"],
+      60_000,
+    );
+    await commandStep(
+      steps,
+      "sqlite-offline-restore",
+      publishRoot,
+      env,
+      [
+        ...composeArgs,
+        "run",
+        "--rm",
+        "--no-deps",
+        "--volume",
+        `${backupRoot}:/backup:ro`,
+        "generated-app",
+        "node",
+        "--input-type=module",
+        "--eval",
+        `import { copyFileSync } from "node:fs"; copyFileSync("${backupPath}", "/app/data/runtime.sqlite")`,
+      ],
+      60_000,
+    );
+    await commandStep(steps, "compose-restart-after-restore", publishRoot, env, [
+      ...composeArgs,
+      "start",
+      "--wait",
+      "--wait-timeout",
+      "60",
+    ]);
+    await probeStep(steps, "sqlite-backup-restore", async () => {
+      const entity = primaryEntity(model);
+      const response = await fetchWithTimeout(
+        `${generatedApiBase(baseUrl, config.appId, entity.name)}/${encodeURIComponent(createdId)}`,
+      );
+      const body = (await response.json()) as Record<string, unknown> | null;
+      if (!response.ok || body?.id !== createdId) {
+        throw new Error("offline SQLite restore did not recover the backed-up record");
+      }
+      return "Stopped-service SQLite backup restored the pre-delete record.";
+    });
   } catch (error) {
     steps.push({
       id: "verification",
@@ -171,6 +245,7 @@ export async function verifyGeneratedAppPublishPackage(
     } catch {
       cleanup = "fail";
     }
+    rmSync(backupRoot, { recursive: true, force: true });
   }
 
   return {

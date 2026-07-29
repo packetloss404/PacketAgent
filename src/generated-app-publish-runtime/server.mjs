@@ -22,6 +22,7 @@ const MAX_MANIFEST_REFERENCES = 4096;
 const RECORDS_TABLE = "generated_records";
 const VERSION_TABLE = "__schema_version";
 const SCHEMA_SIGNATURE_KEY = "schema_signature";
+const SCHEMA_CHANGE_POLICY = "reset-and-reseed";
 
 const config = readJson(CONFIG_PATH, 256 * 1024);
 const model = readJson(MODEL_PATH, 2 * 1024 * 1024);
@@ -80,6 +81,7 @@ async function routeRequest(request, response) {
       status: "ready",
       appId: config.appId,
       checkpointId: config.checkpointId,
+      schemaChangePolicy: SCHEMA_CHANGE_POLICY,
       staticFiles: staticVerification.files,
     });
     return;
@@ -90,6 +92,7 @@ async function routeRequest(request, response) {
       appId: config.appId,
       workspaceId: config.workspaceId,
       checkpointId: config.checkpointId,
+      schemaChangePolicy: SCHEMA_CHANGE_POLICY,
       schemaEntities: model.schema.map((entity) => entity.name),
     });
     return;
@@ -457,6 +460,9 @@ function assertRuntimeConfig(value) {
     if (typeof value?.[field] !== "string" || !value[field].trim()) {
       throw new Error(`runtime config is missing ${field}`);
     }
+  }
+  if (value.schemaChangePolicy !== SCHEMA_CHANGE_POLICY) {
+    throw new Error(`runtime config must declare ${SCHEMA_CHANGE_POLICY} schema changes`);
   }
 }
 

@@ -3,7 +3,11 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { GeneratedAppRuntimeModel } from "../generated-app-runtime.js";
+import {
+  GENERATED_APP_SCHEMA_CHANGE_POLICY,
+  type GeneratedAppRuntimeModel,
+  type GeneratedAppSchemaChangePolicy,
+} from "../generated-app-runtime.js";
 import {
   generatedAppRuntimeSchemaSignature,
   type GeneratedAppRuntimeApiRequest,
@@ -52,6 +56,7 @@ export interface GeneratedAppRuntimeCrashRecord {
 export interface GeneratedAppRuntimePoolHealth {
   status: "idle" | "healthy" | "degraded";
   observedAt: string;
+  schemaChangePolicy: GeneratedAppSchemaChangePolicy;
   maxProcesses: number;
   processCount: number;
   activeRequests: number;
@@ -206,6 +211,7 @@ export class GeneratedAppRuntimeProcessPool {
     return {
       status: hasRecentCrash ? "degraded" : processes.length > 0 ? "healthy" : "idle",
       observedAt: observedAt.toISOString(),
+      schemaChangePolicy: GENERATED_APP_SCHEMA_CHANGE_POLICY,
       maxProcesses: this.maxProcesses,
       processCount: processes.length,
       activeRequests: processes.reduce((total, process) => total + process.activeRequests, 0),

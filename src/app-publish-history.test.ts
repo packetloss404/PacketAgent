@@ -52,6 +52,11 @@ test("generated app publish records include local hosting metadata and compose p
       step.includes("standalone generated app"),
     ),
   );
+  assert.ok(
+    publish.dockerComposeExport.instructions.some((step) =>
+      step.includes("stopped-service backup/restore"),
+    ),
+  );
   assert.equal(publish.artifactManifest.fileName, "publish-artifacts.json");
   assert.equal(publish.manifest.fileName, "publish-artifacts.json");
   assert.ok(

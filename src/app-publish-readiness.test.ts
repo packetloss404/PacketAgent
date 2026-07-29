@@ -59,6 +59,7 @@ test("app publish readiness captures runtime config and generated checks", () =>
 
   assert.equal(readiness.packaging.runtime, "packetagent-generated-app-standalone");
   assert.equal(readiness.runtimeConfig.nodeVersion, "22");
+  assert.equal(readiness.runtimeConfig.schemaChangePolicy, "reset-and-reseed");
   assert.equal(readiness.runtimeConfig.appRouteBase, "/");
   assert.equal(readiness.runtimeConfig.agentRouteBase, null);
   assert.equal(
@@ -70,6 +71,7 @@ test("app publish readiness captures runtime config and generated checks", () =>
   );
   assert.ok(readiness.packaging.notes.some((note) => note.includes("multi-stage image")));
   assert.ok(readiness.packaging.notes.some((note) => note.includes("Vite")));
+  assert.ok(readiness.packaging.notes.some((note) => note.includes("destructive reset/reseed")));
   assert.deepEqual(readiness.packaging.buildCommands.slice(0, 2), [
     "docker compose -f data/published-apps/beta/ops-board/docker-compose.publish.yml config --quiet",
     "npm run verify:generated-app-publish -- data/published-apps/beta/ops-board",

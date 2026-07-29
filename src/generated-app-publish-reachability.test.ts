@@ -13,7 +13,13 @@ test("generated app reachability verifies transport, health, identity, and HTML"
   const fixture = publishFixture();
   const server = await startFixtureServer((path) => {
     if (path === "/health/live") return json(200, { status: "live" });
-    if (path === "/health/ready") return json(200, { status: "ready", appId, checkpointId });
+    if (path === "/health/ready")
+      return json(200, {
+        status: "ready",
+        appId,
+        checkpointId,
+        schemaChangePolicy: "reset-and-reseed",
+      });
     return html(200, "<!doctype html><title>Reachable generated app</title>");
   });
   try {
@@ -51,6 +57,7 @@ test("generated app reachability fails closed on identity substitution", async (
         status: "ready",
         appId: "gapp_other",
         checkpointId: "checkpoint_other",
+        schemaChangePolicy: "reset-and-reseed",
       });
     return html(200, "<!doctype html>");
   });
@@ -79,7 +86,12 @@ test("generated app reachability refuses redirects instead of following another 
         headers: { location: "https://unrelated.example.test/health/live" },
         body: "",
       };
-    return json(200, { status: "ready", appId, checkpointId });
+    return json(200, {
+      status: "ready",
+      appId,
+      checkpointId,
+      schemaChangePolicy: "reset-and-reseed",
+    });
   });
   try {
     const result = await verifyGeneratedAppReachability(fixture, server.origin);
@@ -107,6 +119,32 @@ test("generated app reachability requires HTTPS away from loopback", async () =>
   }
 });
 
+test("generated app reachability fails closed when schema-change policy is obscured", async () => {
+  const fixture = publishFixture();
+  const server = await startFixtureServer((path) => {
+    if (path === "/health/live") return json(200, { status: "live" });
+    if (path === "/health/ready") {
+      return json(200, {
+        status: "ready",
+        appId,
+        checkpointId,
+        schemaChangePolicy: "automatic-migration",
+      });
+    }
+    return html(200, "<!doctype html>");
+  });
+  try {
+    const result = await verifyGeneratedAppReachability(fixture, server.origin);
+
+    assert.equal(result.status, "fail");
+    assert.equal(result.steps.at(-1)?.id, "readiness");
+    assert.equal(result.steps.at(-1)?.code, "policy_mismatch");
+  } finally {
+    await closeServer(server.server);
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 function publishFixture(): string {
   const root = mkdtempSync(join(tmpdir(), "packetagent-reachability-"));
   mkdirSync(root, { recursive: true });
@@ -117,6 +155,7 @@ function publishFixture(): string {
       workspaceId: "workspace_reachability",
       appId,
       checkpointId,
+      schemaChangePolicy: "reset-and-reseed",
     })}\n`,
   );
   return root;

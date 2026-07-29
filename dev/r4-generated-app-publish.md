@@ -32,6 +32,12 @@ remains the implementation ledger.
   service.
 - [Compose build](https://docs.docker.com/reference/compose-file/build/)
   defines the package-local build context and explicit Dockerfile selection.
+- [Docker volumes](https://docs.docker.com/engine/storage/volumes/#back-up-restore-or-migrate-data-volumes)
+  documents explicit volume backup/restore workflows using a temporary
+  container and an external backup mount.
+- [SQLite write-ahead logging](https://www.sqlite.org/wal.html) documents that
+  the last connection performs a final checkpoint and removes the WAL/shm
+  companions, which is why generated-app file backup is an offline operation.
 
 ## Implemented manifest v2
 
@@ -171,10 +177,38 @@ web build, 32 web tests, 18 focused package/reachability/readiness/history
 checks, a real 15-step Docker certification with complete cleanup, and 1,581
 API tests (1,577 passed with four intentional live interoperability skips).
 
-## R4.5 handoff
+## R4.5 schema/data truth
 
-Reconcile every remaining generated-app persistence and migration claim with
-the actual schema-signature reset/reseed behavior. Add characterization and
-data-volume backup/restore evidence where useful, decide whether this gate
-ships only honest destructive-change warnings or a bounded additive migration,
-and then run the full R4 closure gate.
+R4.5 selects the honest destructive-change contract; it does not add a partial
+additive migrator. `reset-and-reseed` is now one exported policy used by the
+preview runtime health response and Builder UI, materialized
+`runtime-config.json`, standalone `/health/ready` and `/meta`, publish
+readiness, integration guidance, and reachability verification. A reachable
+runtime that hides or substitutes the policy fails verification.
+
+The behavior is characterized at both runtime boundaries:
+
+- reopening preview SQLite with the same schema preserves user records;
+- a preview schema-signature change clears records and loads the new seed;
+- the standalone runtime reports the policy and clears/reseeds after a
+  schema-changing process restart; and
+- generated source labels `src/db/migrations/0001_initial.sql` as reference
+  DDL that the generic runtime does not execute.
+
+Every generated runbook includes an offline backup/restore procedure. It stops
+the service so the final SQLite connection checkpoints WAL, uses the
+already-built generated-app image as a temporary copy helper with the named
+volume and an external backup mount, then restarts and re-verifies. The Docker
+certifier proves this contract by backing up the stopped volume, restarting,
+archiving the created record, stopping again, restoring the backup, recovering
+the pre-delete record, and removing all temporary state. Backups remain
+outside the sealed publish directory.
+
+This closes R4 without claiming automatic data-preserving migration. A future
+migrator would be a new versioned runtime policy and must preserve data under
+its own compatibility and recovery gate.
+
+The final R4 gate passes typecheck, zero-warning lint, formatting, production
+web build, 32 web tests, 34 focused backend tests, the publish materialization
+route, real 20-step Docker certification, and 1,583 API tests (1,579 passed
+with four intentional live interoperability skips).

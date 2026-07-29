@@ -297,7 +297,7 @@ Status: complete as of 2026-07-29. Resume at R4.
 
 ### R4 - Generated-app runtime and self-host publish
 
-Status: active.
+Status: complete as of 2026-07-29. Resume at R5.
 
 - [x] Add runtime health, metrics, crash visibility, and documented pool
       limits.
@@ -305,7 +305,7 @@ Status: active.
       signed/checksummed artifact manifests.
 - [x] Turn publish handoff into a verified local Docker Compose run path.
 - [x] Add reverse-proxy/VPN examples and public-URL reachability verification.
-- [ ] Preserve accurate schema/data migration claims.
+- [x] Preserve accurate schema/data migration claims.
 - Gate: an exported app can be integrity-checked, started, health-checked, and
   reached through the documented self-host path.
 - R4.3 result: generated publishes now contain a single-service standalone
@@ -323,6 +323,21 @@ Status: active.
   identity. Typecheck, zero-warning lint, formatting, production web build,
   32 web tests, and 1,581 API tests pass (1,577 passed with four intentional
   live interoperability skips). Resume at migration-truth reconciliation.
+- R4.5 result: preview health, sealed runtime config, standalone readiness/meta,
+  publish guidance, and reachability all declare the exact
+  `reset-and-reseed` schema policy. Same-schema persistence and destructive
+  schema-change reseeding are characterized; generated SQL is explicitly
+  reference DDL; and the real Docker certifier proves a stopped-service
+  SQLite backup/mutate/restore round trip with complete cleanup.
+- Gate result: passed. An exported app is checkpoint-bound and
+  integrity-checked, runs as one hardened standalone service, validates its
+  concrete static output, reports health and schema policy, passes exact-origin
+  reachability, preserves same-schema data, and has a verified offline
+  backup/restore path. Typecheck, zero-warning lint, formatting, production
+  web build, 32 web tests, 34 focused backend tests, the publish
+  materialization route, a real 20-step Docker certification, and 1,583 API
+  tests pass (1,579 passed with four intentional live interoperability skips).
+  Resume at R5.1 real sandboxed TypeScript/Vite validation.
 
 ### R5 - Sandbox, egress, and preview isolation
 
@@ -506,8 +521,10 @@ planning plus zip/git-ready export.
   Compose service, runtime/model/runbook, and bounded Docker verification CLI.
 - Shipped: loopback-by-default publish networking, sealed Caddy/nginx/Tailscale
   examples, and exact-identity public URL reachability verification.
-- Remaining: reconcile schema/data migration claims with the current
-  schema-signature reset/reseed behavior.
+- Shipped: one visible `reset-and-reseed` policy, same-schema and
+  schema-change characterization, reference-only generated DDL, and a verified
+  stopped-service SQLite backup/restore round trip.
+- Remaining self-host work is tracked under R5 isolation and R8 release gates.
 
 ### Quality bar
 

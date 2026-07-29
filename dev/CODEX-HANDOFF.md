@@ -486,10 +486,28 @@ TCP or certificate-validating TLS, liveness, exact app/checkpoint readiness,
 and HTML root verification. Redirects, oversized/wrong-content responses, and
 identity substitution fail closed. The Docker verifier exercises the same
 reachability contract locally. PacketAgent does not claim to provision DNS,
-TLS, VPN policy, or continuous monitoring. Resume at R4.5 schema/data
-migration-truth reconciliation. Typecheck, zero-warning lint, formatting,
-production web build, 32 web tests, 18 focused backend checks, real Docker
-certification, and 1,581 API tests pass (1,577 passed with four intentional
+TLS, VPN policy, or continuous monitoring. Its closure gate passed typecheck,
+zero-warning lint, formatting, production web build, 32 web tests, 18 focused
+backend checks, real Docker certification, and 1,581 API tests (1,577 passed
+with four intentional live interoperability skips).
+
+R4.5 and the R4 gate are complete. One exported
+`reset-and-reseed` policy now appears in preview runtime health and the Builder
+UI, sealed runtime config, standalone readiness/meta, publish/integration
+guidance, and public reachability verification. Same-schema reopen preserves
+records; preview and standalone schema-signature changes clear records and
+reload seeds; generated `0001_initial.sql` is explicitly reference DDL that the
+generic runtime does not execute. Generated runbooks use a stopped-service
+SQLite backup/restore so the last connection checkpoints WAL before the
+already-built image copies `runtime.sqlite` between its named volume and an
+external directory. The real Docker certifier passes all 20
+health/CRUD/restart/backup/mutate/restore/cleanup steps. Exact research and
+decisions are in
+[`r4-generated-app-publish.md`](r4-generated-app-publish.md). Resume at R5.1
+real sandboxed TypeScript/Vite validation. The R4 closure gate passes
+typecheck, zero-warning lint, formatting, production web build, 32 web tests,
+34 focused backend tests, the publish materialization route, real 20-step
+Docker certification, and 1,583 API tests (1,579 passed with four intentional
 live interoperability skips).
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
@@ -641,12 +659,11 @@ without duplicate jobs, and compacted source evidence fails closed. Opt-in live
 PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
-The exact next slice is R4.5 under
-[`R4 - generated-app runtime and self-host publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish):
-reconcile every persistence/schema-migration claim with the current
-schema-signature reset/reseed behavior, add supporting characterization or
-backup/restore evidence, and close the R4 gate.
-After each gate passes, continue through R4-R8 using that backlog's unchecked
+The exact next slice is R5.1 under
+[`R5 - sandbox, egress, and preview isolation`](../BACKLOG.md#r5---sandbox-egress-and-preview-isolation):
+make real sandboxed TypeScript and Vite validation the default and remove
+synthetic success.
+After each gate passes, continue through R5-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
 must not be resumed independently.

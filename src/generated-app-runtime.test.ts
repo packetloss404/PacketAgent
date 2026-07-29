@@ -113,11 +113,16 @@ test("generated runtime emits a self-contained local CRUD app bundle", () => {
 
   const migrationFile =
     findGeneratedAppSourceFile(artifact, "src/db/migrations/0001_initial.sql")?.content ?? "";
+  assert.match(migrationFile, /Reference DDL for an app-owned database/);
+  assert.match(migrationFile, /do not\s+-- execute this file/);
   assert.match(migrationFile, /CREATE TABLE IF NOT EXISTS account/);
   assert.match(migrationFile, /archived BOOLEAN NOT NULL DEFAULT FALSE/);
 
   const packageFile = findGeneratedAppSourceFile(artifact, "package.json")?.content ?? "";
   assert.match(packageFile, /"build": "vite build"/);
+  const readmeFile = findGeneratedAppSourceFile(artifact, "README.md")?.content ?? "";
+  assert.match(readmeFile, /reset-and-reseed/);
+  assert.match(readmeFile, /Automatic data-preserving migration is not implemented/);
 });
 
 test("generated runtime can wrap an LLM-authored file tree as the artifact", () => {

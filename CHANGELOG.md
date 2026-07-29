@@ -6,6 +6,26 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R4.5 generated-app schema and backup truth
+
+- Declared one `reset-and-reseed` schema-change policy across preview health,
+  the Builder UI, sealed runtime config, standalone readiness/meta, publish
+  guidance, and reachability verification.
+- Characterized same-schema record preservation and destructive
+  schema-signature reseeding in both preview SQLite and the standalone process
+  runtime.
+- Labeled generated `0001_initial.sql` as reference DDL that the current
+  generic runtime does not execute, and removed automatic-migration
+  implications from generated and publish guidance.
+- Added a stopped-service SQLite backup/restore runbook and extended real
+  Docker certification to prove backup, mutation, restore, recovered data, and
+  complete temporary-state cleanup.
+- Closed the R4 gate and moved the active implementation ledger to R5.1 real
+  sandboxed TypeScript/Vite validation after typecheck, zero-warning lint,
+  formatting, production web build, 32 web tests, 34 focused backend tests,
+  the publish materialization route, real 20-step Docker certification, and
+  1,583 API tests passed (1,579 passed, four intentional live skips).
+
 ### 2026-07-29 - R4.4 generated-app proxy and reachability
 
 - Bound standalone generated-app Compose ports to `127.0.0.1` by default;

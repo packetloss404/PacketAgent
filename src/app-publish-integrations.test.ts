@@ -96,6 +96,33 @@ test("publish integrations separate database warnings from publish blockers", ()
   assert.equal(JSON.stringify(readiness).includes("postgres://packetagent:secret"), false);
 });
 
+test("publish integrations report generated SQLite reset-and-reseed truth without external secrets", () => {
+  const readiness = inspectAppPublishIntegrations({
+    draft: {
+      summary: "Customer CRUD app with persisted records.",
+      dataModels: [{ name: "customer" }],
+    },
+    database: {
+      store: "generated-sqlite",
+      configured: true,
+      writable: true,
+      schemaChangePolicy: "reset-and-reseed",
+    },
+  });
+
+  const database = readiness.checks.find((check) => check.category === "database");
+  const connector = readiness.connectorReadiness.find((entry) => entry.id === "database");
+  assert.equal(database?.status, "warning");
+  assert.deepEqual(database?.requiredSecrets, []);
+  assert.ok(database?.warnings.some((warning) => warning.includes("reset and reseed")));
+  assert.equal(
+    database?.warnings.some((warning) => warning.includes("db:migrate")),
+    false,
+  );
+  assert.equal(connector?.status, "ready");
+  assert.deepEqual(connector?.requiredSecrets, []);
+});
+
 test("publish integrations stay quiet for static apps without requested integrations", () => {
   const readiness = inspectAppPublishIntegrations({
     draft: { summary: "Static public FAQ with copy and layout only." },

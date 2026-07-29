@@ -1073,6 +1073,7 @@ test("generated app runtime API persists records through per-app SQLite", async 
       scope?: { workspaceId?: string; appId?: string };
       health?: {
         status?: string;
+        schemaChangePolicy?: string;
         processCount?: number;
         maxProcesses?: number;
         metrics?: { requests?: number; successfulRequests?: number; workerStarts?: number };
@@ -1084,6 +1085,7 @@ test("generated app runtime API persists records through per-app SQLite", async 
     assert.equal(health.scope?.workspaceId, "alpha");
     assert.equal(health.scope?.appId, applied.app.id);
     assert.equal(health.health?.status, "healthy");
+    assert.equal(health.health?.schemaChangePolicy, "reset-and-reseed");
     assert.equal(health.health?.processCount, 1);
     assert.ok((health.health?.maxProcesses ?? 0) >= 1);
     assert.equal(health.health?.metrics?.requests, 3);

@@ -89,6 +89,9 @@ export type GeneratedAppRuntimeWorkspaceManifest = GeneratedAppWorkspaceManifest
 export type RuntimeRecordValue = string | number | boolean | null;
 export type RuntimeSeedRecord = Record<string, RuntimeRecordValue>;
 
+export const GENERATED_APP_SCHEMA_CHANGE_POLICY = "reset-and-reseed" as const;
+export type GeneratedAppSchemaChangePolicy = typeof GENERATED_APP_SCHEMA_CHANGE_POLICY;
+
 export type RuntimeSchemaEntity = {
   name: string;
   label: string;
@@ -1164,7 +1167,7 @@ export type GeneratedSchemaEntity = typeof schema[number];
 }
 
 function renderMigrationSql(model: GeneratedAppRuntimeModel) {
-  return model.schema
+  const referenceDdl = model.schema
     .map((entity) => {
       const fieldNames = new Set(entity.fields.map((field) => snakeCase(field.name)));
       const columns = entity.fields.map(
@@ -1179,6 +1182,13 @@ ${columns.join(",\n")}
 );`;
     })
     .join("\n\n");
+  return `-- Reference DDL for an app-owned database.
+-- PacketAgent's current preview and standalone generated-app runtimes do not
+-- execute this file. They use a generic SQLite record table and reset/reseed
+-- records when the generated schema signature changes.
+
+${referenceDdl}
+`;
 }
 
 function renderSeedTs(model: GeneratedAppRuntimeModel) {
@@ -1212,12 +1222,21 @@ Primary entity: \`${model?.primaryEntity ?? draft.app.dataSchema[0]?.name ?? "re
 The generated app talks to PacketAgent's per-app SQLite runtime through \`/api/app/generated-apps/:appId/api/*\`.
 Data survives page reloads and is shared across browser tabs for the same generated app.
 
+## Schema-change policy
+
+The current runtime policy is \`${GENERATED_APP_SCHEMA_CHANGE_POLICY}\`.
+Ordinary restarts with the same schema preserve records. Changing the generated
+schema signature clears the app's records and loads its seed data again. Back
+up or export the app data before applying a schema-changing checkpoint.
+Automatic data-preserving migration is not implemented.
+
 ## Data Files
 
 - \`src/data/schema.ts\` - typed server-runtime schema.
 - \`src/data/seed-data.json\` - starter records used to initialize SQLite.
 - \`src/api/generated-api.ts\` - browser client for the PacketAgent runtime API.
-- \`src/db/migrations/0001_initial.sql\` - starter table DDL.
+- \`src/db/migrations/0001_initial.sql\` - reference DDL for an app-owned
+  database; the current generic SQLite runtime does not execute it.
 - \`src/db/seed.ts\` - seed loader helper.
 
 ## Routes

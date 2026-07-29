@@ -71,7 +71,10 @@ test("generated app publish package contains a single hardened standalone servic
   assert.match(byPath.get("Dockerfile.publish") ?? "", /RUN --network=none/);
   assert.match(byPath.get("Dockerfile.publish") ?? "", /USER node/);
   assert.match(byPath.get("runtime/server.mjs") ?? "", /node:sqlite/);
-  assert.match(byPath.get("RUNBOOK.md") ?? "", /schema-signature change currently clears/);
+  assert.match(byPath.get("RUNBOOK.md") ?? "", /declared policy is `reset-and-reseed`/);
+  assert.match(byPath.get("RUNBOOK.md") ?? "", /Offline backup and restore/);
+  assert.match(byPath.get("RUNBOOK.md") ?? "", /copyFileSync/);
+  assert.match(byPath.get("runtime/server.mjs") ?? "", /SCHEMA_CHANGE_POLICY = "reset-and-reseed"/);
   assert.match(byPath.get("deploy/Caddyfile.example") ?? "", /reverse_proxy 127\.0\.0\.1/);
   assert.match(
     byPath.get("deploy/nginx.generated-app.conf.example") ?? "",
@@ -108,29 +111,16 @@ test("standalone generated app runtime serves health, static output, and persist
       workspaceId: "workspace_alpha",
       appId: "gapp_alpha",
       checkpointId: "checkpoint_alpha",
+      schemaChangePolicy: "reset-and-reseed",
     })}\n`,
   );
-  writeFileSync(join(runtimeRoot, "runtime-model.json"), `${JSON.stringify(model)}\n`);
+  const modelPath = join(runtimeRoot, "runtime-model.json");
+  writeFileSync(modelPath, `${JSON.stringify(model)}\n`);
 
-  const port = await availablePort();
+  let port = await availablePort();
   let child: ChildProcess | undefined;
   try {
-    child = spawn(
-      process.execPath,
-      [join(process.cwd(), "src/generated-app-publish-runtime/server.mjs")],
-      {
-        env: {
-          ...process.env,
-          HOST: "127.0.0.1",
-          PORT: String(port),
-          PACKETAGENT_GENERATED_APP_STATIC_ROOT: staticRoot,
-          PACKETAGENT_GENERATED_APP_DATA_ROOT: dataRoot,
-          PACKETAGENT_GENERATED_APP_CONFIG_PATH: join(runtimeRoot, "runtime-config.json"),
-          PACKETAGENT_GENERATED_APP_MODEL_PATH: join(runtimeRoot, "runtime-model.json"),
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
+    child = spawnStandaloneRuntime({ port, staticRoot, dataRoot, runtimeRoot });
     await waitUntilReady(port, child);
 
     const live = await fetch(`http://127.0.0.1:${port}/health/live`);
@@ -143,6 +133,15 @@ test("standalone generated app runtime serves health, static output, and persist
       ((await ready.json()) as { checkpointId: string }).checkpointId,
       "checkpoint_alpha",
     );
+    const readyAgain = (await (await fetch(`http://127.0.0.1:${port}/health/ready`)).json()) as {
+      schemaChangePolicy?: string;
+    };
+    assert.equal(readyAgain.schemaChangePolicy, "reset-and-reseed");
+
+    const metadata = (await (await fetch(`http://127.0.0.1:${port}/meta`)).json()) as {
+      schemaChangePolicy?: string;
+    };
+    assert.equal(metadata.schemaChangePolicy, "reset-and-reseed");
 
     const rootResponse = await fetch(`http://127.0.0.1:${port}/`);
     assert.equal(rootResponse.status, 200);
@@ -175,12 +174,77 @@ test("standalone generated app runtime serves health, static output, and persist
     const deletedResponse = await fetch(`${api}/${created.id}`, { method: "DELETE" });
     assert.equal(deletedResponse.status, 200);
     assert.equal(((await deletedResponse.json()) as { archivedId: string }).archivedId, created.id);
+
+    const transientResponse = await fetch(api, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Reset by schema change", status: "open" }),
+    });
+    assert.equal(transientResponse.status, 201);
+    const transient = (await transientResponse.json()) as { id: string };
+
+    child.kill("SIGTERM");
+    await waitForExit(child);
+    child = undefined;
+    writeFileSync(
+      modelPath,
+      `${JSON.stringify({
+        ...model,
+        schema: [
+          {
+            ...model.schema[0]!,
+            fields: [
+              ...model.schema[0]!.fields,
+              { name: "ownerEmail", type: "string", required: false },
+            ],
+            editableFields: [...model.schema[0]!.editableFields, "ownerEmail"],
+          },
+        ],
+      })}\n`,
+    );
+    port = await availablePort();
+    child = spawnStandaloneRuntime({ port, staticRoot, dataRoot, runtimeRoot });
+    await waitUntilReady(port, child);
+    const resetApi = `http://127.0.0.1:${port}/api/app/generated-apps/gapp_alpha/api/tickets`;
+    const resetRecords = (await (await fetch(resetApi)).json()) as Array<{ id: string }>;
+    assert.deepEqual(
+      resetRecords.map((record) => record.id),
+      ["tick_seed"],
+    );
+    assert.equal(
+      resetRecords.some((record) => record.id === transient.id),
+      false,
+    );
   } finally {
     child?.kill("SIGTERM");
     await waitForExit(child);
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+function spawnStandaloneRuntime(input: {
+  port: number;
+  staticRoot: string;
+  dataRoot: string;
+  runtimeRoot: string;
+}): ChildProcess {
+  return spawn(
+    process.execPath,
+    [join(process.cwd(), "src/generated-app-publish-runtime/server.mjs")],
+    {
+      env: {
+        ...process.env,
+        HOST: "127.0.0.1",
+        PORT: String(input.port),
+        PACKETAGENT_GENERATED_APP_STATIC_ROOT: input.staticRoot,
+        PACKETAGENT_GENERATED_APP_DATA_ROOT: input.dataRoot,
+        PACKETAGENT_GENERATED_APP_CONFIG_PATH: join(input.runtimeRoot, "runtime-config.json"),
+        PACKETAGENT_GENERATED_APP_MODEL_PATH: join(input.runtimeRoot, "runtime-model.json"),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+}
 
 async function availablePort(): Promise<number> {
   return await new Promise((resolve, reject) => {

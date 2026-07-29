@@ -80,6 +80,7 @@ test("generated app runtime process pool reuses a warm worker for the same app s
   assert.equal(pool.snapshot().length, 1);
   const health = pool.health({ workspaceId: "alpha", appId: "gapp_1" });
   assert.equal(health.status, "healthy");
+  assert.equal(health.schemaChangePolicy, "reset-and-reseed");
   assert.equal(health.processCount, 1);
   assert.equal(health.metrics.requests, 2);
   assert.equal(health.metrics.successfulRequests, 2);

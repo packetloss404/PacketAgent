@@ -69,6 +69,7 @@ export interface AppPublishIntegrationsInput {
     migrationsReady?: boolean;
     writable?: boolean;
     store?: string;
+    schemaChangePolicy?: "reset-and-reseed";
   };
   browser?: {
     required?: boolean;
@@ -407,11 +408,18 @@ function buildConnectorReadiness(
       label: "Database",
       feature: "Database persistence",
       category: "database",
-      requiredSecrets: DATABASE_URL_ENV_KEYS,
+      requiredSecrets: input.database?.store === "generated-sqlite" ? [] : DATABASE_URL_ENV_KEYS,
       inferredRequired: checkByCategory.get("database")?.required === true,
       inferredConfigured:
-        input.database?.configured === true || hasAnyEnv(env, DATABASE_URL_ENV_KEYS),
-      setupGuide: ["Configure a durable database only for generated CRUD or persistence features."],
+        input.database?.store === "generated-sqlite" ||
+        input.database?.configured === true ||
+        hasAnyEnv(env, DATABASE_URL_ENV_KEYS),
+      setupGuide:
+        input.database?.store === "generated-sqlite"
+          ? [
+              "Keep the generated SQLite volume durable and take an offline backup before schema-changing checkpoints.",
+            ]
+          : ["Configure a durable database only for generated CRUD or persistence features."],
     },
   ];
 
@@ -698,6 +706,7 @@ function databaseCheck(
   const migrationsReady = input.database?.migrationsReady;
   const writable = input.database?.writable;
   const memoryStore = store === "memory";
+  const generatedSqlite = store === "generated-sqlite";
 
   return {
     category: "database",
@@ -712,12 +721,15 @@ function databaseCheck(
       ["draft:crud", /\bcrud\b|\bpersist(s|ed|ence)?\b|\bsave records\b/i.test(sourceText)],
       ["input:database-required", input.database?.required === true],
     ]),
-    requiredSecrets: hasDatabaseUrl ? [] : DATABASE_URL_ENV_KEYS,
+    requiredSecrets: generatedSqlite || hasDatabaseUrl ? [] : DATABASE_URL_ENV_KEYS,
     missingSetup: [
-      ...(!configured || memoryStore
+      ...(!generatedSqlite && (!configured || memoryStore)
         ? ["Configure a non-memory database runtime for published CRUD or persistence."]
         : []),
-      ...(migrationsReady === false
+      ...(generatedSqlite && input.database?.schemaChangePolicy !== "reset-and-reseed"
+        ? ["Declare the generated SQLite reset-and-reseed schema-change policy."]
+        : []),
+      ...(!generatedSqlite && migrationsReady === false
         ? ["Run generated-app database migrations before publishing."]
         : []),
       ...(writable === false
@@ -725,7 +737,12 @@ function databaseCheck(
         : []),
     ],
     warnings: [
-      ...(required && configured && migrationsReady === undefined
+      ...(required && generatedSqlite
+        ? [
+            "Generated SQLite schema changes reset and reseed records; take an offline volume backup before applying a schema-changing checkpoint.",
+          ]
+        : []),
+      ...(required && configured && !generatedSqlite && migrationsReady === undefined
         ? [
             "Run npm run db:migrate or confirm migrations are already applied for the publish database.",
           ]
@@ -739,10 +756,15 @@ function databaseCheck(
           ]
         : []),
     ],
-    setupGuide: [
-      "Use PACKETAGENT_STORE=postgres with DATABASE_URL or PACKETAGENT_DATABASE_URL for durable self-hosted publish.",
-      "Run database migration and ready checks before shifting traffic.",
-    ],
+    setupGuide: generatedSqlite
+      ? [
+          "The standalone generated app persists SQLite in its named Docker volume.",
+          "Stop the service before backup or restore; same-schema restarts preserve records, while schema changes reset and reseed.",
+        ]
+      : [
+          "Use PACKETAGENT_STORE=postgres with DATABASE_URL or PACKETAGENT_DATABASE_URL for durable self-hosted publish.",
+          "Run database migration and ready checks before shifting traffic.",
+        ],
   };
 }
 

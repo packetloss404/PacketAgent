@@ -119,6 +119,7 @@ export interface AppPublishRuntimeAssumption {
 
 export interface AppPublishRuntimeConfig {
   runtime: "packetagent-generated-app-standalone";
+  schemaChangePolicy: "reset-and-reseed";
   nodeVersion: "22";
   workingDirectory: string;
   startCommand: "docker compose -f docker-compose.publish.yml up --build --wait";
@@ -407,6 +408,7 @@ function buildRuntimeConfig(
 ): AppPublishRuntimeConfig {
   return {
     runtime: "packetagent-generated-app-standalone",
+    schemaChangePolicy: "reset-and-reseed",
     nodeVersion: "22",
     workingDirectory: localPublishPath,
     startCommand: "docker compose -f docker-compose.publish.yml up --build --wait",
@@ -441,7 +443,7 @@ function buildPublishCommands(
       required: true,
       produces: [`${localPublishPath}/bundle/dist`, "generated-app-data"],
       description:
-        "Build, start, probe, restart, verify SQLite persistence, and clean up the standalone package.",
+        "Build, start, probe, restart, verify SQLite persistence and offline restore, and clean up the standalone package.",
     },
     ...(includesAgent(bundleKind)
       ? [
@@ -538,7 +540,7 @@ function buildArtifactManifest(
         path: `${localPublishPath}/RUNBOOK.md`,
         kind: "config",
         required: true,
-        description: "Local start, health, persistence, stop, and migration instructions.",
+        description: "Local start, health, persistence, backup/restore, and schema-change truth.",
       },
       {
         path: `${localPublishPath}/deploy/Caddyfile.example`,
@@ -682,7 +684,7 @@ function buildDockerComposeExport(
             "Agent execution remains in the permissioned PacketAgent Worker runtime; this package only hosts the generated app surface.",
           ]
         : []),
-      "Run bounded liveness, readiness, static, CRUD, and restart-persistence checks before handoff.",
+      "Run bounded liveness, readiness, static, CRUD, restart-persistence, and offline backup/restore checks before handoff.",
     ],
   };
 }
@@ -878,7 +880,7 @@ function buildPackagingNotes(bundleKind: AppPublishBundleKind): string[] {
     "Build generated Vite source in a multi-stage image and copy only dist plus the standalone Node runtime into the final image.",
     "Keep the final container root read-only and persist only per-app SQLite data in the named volume.",
     "Validate Vite's output manifest and every referenced static file before reporting readiness.",
-    "Treat a schema-signature change as destructive until the data-preserving migration backlog gate passes.",
+    "Treat every schema-signature change as a destructive reset/reseed; automatic data-preserving migration is not implemented.",
     ...(includesAgent(bundleKind)
       ? [
           "Package generated agent prompts, tool policy, and manifest beside the app bundle for one-click self-hosted export.",

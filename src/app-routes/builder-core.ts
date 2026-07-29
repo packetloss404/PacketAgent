@@ -63,6 +63,7 @@ import {
   buildGeneratedAppRuntimeArtifact,
   buildGeneratedAppRuntimeArtifactFromFiles,
   buildGeneratedAppRuntimeModel,
+  GENERATED_APP_SCHEMA_CHANGE_POLICY,
   findGeneratedAppSourceFile,
   summarizeGeneratedAppSourceFiles,
   writeGeneratedAppRuntimeWorkspace,
@@ -2524,8 +2525,10 @@ async function buildPublishPreflight(
     env,
     database: {
       required: draft.app.dataSchema.length > 0,
-      store: env.PACKETAGENT_STORE,
-      configured: env.PACKETAGENT_STORE !== "memory",
+      store: "generated-sqlite",
+      configured: true,
+      writable: true,
+      schemaChangePolicy: GENERATED_APP_SCHEMA_CHANGE_POLICY,
     },
   });
 
@@ -2569,6 +2572,7 @@ function materializeGeneratedAppPublishWorkspace(
   };
   const runtimeConfig = {
     runtime: "packetagent-generated-app-standalone",
+    schemaChangePolicy: GENERATED_APP_SCHEMA_CHANGE_POLICY,
     workspaceId: record.workspaceId,
     appId: record.id,
     checkpointId: checkpoint.id,

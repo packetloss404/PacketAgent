@@ -1091,7 +1091,7 @@ implementation evidence live in
 
 ### R4 - Generated-app runtime and self-host publish
 
-Status: active.
+Status: complete as of 2026-07-29. Resume at R5.
 
 1. [Complete 2026-07-29] Add per-app runtime health, metrics, crash visibility,
    and documented process-pool limits.
@@ -1105,11 +1105,24 @@ Status: active.
    Caddy/nginx/Tailscale reverse-proxy and VPN examples, and a bounded
    certificate-validating, redirect-denying public-URL reachability check bound
    to exact app/checkpoint identity.
-5. Preserve schema/data migration truth; do not imply automatic migration when
-   a schema reset is still the behavior.
+5. [Complete 2026-07-29] Preserve schema/data migration truth with one visible
+   `reset-and-reseed` policy, same-schema and schema-change characterization,
+   reference-only generated DDL, and a real stopped-volume backup/restore
+   proof.
 
 Gate: an exported app can be integrity-checked, started, health-checked, and
 reached through the documented self-host path.
+
+Gate result: passed. Manifest v2 binds and verifies exact package bytes; the
+single-service runtime validates its emitted Vite assets, health, identity,
+schema policy, CRUD, restart persistence, offline backup/restore, and final
+origin through bounded local and reachability certifiers. Research and
+implementation evidence live in
+[`r4-generated-app-publish.md`](r4-generated-app-publish.md). Typecheck,
+zero-warning lint, formatting, production web build, 32 web tests, 34 focused
+backend tests, the publish materialization route, real 20-step Docker
+certification, and 1,583 API tests pass (1,579 passed with four intentional
+live interoperability skips).
 
 ### R5 - Sandbox, egress, and preview isolation
 

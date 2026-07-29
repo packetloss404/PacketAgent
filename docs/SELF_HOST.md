@@ -266,9 +266,10 @@ npm run verify:generated-app-publish -- data/published-apps/<workspace>/<app>
 
 The bounded verifier validates Compose, builds and starts the package on a free
 loopback port, checks `/health/live`, `/health/ready`, static HTML, and
-generated CRUD, restarts the container to prove SQLite volume persistence, and
-then removes its uniquely named test container, network, volume, and local
-image.
+generated CRUD, restarts the container to prove SQLite volume persistence,
+runs a stopped-service backup/mutate/restore round trip, and then removes its
+uniquely named test containers, network, volume, local image, and temporary
+backup.
 
 **To keep a published app running:**
 
@@ -370,7 +371,7 @@ than silently verifying another service. HTTP is accepted only for loopback
 testing. A passing check proves reachability at that moment; it does not
 configure or continuously monitor DNS/TLS.
 
-### Standalone runtime and migration truth
+### Standalone runtime, schema-change, and backup truth
 
 The image build may use the package registry only during dependency
 installation; dependency lifecycle scripts are disabled and the Vite compile
@@ -384,10 +385,30 @@ referenced chunks, CSS, and assets before readiness passes. The source
 `publish-artifacts.json` seals the exact declared build/runtime inputs; it
 does not claim to contain the final image digest.
 
-A generated schema-signature change currently clears and reseeds that app's
-standalone SQLite records. Back up or export the named volume before replacing
-a running package with a schema-changing checkpoint. PacketAgent does not yet
-claim automatic data-preserving schema migration.
+Both `runtime-config.json` and `/health/ready` declare
+`schemaChangePolicy: "reset-and-reseed"`. Same-schema restarts preserve
+records; changing the generated schema signature clears the app's records and
+loads its seed data again. Generated `src/db/migrations/0001_initial.sql` is
+reference DDL for an app-owned database and is not executed by the current
+preview or standalone runtime. Automatic data-preserving schema migration is
+not implemented or claimed.
+
+Use the exact offline backup and restore commands in the generated
+`RUNBOOK.md`. They stop the service, run the already-built generated-app image
+with the named volume plus an external backup directory, copy
+`runtime.sqlite`, restart, and re-verify the app. Stopping matters because
+SQLite checkpoints WAL content when the last database connection closes.
+Docker's volume documentation likewise treats backup/restore as an explicit
+operator workflow:
+
+- [Docker volume backup and restore](https://docs.docker.com/engine/storage/volumes/#back-up-restore-or-migrate-data-volumes)
+- [SQLite write-ahead logging and final-connection checkpoint](https://www.sqlite.org/wal.html)
+
+Keep backups outside the sealed publish directory so they do not invalidate
+artifact integrity. Never add `--volumes` to `docker compose down` unless
+deleting the app data is intentional. The certification CLI exercises the
+same stopped-service backup/restore method against a temporary external
+directory.
 
 For hosted-only conveniences PacketAgent does not ship (free public subdomain, auto TLS, managed App Store submission, hosted OAuth proxy), see [CLOUD.md](../CLOUD.md) for the full deferred-features inventory.
 
@@ -401,6 +422,10 @@ Set `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` to a value from `1` to
 the pool is full, PacketAgent evicts the least-recently-used idle process.
 Each active app therefore consumes one child process in addition to the main
 PacketAgent server.
+
+The health response and Builder Sandbox tab expose the same
+`reset-and-reseed` policy so a preview schema change is not presented as an
+automatic migration.
 
 After authenticating as a workspace viewer, inspect the whole workspace:
 

@@ -82,6 +82,10 @@ export function SandboxBuilderTab({ appId, appName }: { appId: string | null; ap
             label="Crashes / retries"
             value={`${runtimeHealth.data.metrics.crashes}/${runtimeHealth.data.metrics.retryAttempts}`}
           />
+          <div className="muted" style={{ gridColumn: "1 / -1", fontSize: 11.5 }}>
+            Schema changes: {runtimeHealth.data.schemaChangePolicy}. Back up app data before
+            applying a schema-changing checkpoint.
+          </div>
           {runtimeHealth.data.recentCrashes[0] && (
             <div
               style={{ gridColumn: "1 / -1", color: "var(--danger)", fontSize: 11.5 }}
