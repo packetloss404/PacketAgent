@@ -6,7 +6,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
-### 2026-07-28 - R1 persistence correctness
+### 2026-07-28 - R1 persistence and queue correctness
 
 - Reused one managed Postgres pool per connection target instead of opening and
   closing a pool for every store operation, while retaining dedicated
@@ -21,6 +21,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   reviving archived review files as active ledgers.
 - Passed the 1,517-test API gate: 1,513 passed, 4 intentionally skipped live
   Packet-product probes, and 0 failed.
+- Removed the redundant SQLite jobs-table upsert after canonical store
+  mutations, keeping document hydration and dedicated job persistence inside
+  one `begin immediate` transaction so a claimed job cannot be reverted.
+- Required workspace identity on every job find, update, and cancel boundary,
+  rejected cross-workspace ID collisions during upsert, and added repository,
+  route, scheduler, and claim/rewrite regressions. The focused queue gate passes
+  91 tests.
 
 ### 2026-07-28 - Local remote-control certification (W10.4)
 

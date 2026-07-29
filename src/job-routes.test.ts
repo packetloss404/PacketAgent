@@ -184,7 +184,7 @@ test("job cancel does not cancel jobs from another workspace", async () => {
     headers: authHeaders(alpha.cookieValue),
   });
   const body = await response.json();
-  const fresh = findJob(betaJob.id);
+  const fresh = findJob("beta", betaJob.id);
 
   assert.equal(response.status, 404);
   assert.deepEqual(body, { error: "not found" });

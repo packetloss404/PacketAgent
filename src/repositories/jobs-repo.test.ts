@@ -73,7 +73,7 @@ test("empty repository returns no rows", () => {
   runOnBoth((repo) => {
     assert.deepEqual(repo.list({ workspaceId: "ws_a" }), []);
     assert.equal(repo.count(), 0);
-    assert.equal(repo.find("missing"), null);
+    assert.equal(repo.find("ws_a", "missing"), null);
   });
 });
 
@@ -160,21 +160,22 @@ test("list applies default limit of 50 and caps at 200", () => {
   });
 });
 
-test("find returns the matching row regardless of workspace", () => {
+test("find requires the matching workspace", () => {
   runOnBoth((repo) => {
     repo.upsert(makeRecord({ id: "job_1", workspaceId: "ws_a", type: "first" }));
     repo.upsert(makeRecord({ id: "job_2", workspaceId: "ws_b", type: "second" }));
-    const result = repo.find("job_2");
+    const result = repo.find("ws_b", "job_2");
     assert.ok(result);
     assert.equal(result?.type, "second");
     assert.equal(result?.workspaceId, "ws_b");
+    assert.equal(repo.find("ws_a", "job_2"), null);
   });
 });
 
 test("find returns null when id is unknown", () => {
   runOnBoth((repo) => {
     repo.upsert(makeRecord({ id: "job_1", workspaceId: "ws_a" }));
-    assert.equal(repo.find("missing"), null);
+    assert.equal(repo.find("ws_a", "missing"), null);
   });
 });
 
@@ -199,10 +200,32 @@ test("upsert replaces existing row by id", () => {
       }),
     );
     assert.equal(repo.count(), 1);
-    const row = repo.find("job_1");
+    const row = repo.find("ws_a", "job_1");
     assert.equal(row?.status, "success");
     assert.equal(row?.attempts, 2);
     assert.equal(row?.updatedAt, "2026-04-26T10:05:00.000Z");
+  });
+});
+
+test("upsert refuses to replace a job owned by another workspace", () => {
+  runOnBoth((repo) => {
+    const original = makeRecord({
+      id: "job_shared_identity",
+      workspaceId: "ws_a",
+      status: "queued",
+    });
+    repo.upsert(original);
+
+    assert.throws(
+      () => repo.upsert(makeRecord({
+        id: original.id,
+        workspaceId: "ws_b",
+        status: "success",
+      })),
+      /already owned by another workspace/,
+    );
+    assert.deepEqual(repo.find("ws_a", original.id), original);
+    assert.equal(repo.find("ws_b", original.id), null);
   });
 });
 
@@ -217,23 +240,42 @@ test("update applies the patch and bumps updatedAt", () => {
       }),
     );
     const before = Date.now();
-    const updated = repo.update("job_1", { status: "success", error: "none" });
+    const updated = repo.update("ws_a", "job_1", { status: "success", error: "none" });
     const after = Date.now();
     assert.ok(updated);
     assert.equal(updated?.status, "success");
     assert.equal(updated?.error, "none");
     const updatedMs = Date.parse(updated!.updatedAt);
     assert.ok(updatedMs >= before && updatedMs <= after);
-    const row = repo.find("job_1");
+    const row = repo.find("ws_a", "job_1");
     assert.equal(row?.status, "success");
     assert.equal(row?.error, "none");
+  });
+});
+
+test("update cannot mutate a job through another workspace", () => {
+  runOnBoth((repo) => {
+    repo.upsert(makeRecord({
+      id: "job_workspace_scoped_update",
+      workspaceId: "ws_b",
+      status: "queued",
+    }));
+
+    assert.equal(
+      repo.update("ws_a", "job_workspace_scoped_update", { status: "success" }),
+      null,
+    );
+    assert.equal(
+      repo.find("ws_b", "job_workspace_scoped_update")?.status,
+      "queued",
+    );
   });
 });
 
 test("update returns null when id is unknown", () => {
   runOnBoth((repo) => {
     repo.upsert(makeRecord({ id: "job_1", workspaceId: "ws_a" }));
-    assert.equal(repo.update("missing", { status: "failed" }), null);
+    assert.equal(repo.update("ws_a", "missing", { status: "failed" }), null);
   });
 });
 
@@ -245,7 +287,7 @@ test("payload round-trip preserves mixed scalar values", () => {
       payload: { agentId: "agent_x", count: 5, ok: true },
     });
     repo.upsert(record);
-    const found = repo.find("job_payload");
+    const found = repo.find("ws_a", "job_payload");
     assert.deepEqual(found?.payload, { agentId: "agent_x", count: 5, ok: true });
   });
 });
@@ -256,13 +298,13 @@ test("result round-trip handles object, null, and undefined", () => {
     repo.upsert(makeRecord({ id: "nul", workspaceId: "ws_a", result: null }));
     repo.upsert(makeRecord({ id: "und", workspaceId: "ws_a" }));
 
-    const obj = repo.find("obj");
+    const obj = repo.find("ws_a", "obj");
     assert.deepEqual(obj?.result, { ok: true, count: 3 });
 
-    const nul = repo.find("nul");
+    const nul = repo.find("ws_a", "nul");
     assert.equal(nul?.result, null);
 
-    const und = repo.find("und");
+    const und = repo.find("ws_a", "und");
     assert.equal(und?.result, undefined);
   });
 });
@@ -273,9 +315,9 @@ test("cancelRequested round-trips through undefined, true, and false", () => {
     repo.upsert(makeRecord({ id: "tru", workspaceId: "ws_a", cancelRequested: true }));
     repo.upsert(makeRecord({ id: "fal", workspaceId: "ws_a", cancelRequested: false }));
 
-    assert.equal(repo.find("und")?.cancelRequested, undefined);
-    assert.equal(repo.find("tru")?.cancelRequested, true);
-    assert.equal(repo.find("fal")?.cancelRequested, false);
+    assert.equal(repo.find("ws_a", "und")?.cancelRequested, undefined);
+    assert.equal(repo.find("ws_a", "tru")?.cancelRequested, true);
+    assert.equal(repo.find("ws_a", "fal")?.cancelRequested, false);
   });
 });
 
@@ -283,7 +325,7 @@ test("optional fields round-trip as undefined when omitted", () => {
   runOnBoth((repo) => {
     const record = makeRecord({ id: "minimal", workspaceId: "ws_a" });
     repo.upsert(record);
-    const found = repo.find("minimal");
+    const found = repo.find("ws_a", "minimal");
     assert.ok(found);
     assert.equal(found?.startedAt, undefined);
     assert.equal(found?.completedAt, undefined);
@@ -330,7 +372,7 @@ test("claimNext promotes a queued job to running and increments attempts", () =>
     assert.equal(claimed?.attempts, 1);
     assert.equal(claimed?.startedAt, "2026-04-26T10:00:00.000Z");
     assert.equal(claimed?.updatedAt, "2026-04-26T10:00:00.000Z");
-    const persisted = repo.find("job_1");
+    const persisted = repo.find("ws_a", "job_1");
     assert.equal(persisted?.status, "running");
     assert.equal(persisted?.startedAt, "2026-04-26T10:00:00.000Z");
   });
@@ -388,8 +430,8 @@ test("claimNext honors Date.parse-valid non-ISO scheduledAt values", () => {
 
     const claimed = repo.claimNext(new Date("2026-04-26T10:00:00.000Z"));
     assert.equal(claimed?.id, "rfc_due");
-    assert.equal(repo.find("rfc_due")?.status, "running");
-    assert.equal(repo.find("iso_later")?.status, "queued");
+    assert.equal(repo.find("ws_a", "rfc_due")?.status, "running");
+    assert.equal(repo.find("ws_a", "iso_later")?.status, "queued");
   });
 });
 
@@ -428,7 +470,7 @@ test("claimNext respects scheduledAt ordering and never claims future jobs early
     assert.equal(repo.claimNext(now)?.id, "due_late");
     // The future-scheduled job is never claimable at this `now`.
     assert.equal(repo.claimNext(now), null);
-    assert.equal(repo.find("future")?.status, "queued");
+    assert.equal(repo.find("ws_a", "future")?.status, "queued");
 
     // Once time advances past its schedule, the future job becomes claimable.
     const later = new Date("2026-04-26T11:00:00.000Z");
@@ -452,7 +494,7 @@ test("claimNext never claims a future job whose scheduledAt carries a non-UTC of
     );
     const now = new Date("2026-04-26T10:00:00.000Z");
     assert.equal(repo.claimNext(now), null);
-    assert.equal(repo.find("future_offset")?.status, "queued");
+    assert.equal(repo.find("ws_a", "future_offset")?.status, "queued");
     // It becomes claimable only once `now` passes 14:00Z.
     assert.equal(repo.claimNext(new Date("2026-04-26T14:30:00.000Z"))?.id, "future_offset");
   });
@@ -497,7 +539,7 @@ test("sweepStaleRunning returns 0 when no stale rows exist", () => {
     );
     const swept = repo.sweepStaleRunning(60_000, new Date("2026-04-26T10:00:00.000Z"));
     assert.equal(swept, 0);
-    assert.equal(repo.find("fresh")?.status, "running");
+    assert.equal(repo.find("ws_a", "fresh")?.status, "running");
   });
 });
 
@@ -529,13 +571,13 @@ test("sweepStaleRunning resets stale rows to queued and clears startedAt", () =>
     );
     const swept = repo.sweepStaleRunning(5 * 60 * 1000, new Date("2026-04-26T10:00:00.000Z"));
     assert.equal(swept, 2);
-    const a = repo.find("stale_a");
+    const a = repo.find("ws_a", "stale_a");
     assert.equal(a?.status, "queued");
     assert.equal(a?.startedAt, undefined);
-    const b = repo.find("stale_b");
+    const b = repo.find("ws_b", "stale_b");
     assert.equal(b?.status, "queued");
     assert.equal(b?.startedAt, undefined);
-    const fresh = repo.find("fresh");
+    const fresh = repo.find("ws_a", "fresh");
     assert.equal(fresh?.status, "running");
     assert.equal(fresh?.startedAt, "2026-04-26T09:59:30.000Z");
   });
@@ -562,9 +604,9 @@ test("sweepStaleRunning honors Date.parse-valid non-ISO startedAt values", () =>
 
     const count = repo.sweepStaleRunning(5 * 60 * 1000, new Date("2026-04-26T10:00:00.000Z"));
     assert.equal(count, 1);
-    assert.equal(repo.find("rfc_stale")?.status, "queued");
-    assert.equal(repo.find("rfc_stale")?.startedAt, undefined);
-    assert.equal(repo.find("iso_fresh")?.status, "running");
+    assert.equal(repo.find("ws_a", "rfc_stale")?.status, "queued");
+    assert.equal(repo.find("ws_a", "rfc_stale")?.startedAt, undefined);
+    assert.equal(repo.find("ws_a", "iso_fresh")?.status, "running");
   });
 });
 
@@ -580,7 +622,7 @@ test("sweepStaleRunning ignores rows whose startedAt is recent", () => {
     );
     const swept = repo.sweepStaleRunning(5 * 60 * 1000, new Date("2026-04-26T10:00:00.000Z"));
     assert.equal(swept, 0);
-    assert.equal(repo.find("recent")?.status, "running");
+    assert.equal(repo.find("ws_a", "recent")?.status, "running");
   });
 });
 
@@ -597,19 +639,22 @@ test("asyncJobsRepository delegates enqueue, claim, and sweep to the sync reposi
   });
 
   await asyncRepo.upsert(queued);
-  assert.deepEqual(await asyncRepo.find(queued.id), syncRepo.find(queued.id));
+  assert.deepEqual(
+    await asyncRepo.find(queued.workspaceId, queued.id),
+    syncRepo.find(queued.workspaceId, queued.id),
+  );
 
   const claimTime = new Date("2026-04-26T10:00:00.000Z");
   const claimed = await asyncRepo.claimNext(claimTime);
-  assert.deepEqual(claimed, syncRepo.find(queued.id));
+  assert.deepEqual(claimed, syncRepo.find(queued.workspaceId, queued.id));
   assert.equal(claimed?.status, "running");
   assert.equal(claimed?.startedAt, claimTime.toISOString());
 
   const sweepTime = new Date("2026-04-26T10:10:00.000Z");
   const swept = await asyncRepo.sweepStaleRunning(5 * 60 * 1000, sweepTime);
   assert.equal(swept, 1);
-  assert.equal(syncRepo.find(queued.id)?.status, "queued");
-  assert.equal(syncRepo.find(queued.id)?.startedAt, undefined);
+  assert.equal(syncRepo.find(queued.workspaceId, queued.id)?.status, "queued");
+  assert.equal(syncRepo.find(queued.workspaceId, queued.id)?.startedAt, undefined);
 });
 
 test("createJobsRepository returns json impl when env is unset", () => {

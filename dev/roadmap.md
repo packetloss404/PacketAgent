@@ -47,8 +47,10 @@ R1 is underway. Its first persistence slice now reuses managed Postgres pools,
 validates SQLite migration/restore integrity and foreign keys, rejects corrupt
 restore candidates without replacing current data, and preserves target-only
 managed-backfill records. The jobs single-writer/workspace-scoping audit is
-next; [`r1-repository-health-audit.md`](r1-repository-health-audit.md) records
-supporting evidence while `BACKLOG.md` remains the ledger.
+also closed with a single canonical SQLite transaction, workspace-qualified
+job controls, and collision/race coverage. Backend security and startup truth
+are next; [`r1-repository-health-audit.md`](r1-repository-health-audit.md)
+records supporting evidence while `BACKLOG.md` remains the ledger.
 
 ## North star
 

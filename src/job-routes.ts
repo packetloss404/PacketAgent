@@ -98,8 +98,8 @@ jobRoutes.post("/", async (c) => {
 jobRoutes.get("/:id", async (c) => {
   try {
     const { workspace } = requirePrivateWorkspaceRole(c, "viewer");
-    const job = await findJobAsync(c.req.param("id"));
-    if (!job || job.workspaceId !== workspace.id) return errorResponse(c, Object.assign(new Error("not found"), { status: 404 }));
+    const job = await findJobAsync(workspace.id, c.req.param("id"));
+    if (!job) return errorResponse(c, Object.assign(new Error("not found"), { status: 404 }));
     return c.json({ job: serializeJob(job) });
   } catch (error) {
     return errorResponse(c, error);
@@ -109,9 +109,9 @@ jobRoutes.get("/:id", async (c) => {
 jobRoutes.post("/:id/cancel", async (c) => {
   try {
     const { workspace } = requirePrivateWorkspaceRole(c, "admin");
-    const existing = await findJobAsync(c.req.param("id"));
-    if (!existing || existing.workspaceId !== workspace.id) return errorResponse(c, Object.assign(new Error("not found"), { status: 404 }));
-    const job = await cancelJobAsync(existing.id);
+    const existing = await findJobAsync(workspace.id, c.req.param("id"));
+    if (!existing) return errorResponse(c, Object.assign(new Error("not found"), { status: 404 }));
+    const job = await cancelJobAsync(workspace.id, existing.id);
     if (!job) return errorResponse(c, Object.assign(new Error("not found"), { status: 404 }));
     return c.json({ ok: true, job: serializeJob(job) });
   } catch (error) {

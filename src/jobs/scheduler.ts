@@ -219,7 +219,7 @@ export class JobScheduler {
     const ctrl = new AbortController();
     this.inFlight.set(job.id, ctrl);
     const cancelWatcher = setInterval(() => {
-      void findJobAsync(job.id)
+      void findJobAsync(job.workspaceId, job.id)
         .then((fresh) => {
           if (fresh?.cancelRequested) ctrl.abort(WORKER_OPERATOR_CANCEL_REASON);
         })
@@ -239,7 +239,7 @@ export class JobScheduler {
     try {
       if (!handler) {
         recordTerminal("failed");
-        await updateJobAsync(job.id, {
+        await updateJobAsync(job.workspaceId, job.id, {
           status: "failed",
           error: `no handler registered for type "${job.type}"`,
           completedAt: new Date().toISOString(),
@@ -253,12 +253,15 @@ export class JobScheduler {
           return;
         }
         recordTerminal("canceled");
-        await cancelJobAsync(job.id);
-        await updateJobAsync(job.id, { status: "canceled", completedAt: new Date().toISOString() });
+        await cancelJobAsync(job.workspaceId, job.id);
+        await updateJobAsync(job.workspaceId, job.id, {
+          status: "canceled",
+          completedAt: new Date().toISOString(),
+        });
         return;
       }
       recordTerminal("success");
-      await updateJobAsync(job.id, {
+      await updateJobAsync(job.workspaceId, job.id, {
         status: "success",
         result,
         completedAt: new Date().toISOString(),
@@ -297,7 +300,7 @@ export class JobScheduler {
       // store error while handling a job failure can never escape.
       try {
         if (error instanceof JobDeferredError) {
-          await updateJobAsync(job.id, {
+          await updateJobAsync(job.workspaceId, job.id, {
             status: "queued",
             attempts: Math.max(0, job.attempts - 1),
             error: undefined,
@@ -313,10 +316,10 @@ export class JobScheduler {
           await this.releaseJob(job);
           return;
         }
-        const fresh = await findJobAsync(job.id);
+        const fresh = await findJobAsync(job.workspaceId, job.id);
         if (fresh?.cancelRequested || ctrl.signal.aborted) {
           recordTerminal("canceled");
-          await updateJobAsync(job.id, {
+          await updateJobAsync(job.workspaceId, job.id, {
             status: "canceled",
             error: redactedErrorMessage(error),
             completedAt: new Date().toISOString(),
@@ -326,7 +329,7 @@ export class JobScheduler {
         if (job.attempts < job.maxAttempts) {
           // retry path: do not record metrics; only terminal outcomes are tracked.
           const next = new Date(Date.now() + backoffMs(job.attempts));
-          await updateJobAsync(job.id, {
+          await updateJobAsync(job.workspaceId, job.id, {
             status: "queued",
             error: redactedErrorMessage(error),
             scheduledAt: next.toISOString(),
@@ -334,7 +337,7 @@ export class JobScheduler {
           });
         } else {
           recordTerminal("failed");
-          await updateJobAsync(job.id, {
+          await updateJobAsync(job.workspaceId, job.id, {
             status: "failed",
             error: redactedErrorMessage(error),
             completedAt: new Date().toISOString(),
@@ -352,7 +355,7 @@ export class JobScheduler {
   }
 
   private async releaseJob(job: JobRecord): Promise<void> {
-    await updateJobAsync(job.id, {
+    await updateJobAsync(job.workspaceId, job.id, {
       status: "queued",
       attempts: Math.max(0, job.attempts - 1),
       error: undefined,

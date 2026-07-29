@@ -136,22 +136,21 @@ test("listJobsForWorkspaceIndexed filters by status", () => {
   assert.deepEqual(failed, []);
 });
 
-test("findJobIndexed returns the matching row regardless of workspace and null when missing", () => {
+test("findJobIndexed requires the matching workspace and returns null for cross-workspace reads", () => {
   const data = makeStore([
     makeRecord({ id: "job_match", workspaceId: "ws_target", createdAt: "2026-04-26T01:00:00.000Z" }),
     makeRecord({ id: "job_other_ws", workspaceId: "ws_other", createdAt: "2026-04-26T02:00:00.000Z" }),
   ]);
   const repository = jsonJobsRepository({ loadStore: () => data });
 
-  const found = findJobViaRepository("job_match", { repository });
+  const found = findJobViaRepository("ws_target", "job_match", { repository });
   assert.equal(found?.id, "job_match");
   assert.equal(found?.workspaceId, "ws_target");
 
-  const crossWorkspace = findJobViaRepository("job_other_ws", { repository });
-  assert.equal(crossWorkspace?.id, "job_other_ws");
-  assert.equal(crossWorkspace?.workspaceId, "ws_other");
+  const crossWorkspace = findJobViaRepository("ws_target", "job_other_ws", { repository });
+  assert.equal(crossWorkspace, null);
 
-  const missing = findJobViaRepository("job_does_not_exist", { repository });
+  const missing = findJobViaRepository("ws_target", "job_does_not_exist", { repository });
   assert.equal(missing, null);
 });
 
@@ -176,15 +175,14 @@ test("listJobsForWorkspaceIndexed reads from the SQLite repository when PACKETAG
     const queuedOnly = listJobsForWorkspaceIndexed("ws_target", { status: "queued" });
     assert.deepEqual(queuedOnly.map((entry) => entry.id), ["sqlite_c", "sqlite_a"]);
 
-    const found = findJobIndexed("sqlite_b");
+    const found = findJobIndexed("ws_target", "sqlite_b");
     assert.equal(found?.id, "sqlite_b");
     assert.equal(found?.status, "running");
 
-    const crossWorkspace = findJobIndexed("sqlite_other");
-    assert.equal(crossWorkspace?.id, "sqlite_other");
-    assert.equal(crossWorkspace?.workspaceId, "ws_other");
+    const crossWorkspace = findJobIndexed("ws_target", "sqlite_other");
+    assert.equal(crossWorkspace, null);
 
-    const missing = findJobIndexed("does_not_exist");
+    const missing = findJobIndexed("ws_target", "does_not_exist");
     assert.equal(missing, null);
   });
 });
@@ -218,7 +216,7 @@ test("listJobsForWorkspaceIndexed merges JSON-side fall-back rows when in SQLite
     // Newest first by createdAt.
     assert.equal(ids[0], "json_only");
 
-    const foundFallback = findJobViaRepository("json_only", { loadStore });
+    const foundFallback = findJobViaRepository("ws_target", "json_only", { loadStore });
     assert.equal(foundFallback?.id, "json_only");
   });
 });

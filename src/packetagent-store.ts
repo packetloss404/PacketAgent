@@ -647,8 +647,8 @@ export function findAgentRunForWorkspaceIndexed(workspaceId: string, runId: stri
   return findAgentRunForWorkspaceViaRepository(workspaceId, runId);
 }
 
-export function findJobIndexed(jobId: string): JobRecord | null {
-  return findJobViaRepository(jobId);
+export function findJobIndexed(workspaceId: string, jobId: string): JobRecord | null {
+  return findJobViaRepository(workspaceId, jobId);
 }
 
 export async function listActivitiesForWorkspaceIndexedAsync(workspaceId: string, limit?: number): Promise<ActivityRecord[]> {
@@ -928,10 +928,15 @@ export async function findAgentRunForWorkspaceIndexedAsync(
     : (await loadStoreAsync()).agentRuns.find((entry) => entry.workspaceId === workspaceId && entry.id === runId) ?? null;
 }
 
-export async function findJobIndexedAsync(jobId: string): Promise<JobRecord | null> {
+export async function findJobIndexedAsync(
+  workspaceId: string,
+  jobId: string,
+): Promise<JobRecord | null> {
   return shouldUseSqliteIndexedReads()
-    ? findJobIndexed(jobId)
-    : (await loadStoreAsync()).jobs.find((entry) => entry.id === jobId) ?? null;
+    ? findJobIndexed(workspaceId, jobId)
+    : (await loadStoreAsync()).jobs.find(
+      (entry) => entry.workspaceId === workspaceId && entry.id === jobId,
+    ) ?? null;
 }
 
 export function resetLocalStore(): PacketAgentData {

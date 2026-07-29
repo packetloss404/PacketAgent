@@ -26,10 +26,10 @@ import {
   defaultJobSchedulerStorage,
   enqueueJob,
   enqueueRecurringJob,
-  findJob,
+  findJob as findJobForWorkspace,
   listJobs,
   maintainScheduledAgentJobs,
-  updateJob,
+  updateJob as updateJobForWorkspace,
 } from "../store.js";
 import { JobDeferredError, JobReleasedError, JobScheduler } from "../scheduler.js";
 import type { SchedulerLeaderLock } from "../scheduler-lock.js";
@@ -39,6 +39,14 @@ import {
   getSchedulerHeartbeat,
 } from "../scheduler-heartbeat.js";
 import { getOperationsStatus } from "../../operations-status.js";
+
+function findJob(id: string) {
+  return findJobForWorkspace("alpha", id);
+}
+
+function updateJob(id: string, patch: Parameters<typeof updateJobForWorkspace>[2]) {
+  return updateJobForWorkspace("alpha", id, patch);
+}
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

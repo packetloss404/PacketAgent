@@ -87,18 +87,18 @@ test("default async job scheduler boundary enqueues, claims, and sweeps through 
       type: "async.boundary",
       scheduledAt: "2026-04-26T09:00:00.000Z",
     });
-    assert.equal(findJob(job.id)?.id, job.id);
+    assert.equal(findJob("alpha", job.id)?.id, job.id);
 
     const claimTime = new Date("2026-04-26T10:00:00.000Z");
     const claimed = await storage.claimNextJob(claimTime);
     assert.equal(claimed?.id, job.id);
-    assert.equal(findJob(job.id)?.status, "running");
-    assert.equal(findJob(job.id)?.startedAt, claimTime.toISOString());
+    assert.equal(findJob("alpha", job.id)?.status, "running");
+    assert.equal(findJob("alpha", job.id)?.startedAt, claimTime.toISOString());
 
     const swept = await sweepStaleRunningJobsAsync(5 * 60 * 1000, new Date("2026-04-26T10:10:00.000Z"));
     assert.equal(swept, 1);
-    assert.equal(findJob(job.id)?.status, "queued");
-    assert.equal(findJob(job.id)?.startedAt, undefined);
+    assert.equal(findJob("alpha", job.id)?.status, "queued");
+    assert.equal(findJob("alpha", job.id)?.startedAt, undefined);
   } finally {
     restoreEnv("PACKETAGENT_STORE", previousStore);
     resetStoreForTests();

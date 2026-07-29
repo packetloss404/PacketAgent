@@ -94,7 +94,7 @@ test("public webhook enqueues an agent run job with request inputs", async () =>
     body: JSON.stringify({ ticketId: "T-123", priority: "high" }),
   });
   const body = await response.json() as { accepted: boolean; jobId: string };
-  const job = findJob(body.jobId);
+  const job = findJob("alpha", body.jobId);
 
   assert.equal(response.status, 200);
   assert.equal(body.accepted, true);

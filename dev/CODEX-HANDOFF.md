@@ -304,8 +304,13 @@ restore candidates leave the current database untouched; and managed backfill
 preserves target-only records. The current re-audit evidence and remaining
 open findings are in
 [`r1-repository-health-audit.md`](r1-repository-health-audit.md). Resume with
-the open jobs single-writer/workspace-scoping audit, followed by the backend
-security/startup findings.
+the backend security/startup findings.
+
+The jobs audit is also closed: the redundant SQLite post-commit upsert was
+removed, dedicated jobs remain inside the canonical store transaction, and all
+find/update/cancel boundaries require the workspace identity. Cross-workspace
+repository collisions and the historical claim/revert sequence have direct
+regressions. The focused job/scheduler gate passes 91 tests.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private

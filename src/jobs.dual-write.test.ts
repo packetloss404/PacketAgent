@@ -14,7 +14,7 @@ import {
   sweepStaleRunningJobs,
   updateJob,
 } from "./jobs/store.js";
-import { clearStoreCacheForTests, loadStore, resetStoreForTests, type AgentRecord, type JobRecord } from "./packetagent-store.js";
+import { clearStoreCacheForTests, loadStore, mutateStore, resetStoreForTests, type AgentRecord, type JobRecord } from "./packetagent-store.js";
 
 interface JobRow {
   id: string;
@@ -213,7 +213,7 @@ test("updateJob writes the updated record to the dedicated table", () => {
   const restore = withSqliteEnv(dbPath);
   try {
     const job = enqueueJob({ workspaceId: "workspace_a", type: "agent.run" });
-    const updated = updateJob(job.id, { status: "success", result: { ok: true } });
+    const updated = updateJob(job.workspaceId, job.id, { status: "success", result: { ok: true } });
 
     assert.ok(updated);
     assert.equal(updated.status, "success");
@@ -238,7 +238,7 @@ test("cancelJob writes the canceled record to the dedicated table", () => {
   const restore = withSqliteEnv(dbPath);
   try {
     const job = enqueueJob({ workspaceId: "workspace_a", type: "agent.run" });
-    const canceled = cancelJob(job.id);
+    const canceled = cancelJob(job.workspaceId, job.id);
 
     assert.ok(canceled);
     assert.equal(canceled.status, "canceled");
@@ -303,6 +303,18 @@ test("claimNextJob claims a jobs-table-only row in SQLite mode", async () => {
     const hydrated = loadStore().jobs.find((entry) => entry.id === queued.id);
     assert.equal(hydrated?.status, "running");
     assert.equal(hydrated?.startedAt, claimTime.toISOString());
+
+    mutateStore((data) => {
+      data.workspaces[0] = { ...data.workspaces[0], name: "Unrelated mutation" };
+      return null;
+    });
+    const afterUnrelatedMutation = findDedicatedJob(dbPath, queued.id);
+    assert.equal(afterUnrelatedMutation?.status, "running");
+    assert.equal(afterUnrelatedMutation?.attempts, 1);
+    assert.equal(
+      loadStore().jobs.find((entry) => entry.id === queued.id)?.status,
+      "running",
+    );
   } finally {
     restore();
     rmSync(tempDir, { recursive: true, force: true });
@@ -537,10 +549,10 @@ test("enqueueJob does not touch the dedicated jobs table in JSON-default mode", 
   try {
     const before = readDedicatedJobs(dbPath);
     const job = enqueueJob({ workspaceId: "workspace_a", type: "agent.run" });
-    const updated = updateJob(job.id, { status: "success" });
+    const updated = updateJob(job.workspaceId, job.id, { status: "success" });
     assert.ok(updated);
     const canceled = enqueueJob({ workspaceId: "workspace_a", type: "agent.run.two" });
-    cancelJob(canceled.id);
+    cancelJob(canceled.workspaceId, canceled.id);
 
     const after = readDedicatedJobs(dbPath);
     assert.equal(after.length, before.length, "dedicated table must remain unchanged in JSON mode");

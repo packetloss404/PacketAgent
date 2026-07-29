@@ -16,11 +16,13 @@ export interface ListJobsFilter {
   limit?: number;
 }
 
+export type JobPatch = Omit<Partial<JobRecord>, "id" | "workspaceId">;
+
 export interface JobsRepository {
   list(filter: ListJobsFilter): JobRecord[];
-  find(id: string): JobRecord | null;
+  find(workspaceId: string, id: string): JobRecord | null;
   upsert(record: JobRecord): void;
-  update(id: string, patch: Partial<JobRecord>): JobRecord | null;
+  update(workspaceId: string, id: string, patch: JobPatch): JobRecord | null;
   count(): number;
   claimNext(now: Date): JobRecord | null;
   sweepStaleRunning(staleAfterMs: number, now: Date): number;
@@ -28,9 +30,9 @@ export interface JobsRepository {
 
 export interface AsyncJobsRepository {
   list(filter: ListJobsFilter): Promise<JobRecord[]>;
-  find(id: string): Promise<JobRecord | null>;
+  find(workspaceId: string, id: string): Promise<JobRecord | null>;
   upsert(record: JobRecord): Promise<void>;
-  update(id: string, patch: Partial<JobRecord>): Promise<JobRecord | null>;
+  update(workspaceId: string, id: string, patch: JobPatch): Promise<JobRecord | null>;
   count(): Promise<number>;
   claimNext(now: Date): Promise<JobRecord | null>;
   sweepStaleRunning(staleAfterMs: number, now: Date): Promise<number>;
@@ -61,14 +63,14 @@ export function asyncJobsRepository(repository: JobsRepository): AsyncJobsReposi
     async list(filter) {
       return repository.list(filter);
     },
-    async find(id) {
-      return repository.find(id);
+    async find(workspaceId, id) {
+      return repository.find(workspaceId, id);
     },
     async upsert(record) {
       repository.upsert(record);
     },
-    async update(id, patch) {
-      return repository.update(id, patch);
+    async update(workspaceId, id, patch) {
+      return repository.update(workspaceId, id, patch);
     },
     async count() {
       return repository.count();
@@ -108,16 +110,19 @@ export function jsonJobsRepository(deps: JobsRepositoryDeps = {}): JobsRepositor
       });
       return sortAndLimit(filtered, filter.limit);
     },
-    find(id) {
+    find(workspaceId, id) {
       const data = load();
       const collection = Array.isArray(data.jobs) ? data.jobs : [];
-      return collection.find((entry) => entry.id === id) ?? null;
+      return collection.find(
+        (entry) => entry.workspaceId === workspaceId && entry.id === id,
+      ) ?? null;
     },
     upsert(record) {
       mutate((data) => {
         if (!Array.isArray(data.jobs)) data.jobs = [];
         const index = data.jobs.findIndex((entry) => entry.id === record.id);
         if (index >= 0) {
+          assertSameJobWorkspace(data.jobs[index], record.workspaceId);
           data.jobs[index] = record;
         } else {
           data.jobs.push(record);
@@ -125,13 +130,15 @@ export function jsonJobsRepository(deps: JobsRepositoryDeps = {}): JobsRepositor
         return null;
       });
     },
-    update(id, patch) {
+    update(workspaceId, id, patch) {
       return mutate((data) => {
         if (!Array.isArray(data.jobs)) {
           data.jobs = [];
           return null;
         }
-        const target = data.jobs.find((entry) => entry.id === id);
+        const target = data.jobs.find(
+          (entry) => entry.workspaceId === workspaceId && entry.id === id,
+        );
         if (!target) return null;
         Object.assign(target, patch, { updatedAt: new Date().toISOString() });
         return target;
@@ -198,16 +205,19 @@ export function asyncJsonJobsRepository(deps: AsyncJobsRepositoryDeps = {}): Asy
       });
       return sortAndLimit(filtered, filter.limit);
     },
-    async find(id) {
+    async find(workspaceId, id) {
       const data = await load();
       const collection = Array.isArray(data.jobs) ? data.jobs : [];
-      return collection.find((entry) => entry.id === id) ?? null;
+      return collection.find(
+        (entry) => entry.workspaceId === workspaceId && entry.id === id,
+      ) ?? null;
     },
     async upsert(record) {
       await mutate((data) => {
         if (!Array.isArray(data.jobs)) data.jobs = [];
         const index = data.jobs.findIndex((entry) => entry.id === record.id);
         if (index >= 0) {
+          assertSameJobWorkspace(data.jobs[index], record.workspaceId);
           data.jobs[index] = record;
         } else {
           data.jobs.push(record);
@@ -215,13 +225,15 @@ export function asyncJsonJobsRepository(deps: AsyncJobsRepositoryDeps = {}): Asy
         return null;
       });
     },
-    async update(id, patch) {
+    async update(workspaceId, id, patch) {
       return mutate((data) => {
         if (!Array.isArray(data.jobs)) {
           data.jobs = [];
           return null;
         }
-        const target = data.jobs.find((entry) => entry.id === id);
+        const target = data.jobs.find(
+          (entry) => entry.workspaceId === workspaceId && entry.id === id,
+        );
         if (!target) return null;
         Object.assign(target, patch, { updatedAt: new Date().toISOString() });
         return target;
@@ -294,10 +306,12 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
         db.close();
       }
     },
-    find(id) {
+    find(workspaceId, id) {
       const db = openDatabase(dbPath);
       try {
-        const row = db.prepare("select * from jobs where id = ?").get(id) as JobRow | undefined;
+        const row = db.prepare(
+          "select * from jobs where workspace_id = ? and id = ?",
+        ).get(workspaceId, id) as JobRow | undefined;
         return row ? rowToRecord(row) : null;
       } finally {
         db.close();
@@ -306,17 +320,30 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
     upsert(record) {
       const db = openDatabase(dbPath);
       try {
-        upsertRow(db, record);
+        db.exec("begin immediate");
+        try {
+          const existing = db.prepare("select workspace_id from jobs where id = ?").get(
+            record.id,
+          ) as { workspace_id: string } | undefined;
+          if (existing) assertSameJobWorkspace(existing.workspace_id, record.workspaceId);
+          upsertRow(db, record);
+          db.exec("commit");
+        } catch (error) {
+          db.exec("rollback");
+          throw error;
+        }
       } finally {
         db.close();
       }
     },
-    update(id, patch) {
+    update(workspaceId, id, patch) {
       const db = openDatabase(dbPath);
       try {
         db.exec("begin immediate");
         try {
-          const existing = db.prepare("select * from jobs where id = ?").get(id) as JobRow | undefined;
+          const existing = db.prepare(
+            "select * from jobs where workspace_id = ? and id = ?",
+          ).get(workspaceId, id) as JobRow | undefined;
           if (!existing) {
             db.exec("commit");
             return null;
@@ -501,11 +528,27 @@ function claimNextNonIsoFallback(db: DatabaseSync, nowMs: number): JobRow | unde
 
 function upsertRow(db: DatabaseSync, record: JobRecord): void {
   db.prepare(`
-    insert or replace into jobs (
+    insert into jobs (
       id, workspace_id, type, payload, status, attempts, max_attempts,
       scheduled_at, started_at, completed_at, cron, result, error,
       cancel_requested, created_at, updated_at
     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(id) do update set
+      type = excluded.type,
+      payload = excluded.payload,
+      status = excluded.status,
+      attempts = excluded.attempts,
+      max_attempts = excluded.max_attempts,
+      scheduled_at = excluded.scheduled_at,
+      started_at = excluded.started_at,
+      completed_at = excluded.completed_at,
+      cron = excluded.cron,
+      result = excluded.result,
+      error = excluded.error,
+      cancel_requested = excluded.cancel_requested,
+      created_at = excluded.created_at,
+      updated_at = excluded.updated_at
+    where jobs.workspace_id = excluded.workspace_id
   `).run(
     record.id,
     record.workspaceId,
@@ -524,6 +567,17 @@ function upsertRow(db: DatabaseSync, record: JobRecord): void {
     record.createdAt,
     record.updatedAt,
   );
+}
+
+function assertSameJobWorkspace(
+  existing: JobRecord | string,
+  requestedWorkspaceId: string,
+): void {
+  const existingWorkspaceId =
+    typeof existing === "string" ? existing : existing.workspaceId;
+  if (existingWorkspaceId !== requestedWorkspaceId) {
+    throw new Error("Job identity is already owned by another workspace.");
+  }
 }
 
 function rowToRecord(row: JobRow): JobRecord {

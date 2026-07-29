@@ -31,6 +31,7 @@ export function listJobsForWorkspaceViaRepository(
 }
 
 export function findJobViaRepository(
+  workspaceId: string,
   jobId: string,
   deps: JobsReadDeps = {},
 ): JobRecord | null {
@@ -38,10 +39,12 @@ export function findJobViaRepository(
     loadStore: deps.loadStore,
     mutateStore: deps.mutateStore,
   });
-  const found = repo.find(jobId);
+  const found = repo.find(workspaceId, jobId);
   if (found) return found;
   if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
-  return legacyJobsFromStore(deps).find((entry) => entry.id === jobId) ?? null;
+  return legacyJobsFromStore(deps).find(
+    (entry) => entry.workspaceId === workspaceId && entry.id === jobId,
+  ) ?? null;
 }
 
 function legacyJobsFromStore(deps: JobsReadDeps): JobRecord[] {
