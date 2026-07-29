@@ -6,6 +6,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-28 - Local remote-control certification (W10.4)
+
+- Certified the PacketChat and PacketPhone transports against fake hardened
+  endpoints, including immutable binding, secret isolation, stable delivery
+  idempotency, retry classification, and both local-first and remote-first W7
+  action orderings.
+- Added restart coverage for pending deliveries, explicit read-only versus
+  single-use callback replay semantics, and callback-credential rotation for
+  both Packet products.
+- Added atomic dead-letter redrive with renewed bounded attempts/expiry, the
+  original external idempotency key, a fresh scheduler job, an auditable
+  digest-only recovery event/evidence entry, exact request replay, and
+  fail-closed behavior after source-evidence compaction.
+- Added opt-in live PacketChat and PacketPhone delivery probes. They remain
+  conditionally skipped because no external endpoint configuration is present.
+  The full gate passes 1,509 API tests plus 28 web tests, with 4 intentional API
+  skips, 0 failures, and the unchanged 145-warning inherited lint baseline.
+
 ### 2026-07-28 - PacketPhone Worker controls (W10.3)
 
 - Added encrypted `packetagent.packetphone-route/v1` configuration and an
@@ -22,7 +40,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   restart replay, stale/resolved/tamper/expiry/cross-binding, secret-rotation,
   non-persistence, and three-backend parity coverage. The W10.3 baseline passes
   1,506 API tests plus 28 web tests, with 2 intentional API skips and no
-  failures. W10.4 certification remains active.
+  failures. W10.4 certification was the next active loop.
 
 ### 2026-07-28 - Pause handoff and implementation reports
 

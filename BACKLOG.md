@@ -183,8 +183,10 @@ Status: complete. Resume at
 
 Dependencies: W7-W9.
 
-Status: active. Resume at
-[`W10.4 - Close the remote-control gate`](dev/worker-implementation-loops.md#w104---close-the-remote-control-gate).
+Status: local gate complete. Resume at
+[`R1 - Repository health and historical finding re-audit`](dev/worker-implementation-loops.md#r1---repository-health-and-historical-finding-re-audit).
+Live PacketChat/PacketPhone interoperability remains conditional on external
+endpoints and credentials.
 
 - [x] Add a versioned channel-neutral notification outbox with atomic
       event/evidence binding, stable idempotency, bounded retry/expiry,
@@ -203,13 +205,18 @@ Status: active. Resume at
       nonce, and expiry.
 - [x] Consume W10.3 callbacks durably and reject stale, replayed,
       cross-workspace, cross-version, and already-resolved actions.
-- [ ] **W10.4 - Remote-control certification:** contract-test PacketChat and
+- [x] **W10.4 - Remote-control certification:** contract-test PacketChat and
       PacketPhone adapters against fake endpoints; race local and remote
       actions; rotate credentials; restart with pending deliveries; replay
       callbacks; and verify dead-letter recovery.
 - [ ] Run live PacketChat and PacketPhone interoperability checks when those
       endpoints and credentials are available.
-- Gate: remote approvals preserve the same policy and audit guarantees as local approvals.
+- Gate: passed locally 2026-07-28. Fake-endpoint adapters, both local/remote
+  race orderings, credential rotation, pending-delivery restart, read-only and
+  single-use callback replay semantics, and bounded audited dead-letter redrive
+  preserve W7 policy, idempotency, and audit guarantees. Two bounded live
+  delivery probes are registered and conditionally skipped because no external
+  endpoint configuration is present.
 
 ## Post-W10 execution ledger
 
@@ -218,6 +225,8 @@ inventory later in this file supplies additional context, but completion state
 is recorded in these checklists.
 
 ### R1 - Repository health and historical finding re-audit
+
+Status: active.
 
 - [ ] Re-audit every still-relevant historical P0/P1 finding and close stale
       findings with evidence.

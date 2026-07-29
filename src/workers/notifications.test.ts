@@ -200,6 +200,171 @@ test("retry exhaustion and expiry become durable terminal outbox states", async 
   assert.equal(expiryCalls, 0);
 });
 
+test("a pending delivery survives store serialization and resumes with the same idempotency key", async () => {
+  const beforeRestart = notificationHarness();
+  const created = await beforeRestart.transact((draft) => appendProgressNotification(draft));
+  const pending = created.outboxItems[0]!;
+  const rehydrated = JSON.parse(JSON.stringify(beforeRestart.data)) as PacketAgentData;
+  const afterRestart = notificationHarness(rehydrated);
+  const seenKeys: string[] = [];
+  const service = createWorkerNotificationService({
+    mutateStore: afterRestart.mutateStore,
+    transport: {
+      async deliver(input) {
+        seenKeys.push(input.idempotencyKey);
+        return { deliveryReference: "provider-request-after-restart" };
+      },
+    },
+    now: afterRestart.now,
+  });
+
+  const result = await service.deliver({
+    workspaceId: "workspace-1",
+    outboxItemId: pending.id,
+  });
+
+  assert.equal(result.disposition, "delivered");
+  assert.deepEqual(seenKeys, [pending.idempotencyKey]);
+  assert.equal(afterRestart.data.workerNotificationDeliveries[0]?.attemptCount, 1);
+  assert.doesNotThrow(() => validateWorkerPersistence(afterRestart.data));
+});
+
+test("dead-letter redrive is bounded, audited, idempotent, and restart-safe", async () => {
+  const failedHarness = notificationHarness();
+  const created = await failedHarness.transact((draft) =>
+    appendProgressNotification(draft, { maxAttempts: 1 }),
+  );
+  const original = created.outboxItems[0]!;
+  const failing = createWorkerNotificationService({
+    mutateStore: failedHarness.mutateStore,
+    transport: {
+      async deliver() {
+        throw new WorkerNotificationDeliveryError("provider unavailable", true);
+      },
+    },
+    now: failedHarness.now,
+  });
+  const deadLetter = await failing.deliver({
+    workspaceId: "workspace-1",
+    outboxItemId: original.id,
+  });
+  assert.equal(deadLetter.disposition, "dead_letter");
+
+  failedHarness.setNow(new Date("2026-07-28T12:10:00.000Z"));
+  let nextId = 0;
+  const recovery = createWorkerNotificationService({
+    mutateStore: failedHarness.mutateStore,
+    now: failedHarness.now,
+    id: (kind) => `${kind}-redrive-${++nextId}`,
+  });
+  const input = {
+    workspaceId: "workspace-1",
+    outboxItemId: original.id,
+    actor: { type: "user" as const, id: "operator-1" },
+    idempotencyKey: "redrive-notification-1",
+    maxAttempts: 2,
+  };
+  const redriven = await recovery.redrive(input);
+  assert.equal(redriven.disposition, "redriven");
+  assert.equal(redriven.outbox.status, "queued");
+  assert.equal(redriven.outbox.attemptCount, 0);
+  assert.equal(redriven.outbox.maxAttempts, 2);
+  assert.equal(redriven.outbox.idempotencyKey, original.idempotencyKey);
+  assert.equal(redriven.job?.status, "queued");
+  assert.deepEqual(redriven.job?.payload, { outboxItemId: original.id });
+  const event = failedHarness.data.workerEvents.find(
+    (candidate) => candidate.id === redriven.recoveryEventId,
+  );
+  assert.equal(event?.type, "worker.notification.redriven");
+  assert.equal(event && "source" in event ? event.source : undefined, "recovery");
+  assert.match(String(event?.data?.redriveKeyDigest), /^sha256:[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify(event).includes(input.idempotencyKey), false);
+
+  const jobCount = failedHarness.data.jobs.length;
+  const eventCount = failedHarness.data.workerEvents.length;
+  const replay = await recovery.redrive(input);
+  assert.equal(replay.disposition, "replayed");
+  assert.equal(replay.recoveryEventId, redriven.recoveryEventId);
+  assert.equal(failedHarness.data.jobs.length, jobCount);
+  assert.equal(failedHarness.data.workerEvents.length, eventCount);
+  await assert.rejects(
+    () =>
+      recovery.redrive({
+        ...input,
+        idempotencyKey: "different-redrive-request",
+      }),
+    /Only a dead-lettered Worker notification/,
+  );
+
+  const rehydrated = JSON.parse(JSON.stringify(failedHarness.data)) as PacketAgentData;
+  const afterRestart = notificationHarness(rehydrated);
+  afterRestart.setNow(new Date("2026-07-28T12:10:00.000Z"));
+  const deliveredKeys: string[] = [];
+  const restarted = createWorkerNotificationService({
+    mutateStore: afterRestart.mutateStore,
+    transport: {
+      async deliver(delivery) {
+        deliveredKeys.push(delivery.idempotencyKey);
+        return { deliveryReference: "provider-request-after-redrive" };
+      },
+    },
+    now: afterRestart.now,
+  });
+  const delivered = await restarted.deliver({
+    workspaceId: "workspace-1",
+    outboxItemId: original.id,
+  });
+  assert.equal(delivered.disposition, "delivered");
+  assert.deepEqual(deliveredKeys, [original.idempotencyKey]);
+  assert.doesNotThrow(() => validateWorkerPersistence(afterRestart.data));
+
+  const compactedHarness = notificationHarness();
+  const compactedSource = await compactedHarness.transact((draft) =>
+    appendProgressNotification(draft, { maxAttempts: 1 }),
+  );
+  const compactedOutbox = compactedSource.outboxItems[0]!;
+  const compactingFailure = createWorkerNotificationService({
+    mutateStore: compactedHarness.mutateStore,
+    transport: {
+      async deliver() {
+        throw new WorkerNotificationDeliveryError("provider unavailable", true);
+      },
+    },
+    now: compactedHarness.now,
+  });
+  await compactingFailure.deliver({
+    workspaceId: "workspace-1",
+    outboxItemId: compactedOutbox.id,
+  });
+  await createWorkerRetentionService({
+    mutateStore: compactedHarness.mutateStore,
+    now: () => new Date("2026-08-02T12:00:00.000Z"),
+    id: () => "retention-dead-letter",
+  }).cleanup({
+    workspaceId: "workspace-1",
+    policy: RETENTION_POLICY,
+    maxItems: 100,
+    maxDurationMs: 5_000,
+  });
+  assert.equal(
+    compactedHarness.data.workerEvents.some((entry) => entry.id === compactedSource.event.id),
+    false,
+  );
+  await assert.rejects(
+    () =>
+      createWorkerNotificationService({
+        mutateStore: compactedHarness.mutateStore,
+        now: () => new Date("2026-08-02T12:01:00.000Z"),
+      }).redrive({
+        workspaceId: "workspace-1",
+        outboxItemId: compactedOutbox.id,
+        actor: { type: "user", id: "operator-1" },
+        idempotencyKey: "redrive-compacted-notification",
+      }),
+    /source evidence was compacted/,
+  );
+});
+
 test("the scheduler handler defers a transient failure without exposing route data", async () => {
   const harness = notificationHarness();
   const created = await harness.transact((draft) => appendProgressNotification(draft));
@@ -242,13 +407,21 @@ test("the default router delegates configured Packet-product transports and fail
   const harness = notificationHarness();
   const created = await harness.transact((draft) => appendProgressNotification(draft));
   const outbox = created.outboxItems[0]!;
-  let calls = 0;
+  let chatCalls = 0;
+  let phoneCalls = 0;
   const router = createDefaultWorkerNotificationTransport({
     packetchat: {
       async deliver(input) {
-        calls += 1;
+        chatCalls += 1;
         assert.equal(input.route.reference, "vault:packetchat-operations");
         return { deliveryReference: "packetchat:delegated" };
+      },
+    },
+    packetphone: {
+      async deliver(input) {
+        phoneCalls += 1;
+        assert.equal(input.route.reference, "vault:packetphone-operations");
+        return { deliveryReference: "packetphone:delegated" };
       },
     },
   });
@@ -265,7 +438,19 @@ test("the default router delegates configured Packet-product transports and fail
     signal: new AbortController().signal,
   });
   assert.equal(delivered.deliveryReference, "packetchat:delegated");
-  assert.equal(calls, 1);
+  assert.equal(chatCalls, 1);
+  const phoneDelivered = await router.deliver({
+    route: {
+      ...route,
+      kind: "packetphone",
+      reference: "vault:packetphone-operations",
+    },
+    envelope: outbox.envelope,
+    idempotencyKey: outbox.idempotencyKey,
+    signal: new AbortController().signal,
+  });
+  assert.equal(phoneDelivered.deliveryReference, "packetphone:delegated");
+  assert.equal(phoneCalls, 1);
 
   const unavailable = createDefaultWorkerNotificationTransport();
   await assert.rejects(
@@ -392,37 +577,39 @@ function appendProgressNotification(
   });
 }
 
-function notificationHarness() {
-  let data = createSeedStore();
-  const content = makeWorkerVersionContent({
-    credentialRefs: ["vault:release-api", "vault:packetchat-operations"],
-    notificationRoutes: [
-      {
-        id: "operations-chat",
-        kind: "packetchat",
-        reference: "vault:packetchat-operations",
-        events: ["progress", "terminal"],
-      },
-    ],
-  });
-  data.workerDefinitions.push(
-    makeWorkerDefinition({
-      status: "active",
-      currentVersionId: "worker-version-1",
-    }),
-  );
-  data.workerVersions.push(
-    makeWorkerVersion({
-      status: "validated",
-      content,
-    }),
-  );
-  data.workerDeployments.push(
-    makeWorkerDeployment({
-      status: "active",
-    }),
-  );
-  data.workerRuns.push(makeWorkerRun({ status: "running" }));
+function notificationHarness(initialData?: PacketAgentData) {
+  let data = initialData ?? createSeedStore();
+  if (!initialData) {
+    const content = makeWorkerVersionContent({
+      credentialRefs: ["vault:release-api", "vault:packetchat-operations"],
+      notificationRoutes: [
+        {
+          id: "operations-chat",
+          kind: "packetchat",
+          reference: "vault:packetchat-operations",
+          events: ["progress", "terminal"],
+        },
+      ],
+    });
+    data.workerDefinitions.push(
+      makeWorkerDefinition({
+        status: "active",
+        currentVersionId: "worker-version-1",
+      }),
+    );
+    data.workerVersions.push(
+      makeWorkerVersion({
+        status: "validated",
+        content,
+      }),
+    );
+    data.workerDeployments.push(
+      makeWorkerDeployment({
+        status: "active",
+      }),
+    );
+    data.workerRuns.push(makeWorkerRun({ status: "running" }));
+  }
   let currentTime = START;
   const mutateStore = async <T>(
     mutation: (draft: PacketAgentData) => T | Promise<T>,

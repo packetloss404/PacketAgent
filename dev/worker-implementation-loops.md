@@ -739,7 +739,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: complete as of 2026-07-28. Resume at W10.4.
+Status: complete as of 2026-07-28. Resume at R1.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -841,7 +841,7 @@ Packet surfaces without weakening W7 policy or audit guarantees.
 
 ### W10.1 - Add a notification outbox
 
-Status: complete as of 2026-07-28. Resume at W10.4.
+Status: complete as of 2026-07-28. Resume at R1.
 
 - Define a versioned, channel-neutral notification envelope for attention,
   progress summaries, and terminal outcomes.
@@ -872,7 +872,7 @@ Implementation record:
 
 ### W10.2 - Implement PacketChat delivery
 
-Status: complete as of 2026-07-28. Resume at W10.4.
+Status: complete as of 2026-07-28. Resume at R1.
 
 - Send concise deployment/run/version state, reason, budget, checkpoint,
   evidence link, and required action.
@@ -914,7 +914,7 @@ Implementation record:
 
 ### W10.3 - Implement PacketPhone controls
 
-Status: complete as of 2026-07-28. Resume at W10.4.
+Status: complete as of 2026-07-28. Resume at R1.
 
 - Deliver approve, reject, pause, stop, and revoke actions only when the actor
   and role permit them.
@@ -955,6 +955,9 @@ Implementation record:
 
 ### W10.4 - Close the remote-control gate
 
+Status: local gate complete as of 2026-07-28. Resume at R1. Live
+interoperability remains conditional on external endpoint configuration.
+
 - Contract-test Chat and Phone adapters locally with fake endpoints.
 - Race local and remote actions, replay callbacks, rotate credentials, restart
   with pending deliveries, and verify dead-letter recovery.
@@ -963,6 +966,29 @@ Implementation record:
 
 Gate: remote actions preserve exactly the same W7 policy, idempotency, and audit
 semantics as local actions.
+
+Implementation record:
+
+- PacketChat and PacketPhone each pass their actual transport contract through
+  fake hardened-network endpoints, including exact immutable bindings, bounded
+  payloads, route-secret isolation, failure classification, and stable W10.1
+  delivery idempotency.
+- Both local-first and PacketPhone-first action orderings create exactly one
+  applied W7 command and one revision-rejected command with the correct local
+  versus digest-only remote audit source. PacketPhone callback replay remains
+  single-use; PacketChat's read-only callback replay returns the same result
+  without a durable effect. Rotating either callback credential invalidates
+  previously issued tokens.
+- A queued outbox item survives durable-store serialization and fresh service
+  construction, then delivers with its original external idempotency key.
+  Dead-lettered items can be atomically redriven only while source
+  event/evidence remains available, with renewed bounded attempts/expiry, a
+  fresh scheduler job, and a `worker.notification.redriven` recovery
+  journal/evidence entry containing only request/key digests and bounded
+  failure metadata. Exact redrive replay creates no duplicate job or event.
+- The focused gate and full 1,509-pass API suite are green. Two opt-in live
+  PacketChat/PacketPhone delivery probes are registered and intentionally skip
+  because no endpoint/callback configuration is present.
 
 ## R1-R8 - Inherited continuation after W10
 
@@ -987,6 +1013,8 @@ pulled forward only after the backlog records that change.
 | Later, not MVP                            | Decision-gated; no automatic execution |
 
 ### R1 - Repository health and historical finding re-audit
+
+Status: active.
 
 1. Re-run every still-relevant finding from `REPO_REVIEW.md` against current
    code; close stale items with evidence instead of copying old line numbers.

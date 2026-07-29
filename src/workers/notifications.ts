@@ -24,10 +24,12 @@ import type { WorkerJournalAppendInput } from "./persistence-types.js";
 import { validateWorkerPersistence } from "./repository.js";
 import type {
   JsonObject,
+  WorkerActorReference,
   WorkerNotificationRouteReference,
   WorkerRun,
   WorkerVersion,
 } from "./types.js";
+import { canonicalWorkerJson } from "./validation.js";
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -40,7 +42,7 @@ const RETRY_BASE_MS = 30_000;
 const RETRY_CAP_MS = 60 * 60 * 1_000;
 const DELIVERY_ATTEMPT_LEASE_MS = 5 * 60 * 1_000;
 
-type WorkerNotificationIdKind = "outbox" | "job";
+type WorkerNotificationIdKind = "outbox" | "job" | "event";
 type WorkerNotificationIdFactory = (kind: WorkerNotificationIdKind) => string;
 
 export interface WorkerNotificationRequest {
@@ -221,12 +223,20 @@ export type WorkerNotificationDeliveryResult =
       readonly outbox: WorkerNotificationOutboxItem;
     };
 
+export interface WorkerNotificationRedriveResult {
+  readonly disposition: "redriven" | "replayed";
+  readonly outbox: WorkerNotificationOutboxItem;
+  readonly recoveryEventId: string;
+  readonly job?: JobRecord;
+}
+
 export interface WorkerNotificationServiceDependencies {
   readonly mutateStore?: <T>(
     mutator: (data: PacketAgentData) => MaybePromise<T>,
   ) => MaybePromise<T>;
   readonly transport?: WorkerNotificationTransport;
   readonly now?: () => Date;
+  readonly id?: WorkerNotificationIdFactory;
 }
 
 export interface WorkerNotificationService {
@@ -235,6 +245,14 @@ export interface WorkerNotificationService {
     readonly outboxItemId: string;
     readonly signal?: AbortSignal;
   }): Promise<WorkerNotificationDeliveryResult>;
+  redrive(input: {
+    readonly workspaceId: string;
+    readonly outboxItemId: string;
+    readonly actor: WorkerActorReference;
+    readonly idempotencyKey: string;
+    readonly maxAttempts?: number;
+    readonly expiresAt?: string;
+  }): Promise<WorkerNotificationRedriveResult>;
 }
 
 export function createWorkerNotificationService(
@@ -243,6 +261,7 @@ export function createWorkerNotificationService(
   const mutateStore = dependencies.mutateStore ?? defaultMutateStore;
   const transport = dependencies.transport ?? createDefaultWorkerNotificationTransport();
   const now = dependencies.now ?? (() => new Date());
+  const id = dependencies.id ?? ((kind: WorkerNotificationIdKind) => `${kind}_${randomUUID()}`);
 
   return {
     async deliver(input) {
@@ -374,6 +393,140 @@ export function createWorkerNotificationService(
           outbox: clone(result.outbox),
         };
       }
+    },
+    async redrive(input) {
+      const timestamp = now();
+      const idempotencyKey = input.idempotencyKey.trim();
+      if (
+        !idempotencyKey ||
+        idempotencyKey !== input.idempotencyKey ||
+        Buffer.byteLength(idempotencyKey, "utf8") > 200
+      ) {
+        throw new WorkerLifecycleError(
+          "invalid_input",
+          "Worker notification redrive idempotency key is invalid.",
+        );
+      }
+      const redriveKeyDigest = `sha256:${digest(idempotencyKey)}`;
+      const requestDigest = `sha256:${digest(
+        canonicalWorkerJson({
+          workspaceId: input.workspaceId,
+          outboxItemId: input.outboxItemId,
+          actor: input.actor,
+          maxAttempts: input.maxAttempts ?? null,
+          expiresAt: input.expiresAt ?? null,
+        }),
+      )}`;
+      const result = await mutateStore((data) => {
+        validateWorkerPersistence(data);
+        const current = requireOutbox(data, input.workspaceId, input.outboxItemId);
+        const prior = data.workerEvents.find(
+          (event) =>
+            event.workspaceId === input.workspaceId &&
+            event.type === "worker.notification.redriven" &&
+            event.data?.outboxItemId === input.outboxItemId &&
+            event.data?.redriveKeyDigest === redriveKeyDigest,
+        );
+        if (prior) {
+          if (prior.data?.requestDigest !== requestDigest) {
+            throw new WorkerLifecycleError(
+              "idempotency_mismatch",
+              "Worker notification redrive idempotency key was reused with a different request.",
+            );
+          }
+          const redriveJobId =
+            typeof prior.data?.redriveJobId === "string" ? prior.data.redriveJobId : undefined;
+          return {
+            disposition: "replayed" as const,
+            outbox: current,
+            recoveryEventId: prior.id,
+            ...(redriveJobId ? { job: data.jobs.find((job) => job.id === redriveJobId) } : {}),
+          };
+        }
+        if (current.status !== "dead_letter") {
+          throw new WorkerLifecycleError(
+            "conflict",
+            "Only a dead-lettered Worker notification can be redriven.",
+          );
+        }
+        requireRetainedSourceForRedrive(data, current);
+        const maxAttempts = input.maxAttempts ?? current.maxAttempts;
+        const expiresAt =
+          input.expiresAt ??
+          new Date(
+            timestamp.getTime() +
+              (current.event === "progress" ? DEFAULT_PROGRESS_TTL_MS : DEFAULT_TERMINAL_TTL_MS),
+          ).toISOString();
+        if (
+          !Number.isSafeInteger(maxAttempts) ||
+          maxAttempts < 1 ||
+          !Number.isFinite(Date.parse(expiresAt)) ||
+          Date.parse(expiresAt) <= timestamp.getTime()
+        ) {
+          throw new WorkerLifecycleError(
+            "invalid_input",
+            "Worker notification redrive bounds are invalid.",
+          );
+        }
+        const job: JobRecord = {
+          id: id("job"),
+          workspaceId: current.workspaceId,
+          type: WORKER_NOTIFICATION_DELIVERY_JOB_TYPE,
+          payload: { outboxItemId: current.id },
+          status: "queued",
+          attempts: 0,
+          maxAttempts,
+          scheduledAt: timestamp.toISOString(),
+          createdAt: timestamp.toISOString(),
+          updatedAt: timestamp.toISOString(),
+        };
+        const next = replaceOutbox(data, current, {
+          status: "queued",
+          attemptCount: 0,
+          maxAttempts,
+          scheduledAt: timestamp.toISOString(),
+          expiresAt,
+          lastAttemptAt: undefined,
+          deliveredAt: undefined,
+          deliveryReference: undefined,
+          deliveryMetadata: undefined,
+          lastFailureCode: undefined,
+          updatedAt: timestamp.toISOString(),
+        });
+        const recovery = appendWorkerJournalEntry(data, {
+          id: id("event"),
+          workspaceId: current.workspaceId,
+          type: "worker.notification.redriven",
+          source: "recovery",
+          workerDefinitionId: current.workerDefinitionId,
+          workerVersionId: current.workerVersionId,
+          workerDeploymentId: current.workerDeploymentId,
+          workerRunId: current.workerRunId,
+          actor: input.actor,
+          summary: "A dead-lettered Worker notification was queued for bounded redelivery.",
+          data: {
+            outboxItemId: current.id,
+            notificationRouteKind: current.notificationRouteKind,
+            priorAttemptCount: current.attemptCount,
+            priorFailureCode: current.lastFailureCode ?? "unknown",
+            redriveKeyDigest,
+            requestDigest,
+            redriveJobId: job.id,
+            maxAttempts,
+            expiresAt,
+          },
+          occurredAt: timestamp.toISOString(),
+        });
+        data.jobs.push(job);
+        validateWorkerPersistence(data);
+        return {
+          disposition: "redriven" as const,
+          outbox: next,
+          recoveryEventId: recovery.event.id,
+          job,
+        };
+      });
+      return clone(result);
     },
   };
 }
@@ -551,6 +704,32 @@ function requireMatchingAttempt(
     );
   }
   return current;
+}
+
+function requireRetainedSourceForRedrive(
+  data: PacketAgentData,
+  current: WorkerNotificationOutboxItem,
+): void {
+  const source = data.workerEvents.find(
+    (event) =>
+      event.workspaceId === current.workspaceId &&
+      event.id === current.sourceEventId &&
+      "eventDigest" in event &&
+      event.eventDigest === current.sourceEventDigest,
+  );
+  const evidence = data.workerEvidenceEntries.find(
+    (entry) =>
+      entry.workspaceId === current.workspaceId &&
+      entry.id === current.envelope.evidenceId &&
+      entry.sourceEventId === current.sourceEventId &&
+      entry.sourceEventDigest === current.sourceEventDigest,
+  );
+  if (!source || !evidence) {
+    throw new WorkerLifecycleError(
+      "conflict",
+      "Worker notification source evidence was compacted and cannot be redriven safely.",
+    );
+  }
 }
 
 function replaceOutbox(

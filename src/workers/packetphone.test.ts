@@ -320,6 +320,62 @@ test("PacketPhone callback secret rotation revokes previously issued controls", 
   assert.equal(harness.data.workerControlCommands.length, 0);
 });
 
+test("local and PacketPhone controls preserve W7 revision and audit semantics in both race orderings", async () => {
+  const localFirst = packetPhoneHarness();
+  const localFirstMessage = await localFirst.deliver();
+  const localWinner = await localFirst.control.stopRun({
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    actor: { type: "user", id: "local-operator-1" },
+    idempotencyKey: "local-stop-wins",
+    expectedRevision: 1,
+  });
+  assert.equal(localWinner.disposition, "applied");
+  await assert.rejects(
+    () => localFirst.callback().consume(tokenFor(localFirstMessage, "pause_run")),
+    (error: unknown) =>
+      error instanceof PacketPhoneCallbackError && error.code === "stale_callback",
+  );
+  assert.deepEqual(
+    localFirst.data.workerControlCommands.map((command) => ({
+      status: command.status,
+      remote: command.remoteControl?.source ?? "local",
+    })),
+    [
+      { status: "applied", remote: "local" },
+      { status: "rejected", remote: "packetphone" },
+    ],
+  );
+  assert.equal(localFirst.data.workerRuns[0]?.status, "cancelled");
+
+  const remoteFirst = packetPhoneHarness();
+  const remoteFirstMessage = await remoteFirst.deliver();
+  const remoteWinner = await remoteFirst
+    .callback()
+    .consume(tokenFor(remoteFirstMessage, "pause_run"));
+  assert.equal(remoteWinner.disposition, "applied");
+  const losingLocal = await remoteFirst.control.stopRun({
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    actor: { type: "user", id: "local-operator-2" },
+    idempotencyKey: "remote-pause-wins",
+    expectedRevision: 1,
+  });
+  assert.equal(losingLocal.disposition, "rejected");
+  assert.equal(losingLocal.command.rejectionCode, "revision_conflict");
+  assert.deepEqual(
+    remoteFirst.data.workerControlCommands.map((command) => ({
+      status: command.status,
+      remote: command.remoteControl?.source ?? "local",
+    })),
+    [
+      { status: "applied", remote: "packetphone" },
+      { status: "rejected", remote: "local" },
+    ],
+  );
+  assert.equal(remoteFirst.data.workerRuns[0]?.status, "paused");
+});
+
 test("PacketPhone callback route is POST-only, no-store, strict, and externally generic", async () => {
   const routes = createPacketProductCallbackRoutes({
     packetPhone: {
@@ -459,6 +515,57 @@ test("PacketPhone route configuration rejects weak callbacks, non-origin bases, 
   );
 });
 
+const LIVE_PACKETPHONE_INTEROP_ENV_KEYS = [
+  "PACKETAGENT_PACKETPHONE_INTEROP_ENDPOINT",
+  "PACKETAGENT_PACKETPHONE_INTEROP_CALLBACK_BASE_URL",
+  "PACKETAGENT_PACKETPHONE_INTEROP_CALLBACK_SECRET",
+  "PACKETAGENT_PACKETPHONE_INTEROP_ACTOR_ID",
+] as const;
+const LIVE_PACKETPHONE_INTEROP_REQUESTED = LIVE_PACKETPHONE_INTEROP_ENV_KEYS.some(
+  (key) => process.env[key],
+);
+
+test(
+  "live PacketPhone endpoint accepts role-bounded Worker controls",
+  {
+    skip: LIVE_PACKETPHONE_INTEROP_REQUESTED
+      ? false
+      : `set ${LIVE_PACKETPHONE_INTEROP_ENV_KEYS.join(", ")} to run live interoperability`,
+  },
+  async () => {
+    const harness = packetPhoneHarness();
+    const request = harness.notification();
+    const bearerToken = process.env.PACKETAGENT_PACKETPHONE_INTEROP_BEARER_TOKEN?.trim();
+    const transport = createPacketPhoneNotificationTransport({
+      loadStore: () => harness.data,
+      credentialService: configCredentialService(
+        JSON.stringify({
+          schemaVersion: PACKETPHONE_ROUTE_SCHEMA_VERSION,
+          endpoint: requiredInteropEnv("PACKETAGENT_PACKETPHONE_INTEROP_ENDPOINT"),
+          ...(bearerToken ? { bearerToken } : {}),
+          callbackBaseUrl: requiredInteropEnv("PACKETAGENT_PACKETPHONE_INTEROP_CALLBACK_BASE_URL"),
+          callbackSecret: requiredInteropEnv("PACKETAGENT_PACKETPHONE_INTEROP_CALLBACK_SECRET"),
+          actorId: requiredInteropEnv("PACKETAGENT_PACKETPHONE_INTEROP_ACTOR_ID"),
+          actorRole: "admin",
+          allowedActions: ALL_ACTIONS,
+          timeoutMs: 15_000,
+          callbackTtlSeconds: 5 * 60,
+        }),
+      ),
+    });
+
+    const result = await transport.deliver({
+      route: harness.route,
+      envelope: request.envelope,
+      idempotencyKey: request.idempotencyKey,
+      signal: AbortSignal.timeout(20_000),
+    });
+
+    assert.equal(result.metadata?.provider, "packetphone");
+    assert.ok(result.deliveryReference);
+  },
+);
+
 interface PacketPhoneHarnessOptions {
   readonly actorRole?: "viewer" | "member" | "admin" | "owner";
   readonly allowedActions?: readonly PacketPhoneControlAction[];
@@ -530,6 +637,7 @@ function packetPhoneHarness(options: PacketPhoneHarnessOptions = {}) {
   });
   return {
     data,
+    control,
     route,
     versionDigest: version.contentDigest,
     notification() {
@@ -721,4 +829,12 @@ function tokenFor(
   const control = message.actions.find((candidate) => candidate.action === action);
   assert.ok(control, `missing ${action} callback`);
   return control.callback.body.token;
+}
+
+function requiredInteropEnv(key: (typeof LIVE_PACKETPHONE_INTEROP_ENV_KEYS)[number]): string {
+  const value = process.env[key]?.trim();
+  if (!value) {
+    throw new Error(`Missing required live PacketPhone interoperability setting ${key}.`);
+  }
+  return value;
 }

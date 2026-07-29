@@ -30,12 +30,14 @@ retention-safe provenance. W10.2 adds encrypted PacketChat route resolution,
 pinned-network delivery of bounded threaded cards, stable progress
 replacement, and short-lived exact-binding read-only callbacks. W10.3 adds
 encrypted HTTPS-only PacketPhone delivery, role-bounded controls, and durable
-single-use callbacks through W7. W10.4 local certification and live
-interoperability remain outstanding.
+single-use callbacks through W7. W10.4 closes the local gate across
+fake-endpoint contracts, race orderings, credential rotation, restart,
+replay, and audited dead-letter redrive. Live interoperability remains
+conditionally skipped.
 
-Last automated W10.3 baseline (2026-07-28):
+Last automated W10.4 baseline (2026-07-28):
 
-- API: 1,506 passed, 2 skipped, 0 failed
+- API: 1,509 passed, 4 skipped, 0 failed
 - Web: 28 passed, 0 failed
 - Focused production-catalog executor/direct-access guards,
   denial-before-credential/budget/effect/network ordering, linked and
@@ -747,6 +749,32 @@ it in a URL, package, log, event, or evidence payload.
 10. No live PacketPhone endpoint is configured in this repository. Treat the
     local fake-endpoint contract as the W10.3 gate and leave cross-product
     certification for W10.4.
+
+## W10.4 Remote-Control Certification Smoke
+
+1. Run both PacketChat and PacketPhone transports through fake hardened-network
+   endpoints. Confirm each reloads the exact immutable Worker binding, keeps
+   secrets ephemeral, and reuses W10.1's idempotency key.
+2. Execute a local W7 action before a conflicting Phone callback, then reverse
+   the order on fresh state. Confirm each ordering has one applied command, one
+   revision-rejected command, and the correct local versus remote audit source.
+3. Replay a Chat open/inspect callback and confirm the same read-only result
+   returns with no mutation. Replay a consumed Phone callback before and after
+   store serialization and confirm no second command, grant, nonce, or effect.
+4. Rotate each callback secret. Confirm previously issued Chat and Phone tokens
+   fail authentication while newly delivered tokens use the new credential.
+5. Serialize a queued delivery, construct a fresh notification service, and
+   deliver it. Confirm the provider sees the original external idempotency key.
+6. Exhaust a delivery into dead-letter, redrive it with explicit attempt and
+   expiry bounds, and confirm one fresh job plus one recovery event/evidence
+   entry. Replay the same redrive request and confirm it creates no duplicates.
+   After restart, deliver with the original external idempotency key.
+7. Confirm a redrive fails closed if retention already compacted its source
+   event/evidence.
+8. The live Chat/Phone tests require the documented
+   `PACKETAGENT_PACKETCHAT_INTEROP_*` and
+   `PACKETAGENT_PACKETPHONE_INTEROP_*` settings. Without them, the two probes
+   must report intentional skips rather than fabricated interoperability.
 
 ## First 10 Minutes: Self-Host Builder Smoke
 

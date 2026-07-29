@@ -19,7 +19,7 @@ on `origin/main`.
 
 The repository-wide rename, compatibility migration, documentation reset,
 carried Builder layout fix, and rename-sensitive test corrections are preserved
-in foundation commit `d60cd47`. W1-W9 and W10.1-W10.3 are implemented as
+in foundation commit `d60cd47`. W1-W10's local gates are implemented as
 isolated changes on this branch. Do not reset this branch to the historical
 source remote.
 
@@ -284,8 +284,6 @@ Not shipped:
 
 - hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
   closed for Worker runs);
-- W10.4 local cross-product race, restart, replay, credential-rotation, and
-  dead-letter recovery certification; and
 - live PacketChat/PacketPhone interoperability certification when endpoint
   credentials are available.
 
@@ -293,13 +291,13 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **W10.4 - close the remote-control gate** in
-[`../BACKLOG.md#w10---packetchat-and-packetphone-routes`](../BACKLOG.md#w10---packetchat-and-packetphone-routes).
+Continue **R1 - repository health and historical finding re-audit** in
+[`../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit`](../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit).
 `BACKLOG.md` is the single ledger for every remaining W10 and R1-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
 active work absent from the backlog.
 
-W1-W9 and W10.1-W10.3 are complete under `src/workers/`, the store, migrations,
+W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
 route modules. W1's design record is
 [`worker-contract-plan.md`](worker-contract-plan.md). W2 preserves the
@@ -435,11 +433,23 @@ approval nonces do not. Restart replay, stale or resolved actions,
 cross-workspace/version substitution, tampering, expiry, weak roles, and
 callback-secret rotation all fail closed across JSON, SQLite, and managed
 Postgres.
+W10.4 composes those pieces into the local remote-control gate. Both transports
+pass fake-endpoint contracts; Chat read-only callbacks may replay without
+effects while Phone mutations remain single-use; callback credential rotation
+invalidates old tokens; serialized pending deliveries resume with their
+original external idempotency key; and both local-first and remote-first
+operator races produce one W7 winner plus one audited revision rejection.
+Dead-lettered delivery can now be atomically redriven with bounded attempts and
+expiry, the original external idempotency key, a fresh scheduler job, and a
+digest-only recovery journal/evidence entry. Exact redrive requests replay
+without duplicate jobs, and compacted source evidence fails closed. Opt-in live
+PacketChat and PacketPhone delivery probes are registered but skipped because
+no endpoint configuration is present.
 
 The exact next slice is
-[`W10.4 - remote-control certification`](../BACKLOG.md#w10---packetchat-and-packetphone-routes).
-After each gate passes, continue through W10 and then R1-R8 using that
-backlog's unchecked checklists; use the loop document only for execution
+[`R1 - repository health and historical finding re-audit`](../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit).
+After each gate passes, continue through R1-R8 using that backlog's unchecked
+checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and
 must not be resumed independently.
 
@@ -468,7 +478,7 @@ handoff, the roadmap, or the backlog.
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 145 inherited warnings
 - `npm run build:web` - passed
-- `npm run test:api` - 1,506 passed, 2 skipped, 0 failed
+- `npm run test:api` - 1,509 passed, 4 skipped, 0 failed
 - `npm run test:web` - 28 passed, 0 failed
 - focused W7 control-schema, graph-integrity, atomic command races,
   pause/resume/stop/revoke, approval/rejection, nonce non-persistence,
@@ -557,6 +567,13 @@ handoff, the roadmap, or the backlog.
   tamper/expiry rejection, callback-secret rotation, token and secret
   non-persistence, and JSON/SQLite/managed-Postgres persistence/export parity -
   passed
+- focused W10.4 dual fake-endpoint delegation, pending-delivery serialization
+  and restart, stable external idempotency, bounded audited dead-letter
+  redrive and replay, Chat read-only replay and credential rotation, Phone
+  single-use replay and credential rotation, and local-first/remote-first W7
+  race semantics - passed; live PacketChat and PacketPhone delivery probes are
+  registered and conditionally skipped because no endpoint configuration is
+  present
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 

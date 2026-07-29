@@ -155,6 +155,11 @@ test("PacketChat callbacks authenticate the exact Worker binding and return open
     action: "open",
     openUrl: "https://agent.example.test/runs/worker/run-1",
   });
+  assert.deepEqual(
+    await callback.authenticate(extractToken(message.callbacks.open)),
+    opened,
+    "read-only callbacks may replay without creating durable effects",
+  );
   const inspected = await callback.authenticate(extractToken(message.callbacks.inspect));
   assert.equal(inspected.action, "inspect");
   assert.equal(inspected.detail?.run.id, "run-1");
@@ -189,6 +194,20 @@ test("PacketChat callbacks authenticate the exact Worker binding and return open
     () => crossed.authenticate(extractToken(message!.callbacks.open)),
     (error: unknown) =>
       error instanceof PacketChatCallbackError && error.code === "binding_mismatch",
+  );
+
+  const rotated = createPacketChatCallbackService({
+    loadStore: () => harness.data,
+    credentialService: configCredentialService(
+      routeConfig({
+        callbackSecret: "rotated-packetchat-callback-secret-at-least-32-bytes",
+      }),
+    ),
+    now: () => new Date(NOW.getTime() + 30_000),
+  });
+  await assert.rejects(
+    () => rotated.authenticate(extractToken(message!.callbacks.open)),
+    (error: unknown) => error instanceof PacketChatCallbackError && error.code === "invalid_token",
   );
 });
 
@@ -305,6 +324,54 @@ test("PacketChat route configuration rejects weak callback and non-origin base v
   );
 });
 
+const LIVE_PACKETCHAT_INTEROP_ENV_KEYS = [
+  "PACKETAGENT_PACKETCHAT_INTEROP_ENDPOINT",
+  "PACKETAGENT_PACKETCHAT_INTEROP_CALLBACK_BASE_URL",
+  "PACKETAGENT_PACKETCHAT_INTEROP_CALLBACK_SECRET",
+] as const;
+const LIVE_PACKETCHAT_INTEROP_REQUESTED = LIVE_PACKETCHAT_INTEROP_ENV_KEYS.some(
+  (key) => process.env[key],
+);
+
+test(
+  "live PacketChat endpoint accepts a bounded Worker card",
+  {
+    skip: LIVE_PACKETCHAT_INTEROP_REQUESTED
+      ? false
+      : `set ${LIVE_PACKETCHAT_INTEROP_ENV_KEYS.join(", ")} to run live interoperability`,
+  },
+  async () => {
+    const harness = packetChatHarness();
+    const request = harness.notification();
+    const bearerToken = process.env.PACKETAGENT_PACKETCHAT_INTEROP_BEARER_TOKEN?.trim();
+    const transport = createPacketChatNotificationTransport({
+      loadStore: () => harness.data,
+      credentialService: configCredentialService(
+        JSON.stringify({
+          schemaVersion: PACKETCHAT_ROUTE_SCHEMA_VERSION,
+          endpoint: requiredInteropEnv("PACKETAGENT_PACKETCHAT_INTEROP_ENDPOINT"),
+          ...(bearerToken ? { bearerToken } : {}),
+          callbackBaseUrl: requiredInteropEnv("PACKETAGENT_PACKETCHAT_INTEROP_CALLBACK_BASE_URL"),
+          callbackSecret: requiredInteropEnv("PACKETAGENT_PACKETCHAT_INTEROP_CALLBACK_SECRET"),
+          timeoutMs: 15_000,
+          callbackTtlSeconds: 60,
+        }),
+      ),
+      now: () => new Date(),
+    });
+
+    const result = await transport.deliver({
+      route: harness.route,
+      envelope: request.envelope,
+      idempotencyKey: request.idempotencyKey,
+      signal: AbortSignal.timeout(20_000),
+    });
+
+    assert.equal(result.metadata?.provider, "packetchat");
+    assert.ok(result.deliveryReference);
+  },
+);
+
 function packetChatHarness(workspaceId = "workspace-1") {
   const data = createSeedStore();
   const content = makeWorkerVersionContent({
@@ -410,13 +477,17 @@ function packetChatHarness(workspaceId = "workspace-1") {
   };
 }
 
-function routeConfig(): string {
+function routeConfig(
+  overrides: {
+    readonly callbackSecret?: string;
+  } = {},
+): string {
   return JSON.stringify({
     schemaVersion: PACKETCHAT_ROUTE_SCHEMA_VERSION,
     endpoint: ROUTE_ENDPOINT,
     bearerToken: BEARER_TOKEN,
     callbackBaseUrl: "https://agent.example.test",
-    callbackSecret: CALLBACK_SECRET,
+    callbackSecret: overrides.callbackSecret ?? CALLBACK_SECRET,
     timeoutMs: 5_000,
     callbackTtlSeconds: 60,
   });
@@ -478,6 +549,14 @@ function captureMessage(set: (message: PacketChatWorkerMessage) => void): Worker
       };
     },
   };
+}
+
+function requiredInteropEnv(key: (typeof LIVE_PACKETCHAT_INTEROP_ENV_KEYS)[number]): string {
+  const value = process.env[key]?.trim();
+  if (!value) {
+    throw new Error(`Missing required live PacketChat interoperability setting ${key}.`);
+  }
+  return value;
 }
 
 function extractToken(callbackUrl: string): string {
