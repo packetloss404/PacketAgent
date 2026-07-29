@@ -28,6 +28,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   rejected cross-workspace ID collisions during upsert, and added repository,
   route, scheduler, and claim/rewrite regressions. The focused queue gate passes
   91 tests.
+- Made `npm start` launch the single-process production server without Vite or
+  watch mode, and moved legacy migration plus provider/tool registration behind
+  an explicit idempotent startup bootstrap.
+- Added baseline Hono security headers and a restrictive same-origin workbench
+  CSP while preserving the generated-app preview exception that R5 will replace
+  with origin isolation.
+- Required opt-in artifact reads to authenticate as a workspace viewer and
+  authorize the exact URL run ID against that workspace before static serving.
+  Owner, cross-workspace, anonymous, and legacy/canonical run cases now have
+  direct regression coverage.
+- Re-audited the rate-limit and generated-preview-token findings as already
+  fixed, with current proxy-chain, hashed-identity, distributed fail-closed,
+  and production-fallback rejection tests cited in the R1 evidence.
 
 ### 2026-07-28 - Local remote-control certification (W10.4)
 

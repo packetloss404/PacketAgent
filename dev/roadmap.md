@@ -48,9 +48,13 @@ validates SQLite migration/restore integrity and foreign keys, rejects corrupt
 restore candidates without replacing current data, and preserves target-only
 managed-backfill records. The jobs single-writer/workspace-scoping audit is
 also closed with a single canonical SQLite transaction, workspace-qualified
-job controls, and collision/race coverage. Backend security and startup truth
-are next; [`r1-repository-health-audit.md`](r1-repository-health-audit.md)
-records supporting evidence while `BACKLOG.md` remains the ledger.
+job controls, and collision/race coverage. The backend security/startup slice
+now makes `npm start` a single non-watch server, defers bootstrap side effects
+until explicit startup, applies baseline headers/CSP, and authorizes opt-in
+artifact reads against the owning workspace and exact run. Frontend safety,
+persistence end-state, dependency disposition, and formatting/lint are next;
+[`r1-repository-health-audit.md`](r1-repository-health-audit.md) records
+supporting evidence while `BACKLOG.md` remains the ledger.
 
 ## North star
 

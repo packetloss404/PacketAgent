@@ -232,7 +232,11 @@ Supporting finding-by-finding evidence is maintained in
 [`dev/r1-repository-health-audit.md`](dev/r1-repository-health-audit.md).
 The first persistence slice closes managed pool churn, destructive-migration
 integrity/restore checks, and target-only managed-backfill preservation; the
-broader R1 gate remains open.
+jobs slice closes the second writer and incomplete workspace scoping; and the
+backend security slice closes production-start truth, import-safe bootstrap,
+rate-limit/preview-token re-audit, baseline response headers/CSP, and
+workspace-authorized opt-in artifact serving. The broader R1 gate remains
+open.
 
 - [ ] Re-audit every still-relevant historical P0/P1 finding and close stale
       findings with evidence.

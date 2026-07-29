@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
+import { secureHeaders } from "hono/secure-headers";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
   archiveAgentAsync,
   cancelAgentRunAsync,
@@ -111,12 +113,46 @@ import {
   projectWorkerCronTriggers,
 } from "./workers/adapters.js";
 
-migrateLegacyDefaultDataFiles();
-registerDefaultProviders();
-registerDefaultTools();
-
 export const app = new Hono();
 
+const standardSecurityHeaders = secureHeaders({
+  contentSecurityPolicy: {
+    defaultSrc: ["'self'"],
+    baseUri: ["'self'"],
+    connectSrc: ["'self'"],
+    fontSrc: ["'self'", "data:"],
+    formAction: ["'self'"],
+    frameAncestors: ["'self'"],
+    frameSrc: ["'self'"],
+    imgSrc: ["'self'", "data:", "blob:"],
+    objectSrc: ["'none'"],
+    scriptSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    workerSrc: ["'self'", "blob:"],
+  },
+  permissionsPolicy: {
+    camera: false,
+    geolocation: false,
+    microphone: false,
+    payment: false,
+    usb: false,
+  },
+});
+const generatedAppPreviewSecurityHeaders = secureHeaders({
+  permissionsPolicy: {
+    camera: false,
+    geolocation: false,
+    microphone: false,
+    payment: false,
+    usb: false,
+  },
+});
+
+app.use("*", (c, next) =>
+  isGeneratedAppPreviewRequest(c.req.path)
+    ? generatedAppPreviewSecurityHeaders(c, next)
+    : standardSecurityHeaders(c, next),
+);
 app.use("*", accessLogMiddleware());
 
 app.get("/api/health", (c) => c.json({ ok: true }));
@@ -639,13 +675,21 @@ scheduler.register({
   },
 });
 app.use("/data/artifacts/*", async (c, next) => {
-  // Gated behind an explicit opt-in flag (default OFF, even in dev) — see
-  // artifactServingEnabled(). Static artifacts are not tenant-scoped here:
-  // anyone who can reach the route can read any artifact. Today this is only
-  // intended to back the local preview flow when the operator opts in.
-  // TODO(security): add per-tenant auth-scoping so a session/preview token is
-  // required and only the owning workspace's artifacts are served.
   if (!artifactServingEnabled()) return c.text("not found", 404);
+
+  try {
+    const context = await requirePrivateWorkspaceRoleAsync(c, "viewer");
+    const runId = artifactRunIdFromPath(c.req.path);
+    if (!runId) return c.text("not found", 404);
+
+    const { loadStoreAsync } = await import("./packetagent-store.js");
+    if (!artifactRunBelongsToWorkspace(await loadStoreAsync(), context.workspace.id, runId)) {
+      return c.text("not found", 404);
+    }
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+
   await next();
 });
 // Scope the static root to the artifacts directory itself (NOT "./") so a
@@ -671,6 +715,7 @@ export function assertServerStartupRuntimeSupported(env: NodeJS.ProcessEnv = pro
 
 export async function startServer(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   assertServerStartupRuntimeSupported(env);
+  bootstrapServerRuntime();
   await projectWorkerCronTriggers();
   await ensureWorkerCronProjectionJob();
   scheduler.start();
@@ -719,6 +764,54 @@ export function artifactServingEnabled(env: NodeJS.ProcessEnv = process.env): bo
   return isEnvTruthy(env.PACKETAGENT_ARTIFACT_SERVING_ENABLED);
 }
 
+let serverRuntimeBootstrapped = false;
+
+export function bootstrapServerRuntime(): void {
+  if (serverRuntimeBootstrapped) return;
+  migrateLegacyDefaultDataFiles();
+  registerDefaultProviders();
+  registerDefaultTools();
+  serverRuntimeBootstrapped = true;
+}
+
+export function artifactRunBelongsToWorkspace(
+  data: {
+    agentRuns?: ReadonlyArray<{ id: string; workspaceId: string }>;
+    workerRuns?: ReadonlyArray<{ id: string; workspaceId: string }>;
+  },
+  workspaceId: string,
+  runId: string,
+): boolean {
+  return [data.agentRuns ?? [], data.workerRuns ?? []].some((runs) =>
+    runs.some((run) => run.id === runId && run.workspaceId === workspaceId),
+  );
+}
+
+function artifactRunIdFromPath(path: string): string | null {
+  const encoded = path.slice("/data/artifacts/".length).split("/")[0] ?? "";
+  let runId: string;
+  try {
+    runId = decodeURIComponent(encoded);
+  } catch {
+    return null;
+  }
+  if (
+    !runId ||
+    runId === "." ||
+    runId === ".." ||
+    runId.includes("/") ||
+    runId.includes("\\") ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/.test(runId)
+  ) {
+    return null;
+  }
+  return runId;
+}
+
+function isGeneratedAppPreviewRequest(path: string): boolean {
+  return /^\/api\/app\/generated-apps\/[^/]+\/preview(?:\/|$)/.test(path);
+}
+
 function isExecutedDirectly(): boolean {
   const entrypoint = process.argv[1];
   return entrypoint ? resolve(fileURLToPath(import.meta.url)) === resolve(entrypoint) : false;
@@ -729,7 +822,10 @@ if (isExecutedDirectly()) {
 }
 
 function errorResponse(c: Context, error: unknown) {
-  c.status(((error as Error & { status?: number }).status ?? 500) as any);
+  const candidate = (error as Error & { status?: number }).status ?? 500;
+  const status =
+    Number.isInteger(candidate) && candidate >= 400 && candidate <= 599 ? candidate : 500;
+  c.status(status as ContentfulStatusCode);
   return c.json({ error: redactedErrorMessage(error) });
 }
 
@@ -749,9 +845,4 @@ async function readJsonBody(c: Context): Promise<Record<string, unknown>> {
 function isEnvTruthy(value: string | undefined): boolean {
   if (!value) return false;
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
-}
-
-function isEnvFalsey(value: string | undefined): boolean {
-  if (!value) return false;
-  return ["0", "false", "no", "off"].includes(value.toLowerCase());
 }

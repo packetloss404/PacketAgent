@@ -21,7 +21,7 @@
     "dev:web": "vite --config web/vite.config.ts",
     "build": "npm run build:web && npm run typecheck && npm test",
     "build:web": "vite build --config web/vite.config.ts",
-    "start": "node scripts/preflight.mjs && npm run dev",
+    "start": "npm run start:server",
     "start:server": "node --import tsx src/server.ts",
     "db:migrate": "node --import tsx src/db/cli.ts migrate",
     "db:status": "node --import tsx src/db/cli.ts status",

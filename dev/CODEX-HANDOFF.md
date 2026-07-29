@@ -303,14 +303,25 @@ restore candidates must pass SQLite integrity and foreign-key checks; corrupt
 restore candidates leave the current database untouched; and managed backfill
 preserves target-only records. The current re-audit evidence and remaining
 open findings are in
-[`r1-repository-health-audit.md`](r1-repository-health-audit.md). Resume with
-the backend security/startup findings.
+[`r1-repository-health-audit.md`](r1-repository-health-audit.md).
 
 The jobs audit is also closed: the redundant SQLite post-commit upsert was
 removed, dedicated jobs remain inside the canonical store transaction, and all
 find/update/cancel boundaries require the workspace identity. Cross-workspace
 repository collisions and the historical claim/revert sequence have direct
 regressions. The focused job/scheduler gate passes 91 tests.
+
+The backend security/startup audit is also closed. `npm start` launches the
+single-process server without watch mode; legacy migration and provider/tool
+registration happen only inside explicit startup; restrictive workbench/API
+security headers are active while generated-app previews retain a deliberate
+CSP exception pending R5 origin isolation; and opt-in artifact reads require
+an authenticated viewer whose workspace owns the exact legacy-agent or
+canonical-Worker run ID in the URL. The focused startup/security gate passes
+11 tests, typecheck passes, and the broader server/app/auth regression
+selection passed 116 tests with one intentional sandbox skip. Resume with the
+verified frontend/error-boundary/dead-control findings, then the persistence
+end-state, dependency disposition, and repo-wide formatting/lint gate.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
