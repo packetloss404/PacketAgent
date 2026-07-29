@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  detectAppIterationToolCategories,
-  inspectAppIterationTools,
-} from "./app-iteration-tools";
+import { detectAppIterationToolCategories, inspectAppIterationTools } from "./app-iteration-tools";
 
 test("detectAppIterationToolCategories inspects draft and scoped prompt in stable category order", () => {
   const categories = detectAppIterationToolCategories({
@@ -30,7 +27,8 @@ test("inspectAppIterationTools reports missing setup and blocks live connector w
       integrations: ["OpenAI triage", "GitHub issue sync", "Stripe subscription checkout"],
       dataModels: [{ table: "customers" }],
     },
-    changePrompt: "Call the live OpenAI model, create GitHub issues, charge checkout, and save records.",
+    changePrompt:
+      "Call the live OpenAI model, create GitHub issues, charge checkout, and save records.",
     database: { configured: false, migrationsReady: false, writable: false },
   });
 
@@ -48,8 +46,14 @@ test("inspectAppIterationTools reports missing setup and blocks live connector w
   assert.ok(readiness.missingSetup.some((setup) => setup.includes("GitHub connector")));
   assert.ok(readiness.missingSetup.some((setup) => setup.includes("STRIPE_SECRET_KEY")));
   assert.ok(readiness.missingSetup.some((setup) => setup.includes("database runtime")));
-  assert.equal(readiness.requests.find((request) => request.category === "openai_provider")?.readinessStatus, "blocked");
-  assert.equal(readiness.requests.find((request) => request.category === "database")?.requiresLiveSetup, true);
+  assert.equal(
+    readiness.requests.find((request) => request.category === "openai_provider")?.readinessStatus,
+    "blocked",
+  );
+  assert.equal(
+    readiness.requests.find((request) => request.category === "database")?.requiresLiveSetup,
+    true,
+  );
 });
 
 test("inspectAppIterationTools allows draft-only iteration when live setup is missing", () => {
@@ -72,13 +76,16 @@ test("inspectAppIterationTools allows draft-only iteration when live setup is mi
     "browser_scrape",
   ]);
   assert.ok(readiness.requests.every((request) => request.canProceedWithout));
-  assert.ok(readiness.requests.every((request) => request.rationale.includes("draft-safe placeholders")));
+  assert.ok(
+    readiness.requests.every((request) => request.rationale.includes("draft-safe placeholders")),
+  );
 });
 
 test("inspectAppIterationTools marks requested integrations ready from env and connector context", () => {
   const readiness = inspectAppIterationTools({
     draft: {
-      summary: "OpenAI assist, webhook email flow, GitHub pull request handoff, Stripe checkout, browser scrape import, and database CRUD.",
+      summary:
+        "OpenAI assist, webhook email flow, GitHub pull request handoff, Stripe checkout, browser scrape import, and database CRUD.",
       apiRoutes: [{ path: "/api/webhooks/stripe" }],
     },
     changePrompt: "Run the live integrations after the app updates.",
@@ -101,14 +108,10 @@ test("inspectAppIterationTools marks requested integrations ready from env and c
   assert.equal(readiness.canProceedWithoutRequests, true);
   assert.deepEqual(readiness.missingSetup, []);
   assert.deepEqual(readiness.nextSteps, []);
-  assert.deepEqual(readiness.requests.map((request) => request.readinessStatus), [
-    "ready",
-    "ready",
-    "ready",
-    "ready",
-    "ready",
-    "ready",
-  ]);
+  assert.deepEqual(
+    readiness.requests.map((request) => request.readinessStatus),
+    ["ready", "ready", "ready", "ready", "ready", "ready"],
+  );
 });
 
 test("inspectAppIterationTools separates webhook and email setup requirements", () => {

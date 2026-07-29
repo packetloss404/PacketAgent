@@ -38,13 +38,17 @@ export interface IntegrationSandboxInput {
   connectedConnectors?: string[];
   runtime?: {
     sandboxEnabled?: boolean;
-    connectors?: Partial<Record<IntegrationSandboxConnectorId, IntegrationSandboxConnectorOverride>>;
+    connectors?: Partial<
+      Record<IntegrationSandboxConnectorId, IntegrationSandboxConnectorOverride>
+    >;
   };
   preview?: {
     sandboxEnabled?: boolean;
     previewUrl?: string;
     buildReady?: boolean;
-    connectors?: Partial<Record<IntegrationSandboxConnectorId, IntegrationSandboxConnectorOverride>>;
+    connectors?: Partial<
+      Record<IntegrationSandboxConnectorId, IntegrationSandboxConnectorOverride>
+    >;
   };
 }
 
@@ -142,7 +146,11 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
     id: "webhook",
     surface: "runtime",
     label: "Webhook connector sandbox",
-    envKeys: ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL", "PACKETAGENT_WEBHOOK_SIGNING_SECRET"],
+    envKeys: [
+      "PACKETAGENT_PUBLIC_BASE_URL",
+      "PACKETAGENT_PUBLIC_APP_BASE_URL",
+      "PACKETAGENT_WEBHOOK_SIGNING_SECRET",
+    ],
     envKeyMode: "all",
     connectorNames: ["webhook"],
     toolNames: ["webhook"],
@@ -165,7 +173,10 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
     toolNames: ["stripe", "payment"],
     signals: [
       { label: "stripe", pattern: /\bstripe\b/i },
-      { label: "payment", pattern: /\bpayment(s)?\b|\bcheckout\b|\bsubscription(s)?\b|\binvoice(s)?\b|\bbilling\b/i },
+      {
+        label: "payment",
+        pattern: /\bpayment(s)?\b|\bcheckout\b|\bsubscription(s)?\b|\binvoice(s)?\b|\bbilling\b/i,
+      },
     ],
     defaultSetupGuide: [
       "Configure STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, and STRIPE_PRICE_ID before running payment sandbox flows.",
@@ -181,7 +192,10 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
     toolNames: ["github"],
     signals: [
       { label: "github", pattern: /\bgithub\b|\bgh\b/i },
-      { label: "repository", pattern: /\bpull request(s)?\b|\bpr(s)?\b|\brepo(sitory)?\b|\bcommit(s)?\b|\bissue(s)?\b/i },
+      {
+        label: "repository",
+        pattern: /\bpull request(s)?\b|\bpr(s)?\b|\brepo(sitory)?\b|\bcommit(s)?\b|\bissue(s)?\b/i,
+      },
     ],
     defaultSetupGuide: [
       "Connect the GitHub connector or configure GITHUB_TOKEN/GH_TOKEN before testing repository actions.",
@@ -197,7 +211,11 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
     toolNames: ["browser", "browser-use", "playwright"],
     signals: [
       { label: "browser", pattern: /\bbrowser\b|\bplaywright\b|\bpuppeteer\b/i },
-      { label: "scrape", pattern: /\bscrap(e|ing|er)\b|\bcrawl(er|ing)?\b|\bscreenshot\b|\bextract from (a )?(site|url|page)\b/i },
+      {
+        label: "scrape",
+        pattern:
+          /\bscrap(e|ing|er)\b|\bcrawl(er|ing)?\b|\bscreenshot\b|\bextract from (a )?(site|url|page)\b/i,
+      },
     ],
     defaultSetupGuide: [
       "Enable browser-use or Playwright before running runtime sandbox extraction.",
@@ -254,24 +272,37 @@ const CONNECTOR_SPECS: readonly ConnectorSpec[] = [
   },
 ];
 
-const SECRET_KEY_PATTERN = /(secret|token|key|password|credential|authorization|database_url|smtp_url)$/i;
+const SECRET_KEY_PATTERN =
+  /(secret|token|key|password|credential|authorization|database_url|smtp_url)$/i;
 
-export function inspectIntegrationSandbox(input: IntegrationSandboxInput = {}): IntegrationSandboxReport {
+export function inspectIntegrationSandbox(
+  input: IntegrationSandboxInput = {},
+): IntegrationSandboxReport {
   const env = { ...(input.draft?.env ?? {}), ...(input.env ?? {}) };
   const sourceText = normalizeText(flattenText(input.draft));
   const results = CONNECTOR_SPECS.map((spec) => buildConnectorResult(spec, input, env, sourceText));
   const requiredResults = results.filter((result) => result.required);
-  const failures = requiredResults.filter((result) => result.status === "fail").map((result) => result.label);
-  const pending = requiredResults.filter((result) => result.status === "pending").map((result) => result.label);
-  const setupGuide = uniqueSorted(requiredResults.flatMap((result) => result.status === "pass" ? [] : result.setupGuide));
+  const failures = requiredResults
+    .filter((result) => result.status === "fail")
+    .map((result) => result.label);
+  const pending = requiredResults
+    .filter((result) => result.status === "pending")
+    .map((result) => result.label);
+  const setupGuide = uniqueSorted(
+    requiredResults.flatMap((result) => (result.status === "pass" ? [] : result.setupGuide)),
+  );
   const runtimeResults = results.filter((result) => result.surface === "runtime");
   const previewResults = results.filter((result) => result.surface === "preview");
 
   return {
     version: "phase-71-lane-3",
     status: failures.length > 0 ? "fail" : pending.length > 0 ? "pending" : "pass",
-    canRunRuntimeSandbox: runtimeResults.every((result) => result.status === "pass" || !result.required),
-    canRunPreviewSandbox: previewResults.every((result) => result.status === "pass" || !result.required),
+    canRunRuntimeSandbox: runtimeResults.every(
+      (result) => result.status === "pass" || !result.required,
+    ),
+    canRunPreviewSandbox: previewResults.every(
+      (result) => result.status === "pass" || !result.required,
+    ),
     results,
     failures,
     pending,
@@ -299,11 +330,15 @@ function buildConnectorResult(
     configured,
     available,
     envKeysPresent: spec.envKeys.filter((key) => hasValue(env[key])),
-    connected: spec.connectorNames.filter((name) => normalizedSet(input.connectedConnectors).has(name)),
+    connected: spec.connectorNames.filter((name) =>
+      normalizedSet(input.connectedConnectors).has(name),
+    ),
     tools: spec.toolNames.filter((name) => normalizedSet(input.availableTools).has(name)),
   });
 
-  const status = override?.status ?? deriveStatus({ required, configured, available, pending: override?.pending });
+  const status =
+    override?.status ??
+    deriveStatus({ required, configured, available, pending: override?.pending });
 
   return {
     id: spec.id,
@@ -348,7 +383,8 @@ function messageForStatus(
 ): string {
   if (!required) return `${spec.label} is not requested by the current generated app context.`;
   if (status === "pass") return `${spec.label} has deterministic sandbox setup available.`;
-  if (status === "pending") return `${spec.label} is waiting on an explicit sandbox result or setup confirmation.`;
+  if (status === "pending")
+    return `${spec.label} is waiting on an explicit sandbox result or setup confirmation.`;
   return `${spec.label} is required but sandbox setup is incomplete.`;
 }
 
@@ -359,11 +395,17 @@ function isAvailable(
 ): boolean {
   if (spec.surface === "runtime" && input.runtime?.sandboxEnabled === false) return false;
   if (spec.surface === "preview" && input.preview?.sandboxEnabled === false) return false;
-  if (spec.id === "preview_renderer") return input.preview?.buildReady === true || hasValue(input.preview?.previewUrl);
-  if (spec.id === "preview_runtime") return input.preview?.sandboxEnabled === true || hasAnyEnv(env, ["PACKETAGENT_PREVIEW_SANDBOX"]);
-  return intersects(normalizedSet(input.availableTools), spec.toolNames)
-    || intersects(normalizedSet(input.connectedConnectors), spec.connectorNames)
-    || spec.envKeys.length > 0;
+  if (spec.id === "preview_renderer")
+    return input.preview?.buildReady === true || hasValue(input.preview?.previewUrl);
+  if (spec.id === "preview_runtime")
+    return (
+      input.preview?.sandboxEnabled === true || hasAnyEnv(env, ["PACKETAGENT_PREVIEW_SANDBOX"])
+    );
+  return (
+    intersects(normalizedSet(input.availableTools), spec.toolNames) ||
+    intersects(normalizedSet(input.connectedConnectors), spec.connectorNames) ||
+    spec.envKeys.length > 0
+  );
 }
 
 function isConfigured(
@@ -371,22 +413,31 @@ function isConfigured(
   env: Record<string, string | undefined>,
   input: IntegrationSandboxInput,
 ): boolean {
-  if (spec.id === "preview_renderer") return input.preview?.buildReady === true || hasValue(input.preview?.previewUrl);
-  if (spec.id === "preview_browser") return hasValue(input.preview?.previewUrl) && (
-    intersects(normalizedSet(input.availableTools), spec.toolNames)
-    || intersects(normalizedSet(input.connectedConnectors), spec.connectorNames)
-  );
+  if (spec.id === "preview_renderer")
+    return input.preview?.buildReady === true || hasValue(input.preview?.previewUrl);
+  if (spec.id === "preview_browser")
+    return (
+      hasValue(input.preview?.previewUrl) &&
+      (intersects(normalizedSet(input.availableTools), spec.toolNames) ||
+        intersects(normalizedSet(input.connectedConnectors), spec.connectorNames))
+    );
   if (spec.id === "webhook") {
-    return hasAnyEnv(env, ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL"])
-      && hasValue(env.PACKETAGENT_WEBHOOK_SIGNING_SECRET);
+    return (
+      hasAnyEnv(env, ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL"]) &&
+      hasValue(env.PACKETAGENT_WEBHOOK_SIGNING_SECRET)
+    );
   }
   if (spec.envKeys.length === 0) {
-    return intersects(normalizedSet(input.availableTools), spec.toolNames)
-      || intersects(normalizedSet(input.connectedConnectors), spec.connectorNames);
+    return (
+      intersects(normalizedSet(input.availableTools), spec.toolNames) ||
+      intersects(normalizedSet(input.connectedConnectors), spec.connectorNames)
+    );
   }
-  return hasEnvByMode(env, spec.envKeys, spec.envKeyMode ?? "any")
-    || intersects(normalizedSet(input.availableTools), spec.toolNames)
-    || intersects(normalizedSet(input.connectedConnectors), spec.connectorNames);
+  return (
+    hasEnvByMode(env, spec.envKeys, spec.envKeyMode ?? "any") ||
+    intersects(normalizedSet(input.availableTools), spec.toolNames) ||
+    intersects(normalizedSet(input.connectedConnectors), spec.connectorNames)
+  );
 }
 
 function sourceSignalsForSpec(
@@ -397,16 +448,31 @@ function sourceSignalsForSpec(
   const signals = spec.signals
     .filter((signal) => signal.pattern.test(sourceText))
     .map((signal) => `draft:${signal.label}`);
-  if (spec.id === "database" && Array.isArray(input.draft?.dataModels) && input.draft.dataModels.length > 0) {
+  if (
+    spec.id === "database" &&
+    Array.isArray(input.draft?.dataModels) &&
+    input.draft.dataModels.length > 0
+  ) {
     signals.push("draft:data-model");
   }
-  if (spec.id === "webhook" && Array.isArray(input.draft?.apiRoutes) && /webhook/i.test(flattenText(input.draft.apiRoutes))) {
+  if (
+    spec.id === "webhook" &&
+    Array.isArray(input.draft?.apiRoutes) &&
+    /webhook/i.test(flattenText(input.draft.apiRoutes))
+  ) {
     signals.push("draft:webhook-route");
   }
-  if (spec.id === "preview_renderer" && (Array.isArray(input.draft?.pages) || input.preview?.previewUrl)) {
+  if (
+    spec.id === "preview_renderer" &&
+    (Array.isArray(input.draft?.pages) || input.preview?.previewUrl)
+  ) {
     signals.push("input:preview");
   }
-  if (spec.id === "preview_runtime" && Array.isArray(input.draft?.apiRoutes) && input.draft.apiRoutes.length > 0) {
+  if (
+    spec.id === "preview_runtime" &&
+    Array.isArray(input.draft?.apiRoutes) &&
+    input.draft.apiRoutes.length > 0
+  ) {
     signals.push("draft:api-route");
   }
   return uniqueSorted(signals);
@@ -414,7 +480,8 @@ function sourceSignalsForSpec(
 
 function flattenText(value: unknown): string {
   if (value === undefined || value === null) return "";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    return String(value);
   if (Array.isArray(value)) return value.map(flattenText).filter(Boolean).join(" ");
   if (typeof value === "object") {
     return Object.keys(value as Record<string, unknown>)
@@ -427,7 +494,10 @@ function flattenText(value: unknown): string {
 }
 
 function normalizeText(value: unknown): string {
-  return String(value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizedSet(values: string[] | undefined): Set<string> {
@@ -438,10 +508,12 @@ function hasAnyEnv(env: Record<string, string | undefined>, keys: string[]): boo
   return keys.some((key) => hasValue(env[key]));
 }
 
-function hasEnvByMode(env: Record<string, string | undefined>, keys: string[], mode: EnvKeyMode): boolean {
-  return mode === "all"
-    ? keys.every((key) => hasValue(env[key]))
-    : hasAnyEnv(env, keys);
+function hasEnvByMode(
+  env: Record<string, string | undefined>,
+  keys: string[],
+  mode: EnvKeyMode,
+): boolean {
+  return mode === "all" ? keys.every((key) => hasValue(env[key])) : hasAnyEnv(env, keys);
 }
 
 function hasValue(value: string | undefined): boolean {
@@ -462,21 +534,27 @@ function redactValue(value: unknown, key: string | undefined): unknown {
   if (typeof value === "number" || typeof value === "boolean") return value;
   if (Array.isArray(value)) return value.map((item) => redactValue(item, key));
   if (typeof value === "object") {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-      .map(([entryKey, entryValue]) => [entryKey, redactValue(entryValue, entryKey)]));
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [
+        entryKey,
+        redactValue(entryValue, entryKey),
+      ]),
+    );
   }
   return "[redacted]";
 }
 
 function shouldRedact(key: string | undefined, value: string): boolean {
   const normalizedKey = key ?? "";
-  return SECRET_KEY_PATTERN.test(normalizedKey)
-    || /^database_?url$/i.test(normalizedKey)
-    || /^smtp_?url$/i.test(normalizedKey)
-    || /\b(bearer|basic)\s+[a-z0-9._~+/-]+=*/i.test(value)
-    || /^(sk-|sk_|pk_live_|rk_live_|ghp_|github_pat_|xox[baprs]-)/i.test(value)
-    || /^[a-z0-9+/]{32,}={0,2}$/i.test(value)
-    || /^[a-z][a-z0-9+.-]*:\/\/[^:\s/]+:[^@\s/]+@/i.test(value);
+  return (
+    SECRET_KEY_PATTERN.test(normalizedKey) ||
+    /^database_?url$/i.test(normalizedKey) ||
+    /^smtp_?url$/i.test(normalizedKey) ||
+    /\b(bearer|basic)\s+[a-z0-9._~+/-]+=*/i.test(value) ||
+    /^(sk-|sk_|pk_live_|rk_live_|ghp_|github_pat_|xox[baprs]-)/i.test(value) ||
+    /^[a-z0-9+/]{32,}={0,2}$/i.test(value) ||
+    /^[a-z][a-z0-9+.-]*:\/\/[^:\s/]+:[^@\s/]+@/i.test(value)
+  );
 }
 
 function redactString(value: string): string {
@@ -486,6 +564,7 @@ function redactString(value: string): string {
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right));
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) =>
+    left.localeCompare(right),
+  );
 }

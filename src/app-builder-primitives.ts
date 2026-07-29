@@ -109,8 +109,10 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     id: "ai.feature",
     kind: "ai_feature",
     name: "AI feature block",
-    summary: "Adds model-backed generation, classification, extraction, summarization, or chat features.",
-    generatedAppUse: "Use for generated app features that call an LLM or produce structured AI output.",
+    summary:
+      "Adds model-backed generation, classification, extraction, summarization, or chat features.",
+    generatedAppUse:
+      "Use for generated app features that call an LLM or produce structured AI output.",
     supportedBlocks: ["chat", "completion", "classification", "extraction", "summarization"],
     requiredEnv: ["OPENAI_API_KEY or ANTHROPIC_API_KEY or OLLAMA_BASE_URL"],
     optionalEnv: ["PACKETAGENT_AI_MODEL"],
@@ -127,7 +129,8 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     kind: "database_crud",
     name: "Database CRUD block",
     summary: "Describes data tables, fields, seed rows, and create/read/update/delete flows.",
-    generatedAppUse: "Use for generated app drafts with data-backed list, detail, create, edit, and delete screens.",
+    generatedAppUse:
+      "Use for generated app drafts with data-backed list, detail, create, edit, and delete screens.",
     supportedBlocks: ["schema", "seed_data", "list", "detail", "create", "update", "delete"],
     requiredEnv: [],
     optionalEnv: ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_DB_PATH"],
@@ -147,7 +150,10 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     generatedAppUse: "Use for generated app drafts that need background work on a schedule.",
     supportedBlocks: ["cron", "recurring_job", "retry", "job_payload"],
     requiredEnv: [],
-    optionalEnv: ["PACKETAGENT_SCHEDULER_HTTP_LEADER_URL", "PACKETAGENT_SCHEDULER_COORDINATION_EVIDENCE"],
+    optionalEnv: [
+      "PACKETAGENT_SCHEDULER_HTTP_LEADER_URL",
+      "PACKETAGENT_SCHEDULER_COORDINATION_EVIDENCE",
+    ],
     draftReference: {
       primitiveId: "scheduled.job",
       kind: "scheduled_job",
@@ -160,8 +166,10 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     id: "webhook.endpoint",
     kind: "webhook",
     name: "Webhook block",
-    summary: "Defines inbound HTTP event handlers with payload examples and signing-secret posture.",
-    generatedAppUse: "Use for generated app drafts that receive external events from Slack, GitHub, Stripe, or custom systems.",
+    summary:
+      "Defines inbound HTTP event handlers with payload examples and signing-secret posture.",
+    generatedAppUse:
+      "Use for generated app drafts that receive external events from Slack, GitHub, Stripe, or custom systems.",
     supportedBlocks: ["inbound_event", "payload_validation", "signature_check", "event_response"],
     requiredEnv: [],
     optionalEnv: ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_WEBHOOK_SIGNING_SECRET"],
@@ -178,7 +186,8 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
     kind: "payment",
     name: "Payment block",
     summary: "Describes checkout, subscription, customer portal, and payment webhook readiness.",
-    generatedAppUse: "Use for generated app drafts that need Stripe-style checkout or subscription flows.",
+    generatedAppUse:
+      "Use for generated app drafts that need Stripe-style checkout or subscription flows.",
     supportedBlocks: ["checkout", "subscription", "customer_portal", "payment_webhook"],
     requiredEnv: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
     optionalEnv: ["STRIPE_PRICE_ID", "STRIPE_PUBLISHABLE_KEY"],
@@ -192,8 +201,12 @@ export const APP_BUILDER_PRIMITIVES: readonly AppBuilderPrimitive[] = [
   },
 ];
 
-const PRIMITIVE_ORDER = new Map(APP_BUILDER_PRIMITIVES.map((primitive, index) => [primitive.id, index]));
-const PRIMITIVES_BY_ID = new Map(APP_BUILDER_PRIMITIVES.map((primitive) => [primitive.id, primitive]));
+const PRIMITIVE_ORDER = new Map(
+  APP_BUILDER_PRIMITIVES.map((primitive, index) => [primitive.id, index]),
+);
+const PRIMITIVES_BY_ID = new Map(
+  APP_BUILDER_PRIMITIVES.map((primitive) => [primitive.id, primitive]),
+);
 export const APP_BUILDER_PRIMITIVE_KINDS: readonly AppBuilderPrimitiveKind[] = [
   "ai_feature",
   "database_crud",
@@ -202,7 +215,9 @@ export const APP_BUILDER_PRIMITIVE_KINDS: readonly AppBuilderPrimitiveKind[] = [
   "payment",
 ];
 
-export function listAppBuilderPrimitives(input: AppBuilderPrimitiveCatalogInput = {}): AppBuilderPrimitive[] {
+export function listAppBuilderPrimitives(
+  input: AppBuilderPrimitiveCatalogInput = {},
+): AppBuilderPrimitive[] {
   return selectPrimitives(input).map(copyPrimitive);
 }
 
@@ -211,7 +226,9 @@ export function findAppBuilderPrimitive(id: string): AppBuilderPrimitive | null 
   return primitive ? copyPrimitive(primitive) : null;
 }
 
-export function buildAppBuilderPrimitiveCatalog(input: AppBuilderPrimitiveCatalogInput = {}): AppBuilderPrimitiveCatalogSummary {
+export function buildAppBuilderPrimitiveCatalog(
+  input: AppBuilderPrimitiveCatalogInput = {},
+): AppBuilderPrimitiveCatalogSummary {
   const primitives = listAppBuilderPrimitives(input);
   const readiness = buildAppBuilderPrimitiveReadinessSummary({
     ...input.readiness,
@@ -236,10 +253,9 @@ export function buildAppBuilderPrimitiveReadinessSummary(
   const primitives = selectPrimitives(input);
   const unknownPrimitiveIds = unknownRequestedPrimitiveIds(input);
   const entries = primitives.map((primitive) => buildPrimitiveReadinessEntry(primitive, input));
-  const byKind = Object.fromEntries(APP_BUILDER_PRIMITIVE_KINDS.map((kind) => [kind, null])) as Record<
-    AppBuilderPrimitiveKind,
-    AppBuilderPrimitiveReadinessEntry | null
-  >;
+  const byKind = Object.fromEntries(
+    APP_BUILDER_PRIMITIVE_KINDS.map((kind) => [kind, null]),
+  ) as Record<AppBuilderPrimitiveKind, AppBuilderPrimitiveReadinessEntry | null>;
 
   for (const entry of entries) {
     byKind[entry.kind] = entry;
@@ -250,7 +266,8 @@ export function buildAppBuilderPrimitiveReadinessSummary(
     ...entries.flatMap((entry) => entry.requiredSetup),
     ...unknownPrimitiveIds.map((id) => `Remove or register unknown app builder primitive ${id}.`),
   ]);
-  const needsSetupCount = entries.filter((entry) => !entry.ready).length + unknownPrimitiveIds.length;
+  const needsSetupCount =
+    entries.filter((entry) => !entry.ready).length + unknownPrimitiveIds.length;
   const readyCount = entries.filter((entry) => entry.ready).length;
   const ready = needsSetupCount === 0;
 
@@ -275,11 +292,15 @@ export function listAppBuilderPrimitiveCatalog(input: AppBuilderPrimitiveCatalog
   return buildAppBuilderPrimitiveCatalog(input);
 }
 
-export function buildPaymentBlockReadiness(input: AppBuilderPrimitiveReadinessInput = {}): PaymentBlockReadiness {
+export function buildPaymentBlockReadiness(
+  input: AppBuilderPrimitiveReadinessInput = {},
+): PaymentBlockReadiness {
   const env = input.env ?? {};
   const provider = input.payments?.provider ?? "stripe";
-  const secretKeyConfigured = input.payments?.secretKeyConfigured ?? hasEnv(env, "STRIPE_SECRET_KEY");
-  const webhookSecretConfigured = input.payments?.webhookSecretConfigured ?? hasEnv(env, "STRIPE_WEBHOOK_SECRET");
+  const secretKeyConfigured =
+    input.payments?.secretKeyConfigured ?? hasEnv(env, "STRIPE_SECRET_KEY");
+  const webhookSecretConfigured =
+    input.payments?.webhookSecretConfigured ?? hasEnv(env, "STRIPE_WEBHOOK_SECRET");
   const checkoutEnabled = input.payments?.checkoutEnabled ?? provider === "stripe";
   const missingSecrets = [
     ...(!secretKeyConfigured ? ["STRIPE_SECRET_KEY"] : []),
@@ -287,7 +308,9 @@ export function buildPaymentBlockReadiness(input: AppBuilderPrimitiveReadinessIn
   ];
   const requiredSetup = [
     ...(!checkoutEnabled ? ["Enable checkout in the payment provider configuration."] : []),
-    ...(missingSecrets.length > 0 ? [`Configure payment secrets: ${missingSecrets.join(", ")}.`] : []),
+    ...(missingSecrets.length > 0
+      ? [`Configure payment secrets: ${missingSecrets.join(", ")}.`]
+      : []),
   ];
   const ready = checkoutEnabled && missingSecrets.length === 0;
 
@@ -322,19 +345,27 @@ function buildAiReadinessEntry(
   const providerReady = (input.providers ?? []).some(
     (provider) => provider.status === "connected" && provider.apiKeyConfigured !== false,
   );
-  const envReady = hasEnv(env, "OPENAI_API_KEY")
-    || hasEnv(env, "ANTHROPIC_API_KEY")
-    || hasEnv(env, "OLLAMA_BASE_URL")
-    || envFlag(env, "PACKETAGENT_AI_PROVIDER_READY");
+  const envReady =
+    hasEnv(env, "OPENAI_API_KEY") ||
+    hasEnv(env, "ANTHROPIC_API_KEY") ||
+    hasEnv(env, "OLLAMA_BASE_URL") ||
+    envFlag(env, "PACKETAGENT_AI_PROVIDER_READY");
   const ready = providerReady || envReady;
   const missingSecrets = ready ? [] : ["OPENAI_API_KEY or ANTHROPIC_API_KEY or OLLAMA_BASE_URL"];
 
-  return readinessEntry(primitive, ready, missingSecrets, ready
-    ? []
-    : ["Connect an AI provider or configure a local Ollama endpoint before enabling AI feature blocks."],
-  ready
-    ? "AI feature blocks can reference configured model execution."
-    : "AI feature blocks can be planned, but generated runtime calls need a configured model provider.");
+  return readinessEntry(
+    primitive,
+    ready,
+    missingSecrets,
+    ready
+      ? []
+      : [
+          "Connect an AI provider or configure a local Ollama endpoint before enabling AI feature blocks.",
+        ],
+    ready
+      ? "AI feature blocks can reference configured model execution."
+      : "AI feature blocks can be planned, but generated runtime calls need a configured model provider.",
+  );
 }
 
 function buildDatabaseReadinessEntry(
@@ -345,12 +376,15 @@ function buildDatabaseReadinessEntry(
   const configured = input.database?.configured ?? true;
   const ready = supportsCrud && configured;
 
-  return readinessEntry(primitive, ready, [], ready
-    ? []
-    : ["Choose a supported generated-app data store before enabling CRUD flows."],
-  ready
-    ? "Database CRUD blocks can describe schema metadata, seed data, and CRUD flows."
-    : "Database CRUD blocks need a supported store before generated routes should mutate data.");
+  return readinessEntry(
+    primitive,
+    ready,
+    [],
+    ready ? [] : ["Choose a supported generated-app data store before enabling CRUD flows."],
+    ready
+      ? "Database CRUD blocks can describe schema metadata, seed data, and CRUD flows."
+      : "Database CRUD blocks need a supported store before generated routes should mutate data.",
+  );
 }
 
 function buildSchedulerReadinessEntry(
@@ -361,12 +395,17 @@ function buildSchedulerReadinessEntry(
   const configured = input.scheduler?.configured ?? true;
   const ready = supportsRecurringJobs && configured;
 
-  return readinessEntry(primitive, ready, [], ready
-    ? []
-    : ["Enable recurring job support before generated scheduled job blocks run automatically."],
-  ready
-    ? "Scheduled job blocks can reference cron cadence, payload, and retry metadata."
-    : "Scheduled job blocks can be drafted, but automatic execution needs scheduler support.");
+  return readinessEntry(
+    primitive,
+    ready,
+    [],
+    ready
+      ? []
+      : ["Enable recurring job support before generated scheduled job blocks run automatically."],
+    ready
+      ? "Scheduled job blocks can reference cron cadence, payload, and retry metadata."
+      : "Scheduled job blocks can be drafted, but automatic execution needs scheduler support.",
+  );
 }
 
 function buildWebhookReadinessEntry(
@@ -374,18 +413,32 @@ function buildWebhookReadinessEntry(
   input: AppBuilderPrimitiveReadinessInput,
 ): AppBuilderPrimitiveReadinessEntry {
   const env = input.env ?? {};
-  const hasPublicBaseUrl = Boolean(cleanString(input.webhook?.publicBaseUrl)) || hasEnv(env, "PACKETAGENT_PUBLIC_BASE_URL");
-  const hasSigningSecret = input.webhook?.signingSecretConfigured === true || hasEnv(env, "PACKETAGENT_WEBHOOK_SIGNING_SECRET");
+  const hasPublicBaseUrl =
+    Boolean(cleanString(input.webhook?.publicBaseUrl)) ||
+    hasEnv(env, "PACKETAGENT_PUBLIC_BASE_URL");
+  const hasSigningSecret =
+    input.webhook?.signingSecretConfigured === true ||
+    hasEnv(env, "PACKETAGENT_WEBHOOK_SIGNING_SECRET");
   const missingSecrets = hasSigningSecret ? [] : ["PACKETAGENT_WEBHOOK_SIGNING_SECRET"];
   const requiredSetup = [
-    ...(!hasPublicBaseUrl ? ["Set PACKETAGENT_PUBLIC_BASE_URL before publishing external webhook URLs."] : []),
-    ...(!hasSigningSecret ? ["Configure PACKETAGENT_WEBHOOK_SIGNING_SECRET for signed inbound webhook blocks."] : []),
+    ...(!hasPublicBaseUrl
+      ? ["Set PACKETAGENT_PUBLIC_BASE_URL before publishing external webhook URLs."]
+      : []),
+    ...(!hasSigningSecret
+      ? ["Configure PACKETAGENT_WEBHOOK_SIGNING_SECRET for signed inbound webhook blocks."]
+      : []),
   ];
   const ready = requiredSetup.length === 0;
 
-  return readinessEntry(primitive, ready, missingSecrets, requiredSetup, ready
-    ? "Webhook blocks can reference public URL and signing-secret readiness."
-    : "Webhook blocks can be drafted, but publishing should wait for public URL and signing-secret setup.");
+  return readinessEntry(
+    primitive,
+    ready,
+    missingSecrets,
+    requiredSetup,
+    ready
+      ? "Webhook blocks can reference public URL and signing-secret readiness."
+      : "Webhook blocks can be drafted, but publishing should wait for public URL and signing-secret setup.",
+  );
 }
 
 function buildPaymentReadinessEntry(
@@ -393,7 +446,13 @@ function buildPaymentReadinessEntry(
   input: AppBuilderPrimitiveReadinessInput,
 ): AppBuilderPrimitiveReadinessEntry {
   const payment = buildPaymentBlockReadiness(input);
-  return readinessEntry(primitive, payment.ready, payment.missingSecrets, payment.requiredSetup, payment.message);
+  return readinessEntry(
+    primitive,
+    payment.ready,
+    payment.missingSecrets,
+    payment.requiredSetup,
+    payment.message,
+  );
 }
 
 function readinessEntry(
@@ -415,21 +474,27 @@ function readinessEntry(
   };
 }
 
-function selectPrimitives(input: AppBuilderPrimitiveCatalogInput | AppBuilderPrimitiveReadinessInput): AppBuilderPrimitive[] {
+function selectPrimitives(
+  input: AppBuilderPrimitiveCatalogInput | AppBuilderPrimitiveReadinessInput,
+): AppBuilderPrimitive[] {
   const requestedIds = new Set(input.requestedPrimitiveIds ?? []);
   const requestedKinds = new Set(input.requestedKinds ?? []);
 
-  return APP_BUILDER_PRIMITIVES
-    .filter((primitive) => {
-      const idSelected = requestedIds.size === 0 || requestedIds.has(primitive.id);
-      const kindSelected = requestedKinds.size === 0 || requestedKinds.has(primitive.kind);
-      return idSelected && kindSelected;
-    })
-    .sort((left, right) => (PRIMITIVE_ORDER.get(left.id) ?? 0) - (PRIMITIVE_ORDER.get(right.id) ?? 0));
+  return APP_BUILDER_PRIMITIVES.filter((primitive) => {
+    const idSelected = requestedIds.size === 0 || requestedIds.has(primitive.id);
+    const kindSelected = requestedKinds.size === 0 || requestedKinds.has(primitive.kind);
+    return idSelected && kindSelected;
+  }).sort(
+    (left, right) => (PRIMITIVE_ORDER.get(left.id) ?? 0) - (PRIMITIVE_ORDER.get(right.id) ?? 0),
+  );
 }
 
-function unknownRequestedPrimitiveIds(input: AppBuilderPrimitiveCatalogInput | AppBuilderPrimitiveReadinessInput): string[] {
-  return uniqueSorted((input.requestedPrimitiveIds ?? []).filter((id) => !PRIMITIVES_BY_ID.has(id)));
+function unknownRequestedPrimitiveIds(
+  input: AppBuilderPrimitiveCatalogInput | AppBuilderPrimitiveReadinessInput,
+): string[] {
+  return uniqueSorted(
+    (input.requestedPrimitiveIds ?? []).filter((id) => !PRIMITIVES_BY_ID.has(id)),
+  );
 }
 
 function copyPrimitive(primitive: AppBuilderPrimitive): AppBuilderPrimitive {

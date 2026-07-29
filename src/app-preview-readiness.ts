@@ -1,6 +1,12 @@
 export type PreviewVisibility = "public" | "private";
 export type PreviewDevice = "desktop" | "mobile";
-export type PreviewBuildPhase = "not-started" | "queued" | "running" | "passed" | "failed" | "canceled";
+export type PreviewBuildPhase =
+  | "not-started"
+  | "queued"
+  | "running"
+  | "passed"
+  | "failed"
+  | "canceled";
 export type PreviewBuildTone = "neutral" | "working" | "success" | "danger";
 export type SmokeCheckKind = "page" | "api" | "crud";
 export type SmokeCheckRunMode = "browser" | "http";
@@ -135,7 +141,8 @@ const SAFE_API_METHODS = new Set<HttpMethod>(["GET", "HEAD", "OPTIONS"]);
 const DEFAULT_PREVIEW_BASE_PATH = "/builder/preview";
 const DEFAULT_ENTRY_PATH = "/";
 const DEFAULT_EXPECTED_STATUS = 200;
-const SECRET_PATTERN = /\b(api[_-]?key|authorization|bearer|secret|token|password)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/gi;
+const SECRET_PATTERN =
+  /\b(api[_-]?key|authorization|bearer|secret|token|password)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/gi;
 
 export function deriveAppPreviewTarget(input: AppPreviewTargetInput): AppPreviewTarget {
   const previewRoot = joinPaths(
@@ -143,12 +150,17 @@ export function deriveAppPreviewTarget(input: AppPreviewTargetInput): AppPreview
     input.workspaceId ? encodePathSegment(input.workspaceId) : undefined,
     encodePathSegment(input.appId),
   );
-  const entryPath = normalizeAppPath(input.preferredPath) ?? firstPreviewPagePath(input.pageMap) ?? DEFAULT_ENTRY_PATH;
+  const entryPath =
+    normalizeAppPath(input.preferredPath) ??
+    firstPreviewPagePath(input.pageMap) ??
+    DEFAULT_ENTRY_PATH;
   const path = joinPaths(previewRoot, entryPath);
   const mobilePage = (input.pageMap ?? [])
     .filter((page) => page.supportsMobilePreview)
     .sort(comparePages)[0];
-  const mobilePath = mobilePage ? joinPaths(previewRoot, normalizeAppPath(mobilePage.path) ?? DEFAULT_ENTRY_PATH) : undefined;
+  const mobilePath = mobilePage
+    ? joinPaths(previewRoot, normalizeAppPath(mobilePage.path) ?? DEFAULT_ENTRY_PATH)
+    : undefined;
   const qrPath = mobilePath ? `${mobilePath}?device=mobile` : undefined;
   const url = input.baseUrl ? absoluteUrl(input.baseUrl, path) : undefined;
 
@@ -201,7 +213,9 @@ export function derivePreviewBuildStatus(input: PreviewBuildStatusInput = {}): P
       tone: "working",
       canPreview: false,
       canPublish: false,
-      summary: input.message ?? `${phase === "queued" ? "Preview build is queued" : "Preview build is running"}.${checkSummary}`.trim(),
+      summary:
+        input.message ??
+        `${phase === "queued" ? "Preview build is queued" : "Preview build is running"}.${checkSummary}`.trim(),
     };
   }
 
@@ -230,12 +244,16 @@ export function buildRuntimeErrorHandoff(input: RuntimeErrorHandoffInput): Runti
   const normalized = normalizeError(input.error);
   const source = input.source ?? "runtime";
   const title = `Fix ${source} error`;
-  const routeLine = input.routePath ? `Route: ${normalizeAppPath(input.routePath) ?? input.routePath}\n` : "";
+  const routeLine = input.routePath
+    ? `Route: ${normalizeAppPath(input.routePath) ?? input.routePath}\n`
+    : "";
   const prompt = [
     `Fix the generated app ${source} error for app ${input.appId}.`,
     `${routeLine}Error: ${normalized.message}`,
     "Use the current generated app plan, route map, and smoke-check context. Return a minimal patch and explain the verification step.",
-  ].filter(Boolean).join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   return {
     kind: "runtime-error-fix",
@@ -244,7 +262,9 @@ export function buildRuntimeErrorHandoff(input: RuntimeErrorHandoffInput): Runti
     metadata: removeUndefined({
       appId: input.appId,
       workspaceId: input.workspaceId,
-      routePath: input.routePath ? normalizeAppPath(input.routePath) ?? input.routePath : undefined,
+      routePath: input.routePath
+        ? (normalizeAppPath(input.routePath) ?? input.routePath)
+        : undefined,
       source,
       buildId: input.buildId,
       smokeCheckId: input.smokeCheckId,
@@ -261,14 +281,18 @@ export function buildAppPreviewReadiness(input: AppPreviewReadinessInput): AppPr
     preview: deriveAppPreviewTarget(input),
     smokeChecks: deriveAppSmokeChecks(input),
     buildStatus: derivePreviewBuildStatus(input.build),
-    runtimeErrorHandoff: input.runtimeError ? buildRuntimeErrorHandoff(input.runtimeError) : undefined,
+    runtimeErrorHandoff: input.runtimeError
+      ? buildRuntimeErrorHandoff(input.runtimeError)
+      : undefined,
   });
 }
 
 function pageSmokeChecks(pageMap: GeneratedAppPageMapEntry[]): AppSmokeCheck[] {
   return pageMap
     .map((page) => ({ page, path: normalizeAppPath(page.path) }))
-    .filter((entry): entry is { page: GeneratedAppPageMapEntry; path: string } => Boolean(entry.path))
+    .filter((entry): entry is { page: GeneratedAppPageMapEntry; path: string } =>
+      Boolean(entry.path),
+    )
     .sort((left, right) => comparePages(left.page, right.page))
     .map(({ page, path }) => ({
       id: `page:${stableKey(page.key || path)}`,
@@ -280,13 +304,19 @@ function pageSmokeChecks(pageMap: GeneratedAppPageMapEntry[]): AppSmokeCheck[] {
       requiredAuth: page.visibility !== "public",
       expectedStatus: DEFAULT_EXPECTED_STATUS,
       sourceKey: page.key,
-      assertions: ["page renders without a runtime error", "document title or main content is present"],
+      assertions: [
+        "page renders without a runtime error",
+        "document title or main content is present",
+      ],
     }));
 }
 
 function apiSmokeChecks(apiRoutes: GeneratedAppApiRoute[]): AppSmokeCheck[] {
   return apiRoutes
-    .filter((route) => route.smoke === true || (route.smoke !== false && SAFE_API_METHODS.has(route.method)))
+    .filter(
+      (route) =>
+        route.smoke === true || (route.smoke !== false && SAFE_API_METHODS.has(route.method)),
+    )
     .map((route) => ({ route, path: normalizeAppPath(route.path) }))
     .filter((entry): entry is { route: GeneratedAppApiRoute; path: string } => Boolean(entry.path))
     .map(({ route, path }) => ({
@@ -299,7 +329,10 @@ function apiSmokeChecks(apiRoutes: GeneratedAppApiRoute[]): AppSmokeCheck[] {
       requiredAuth: route.authRequired !== false,
       expectedStatus: route.expectedStatus ?? DEFAULT_EXPECTED_STATUS,
       sourceKey: route.key ?? `${route.method} ${path}`,
-      assertions: ["response status matches the generated route contract", "response body is valid for the route contract"],
+      assertions: [
+        "response status matches the generated route contract",
+        "response body is valid for the route contract",
+      ],
     }));
 }
 
@@ -321,25 +354,56 @@ function crudCheck(flow: GeneratedAppCrudFlow, operation: CrudOperation): AppSmo
   const authRequired = flow.authRequired !== false;
   const apiBasePath = normalizeAppPath(flow.apiBasePath);
   const listPath = normalizeAppPath(flow.listPath) ?? apiBasePath;
-  const detailPath = normalizeAppPath(flow.detailPath) ?? (apiBasePath ? joinPaths(apiBasePath, ":id") : undefined);
+  const detailPath =
+    normalizeAppPath(flow.detailPath) ?? (apiBasePath ? joinPaths(apiBasePath, ":id") : undefined);
 
   switch (operation) {
     case "list":
-      return listPath ? crudCheckRecord(sourceKey, `List ${resource}`, "GET", listPath, authRequired, ["collection endpoint returns records"]) : null;
+      return listPath
+        ? crudCheckRecord(sourceKey, `List ${resource}`, "GET", listPath, authRequired, [
+            "collection endpoint returns records",
+          ])
+        : null;
     case "create":
       return (normalizeAppPath(flow.createPath) ?? apiBasePath)
-        ? crudCheckRecord(sourceKey, `Create ${resource}`, "POST", normalizeAppPath(flow.createPath) ?? apiBasePath ?? "", authRequired, ["create endpoint accepts generated seed-shaped payload"])
+        ? crudCheckRecord(
+            sourceKey,
+            `Create ${resource}`,
+            "POST",
+            normalizeAppPath(flow.createPath) ?? apiBasePath ?? "",
+            authRequired,
+            ["create endpoint accepts generated seed-shaped payload"],
+          )
         : null;
     case "read":
-      return detailPath ? crudCheckRecord(sourceKey, `Read ${resource}`, "GET", detailPath, authRequired, ["detail endpoint returns one seeded record"]) : null;
+      return detailPath
+        ? crudCheckRecord(sourceKey, `Read ${resource}`, "GET", detailPath, authRequired, [
+            "detail endpoint returns one seeded record",
+          ])
+        : null;
     case "update":
-      return detailPath ? crudCheckRecord(sourceKey, `Update ${resource}`, "PATCH", detailPath, authRequired, ["update endpoint persists a generated field change"]) : null;
+      return detailPath
+        ? crudCheckRecord(sourceKey, `Update ${resource}`, "PATCH", detailPath, authRequired, [
+            "update endpoint persists a generated field change",
+          ])
+        : null;
     case "delete":
-      return detailPath ? crudCheckRecord(sourceKey, `Delete ${resource}`, "DELETE", detailPath, authRequired, ["delete endpoint removes or archives a generated record"]) : null;
+      return detailPath
+        ? crudCheckRecord(sourceKey, `Delete ${resource}`, "DELETE", detailPath, authRequired, [
+            "delete endpoint removes or archives a generated record",
+          ])
+        : null;
   }
 }
 
-function crudCheckRecord(sourceKey: string, label: string, method: HttpMethod, path: string, requiredAuth: boolean, assertions: string[]): AppSmokeCheck {
+function crudCheckRecord(
+  sourceKey: string,
+  label: string,
+  method: HttpMethod,
+  path: string,
+  requiredAuth: boolean,
+  assertions: string[],
+): AppSmokeCheck {
   return {
     id: `crud:${method.toLowerCase()}:${stableKey(sourceKey)}`,
     kind: "crud",
@@ -355,36 +419,45 @@ function crudCheckRecord(sourceKey: string, label: string, method: HttpMethod, p
 }
 
 function firstPreviewPagePath(pageMap: GeneratedAppPageMapEntry[] | undefined): string | undefined {
-  return (pageMap ?? [])
-    .filter((page) => page.visibility === "public")
-    .sort(comparePages)
-    .map((page) => normalizeAppPath(page.path))
-    .find((path): path is string => Boolean(path))
-    ?? (pageMap ?? [])
+  return (
+    (pageMap ?? [])
+      .filter((page) => page.visibility === "public")
       .sort(comparePages)
       .map((page) => normalizeAppPath(page.path))
-      .find((path): path is string => Boolean(path));
+      .find((path): path is string => Boolean(path)) ??
+    (pageMap ?? [])
+      .sort(comparePages)
+      .map((page) => normalizeAppPath(page.path))
+      .find((path): path is string => Boolean(path))
+  );
 }
 
 function comparePages(left: GeneratedAppPageMapEntry, right: GeneratedAppPageMapEntry): number {
-  return (normalizeAppPath(left.path) ?? left.key).localeCompare(normalizeAppPath(right.path) ?? right.key)
-    || left.key.localeCompare(right.key);
+  return (
+    (normalizeAppPath(left.path) ?? left.key).localeCompare(
+      normalizeAppPath(right.path) ?? right.key,
+    ) || left.key.localeCompare(right.key)
+  );
 }
 
 function compareChecks(left: AppSmokeCheck, right: AppSmokeCheck): number {
   if (left.kind === "crud" && right.kind === "crud") {
     const [leftFlow, leftOperation] = left.sourceKey.split(":");
     const [rightFlow, rightOperation] = right.sourceKey.split(":");
-    return (leftFlow ?? "").localeCompare(rightFlow ?? "")
-      || crudOperationRank(leftOperation) - crudOperationRank(rightOperation)
-      || left.path.localeCompare(right.path)
-      || left.id.localeCompare(right.id);
+    return (
+      (leftFlow ?? "").localeCompare(rightFlow ?? "") ||
+      crudOperationRank(leftOperation) - crudOperationRank(rightOperation) ||
+      left.path.localeCompare(right.path) ||
+      left.id.localeCompare(right.id)
+    );
   }
 
-  return kindRank(left.kind) - kindRank(right.kind)
-    || left.path.localeCompare(right.path)
-    || left.method.localeCompare(right.method)
-    || left.id.localeCompare(right.id);
+  return (
+    kindRank(left.kind) - kindRank(right.kind) ||
+    left.path.localeCompare(right.path) ||
+    left.method.localeCompare(right.method) ||
+    left.id.localeCompare(right.id)
+  );
 }
 
 function kindRank(kind: SmokeCheckKind): number {
@@ -392,7 +465,13 @@ function kindRank(kind: SmokeCheckKind): number {
 }
 
 function crudOperationRank(operation: string | undefined): number {
-  const order: Record<CrudOperation, number> = { list: 0, create: 1, read: 2, update: 3, delete: 4 };
+  const order: Record<CrudOperation, number> = {
+    list: 0,
+    create: 1,
+    read: 2,
+    update: 3,
+    delete: 4,
+  };
   return operation && operation in order ? order[operation as CrudOperation] : 99;
 }
 
@@ -412,10 +491,7 @@ function normalizeAppPath(path: string | undefined): string | undefined {
   const trimmed = path?.trim();
   if (!trimmed) return undefined;
   const [pathname, query = ""] = trimmed.split("?", 2);
-  const normalized = pathname
-    .replace(/\\/g, "/")
-    .replace(/\/+/g, "/")
-    .replace(/\/$/g, "");
+  const normalized = pathname.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/g, "");
   const prefixed = normalized.startsWith("/") ? normalized : `/${normalized}`;
   return `${prefixed === "" ? "/" : prefixed}${query ? `?${query}` : ""}`;
 }
@@ -424,7 +500,9 @@ function joinPaths(...parts: Array<string | undefined>): string {
   const [first, ...rest] = parts.filter((part): part is string => Boolean(part));
   if (!first) return "/";
   const joined = [first, ...rest]
-    .map((part, index) => index === 0 ? part.replace(/\/+$/g, "") : part.replace(/^\/+|\/+$/g, ""))
+    .map((part, index) =>
+      index === 0 ? part.replace(/\/+$/g, "") : part.replace(/^\/+|\/+$/g, ""),
+    )
     .filter(Boolean)
     .join("/");
   return joined.startsWith("/") ? joined : `/${joined}`;
@@ -443,11 +521,19 @@ function encodePathSegment(value: string): string {
 }
 
 function stableKey(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9:_/-]+/g, "-").replace(/^-+|-+$/g, "") || "generated";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9:_/-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "generated"
+  );
 }
 
 function positiveInteger(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : undefined;
 }
 
 function normalizeError(error: unknown): { message: string; name?: string; stack?: string } {

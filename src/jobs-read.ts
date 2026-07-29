@@ -16,10 +16,12 @@ export function listJobsForWorkspaceViaRepository(
   opts: { status?: JobStatus; limit?: number } = {},
   deps: JobsReadDeps = {},
 ): JobRecord[] {
-  const repo = deps.repository ?? createJobsRepository({
-    loadStore: deps.loadStore,
-    mutateStore: deps.mutateStore,
-  });
+  const repo =
+    deps.repository ??
+    createJobsRepository({
+      loadStore: deps.loadStore,
+      mutateStore: deps.mutateStore,
+    });
   const primary = repo.list({ workspaceId, status: opts.status, limit: opts.limit });
   if (process.env.PACKETAGENT_STORE !== "sqlite") return primary;
   const fallback = legacyJobsFromStore(deps).filter((entry) => {
@@ -35,16 +37,20 @@ export function findJobViaRepository(
   jobId: string,
   deps: JobsReadDeps = {},
 ): JobRecord | null {
-  const repo = deps.repository ?? createJobsRepository({
-    loadStore: deps.loadStore,
-    mutateStore: deps.mutateStore,
-  });
+  const repo =
+    deps.repository ??
+    createJobsRepository({
+      loadStore: deps.loadStore,
+      mutateStore: deps.mutateStore,
+    });
   const found = repo.find(workspaceId, jobId);
   if (found) return found;
   if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
-  return legacyJobsFromStore(deps).find(
-    (entry) => entry.workspaceId === workspaceId && entry.id === jobId,
-  ) ?? null;
+  return (
+    legacyJobsFromStore(deps).find(
+      (entry) => entry.workspaceId === workspaceId && entry.id === jobId,
+    ) ?? null
+  );
 }
 
 function legacyJobsFromStore(deps: JobsReadDeps): JobRecord[] {
@@ -57,11 +63,7 @@ function legacyJobsFromStore(deps: JobsReadDeps): JobRecord[] {
   }
 }
 
-function mergeAndLimit(
-  primary: JobRecord[],
-  fallback: JobRecord[],
-  limit?: number,
-): JobRecord[] {
+function mergeAndLimit(primary: JobRecord[], fallback: JobRecord[], limit?: number): JobRecord[] {
   if (fallback.length === 0) return primary;
   const seen = new Set(primary.map((entry) => entry.id));
   const combined = primary.slice();

@@ -6,7 +6,11 @@ export type AppIterationToolCategory =
   | "browser_scrape"
   | "database";
 
-export type AppIterationToolRequestKind = "provider" | "connector" | "runtime_tool" | "infrastructure";
+export type AppIterationToolRequestKind =
+  | "provider"
+  | "connector"
+  | "runtime_tool"
+  | "infrastructure";
 export type AppIterationToolReadinessStatus = "not_requested" | "ready" | "needs_setup" | "blocked";
 
 export interface GeneratedAppDraftToolContext {
@@ -159,7 +163,10 @@ const CATEGORY_SPECS: readonly ToolCategorySpec[] = [
     draftableWithoutLiveSetup: true,
     signals: [
       { label: "stripe", pattern: /\bstripe\b/i },
-      { label: "payment", pattern: /\bpayment(s)?\b|\bcheckout\b|\bsubscription(s)?\b|\binvoice(s)?\b|\bbilling\b/i },
+      {
+        label: "payment",
+        pattern: /\bpayment(s)?\b|\bcheckout\b|\bsubscription(s)?\b|\binvoice(s)?\b|\bbilling\b/i,
+      },
       { label: "price", pattern: /\bprice id\b|\bpricing\b|\bcustomer portal\b/i },
     ],
     livePatterns: [
@@ -175,7 +182,10 @@ const CATEGORY_SPECS: readonly ToolCategorySpec[] = [
     draftableWithoutLiveSetup: true,
     signals: [
       { label: "browser", pattern: /\bbrowser\b|\bplaywright\b|\bpuppeteer\b/i },
-      { label: "scrape", pattern: /\bscrap(e|ing|er)\b|\bcrawl(er|ing)?\b|\bextract from (a )?(site|url|page)\b/i },
+      {
+        label: "scrape",
+        pattern: /\bscrap(e|ing|er)\b|\bcrawl(er|ing)?\b|\bextract from (a )?(site|url|page)\b/i,
+      },
       { label: "website", pattern: /\bwebsite\b|\bweb page\b|\burl\b|\bscreenshot\b/i },
     ],
     livePatterns: [
@@ -192,8 +202,14 @@ const CATEGORY_SPECS: readonly ToolCategorySpec[] = [
     signals: [
       { label: "database", pattern: /\bdatabase\b|\bpostgres\b|\bsql\b|\bsqlite\b/i },
       { label: "crud", pattern: /\bcrud\b|\bcreate\/read\/update\/delete\b/i },
-      { label: "data-model", pattern: /\bdata model(s)?\b|\bschema\b|\btable(s)?\b|\bmigration(s)?\b/i },
-      { label: "persistence", pattern: /\bpersist(s|ed|ence)?\b|\bsave records\b|\bstored records\b/i },
+      {
+        label: "data-model",
+        pattern: /\bdata model(s)?\b|\bschema\b|\btable(s)?\b|\bmigration(s)?\b/i,
+      },
+      {
+        label: "persistence",
+        pattern: /\bpersist(s|ed|ence)?\b|\bsave records\b|\bstored records\b/i,
+      },
     ],
     livePatterns: [
       /\b(create|read|update|delete|persist|save|query|migrate|seed)\b.*\b(record(s)?|row(s)?|table(s)?|database|schema|model(s)?)\b/i,
@@ -202,18 +218,23 @@ const CATEGORY_SPECS: readonly ToolCategorySpec[] = [
   },
 ];
 
-const EMAIL_SIGNAL_PATTERN = /\bemail(s)?\b|\bsmtp\b|\bresend\b|\bsendgrid\b|\bpostmark\b|\binvite(s|d)?\b/i;
+const EMAIL_SIGNAL_PATTERN =
+  /\bemail(s)?\b|\bsmtp\b|\bresend\b|\bsendgrid\b|\bpostmark\b|\binvite(s|d)?\b/i;
 const WEBHOOK_SIGNAL_PATTERN = /\bwebhook(s)?\b|\binbound event(s)?\b/i;
 
-export function inspectAppIterationTools(input: AppIterationToolsInput = {}): AppIterationToolsReadiness {
+export function inspectAppIterationTools(
+  input: AppIterationToolsInput = {},
+): AppIterationToolsReadiness {
   const env = { ...(input.draft?.env ?? {}), ...(input.env ?? {}) };
   const promptText = normalizeText(input.changePrompt);
   const draftText = normalizeText(flattenDraftText(input.draft));
-  const requests = CATEGORY_SPECS
-    .map((spec) => buildToolRequest(spec, input, env, draftText, promptText))
-    .filter((request): request is AppIterationToolRequest => Boolean(request));
+  const requests = CATEGORY_SPECS.map((spec) =>
+    buildToolRequest(spec, input, env, draftText, promptText),
+  ).filter((request): request is AppIterationToolRequest => Boolean(request));
   const missingSetup = uniqueSorted(requests.flatMap((request) => request.missingSetup));
-  const nextSteps = uniqueSorted(requests.flatMap((request) => request.ready ? [] : request.missingSetup));
+  const nextSteps = uniqueSorted(
+    requests.flatMap((request) => (request.ready ? [] : request.missingSetup)),
+  );
   const canProceed = requests.every((request) => request.ready || request.canProceedWithout);
   const canProceedWithoutRequests = requests.every((request) => request.canProceedWithout);
   const blocked = requests.some((request) => request.readinessStatus === "blocked");
@@ -221,7 +242,14 @@ export function inspectAppIterationTools(input: AppIterationToolsInput = {}): Ap
 
   return {
     version: "phase-69-lane-4",
-    readinessStatus: requests.length === 0 ? "not_requested" : blocked ? "blocked" : needsSetup ? "needs_setup" : "ready",
+    readinessStatus:
+      requests.length === 0
+        ? "not_requested"
+        : blocked
+          ? "blocked"
+          : needsSetup
+            ? "needs_setup"
+            : "ready",
     canProceed,
     canProceedWithoutRequests,
     requestedCategories: requests.map((request) => request.category),
@@ -231,7 +259,9 @@ export function inspectAppIterationTools(input: AppIterationToolsInput = {}): Ap
   };
 }
 
-export function detectAppIterationToolCategories(input: AppIterationToolsInput = {}): AppIterationToolCategory[] {
+export function detectAppIterationToolCategories(
+  input: AppIterationToolsInput = {},
+): AppIterationToolCategory[] {
   return inspectAppIterationTools(input).requestedCategories;
 }
 
@@ -251,7 +281,9 @@ function buildToolRequest(
   const canProceedWithout = ready || (spec.draftableWithoutLiveSetup && !requiresLiveSetup);
   const readinessStatus: AppIterationToolReadinessStatus = ready
     ? "ready"
-    : canProceedWithout ? "needs_setup" : "blocked";
+    : canProceedWithout
+      ? "needs_setup"
+      : "blocked";
 
   return {
     category: spec.category,
@@ -281,17 +313,21 @@ function readinessForSpec(
   switch (category) {
     case "openai_provider":
       return {
-        missingSetup: hasModelProvider(input, env) ? [] : [
-          "Configure OPENAI_API_KEY, ANTHROPIC_API_KEY, OLLAMA_BASE_URL, or connect a model provider.",
-        ],
+        missingSetup: hasModelProvider(input, env)
+          ? []
+          : [
+              "Configure OPENAI_API_KEY, ANTHROPIC_API_KEY, OLLAMA_BASE_URL, or connect a model provider.",
+            ],
       };
     case "webhook_email":
       return webhookEmailReadiness(input, env, combinedText);
     case "github":
       return {
-        missingSetup: hasGitHubConnector(input, env) ? [] : [
-          "Connect the GitHub connector or configure GITHUB_TOKEN before live repository actions.",
-        ],
+        missingSetup: hasGitHubConnector(input, env)
+          ? []
+          : [
+              "Connect the GitHub connector or configure GITHUB_TOKEN before live repository actions.",
+            ],
       };
     case "stripe_payment":
       return stripeReadiness(input, env);
@@ -309,28 +345,58 @@ function webhookEmailReadiness(
 ): { missingSetup: string[] } {
   const needsEmail = EMAIL_SIGNAL_PATTERN.test(combinedText);
   const needsWebhook = WEBHOOK_SIGNAL_PATTERN.test(combinedText);
-  const emailReady = input.webhookEmail?.emailProviderConfigured === true
-    || hasAnyEnv(env, ["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_TOKEN", "SMTP_URL", "PACKETAGENT_EMAIL_PROVIDER_READY"]);
-  const publicBaseUrlReady = hasValue(input.webhookEmail?.publicBaseUrl) || hasAnyEnv(env, ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL"]);
-  const signingReady = input.webhookEmail?.signingSecretConfigured === true || hasAnyEnv(env, ["PACKETAGENT_WEBHOOK_SIGNING_SECRET"]);
+  const emailReady =
+    input.webhookEmail?.emailProviderConfigured === true ||
+    hasAnyEnv(env, [
+      "RESEND_API_KEY",
+      "SENDGRID_API_KEY",
+      "POSTMARK_TOKEN",
+      "SMTP_URL",
+      "PACKETAGENT_EMAIL_PROVIDER_READY",
+    ]);
+  const publicBaseUrlReady =
+    hasValue(input.webhookEmail?.publicBaseUrl) ||
+    hasAnyEnv(env, ["PACKETAGENT_PUBLIC_BASE_URL", "PACKETAGENT_PUBLIC_APP_BASE_URL"]);
+  const signingReady =
+    input.webhookEmail?.signingSecretConfigured === true ||
+    hasAnyEnv(env, ["PACKETAGENT_WEBHOOK_SIGNING_SECRET"]);
   const missingSetup = [
-    ...(needsEmail && !emailReady ? ["Configure an email delivery provider such as RESEND_API_KEY, SENDGRID_API_KEY, POSTMARK_TOKEN, or SMTP_URL."] : []),
-    ...(needsWebhook && !publicBaseUrlReady ? ["Set PACKETAGENT_PUBLIC_BASE_URL before publishing external webhook URLs."] : []),
-    ...(needsWebhook && !signingReady ? ["Configure PACKETAGENT_WEBHOOK_SIGNING_SECRET for signed inbound webhook requests."] : []),
+    ...(needsEmail && !emailReady
+      ? [
+          "Configure an email delivery provider such as RESEND_API_KEY, SENDGRID_API_KEY, POSTMARK_TOKEN, or SMTP_URL.",
+        ]
+      : []),
+    ...(needsWebhook && !publicBaseUrlReady
+      ? ["Set PACKETAGENT_PUBLIC_BASE_URL before publishing external webhook URLs."]
+      : []),
+    ...(needsWebhook && !signingReady
+      ? ["Configure PACKETAGENT_WEBHOOK_SIGNING_SECRET for signed inbound webhook requests."]
+      : []),
   ];
 
   return { missingSetup };
 }
 
-function stripeReadiness(input: AppIterationToolsInput, env: Record<string, string | undefined>): { missingSetup: string[] } {
-  const secretReady = input.stripe?.secretKeyConfigured === true || hasAnyEnv(env, ["STRIPE_SECRET_KEY"]);
-  const webhookReady = input.stripe?.webhookSecretConfigured === true || hasAnyEnv(env, ["STRIPE_WEBHOOK_SECRET"]);
+function stripeReadiness(
+  input: AppIterationToolsInput,
+  env: Record<string, string | undefined>,
+): { missingSetup: string[] } {
+  const secretReady =
+    input.stripe?.secretKeyConfigured === true || hasAnyEnv(env, ["STRIPE_SECRET_KEY"]);
+  const webhookReady =
+    input.stripe?.webhookSecretConfigured === true || hasAnyEnv(env, ["STRIPE_WEBHOOK_SECRET"]);
   const priceReady = input.stripe?.priceConfigured === true || hasAnyEnv(env, ["STRIPE_PRICE_ID"]);
   return {
     missingSetup: [
-      ...(!secretReady ? ["Configure STRIPE_SECRET_KEY before creating live checkout or payment actions."] : []),
-      ...(!webhookReady ? ["Configure STRIPE_WEBHOOK_SECRET before trusting Stripe payment events."] : []),
-      ...(!priceReady ? ["Configure STRIPE_PRICE_ID or map generated plans to Stripe prices."] : []),
+      ...(!secretReady
+        ? ["Configure STRIPE_SECRET_KEY before creating live checkout or payment actions."]
+        : []),
+      ...(!webhookReady
+        ? ["Configure STRIPE_WEBHOOK_SECRET before trusting Stripe payment events."]
+        : []),
+      ...(!priceReady
+        ? ["Configure STRIPE_PRICE_ID or map generated plans to Stripe prices."]
+        : []),
     ],
   };
 }
@@ -338,18 +404,23 @@ function stripeReadiness(input: AppIterationToolsInput, env: Record<string, stri
 function browserReadiness(input: AppIterationToolsInput): { missingSetup: string[] } {
   const availableTools = normalizedSet(input.availableTools);
   const connectorNames = normalizedSet(input.connectedConnectors);
-  const browserToolReady = input.browser?.browserToolAvailable === true
-    || availableTools.has("browser")
-    || availableTools.has("browser-use")
-    || availableTools.has("playwright")
-    || connectorNames.has("browser")
-    || connectorNames.has("browser-use");
+  const browserToolReady =
+    input.browser?.browserToolAvailable === true ||
+    availableTools.has("browser") ||
+    availableTools.has("browser-use") ||
+    availableTools.has("playwright") ||
+    connectorNames.has("browser") ||
+    connectorNames.has("browser-use");
   const scrapingAllowed = input.browser?.scrapingAllowed !== false;
 
   return {
     missingSetup: [
-      ...(!browserToolReady ? ["Enable a browser automation or scraping tool before live page extraction."] : []),
-      ...(!scrapingAllowed ? ["Confirm scraping is allowed for the target site before running extraction."] : []),
+      ...(!browserToolReady
+        ? ["Enable a browser automation or scraping tool before live page extraction."]
+        : []),
+      ...(!scrapingAllowed
+        ? ["Confirm scraping is allowed for the target site before running extraction."]
+        : []),
     ],
   };
 }
@@ -362,37 +433,62 @@ function databaseReadiness(input: AppIterationToolsInput): { missingSetup: strin
 
   return {
     missingSetup: [
-      ...(!configured ? ["Configure a generated-app database runtime before persistence or CRUD changes."] : []),
-      ...(!migrationsReady ? ["Run or confirm generated-app database migrations before this iteration."] : []),
-      ...(!writable ? ["Confirm the generated-app database is writable before mutating records."] : []),
+      ...(!configured
+        ? ["Configure a generated-app database runtime before persistence or CRUD changes."]
+        : []),
+      ...(!migrationsReady
+        ? ["Run or confirm generated-app database migrations before this iteration."]
+        : []),
+      ...(!writable
+        ? ["Confirm the generated-app database is writable before mutating records."]
+        : []),
     ],
   };
 }
 
-function hasModelProvider(input: AppIterationToolsInput, env: Record<string, string | undefined>): boolean {
+function hasModelProvider(
+  input: AppIterationToolsInput,
+  env: Record<string, string | undefined>,
+): boolean {
   const availableTools = normalizedSet(input.availableTools);
   const connectors = normalizedSet(input.connectedConnectors);
-  return input.providers?.configured === true
-    || input.providers?.openai === true
-    || input.providers?.anthropic === true
-    || input.providers?.localModel === true
-    || hasAnyEnv(env, ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OLLAMA_BASE_URL", "PACKETAGENT_AI_PROVIDER_READY"])
-    || availableTools.has("openai")
-    || connectors.has("openai")
-    || connectors.has("anthropic");
+  return (
+    input.providers?.configured === true ||
+    input.providers?.openai === true ||
+    input.providers?.anthropic === true ||
+    input.providers?.localModel === true ||
+    hasAnyEnv(env, [
+      "OPENAI_API_KEY",
+      "ANTHROPIC_API_KEY",
+      "OLLAMA_BASE_URL",
+      "PACKETAGENT_AI_PROVIDER_READY",
+    ]) ||
+    availableTools.has("openai") ||
+    connectors.has("openai") ||
+    connectors.has("anthropic")
+  );
 }
 
-function hasGitHubConnector(input: AppIterationToolsInput, env: Record<string, string | undefined>): boolean {
+function hasGitHubConnector(
+  input: AppIterationToolsInput,
+  env: Record<string, string | undefined>,
+): boolean {
   const availableTools = normalizedSet(input.availableTools);
   const connectors = normalizedSet(input.connectedConnectors);
-  return input.github?.connectorConnected === true
-    || input.github?.tokenConfigured === true
-    || hasAnyEnv(env, ["GITHUB_TOKEN", "GH_TOKEN"])
-    || availableTools.has("github")
-    || connectors.has("github");
+  return (
+    input.github?.connectorConnected === true ||
+    input.github?.tokenConfigured === true ||
+    hasAnyEnv(env, ["GITHUB_TOKEN", "GH_TOKEN"]) ||
+    availableTools.has("github") ||
+    connectors.has("github")
+  );
 }
 
-function collectSourceSignals(spec: ToolCategorySpec, draftText: string, promptText: string): string[] {
+function collectSourceSignals(
+  spec: ToolCategorySpec,
+  draftText: string,
+  promptText: string,
+): string[] {
   const signals: string[] = [];
   for (const signal of spec.signals) {
     if (signal.pattern.test(draftText)) signals.push(`draft:${signal.label}`);
@@ -403,7 +499,8 @@ function collectSourceSignals(spec: ToolCategorySpec, draftText: string, promptT
 
 function flattenDraftText(value: unknown): string {
   if (value === undefined || value === null) return "";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    return String(value);
   if (Array.isArray(value)) return value.map(flattenDraftText).filter(Boolean).join(" ");
   if (typeof value === "object") {
     return Object.keys(value as Record<string, unknown>)
@@ -416,7 +513,10 @@ function flattenDraftText(value: unknown): string {
 }
 
 function normalizeText(value: unknown): string {
-  return String(value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizedSet(values: string[] | undefined): Set<string> {

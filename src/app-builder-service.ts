@@ -40,10 +40,7 @@ export {
   detectPhase71Integrations,
 } from "./app-builder/template-draft.js";
 
-export {
-  modelForPreset,
-  generateAppDraftViaLLM,
-} from "./app-builder/llm-draft.js";
+export { modelForPreset, generateAppDraftViaLLM } from "./app-builder/llm-draft.js";
 export type {
   AppDraftLLMPreset,
   AppDraftLLMOptions,

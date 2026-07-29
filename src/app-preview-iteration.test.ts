@@ -22,7 +22,11 @@ test("derivePreviewRefreshState reports stale, refreshing, ready, and blocked st
     appId: "task-tracker",
     previewUrl: "http://localhost:5173/builder/preview/task-tracker",
     build: { phase: "passed", buildId: "build_2", revision: "rev_2" },
-    lastRendered: { buildId: "build_1", revision: "rev_1", refreshedAt: "2026-05-03T12:00:00.000Z" },
+    lastRendered: {
+      buildId: "build_1",
+      revision: "rev_1",
+      refreshedAt: "2026-05-03T12:00:00.000Z",
+    },
   });
 
   assert.equal(stale.status, "stale");
@@ -33,8 +37,16 @@ test("derivePreviewRefreshState reports stale, refreshing, ready, and blocked st
   const refreshing = derivePreviewRefreshState({
     appId: "task-tracker",
     build: { phase: "passed", buildId: "build_2", revision: "rev_2" },
-    lastRendered: { buildId: "build_1", revision: "rev_1", refreshedAt: "2026-05-03T12:00:00.000Z" },
-    refreshRequest: { requestId: "refresh_123", buildId: "build_2", requestedAt: "2026-05-03T12:01:00.000Z" },
+    lastRendered: {
+      buildId: "build_1",
+      revision: "rev_1",
+      refreshedAt: "2026-05-03T12:00:00.000Z",
+    },
+    refreshRequest: {
+      requestId: "refresh_123",
+      buildId: "build_2",
+      requestedAt: "2026-05-03T12:01:00.000Z",
+    },
   });
 
   assert.equal(refreshing.status, "refreshing");
@@ -44,7 +56,11 @@ test("derivePreviewRefreshState reports stale, refreshing, ready, and blocked st
   const ready = derivePreviewRefreshState({
     appId: "task-tracker",
     build: { phase: "passed", buildId: "build_2", revision: "rev_2" },
-    lastRendered: { buildId: "build_2", revision: "rev_2", refreshedAt: "2026-05-03T12:02:00.000Z" },
+    lastRendered: {
+      buildId: "build_2",
+      revision: "rev_2",
+      refreshedAt: "2026-05-03T12:02:00.000Z",
+    },
   });
 
   assert.equal(ready.status, "ready");
@@ -108,7 +124,14 @@ test("buildSmokeRerunResult summarizes outcomes and captures failed smoke errors
   });
 
   assert.equal(result.status, "failed");
-  assert.deepEqual(result.summary, { total: 2, passed: 1, failed: 1, skipped: 0, timedOut: 0, notRun: 0 });
+  assert.deepEqual(result.summary, {
+    total: 2,
+    passed: 1,
+    failed: 1,
+    skipped: 0,
+    timedOut: 0,
+    notRun: 0,
+  });
   assert.deepEqual(result.failedCheckIds, ["page:home"]);
   assert.deepEqual(result.unknownOutcomeCheckIds, ["not-requested"]);
   assert.equal(result.results.find((entry) => entry.checkId === "api:get:health")?.durationMs, 18);
@@ -122,10 +145,7 @@ test("capturePreviewBuildError and capturePreviewRuntimeError redact secrets and
     buildId: "build_9",
     capturedAt: "2026-05-03T12:05:00.000Z",
     error: { name: "BuildError", message: "Vite failed authorization=Bearer abc123" },
-    logs: [
-      "Transform failed",
-      "api_key=sk-test-123",
-    ],
+    logs: ["Transform failed", "api_key=sk-test-123"],
     location: { filePath: "src/generated/App.tsx", line: 24.9, column: 8 },
   });
   const second = capturePreviewBuildError({

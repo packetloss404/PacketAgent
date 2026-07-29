@@ -16,7 +16,10 @@ test("/stream requires auth (401 without session)", async () => {
   const res = await app.request("/api/app/llm/stream", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ routeKey: "agent.summary", messages: [{ role: "user", content: "hi" }] }),
+    body: JSON.stringify({
+      routeKey: "agent.summary",
+      messages: [{ role: "user", content: "hi" }],
+    }),
   });
   assert.equal(res.status, 401);
 });
@@ -34,7 +37,9 @@ test("/cancel/:id requires at least member role", async () => {
   app.route("/api/app/llm", llmStreamRoutes);
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "viewer";
   });

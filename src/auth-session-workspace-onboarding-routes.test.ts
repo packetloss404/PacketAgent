@@ -8,7 +8,11 @@ import { Hono } from "hono";
 import { appRoutes, resetAppRouteSecurityForTests } from "./app-routes.js";
 import { SESSION_COOKIE_NAME } from "./auth-utils.js";
 import { enforcePrivateAppMutationSecurity } from "./route-security.js";
-import { PACKETAGENT_INVITATION_EMAIL_MODE_ENV, PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV, PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV } from "./invitation-email.js";
+import {
+  PACKETAGENT_INVITATION_EMAIL_MODE_ENV,
+  PACKETAGENT_INVITATION_EMAIL_RETRY_MAX_ATTEMPTS_ENV,
+  PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV,
+} from "./invitation-email.js";
 import {
   listInvitationEmailDeliveryRecordsForTests,
   resetInvitationEmailDeliveryForTests,
@@ -16,7 +20,14 @@ import {
   setInvitationEmailFetchForTests,
 } from "./invitation-email-delivery.js";
 import { INVITATION_EMAIL_JOB_TYPE, login } from "./packetagent-services.js";
-import { clearStoreCacheForTests, listInvitationEmailDeliveriesIndexed, loadStore, mutateStore, resetStoreForTests, type WorkspaceRole } from "./packetagent-store.js";
+import {
+  clearStoreCacheForTests,
+  listInvitationEmailDeliveriesIndexed,
+  loadStore,
+  mutateStore,
+  resetStoreForTests,
+  type WorkspaceRole,
+} from "./packetagent-store.js";
 
 function createTestApp() {
   const app = new Hono();
@@ -54,7 +65,9 @@ function browserAuthHeaders(cookie: string, csrfToken: string) {
 
 function setAlphaRole(role: WorkspaceRole) {
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership, "expected alpha membership");
     membership.role = role;
   });
@@ -78,9 +91,17 @@ test("register creates an authenticated session response and session cookie", as
   const response = await app.request("/api/auth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "New.User@Example.com", password: "demo12345", displayName: "New User" }),
+    body: JSON.stringify({
+      email: "New.User@Example.com",
+      password: "demo12345",
+      displayName: "New User",
+    }),
   });
-  const body = await response.json() as { authenticated: boolean; user: { email: string }; workspace: { name: string } };
+  const body = (await response.json()) as {
+    authenticated: boolean;
+    user: { email: string };
+    workspace: { name: string };
+  };
 
   assert.equal(response.status, 201);
   assert.equal(body.authenticated, true);
@@ -114,7 +135,11 @@ test("auth routes rate limit repeated local attempts", async () => {
     const response = await app.request("/api/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.10" },
-      body: JSON.stringify({ email: "not-an-email", password: "demo12345", displayName: "New User" }),
+      body: JSON.stringify({
+        email: "not-an-email",
+        password: "demo12345",
+        displayName: "New User",
+      }),
     });
     assert.equal(response.status, 400);
   }
@@ -163,7 +188,9 @@ test("auth rate limit env overrides max attempts and window", async () => {
       body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(first.status, 401);
-    const bucket = (loadStore().rateLimits ?? []).find((entry) => entry.id.startsWith("auth:login:"));
+    const bucket = (loadStore().rateLimits ?? []).find((entry) =>
+      entry.id.startsWith("auth:login:"),
+    );
     assert.ok(bucket, "expected auth login rate limit bucket");
     assert.equal(new Date(bucket.resetAt).getTime() - new Date(bucket.updatedAt).getTime(), 2500);
 
@@ -203,7 +230,9 @@ test("auth rate limit invalid env values fall back to defaults", async () => {
       body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(first.status, 401);
-    const bucket = (loadStore().rateLimits ?? []).find((entry) => entry.id.startsWith("auth:login:"));
+    const bucket = (loadStore().rateLimits ?? []).find((entry) =>
+      entry.id.startsWith("auth:login:"),
+    );
     assert.ok(bucket, "expected auth login rate limit bucket");
     assert.equal(new Date(bucket.resetAt).getTime() - new Date(bucket.updatedAt).getTime(), 60_000);
 
@@ -228,72 +257,86 @@ test("auth rate limit invalid env values fall back to defaults", async () => {
   }
 });
 
-test("auth route rate limits persist across app instances and store reloads", { concurrency: false }, async () => {
-  const previousStore = process.env.PACKETAGENT_STORE;
-  const previousDbPath = process.env.PACKETAGENT_DB_PATH;
-  const previousTrustProxy = process.env.PACKETAGENT_TRUST_PROXY;
-  const previousSalt = process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT;
-  const tempDir = mkdtempSync(join(tmpdir(), "packetagent-rate-limit-"));
+test(
+  "auth route rate limits persist across app instances and store reloads",
+  { concurrency: false },
+  async () => {
+    const previousStore = process.env.PACKETAGENT_STORE;
+    const previousDbPath = process.env.PACKETAGENT_DB_PATH;
+    const previousTrustProxy = process.env.PACKETAGENT_TRUST_PROXY;
+    const previousSalt = process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT;
+    const tempDir = mkdtempSync(join(tmpdir(), "packetagent-rate-limit-"));
 
-  try {
-    process.env.PACKETAGENT_STORE = "sqlite";
-    process.env.PACKETAGENT_DB_PATH = join(tempDir, "packetagent.sqlite");
-    process.env.PACKETAGENT_TRUST_PROXY = "true";
-    process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT = "test-rate-limit-salt";
-    resetStoreForTests();
-    resetAppRouteSecurityForTests();
-    const headers = { "content-type": "application/json", "x-forwarded-for": "203.0.113.12" };
+    try {
+      process.env.PACKETAGENT_STORE = "sqlite";
+      process.env.PACKETAGENT_DB_PATH = join(tempDir, "packetagent.sqlite");
+      process.env.PACKETAGENT_TRUST_PROXY = "true";
+      process.env.PACKETAGENT_RATE_LIMIT_KEY_SALT = "test-rate-limit-salt";
+      resetStoreForTests();
+      resetAppRouteSecurityForTests();
+      const headers = { "content-type": "application/json", "x-forwarded-for": "203.0.113.12" };
 
-    for (let index = 0; index < 20; index += 1) {
-      const response = await createTestApp().request("/api/auth/login", {
+      for (let index = 0; index < 20; index += 1) {
+        const response = await createTestApp().request("/api/auth/login", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
+        });
+        assert.equal(response.status, 401);
+      }
+      const buckets = loadStore().rateLimits ?? [];
+      assert.equal(buckets.length, 1);
+      assert.match(buckets[0]?.id ?? "", /^auth:login:sha256:[a-f0-9]{64}$/);
+      assert.equal(buckets[0]?.id.includes("203.0.113.12"), false);
+      assert.deepEqual(rateLimitSqliteSnapshot(process.env.PACKETAGENT_DB_PATH), {
+        appRecordRateLimits: 0,
+        buckets: 1,
+        count: 20,
+      });
+
+      clearStoreCacheForTests();
+      const app = createTestApp();
+
+      const limited = await app.request("/api/auth/login", {
         method: "POST",
         headers,
         body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
       });
-      assert.equal(response.status, 401);
+      assert.equal(limited.status, 429);
+      assert.deepEqual(await limited.json(), { error: "too many requests" });
+      assert.deepEqual(rateLimitSqliteSnapshot(process.env.PACKETAGENT_DB_PATH), {
+        appRecordRateLimits: 0,
+        buckets: 1,
+        count: 21,
+      });
+    } finally {
+      clearStoreCacheForTests();
+      restoreEnv("PACKETAGENT_STORE", previousStore);
+      restoreEnv("PACKETAGENT_DB_PATH", previousDbPath);
+      restoreEnv("PACKETAGENT_TRUST_PROXY", previousTrustProxy);
+      restoreEnv("PACKETAGENT_RATE_LIMIT_KEY_SALT", previousSalt);
+      rmSync(tempDir, { recursive: true, force: true });
     }
-    const buckets = loadStore().rateLimits ?? [];
-    assert.equal(buckets.length, 1);
-    assert.match(buckets[0]?.id ?? "", /^auth:login:sha256:[a-f0-9]{64}$/);
-    assert.equal(buckets[0]?.id.includes("203.0.113.12"), false);
-    assert.deepEqual(rateLimitSqliteSnapshot(process.env.PACKETAGENT_DB_PATH), {
-      appRecordRateLimits: 0,
-      buckets: 1,
-      count: 20,
-    });
-
-    clearStoreCacheForTests();
-    const app = createTestApp();
-
-    const limited = await app.request("/api/auth/login", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
-    });
-    assert.equal(limited.status, 429);
-    assert.deepEqual(await limited.json(), { error: "too many requests" });
-    assert.deepEqual(rateLimitSqliteSnapshot(process.env.PACKETAGENT_DB_PATH), {
-      appRecordRateLimits: 0,
-      buckets: 1,
-      count: 21,
-    });
-  } finally {
-    clearStoreCacheForTests();
-    restoreEnv("PACKETAGENT_STORE", previousStore);
-    restoreEnv("PACKETAGENT_DB_PATH", previousDbPath);
-    restoreEnv("PACKETAGENT_TRUST_PROXY", previousTrustProxy);
-    restoreEnv("PACKETAGENT_RATE_LIMIT_KEY_SALT", previousSalt);
-    rmSync(tempDir, { recursive: true, force: true });
-  }
-});
+  },
+);
 
 function rateLimitSqliteSnapshot(dbPath: string | undefined) {
   assert.ok(dbPath, "expected PACKETAGENT_DB_PATH");
   const db = new DatabaseSync(dbPath);
   try {
-    const appRecords = db.prepare("select count(*) as count from app_records where collection = 'rateLimits'").get() as { count: number };
-    const buckets = db.prepare("select count(*) as buckets, coalesce(max(count), 0) as count from rate_limit_buckets").get() as { buckets: number; count: number };
-    return { appRecordRateLimits: appRecords.count, buckets: buckets.buckets, count: buckets.count };
+    const appRecords = db
+      .prepare("select count(*) as count from app_records where collection = 'rateLimits'")
+      .get() as { count: number };
+    const buckets = db
+      .prepare(
+        "select count(*) as buckets, coalesce(max(count), 0) as count from rate_limit_buckets",
+      )
+      .get() as { buckets: number; count: number };
+    return {
+      appRecordRateLimits: appRecords.count,
+      buckets: buckets.buckets,
+      count: buckets.count,
+    };
   } finally {
     db.close();
   }
@@ -339,7 +382,10 @@ test("rate limit client keys only trust forwarded headers when enabled", async (
       body: JSON.stringify({ email: "alpha@packetagent.local", password: "wrong-password" }),
     });
     assert.equal(trustedSeparateClient.status, 401);
-    assert.equal((loadStore().rateLimits ?? []).some((entry) => entry.id.includes("203.0.113")), false);
+    assert.equal(
+      (loadStore().rateLimits ?? []).some((entry) => entry.id.includes("203.0.113")),
+      false,
+    );
   } finally {
     restoreEnv("PACKETAGENT_TRUST_PROXY", previousTrustProxy);
     restoreEnv("PACKETAGENT_RATE_LIMIT_KEY_SALT", previousSalt);
@@ -368,7 +414,10 @@ test("distributed rate limiter receives hashed auth and invitation bucket checks
         headers,
         body: JSON.parse(body) as Record<string, unknown>,
       });
-      return new Response(JSON.stringify({ allowed: true }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ allowed: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     };
     resetStoreForTests();
     resetAppRouteSecurityForTests();
@@ -385,7 +434,11 @@ test("distributed rate limiter receives hashed auth and invitation bucket checks
 
     const invitationResponse = await app.request("/api/app/invitations", {
       method: "POST",
-      headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json", "x-forwarded-for": "203.0.113.41" },
+      headers: {
+        ...authHeaders(alpha.cookieValue),
+        "content-type": "application/json",
+        "x-forwarded-for": "203.0.113.41",
+      },
       body: JSON.stringify({ email: "not-an-email", role: "member" }),
     });
     assert.equal(invitationResponse.status, 400);
@@ -401,8 +454,14 @@ test("distributed rate limiter receives hashed auth and invitation bucket checks
     assert.equal(calls[1]?.body.scope, "invitation:create");
     assert.match(String(calls[1]?.body.bucketId), /^invitation:create:sha256:[a-f0-9]{64}$/);
     assert.equal(String(calls[1]?.body.bucketId).includes("203.0.113.41"), false);
-    assert.equal((loadStore().rateLimits ?? []).some((entry) => entry.id.startsWith("auth:login:")), true);
-    assert.equal((loadStore().rateLimits ?? []).some((entry) => entry.id.startsWith("invitation:create:")), true);
+    assert.equal(
+      (loadStore().rateLimits ?? []).some((entry) => entry.id.startsWith("auth:login:")),
+      true,
+    );
+    assert.equal(
+      (loadStore().rateLimits ?? []).some((entry) => entry.id.startsWith("invitation:create:")),
+      true,
+    );
   } finally {
     globalThis.fetch = previousFetch;
     restoreEnv("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL", previousUrl);
@@ -417,10 +476,11 @@ test("distributed rate limiter blocks before local buckets and sets retry-after"
   const previousFetch = globalThis.fetch;
   try {
     process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL = "https://limits.example/check";
-    globalThis.fetch = async () => new Response(JSON.stringify({ limited: true }), {
-      status: 429,
-      headers: { "content-type": "application/json", "retry-after": "7" },
-    });
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ limited: true }), {
+        status: 429,
+        headers: { "content-type": "application/json", "retry-after": "7" },
+      });
     resetStoreForTests();
     resetAppRouteSecurityForTests();
     const app = createTestApp();
@@ -492,8 +552,18 @@ test("rate limit cleanup drops expired buckets and caps retained buckets", async
     resetStoreForTests();
     mutateStore((data) => {
       data.rateLimits = [
-        { id: "expired", count: 3, resetAt: new Date(Date.now() - 1_000).toISOString(), updatedAt: new Date(Date.now() - 1_000).toISOString() },
-        { id: "old-active", count: 1, resetAt: new Date(Date.now() + 60_000).toISOString(), updatedAt: new Date(Date.now() - 500).toISOString() },
+        {
+          id: "expired",
+          count: 3,
+          resetAt: new Date(Date.now() - 1_000).toISOString(),
+          updatedAt: new Date(Date.now() - 1_000).toISOString(),
+        },
+        {
+          id: "old-active",
+          count: 1,
+          resetAt: new Date(Date.now() + 60_000).toISOString(),
+          updatedAt: new Date(Date.now() - 500).toISOString(),
+        },
       ];
     });
     const app = createTestApp();
@@ -501,7 +571,11 @@ test("rate limit cleanup drops expired buckets and caps retained buckets", async
     await app.request("/api/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "not-an-email", password: "demo12345", displayName: "New User" }),
+      body: JSON.stringify({
+        email: "not-an-email",
+        password: "demo12345",
+        displayName: "New User",
+      }),
     });
     await app.request("/api/auth/login", {
       method: "POST",
@@ -510,7 +584,10 @@ test("rate limit cleanup drops expired buckets and caps retained buckets", async
     });
 
     const buckets = loadStore().rateLimits ?? [];
-    assert.equal(buckets.some((entry) => entry.id === "expired"), false);
+    assert.equal(
+      buckets.some((entry) => entry.id === "expired"),
+      false,
+    );
     assert.equal(buckets.length, 2);
   } finally {
     restoreEnv("PACKETAGENT_RATE_LIMIT_MAX_BUCKETS", previousMaxBuckets);
@@ -570,7 +647,10 @@ test("browser private mutations enforce same-origin and session-bound csrf", asy
 
   const sameOrigin = await app.request("/api/app/profile", {
     method: "PATCH",
-    headers: { ...browserAuthHeaders(sessionCookie, csrfToken), "content-type": "application/json" },
+    headers: {
+      ...browserAuthHeaders(sessionCookie, csrfToken),
+      "content-type": "application/json",
+    },
     body: JSON.stringify({ displayName: "Same Origin", timezone: "UTC" }),
   });
   assert.equal(sameOrigin.status, 200);
@@ -598,7 +678,12 @@ test("logout removes the current session so subsequent session reads are anonymo
   const sessionBody = await sessionResponse.json();
 
   assert.equal(logoutResponse.status, 200);
-  assert.deepEqual(sessionBody, { authenticated: false, user: null, workspace: null, onboarding: null });
+  assert.deepEqual(sessionBody, {
+    authenticated: false,
+    user: null,
+    workspace: null,
+    onboarding: null,
+  });
 });
 
 test("workspace route requires auth, validates website, and returns the updated workspace", async () => {
@@ -617,7 +702,11 @@ test("workspace route requires auth, validates website, and returns the updated 
   const invalid = await app.request("/api/app/workspace", {
     method: "PATCH",
     headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
-    body: JSON.stringify({ name: "Alpha Workspace", website: "not-a-url", automationGoal: "Automate triage" }),
+    body: JSON.stringify({
+      name: "Alpha Workspace",
+      website: "not-a-url",
+      automationGoal: "Automate triage",
+    }),
   });
   assert.equal(invalid.status, 400);
   assert.deepEqual(await invalid.json(), { error: "website must be a valid URL" });
@@ -625,9 +714,15 @@ test("workspace route requires auth, validates website, and returns the updated 
   const valid = await app.request("/api/app/workspace", {
     method: "PATCH",
     headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
-    body: JSON.stringify({ name: "Alpha Ops", website: "https://alpha.example", automationGoal: "Automate triage" }),
+    body: JSON.stringify({
+      name: "Alpha Ops",
+      website: "https://alpha.example",
+      automationGoal: "Automate triage",
+    }),
   });
-  const body = await valid.json() as { workspace: { name: string; slug: string; website: string; automationGoal: string } };
+  const body = (await valid.json()) as {
+    workspace: { name: string; slug: string; website: string; automationGoal: string };
+  };
 
   assert.equal(valid.status, 200);
   assert.equal(body.workspace.name, "Alpha Ops");
@@ -646,7 +741,11 @@ test("workspace settings require admin or owner membership", async () => {
     const denied = await app.request("/api/app/workspace", {
       method: "PATCH",
       headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
-      body: JSON.stringify({ name: "Alpha Ops", website: "https://alpha.example", automationGoal: "Automate triage" }),
+      body: JSON.stringify({
+        name: "Alpha Ops",
+        website: "https://alpha.example",
+        automationGoal: "Automate triage",
+      }),
     });
 
     assert.equal(denied.status, 403);
@@ -657,9 +756,13 @@ test("workspace settings require admin or owner membership", async () => {
   const allowed = await app.request("/api/app/workspace", {
     method: "PATCH",
     headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
-    body: JSON.stringify({ name: "Alpha Admin Ops", website: "https://alpha.example", automationGoal: "Automate triage" }),
+    body: JSON.stringify({
+      name: "Alpha Admin Ops",
+      website: "https://alpha.example",
+      automationGoal: "Automate triage",
+    }),
   });
-  const body = await allowed.json() as { workspace: { name: string } };
+  const body = (await allowed.json()) as { workspace: { name: string } };
 
   assert.equal(allowed.status, 200);
   assert.equal(body.workspace.name, "Alpha Admin Ops");
@@ -671,7 +774,13 @@ test("viewer memberships can read shared app state and update their own profile"
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   setAlphaRole("viewer");
 
-  for (const path of ["/api/auth/session", "/api/app/bootstrap", "/api/app/activation", "/api/app/activity", "/api/app/onboarding"] as const) {
+  for (const path of [
+    "/api/auth/session",
+    "/api/app/bootstrap",
+    "/api/app/activation",
+    "/api/app/activity",
+    "/api/app/onboarding",
+  ] as const) {
     const response = await app.request(path, { headers: authHeaders(auth.cookieValue) });
     assert.equal(response.status, 200, `${path} should allow viewer reads`);
   }
@@ -681,7 +790,7 @@ test("viewer memberships can read shared app state and update their own profile"
     headers: { ...authHeaders(auth.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ displayName: "Alpha Viewer", timezone: "America/New_York" }),
   });
-  const body = await profile.json() as { profile: { displayName: string; timezone: string } };
+  const body = (await profile.json()) as { profile: { displayName: string; timezone: string } };
 
   assert.equal(profile.status, 200);
   assert.equal(body.profile.displayName, "Alpha Viewer");
@@ -694,10 +803,14 @@ test("activation route reflects normalized durable activation signals", async ()
   const registration = await app.request("/api/auth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "signals@example.com", password: "demo12345", displayName: "Signals User" }),
+    body: JSON.stringify({
+      email: "signals@example.com",
+      password: "demo12345",
+      displayName: "Signals User",
+    }),
   });
   const authCookie = cookieValue(registration);
-  const registered = await registration.json() as { workspace: { id: string } };
+  const registered = (await registration.json()) as { workspace: { id: string } };
 
   mutateStore((data) => {
     data.activationSignals.push(
@@ -723,7 +836,9 @@ test("activation route reflects normalized durable activation signals", async ()
   });
 
   const response = await app.request("/api/app/activation", { headers: authHeaders(authCookie) });
-  const body = await response.json() as { activation: { status: { risk: { reasons: string[] } } } };
+  const body = (await response.json()) as {
+    activation: { status: { risk: { reasons: string[] } } };
+  };
 
   assert.equal(response.status, 200);
   assert.ok(body.activation.status.risk.reasons.includes("Work required retries."));
@@ -748,7 +863,7 @@ test("onboarding completion requires member or above membership", async () => {
     method: "POST",
     headers: authHeaders(auth.cookieValue),
   });
-  const body = await allowed.json() as { onboarding: { completedSteps: string[] } };
+  const body = (await allowed.json()) as { onboarding: { completedSteps: string[] } };
 
   assert.equal(allowed.status, 200);
   assert.ok(body.onboarding.completedSteps.includes("create_workspace_profile"));
@@ -760,12 +875,18 @@ test("onboarding routes expose current state and reject unknown completion steps
   const registration = await app.request("/api/auth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "onboarding@example.com", password: "demo12345", displayName: "Onboarding User" }),
+    body: JSON.stringify({
+      email: "onboarding@example.com",
+      password: "demo12345",
+      displayName: "Onboarding User",
+    }),
   });
   const authCookie = cookieValue(registration);
 
   const current = await app.request("/api/app/onboarding", { headers: authHeaders(authCookie) });
-  const currentBody = await current.json() as { onboarding: { status: string; currentStep: string; completedSteps: string[] } };
+  const currentBody = (await current.json()) as {
+    onboarding: { status: string; currentStep: string; completedSteps: string[] };
+  };
   assert.equal(current.status, 200);
   assert.equal(currentBody.onboarding.status, "not_started");
   assert.equal(currentBody.onboarding.currentStep, "create_workspace_profile");
@@ -778,11 +899,16 @@ test("onboarding routes expose current state and reject unknown completion steps
   assert.equal(invalid.status, 400);
   assert.deepEqual(await invalid.json(), { error: "unknown onboarding step" });
 
-  const completed = await app.request("/api/app/onboarding/steps/create_workspace_profile/complete", {
-    method: "POST",
-    headers: authHeaders(authCookie),
-  });
-  const completedBody = await completed.json() as { onboarding: { status: string; currentStep: string; completedSteps: string[] } };
+  const completed = await app.request(
+    "/api/app/onboarding/steps/create_workspace_profile/complete",
+    {
+      method: "POST",
+      headers: authHeaders(authCookie),
+    },
+  );
+  const completedBody = (await completed.json()) as {
+    onboarding: { status: string; currentStep: string; completedSteps: string[] };
+  };
 
   assert.equal(completed.status, 200);
   assert.equal(completedBody.onboarding.status, "in_progress");
@@ -799,7 +925,7 @@ test("member and invitation routes enforce workspace management permissions", as
   setAlphaRole("viewer");
   const list = await app.request("/api/app/members", { headers: authHeaders(auth.cookieValue) });
   assert.equal(list.status, 200);
-  assert.ok((await list.json() as { members: unknown[] }).members.length > 0);
+  assert.ok(((await list.json()) as { members: unknown[] }).members.length > 0);
 
   for (const role of ["viewer", "member"] as const) {
     setAlphaRole(role);
@@ -848,14 +974,22 @@ test("member listing exposes invitation previews without full tokens", async () 
   });
   assert.equal(created.status, 201);
 
-  const adminList = await app.request("/api/app/members", { headers: authHeaders(auth.cookieValue) });
-  const adminBody = await adminList.json() as { invitations: Array<{ token?: string; tokenPreview?: string }> };
+  const adminList = await app.request("/api/app/members", {
+    headers: authHeaders(auth.cookieValue),
+  });
+  const adminBody = (await adminList.json()) as {
+    invitations: Array<{ token?: string; tokenPreview?: string }>;
+  };
   assert.equal(adminBody.invitations[0]?.token, undefined);
   assert.ok(adminBody.invitations[0]?.tokenPreview);
 
   setAlphaRole("viewer");
-  const viewerList = await app.request("/api/app/members", { headers: authHeaders(auth.cookieValue) });
-  const viewerBody = await viewerList.json() as { invitations: Array<{ token?: string; tokenPreview?: string }> };
+  const viewerList = await app.request("/api/app/members", {
+    headers: authHeaders(auth.cookieValue),
+  });
+  const viewerBody = (await viewerList.json()) as {
+    invitations: Array<{ token?: string; tokenPreview?: string }>;
+  };
   assert.equal(viewerList.status, 200);
   assert.equal(viewerBody.invitations[0]?.token, undefined);
   assert.ok(viewerBody.invitations[0]?.tokenPreview);
@@ -874,7 +1008,9 @@ test("admins can invite an existing user and that user can accept", async () => 
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "Beta@PacketAgent.Local", role: "member" }),
   });
-  const createdBody = await created.json() as { invitation: { token: string; email: string; role: string; status: string } };
+  const createdBody = (await created.json()) as {
+    invitation: { token: string; email: string; role: string; status: string };
+  };
 
   assert.equal(created.status, 201);
   assert.equal(createdBody.invitation.email, "beta@packetagent.local");
@@ -882,17 +1018,28 @@ test("admins can invite an existing user and that user can accept", async () => 
   assert.equal(createdBody.invitation.status, "pending");
   assert.ok(createdBody.invitation.token);
 
-  const accepted = await app.request(`/api/app/invitations/${createdBody.invitation.token}/accept`, {
-    method: "POST",
-    headers: authHeaders(beta.cookieValue),
-  });
-  const acceptedBody = await accepted.json() as { membership: { userId: string; role: string }; invitation: { status: string } };
+  const accepted = await app.request(
+    `/api/app/invitations/${createdBody.invitation.token}/accept`,
+    {
+      method: "POST",
+      headers: authHeaders(beta.cookieValue),
+    },
+  );
+  const acceptedBody = (await accepted.json()) as {
+    membership: { userId: string; role: string };
+    invitation: { status: string };
+  };
 
   assert.equal(accepted.status, 200);
   assert.equal(acceptedBody.membership.userId, "user_beta");
   assert.equal(acceptedBody.membership.role, "member");
   assert.equal(acceptedBody.invitation.status, "accepted");
-  assert.equal(loadStore().memberships.some((entry) => entry.workspaceId === "alpha" && entry.userId === "user_beta"), true);
+  assert.equal(
+    loadStore().memberships.some(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_beta",
+    ),
+    true,
+  );
 });
 
 test("invitation create, accept, and resend routes are rate limited", async () => {
@@ -906,52 +1053,70 @@ test("invitation create, accept, and resend routes are rate limited", async () =
     const beta = login({ email: "beta@packetagent.local", password: "demo12345" });
     setAlphaRole("admin");
 
-  for (let index = 0; index < 20; index += 1) {
-    const response = await app.request("/api/app/invitations", {
+    for (let index = 0; index < 20; index += 1) {
+      const response = await app.request("/api/app/invitations", {
+        method: "POST",
+        headers: {
+          ...authHeaders(alpha.cookieValue),
+          "content-type": "application/json",
+          "x-forwarded-for": "203.0.113.20",
+        },
+        body: JSON.stringify({ email: "not-an-email", role: "member" }),
+      });
+      assert.equal(response.status, 400);
+    }
+    const createLimited = await app.request("/api/app/invitations", {
       method: "POST",
-      headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json", "x-forwarded-for": "203.0.113.20" },
+      headers: {
+        ...authHeaders(alpha.cookieValue),
+        "content-type": "application/json",
+        "x-forwarded-for": "203.0.113.20",
+      },
       body: JSON.stringify({ email: "not-an-email", role: "member" }),
     });
-    assert.equal(response.status, 400);
-  }
-  const createLimited = await app.request("/api/app/invitations", {
-    method: "POST",
-    headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json", "x-forwarded-for": "203.0.113.20" },
-    body: JSON.stringify({ email: "not-an-email", role: "member" }),
-  });
-  assert.equal(createLimited.status, 429);
+    assert.equal(createLimited.status, 429);
 
-  const created = await app.request("/api/app/invitations", {
-    method: "POST",
-    headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json", "x-forwarded-for": "203.0.113.21" },
-    body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
-  });
-  const createdBody = await created.json() as { invitation: { id: string; token: string } };
-
-  for (let index = 0; index < 20; index += 1) {
-    const response = await app.request(`/api/app/invitations/${createdBody.invitation.id}/resend`, {
+    const created = await app.request("/api/app/invitations", {
       method: "POST",
-      headers: { ...authHeaders(alpha.cookieValue), "x-forwarded-for": "203.0.113.22" },
+      headers: {
+        ...authHeaders(alpha.cookieValue),
+        "content-type": "application/json",
+        "x-forwarded-for": "203.0.113.21",
+      },
+      body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
     });
-    assert.equal(response.status, 200);
-  }
-  const resendLimited = await app.request(`/api/app/invitations/${createdBody.invitation.id}/resend`, {
-    method: "POST",
-    headers: { ...authHeaders(alpha.cookieValue), "x-forwarded-for": "203.0.113.22" },
-  });
-  assert.equal(resendLimited.status, 429);
+    const createdBody = (await created.json()) as { invitation: { id: string; token: string } };
 
-  for (let index = 0; index < 20; index += 1) {
-    const response = await app.request("/api/app/invitations/missing-token/accept", {
+    for (let index = 0; index < 20; index += 1) {
+      const response = await app.request(
+        `/api/app/invitations/${createdBody.invitation.id}/resend`,
+        {
+          method: "POST",
+          headers: { ...authHeaders(alpha.cookieValue), "x-forwarded-for": "203.0.113.22" },
+        },
+      );
+      assert.equal(response.status, 200);
+    }
+    const resendLimited = await app.request(
+      `/api/app/invitations/${createdBody.invitation.id}/resend`,
+      {
+        method: "POST",
+        headers: { ...authHeaders(alpha.cookieValue), "x-forwarded-for": "203.0.113.22" },
+      },
+    );
+    assert.equal(resendLimited.status, 429);
+
+    for (let index = 0; index < 20; index += 1) {
+      const response = await app.request("/api/app/invitations/missing-token/accept", {
+        method: "POST",
+        headers: { ...authHeaders(beta.cookieValue), "x-forwarded-for": "203.0.113.23" },
+      });
+      assert.equal(response.status, 404);
+    }
+    const acceptLimited = await app.request("/api/app/invitations/missing-token/accept", {
       method: "POST",
       headers: { ...authHeaders(beta.cookieValue), "x-forwarded-for": "203.0.113.23" },
     });
-    assert.equal(response.status, 404);
-  }
-  const acceptLimited = await app.request("/api/app/invitations/missing-token/accept", {
-    method: "POST",
-    headers: { ...authHeaders(beta.cookieValue), "x-forwarded-for": "203.0.113.23" },
-  });
     assert.equal(acceptLimited.status, 429);
   } finally {
     restoreEnv("PACKETAGENT_TRUST_PROXY", previousTrustProxy);
@@ -977,7 +1142,9 @@ test("invitation rate limit env overrides max attempts and window", async () => 
       body: JSON.stringify({ email: "not-an-email", role: "member" }),
     });
     assert.equal(first.status, 400);
-    const bucket = (loadStore().rateLimits ?? []).find((entry) => entry.id.startsWith("invitation:create:"));
+    const bucket = (loadStore().rateLimits ?? []).find((entry) =>
+      entry.id.startsWith("invitation:create:"),
+    );
     assert.ok(bucket, "expected invitation create rate limit bucket");
     assert.equal(new Date(bucket.resetAt).getTime() - new Date(bucket.updatedAt).getTime(), 3456);
 
@@ -1012,7 +1179,9 @@ test("invitation rate limit invalid env values fall back to defaults", async () 
       body: JSON.stringify({ email: "not-an-email", role: "member" }),
     });
     assert.equal(first.status, 400);
-    const bucket = (loadStore().rateLimits ?? []).find((entry) => entry.id.startsWith("invitation:create:"));
+    const bucket = (loadStore().rateLimits ?? []).find((entry) =>
+      entry.id.startsWith("invitation:create:"),
+    );
     assert.ok(bucket, "expected invitation create rate limit bucket");
     assert.equal(new Date(bucket.resetAt).getTime() - new Date(bucket.updatedAt).getTime(), 60_000);
 
@@ -1050,10 +1219,14 @@ test("admins can resend invitations by rotating token and expiry", async () => {
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
   });
-  const createdBody = await created.json() as { invitation: { id: string; token: string; expiresAt: string } };
+  const createdBody = (await created.json()) as {
+    invitation: { id: string; token: string; expiresAt: string };
+  };
 
   mutateStore((data) => {
-    const invitation = data.workspaceInvitations.find((entry) => entry.id === createdBody.invitation.id);
+    const invitation = data.workspaceInvitations.find(
+      (entry) => entry.id === createdBody.invitation.id,
+    );
     assert.ok(invitation, "expected invitation");
     invitation.expiresAt = "2000-01-01T00:00:00.000Z";
   });
@@ -1062,17 +1235,22 @@ test("admins can resend invitations by rotating token and expiry", async () => {
     method: "POST",
     headers: authHeaders(alpha.cookieValue),
   });
-  const resentBody = await resent.json() as { invitation: { token: string; expiresAt: string; status: string } };
+  const resentBody = (await resent.json()) as {
+    invitation: { token: string; expiresAt: string; status: string };
+  };
 
   assert.equal(resent.status, 200);
   assert.notEqual(resentBody.invitation.token, createdBody.invitation.token);
   assert.equal(resentBody.invitation.status, "pending");
   assert.ok(new Date(resentBody.invitation.expiresAt).getTime() > Date.now());
 
-  const oldToken = await app.request(`/api/app/invitations/${createdBody.invitation.token}/accept`, {
-    method: "POST",
-    headers: authHeaders(beta.cookieValue),
-  });
+  const oldToken = await app.request(
+    `/api/app/invitations/${createdBody.invitation.token}/accept`,
+    {
+      method: "POST",
+      headers: authHeaders(beta.cookieValue),
+    },
+  );
   assert.equal(oldToken.status, 404);
 
   const accepted = await app.request(`/api/app/invitations/${resentBody.invitation.token}/accept`, {
@@ -1096,7 +1274,10 @@ test("invitation create and resend record email deliveries", async () => {
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "Delivery@Test.Example", role: "member" }),
   });
-  const createdBody = await created.json() as { invitation: { id: string; token: string }; emailDelivery: { status: string; action: string } };
+  const createdBody = (await created.json()) as {
+    invitation: { id: string; token: string };
+    emailDelivery: { status: string; action: string };
+  };
 
   assert.equal(created.status, 201);
   assert.equal(createdBody.emailDelivery.status, "sent");
@@ -1112,7 +1293,10 @@ test("invitation create and resend record email deliveries", async () => {
     method: "POST",
     headers: authHeaders(alpha.cookieValue),
   });
-  const resentBody = await resent.json() as { invitation: { token: string }; emailDelivery: { status: string; action: string } };
+  const resentBody = (await resent.json()) as {
+    invitation: { token: string };
+    emailDelivery: { status: string; action: string };
+  };
 
   assert.equal(resent.status, 200);
   assert.equal(resentBody.emailDelivery.status, "sent");
@@ -1141,16 +1325,31 @@ test("invitation delivery failures are recorded without rolling back invitation 
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "failure@test.example", role: "member" }),
   });
-  const createdBody = await created.json() as { invitation: { id: string; status: string }; emailDelivery: { status: string; error: string | null } };
+  const createdBody = (await created.json()) as {
+    invitation: { id: string; status: string };
+    emailDelivery: { status: string; error: string | null };
+  };
 
   assert.equal(created.status, 201);
   assert.equal(createdBody.invitation.status, "pending");
   assert.equal(createdBody.emailDelivery.status, "failed");
   assert.equal(createdBody.emailDelivery.error, "smtp unavailable");
-  assert.ok(loadStore().workspaceInvitations.some((entry) => entry.id === createdBody.invitation.id && !entry.revokedAt && !entry.acceptedAt));
+  assert.ok(
+    loadStore().workspaceInvitations.some(
+      (entry) => entry.id === createdBody.invitation.id && !entry.revokedAt && !entry.acceptedAt,
+    ),
+  );
   assert.equal(listInvitationEmailDeliveryRecordsForTests()[0]?.status, "failed");
-  assert.equal(listInvitationEmailDeliveriesIndexed("alpha", createdBody.invitation.id)[0]?.status, "failed");
-  assert.ok(loadStore().activities.some((entry) => entry.event === "workspace.invitation_email_delivery" && entry.data.status === "failed"));
+  assert.equal(
+    listInvitationEmailDeliveriesIndexed("alpha", createdBody.invitation.id)[0]?.status,
+    "failed",
+  );
+  assert.ok(
+    loadStore().activities.some(
+      (entry) =>
+        entry.event === "workspace.invitation_email_delivery" && entry.data.status === "failed",
+    ),
+  );
 });
 
 test("webhook invitation delivery failures enqueue retry jobs without tokens", async () => {
@@ -1176,7 +1375,10 @@ test("webhook invitation delivery failures enqueue retry jobs without tokens", a
       headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
       body: JSON.stringify({ email: "retry@test.example", role: "member" }),
     });
-    const createdBody = await created.json() as { invitation: { id: string }; emailDelivery: { status: string; retryJobId: string | null } };
+    const createdBody = (await created.json()) as {
+      invitation: { id: string };
+      emailDelivery: { status: string; retryJobId: string | null };
+    };
 
     assert.equal(created.status, 201);
     assert.equal(createdBody.emailDelivery.status, "failed");
@@ -1217,7 +1419,7 @@ test("revoked and accepted invitations do not send email on resend failures", as
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "revoked@test.example", role: "member" }),
   });
-  const revokedBody = await revokedCreate.json() as { invitation: { id: string } };
+  const revokedBody = (await revokedCreate.json()) as { invitation: { id: string } };
   assert.equal(listInvitationEmailDeliveriesIndexed("alpha").length, 1);
 
   const revoked = await app.request(`/api/app/invitations/${revokedBody.invitation.id}/revoke`, {
@@ -1225,10 +1427,13 @@ test("revoked and accepted invitations do not send email on resend failures", as
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(revoked.status, 200);
-  const revokedResend = await app.request(`/api/app/invitations/${revokedBody.invitation.id}/resend`, {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
+  const revokedResend = await app.request(
+    `/api/app/invitations/${revokedBody.invitation.id}/resend`,
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
   assert.equal(revokedResend.status, 400);
   assert.deepEqual(await revokedResend.json(), { error: "invitation has been revoked" });
   assert.equal(listInvitationEmailDeliveriesIndexed("alpha").length, 1);
@@ -1238,18 +1443,26 @@ test("revoked and accepted invitations do not send email on resend failures", as
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
   });
-  const acceptedBody = await acceptedCreate.json() as { invitation: { id: string; token: string } };
+  const acceptedBody = (await acceptedCreate.json()) as {
+    invitation: { id: string; token: string };
+  };
   assert.equal(listInvitationEmailDeliveriesIndexed("alpha").length, 2);
 
-  const accepted = await app.request(`/api/app/invitations/${acceptedBody.invitation.token}/accept`, {
-    method: "POST",
-    headers: authHeaders(beta.cookieValue),
-  });
+  const accepted = await app.request(
+    `/api/app/invitations/${acceptedBody.invitation.token}/accept`,
+    {
+      method: "POST",
+      headers: authHeaders(beta.cookieValue),
+    },
+  );
   assert.equal(accepted.status, 200);
-  const acceptedResend = await app.request(`/api/app/invitations/${acceptedBody.invitation.id}/resend`, {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
+  const acceptedResend = await app.request(
+    `/api/app/invitations/${acceptedBody.invitation.id}/resend`,
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
   assert.equal(acceptedResend.status, 400);
   assert.deepEqual(await acceptedResend.json(), { error: "invitation has already been accepted" });
   assert.equal(listInvitationEmailDeliveriesIndexed("alpha").length, 2);
@@ -1267,21 +1480,27 @@ test("invitation revoke and resend enforce workspace roles", async () => {
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "beta@packetagent.local", role: "member" }),
   });
-  const createdBody = await created.json() as { invitation: { id: string; token: string } };
+  const createdBody = (await created.json()) as { invitation: { id: string; token: string } };
 
   setAlphaRole("member");
-  const deniedResend = await app.request(`/api/app/invitations/${createdBody.invitation.id}/resend`, {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
+  const deniedResend = await app.request(
+    `/api/app/invitations/${createdBody.invitation.id}/resend`,
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
   assert.equal(deniedResend.status, 403);
   assert.deepEqual(await deniedResend.json(), { error: "workspace role admin is required" });
 
   setAlphaRole("viewer");
-  const deniedRevoke = await app.request(`/api/app/invitations/${createdBody.invitation.id}/revoke`, {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
+  const deniedRevoke = await app.request(
+    `/api/app/invitations/${createdBody.invitation.id}/revoke`,
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
   assert.equal(deniedRevoke.status, 403);
   assert.deepEqual(await deniedRevoke.json(), { error: "workspace role admin is required" });
 
@@ -1290,15 +1509,22 @@ test("invitation revoke and resend enforce workspace roles", async () => {
     method: "POST",
     headers: authHeaders(alpha.cookieValue),
   });
-  const revokedBody = await revoked.json() as { invitation: { status: string; revokedAt: string | null } };
+  const revokedBody = (await revoked.json()) as {
+    invitation: { status: string; revokedAt: string | null };
+  };
   assert.equal(revoked.status, 200);
   assert.equal(revokedBody.invitation.status, "revoked");
   assert.ok(revokedBody.invitation.revokedAt);
 
-  const accepted = await app.request(`/api/app/invitations/${createdBody.invitation.token}/accept`, {
-    method: "POST",
-    headers: authHeaders(login({ email: "beta@packetagent.local", password: "demo12345" }).cookieValue),
-  });
+  const accepted = await app.request(
+    `/api/app/invitations/${createdBody.invitation.token}/accept`,
+    {
+      method: "POST",
+      headers: authHeaders(
+        login({ email: "beta@packetagent.local", password: "demo12345" }).cookieValue,
+      ),
+    },
+  );
   assert.equal(accepted.status, 400);
   assert.deepEqual(await accepted.json(), { error: "invitation has been revoked" });
 });
@@ -1309,7 +1535,12 @@ test("member role updates and removals protect owner-only operations", async () 
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
   mutateStore((data) => {
-    data.memberships.push({ workspaceId: "alpha", userId: "user_beta", role: "member", joinedAt: new Date().toISOString() });
+    data.memberships.push({
+      workspaceId: "alpha",
+      userId: "user_beta",
+      role: "member",
+      joinedAt: new Date().toISOString(),
+    });
   });
   setAlphaRole("admin");
 
@@ -1326,7 +1557,7 @@ test("member role updates and removals protect owner-only operations", async () 
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ role: "viewer" }),
   });
-  const updatedBody = await updated.json() as { member: { role: string } };
+  const updatedBody = (await updated.json()) as { member: { role: string } };
   assert.equal(updated.status, 200);
   assert.equal(updatedBody.member.role, "viewer");
 
@@ -1337,14 +1568,21 @@ test("member role updates and removals protect owner-only operations", async () 
     body: JSON.stringify({ role: "admin" }),
   });
   assert.equal(demoteLastOwner.status, 400);
-  assert.deepEqual(await demoteLastOwner.json(), { error: "workspace must keep at least one owner" });
+  assert.deepEqual(await demoteLastOwner.json(), {
+    error: "workspace must keep at least one owner",
+  });
 
   const removed = await app.request("/api/app/members/user_beta", {
     method: "DELETE",
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(removed.status, 200);
-  assert.equal(loadStore().memberships.some((entry) => entry.workspaceId === "alpha" && entry.userId === "user_beta"), false);
+  assert.equal(
+    loadStore().memberships.some(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_beta",
+    ),
+    false,
+  );
 });
 
 function restoreEnv(name: string, value: string | undefined) {

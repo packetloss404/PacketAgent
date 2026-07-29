@@ -26,7 +26,11 @@ test("expandBuilderTemplateBeta expands deterministic app and agent bundles acro
   );
   assert.ok(first.bundles.every((bundle) => bundle.agents.length >= 2));
   assert.ok(first.bundles.every((bundle) => bundle.app.pageMap.length > 0));
-  assert.ok(first.bundles.every((bundle) => bundle.agents.every((agent) => agent.agent.playbook.length >= 3)));
+  assert.ok(
+    first.bundles.every((bundle) =>
+      bundle.agents.every((agent) => agent.agent.playbook.length >= 3),
+    ),
+  );
 });
 
 test("generated manifest covers smoke, unit, access, and integration checks for each bundle", () => {
@@ -37,7 +41,11 @@ test("generated manifest covers smoke, unit, access, and integration checks for 
   const expectedKinds: GeneratedTestCheckKind[] = ["smoke", "unit", "access", "integration"];
 
   assert.deepEqual(manifest.checkKinds, expectedKinds);
-  assert.deepEqual(manifest.bundleIds, ["beta-sales-crm", "beta-booking-ops", "beta-customer-success"]);
+  assert.deepEqual(manifest.bundleIds, [
+    "beta-sales-crm",
+    "beta-booking-ops",
+    "beta-customer-success",
+  ]);
   assert.equal(manifest.checks.length, expansion.bundles.length * expectedKinds.length);
 
   for (const bundle of expansion.bundles) {
@@ -45,8 +53,20 @@ test("generated manifest covers smoke, unit, access, and integration checks for 
       manifest.checks.filter((check) => check.bundleId === bundle.id).map((check) => check.kind),
       expectedKinds,
     );
-    assert.ok(manifest.checks.some((check) => check.bundleId === bundle.id && check.kind === "access" && check.assertions.some((assertion) => assertion.includes("Admin routes"))));
-    assert.ok(manifest.checks.some((check) => check.bundleId === bundle.id && check.kind === "integration" && check.cleanup.length >= 2));
+    assert.ok(
+      manifest.checks.some(
+        (check) =>
+          check.bundleId === bundle.id &&
+          check.kind === "access" &&
+          check.assertions.some((assertion) => assertion.includes("Admin routes")),
+      ),
+    );
+    assert.ok(
+      manifest.checks.some(
+        (check) =>
+          check.bundleId === bundle.id && check.kind === "integration" && check.cleanup.length >= 2,
+      ),
+    );
   }
 });
 
@@ -63,7 +83,13 @@ test("manifest helper includes reliability cleanup guidance without leaking secr
   assert.match(cleanupText, /agent preview runs/);
   assert.match(cleanupText, /provider secrets out of generated manifests/);
   assert.match(cleanupText, /Stripe fixture IDs/);
-  assert.ok(manifest.checks.some((check) => check.kind === "integration" && check.assertions.some((assertion) => assertion.includes("missing env vars"))));
+  assert.ok(
+    manifest.checks.some(
+      (check) =>
+        check.kind === "integration" &&
+        check.assertions.some((assertion) => assertion.includes("missing env vars")),
+    ),
+  );
   assert.ok(manifestText.includes("STRIPE_SECRET_KEY"));
   assert.equal(manifestText.includes("sk_live_"), false);
 });

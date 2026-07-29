@@ -49,14 +49,17 @@ test("deriveAgentRunTraceSpans orders successful run context, transcript, logs, 
 
   const spans = deriveAgentRunTraceSpans(run);
 
-  assert.deepEqual(spans.map((span) => `${span.sequence}:${span.type}:${span.title}`), [
-    "1:run:Daily brief",
-    "2:input:Inputs",
-    "3:step:Read signals",
-    "4:log:INFO log",
-    "5:step:Write summary",
-    "6:output:Output",
-  ]);
+  assert.deepEqual(
+    spans.map((span) => `${span.sequence}:${span.type}:${span.title}`),
+    [
+      "1:run:Daily brief",
+      "2:input:Inputs",
+      "3:step:Read signals",
+      "4:log:INFO log",
+      "5:step:Write summary",
+      "6:output:Output",
+    ],
+  );
   assert.equal(spans[0]?.durationMs, 5_000);
   assert.equal(spans[0]?.modelUsed, "gpt-4.1-mini");
   assert.equal(spans[0]?.costUsd, 0.0123);
@@ -83,7 +86,13 @@ test("deriveAgentRunTraceSpans redacts failed run errors and transcript output",
         startedAt: "2026-05-27T12:10:01.000Z",
       },
     ],
-    logs: [{ at: "2026-05-27T12:10:03.000Z", level: "error", message: "Bearer provider-secret-1234 failed." }],
+    logs: [
+      {
+        at: "2026-05-27T12:10:03.000Z",
+        level: "error",
+        message: "Bearer provider-secret-1234 failed.",
+      },
+    ],
     error: "Request failed with token=super-secret-token.",
   });
 
@@ -123,7 +132,10 @@ test("deriveAgentRunTraceSpans keeps canceled runs and skipped steps distinct", 
 
   const spans = deriveAgentRunTraceSpans(run);
 
-  assert.deepEqual(spans.map((span) => span.type), ["run", "input", "step", "log", "error"]);
+  assert.deepEqual(
+    spans.map((span) => span.type),
+    ["run", "input", "step", "log", "error"],
+  );
   assert.equal(spans[0]?.status, "canceled");
   assert.equal(spans.find((span) => span.type === "step")?.status, "skipped");
   assert.equal(spans.find((span) => span.type === "log")?.status, "warn");

@@ -31,17 +31,32 @@ test("generated app publish records include local hosting metadata and compose p
   assert.equal(publish.localPublishPath, "exports/packetagent/alpha-workspace/booking-app");
   assert.equal(publish.workspacePath, "exports/packetagent/alpha-workspace/booking-app");
   assert.equal(publish.publicUrl, "https://apps.example.test/alpha-workspace/booking-app");
-  assert.equal(publish.privateUrl, "http://localhost:8484/api/app/generated-apps/gapp_booking/preview?checkpointId=ckpt_1");
+  assert.equal(
+    publish.privateUrl,
+    "http://localhost:8484/api/app/generated-apps/gapp_booking/preview?checkpointId=ckpt_1",
+  );
   assert.equal(publish.dockerComposeExport.fileName, "docker-compose.publish.yml");
   assert.equal(publish.dockerComposeExport.services.includes("packetagent-app"), true);
   assert.match(publish.dockerComposeExport.yaml, /packetagent-app:/);
-  assert.equal(publish.dockerComposeExport.bundlePath, "exports/packetagent/alpha-workspace/booking-app/bundle");
-  assert.equal(publish.dockerComposeExport.manifestPath, "exports/packetagent/alpha-workspace/booking-app/publish-artifacts.json");
+  assert.equal(
+    publish.dockerComposeExport.bundlePath,
+    "exports/packetagent/alpha-workspace/booking-app/bundle",
+  );
+  assert.equal(
+    publish.dockerComposeExport.manifestPath,
+    "exports/packetagent/alpha-workspace/booking-app/publish-artifacts.json",
+  );
   assert.match(publish.dockerComposeExport.yaml, /PACKETAGENT_APP_BUNDLE_PATH/);
-  assert.ok(publish.dockerComposeExport.instructions.some((step) => step.includes("generated app bundle")));
+  assert.ok(
+    publish.dockerComposeExport.instructions.some((step) => step.includes("generated app bundle")),
+  );
   assert.equal(publish.artifactManifest.fileName, "publish-artifacts.json");
   assert.equal(publish.manifest.fileName, "publish-artifacts.json");
-  assert.ok(publish.artifactManifest.entries.some((entry) => entry.kind === "generated_bundle" && entry.path.endsWith("/bundle")));
+  assert.ok(
+    publish.artifactManifest.entries.some(
+      (entry) => entry.kind === "generated_bundle" && entry.path.endsWith("/bundle"),
+    ),
+  );
   assert.ok(publish.artifactPaths.some((path) => path.endsWith("publish-artifacts.json")));
   assert.ok(publish.logs.some((entry) => entry.message.includes("Published artifact manifest")));
 });
@@ -75,7 +90,11 @@ test("second publish keeps previous publish rollback command and result shape", 
   assert.equal(second.rollbackCommand?.toPublishId, first.id);
   assert.match(second.rollbackCommand?.command ?? "", /packetagent publish rollback/);
 
-  const command = createGeneratedAppPublishRollbackCommand({ current: second, target: first, reason: "test" });
+  const command = createGeneratedAppPublishRollbackCommand({
+    current: second,
+    target: first,
+    reason: "test",
+  });
   const result = buildGeneratedAppPublishRollbackResult({
     command,
     status: "succeeded",
@@ -111,5 +130,8 @@ test("publish history orders newest first", () => {
     createdAt: "2026-05-03T19:00:00.000Z",
   });
 
-  assert.deepEqual(orderGeneratedAppPublishHistory([older, newer]).map((entry) => entry.id), [newer.id, older.id]);
+  assert.deepEqual(
+    orderGeneratedAppPublishHistory([older, newer]).map((entry) => entry.id),
+    [newer.id, older.id],
+  );
 });

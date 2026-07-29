@@ -49,7 +49,13 @@ test("deriveAppSmokeChecks derives page, safe API, and CRUD checks in stable ord
     apiRoutes: [
       { key: "create-task", method: "POST", path: "/api/tasks" },
       { key: "health", method: "GET", path: "/api/health", authRequired: false },
-      { key: "preview-create-task", method: "POST", path: "/api/tasks/preview", smoke: true, expectedStatus: 202 },
+      {
+        key: "preview-create-task",
+        method: "POST",
+        path: "/api/tasks/preview",
+        smoke: true,
+        expectedStatus: 202,
+      },
     ],
     crudFlows: [
       {
@@ -62,20 +68,29 @@ test("deriveAppSmokeChecks derives page, safe API, and CRUD checks in stable ord
     ],
   });
 
-  assert.deepEqual(checks.map((check) => check.id), [
-    "page:home",
-    "page:task-detail",
-    "api:get:health",
-    "api:post:preview-create-task",
-    "crud:get:tasks:list",
-    "crud:post:tasks:create",
-    "crud:get:tasks:read",
-    "crud:patch:tasks:update",
-    "crud:delete:tasks:delete",
-  ]);
+  assert.deepEqual(
+    checks.map((check) => check.id),
+    [
+      "page:home",
+      "page:task-detail",
+      "api:get:health",
+      "api:post:preview-create-task",
+      "crud:get:tasks:list",
+      "crud:post:tasks:create",
+      "crud:get:tasks:read",
+      "crud:patch:tasks:update",
+      "crud:delete:tasks:delete",
+    ],
+  );
   assert.equal(checks.find((check) => check.id === "api:get:health")?.requiredAuth, false);
-  assert.equal(checks.find((check) => check.id === "api:post:preview-create-task")?.expectedStatus, 202);
-  assert.equal(checks.some((check) => check.id === "api:post:create-task"), false);
+  assert.equal(
+    checks.find((check) => check.id === "api:post:preview-create-task")?.expectedStatus,
+    202,
+  );
+  assert.equal(
+    checks.some((check) => check.id === "api:post:create-task"),
+    false,
+  );
   assert.equal(checks.find((check) => check.id === "crud:post:tasks:create")?.expectedStatus, 201);
 });
 
@@ -98,14 +113,17 @@ test("derivePreviewBuildStatus exposes builder-ready labels", () => {
     summary: "Preview build is running. 1/4 checks passed.",
   });
 
-  assert.deepEqual(derivePreviewBuildStatus({ phase: "passed", failedChecks: 1, passedChecks: 2 }), {
-    phase: "failed",
-    label: "Needs fix",
-    tone: "danger",
-    canPreview: false,
-    canPublish: false,
-    summary: "Build or smoke checks failed. 2/3 checks passed.",
-  });
+  assert.deepEqual(
+    derivePreviewBuildStatus({ phase: "passed", failedChecks: 1, passedChecks: 2 }),
+    {
+      phase: "failed",
+      label: "Needs fix",
+      tone: "danger",
+      canPreview: false,
+      canPublish: false,
+      summary: "Build or smoke checks failed. 2/3 checks passed.",
+    },
+  );
 });
 
 test("buildRuntimeErrorHandoff redacts secret-like values and preserves fix context", () => {
@@ -138,8 +156,17 @@ test("buildAppPreviewReadiness composes preview, smoke, build, and handoff metad
     workspaceId: "alpha",
     baseUrl: "http://localhost:4173",
     pageMap: [{ key: "booking-home", path: "/", visibility: "public" }],
-    apiRoutes: [{ key: "availability", method: "GET", path: "/api/availability", authRequired: false }],
-    crudFlows: [{ key: "appointments", resource: "appointments", apiBasePath: "/api/appointments", operations: ["list"] }],
+    apiRoutes: [
+      { key: "availability", method: "GET", path: "/api/availability", authRequired: false },
+    ],
+    crudFlows: [
+      {
+        key: "appointments",
+        resource: "appointments",
+        apiBasePath: "/api/appointments",
+        operations: ["list"],
+      },
+    ],
     build: { phase: "queued" },
     runtimeError: {
       appId: "booking",
@@ -151,11 +178,10 @@ test("buildAppPreviewReadiness composes preview, smoke, build, and handoff metad
   });
 
   assert.equal(readiness.preview.url, "http://localhost:4173/builder/preview/alpha/booking");
-  assert.deepEqual(readiness.smokeChecks.map((check) => check.id), [
-    "page:booking-home",
-    "api:get:availability",
-    "crud:get:appointments:list",
-  ]);
+  assert.deepEqual(
+    readiness.smokeChecks.map((check) => check.id),
+    ["page:booking-home", "api:get:availability", "crud:get:appointments:list"],
+  );
   assert.equal(readiness.buildStatus.label, "Queued");
   assert.equal(readiness.runtimeErrorHandoff?.metadata.name, "ReferenceError");
 });

@@ -6,7 +6,12 @@ import {
 
 export type AppPublishVisibility = "private" | "public";
 export type AppPublishBundleKind = "app" | "agent" | "app_agent";
-export type AppPublishArtifactKind = "source" | "build_output" | "generated_bundle" | "manifest" | "config";
+export type AppPublishArtifactKind =
+  | "source"
+  | "build_output"
+  | "generated_bundle"
+  | "manifest"
+  | "config";
 export type AppPublishCheckKind = "health" | "smoke";
 
 export interface AppPublishReadinessInput extends AppPublishIntegrationsInput {
@@ -210,12 +215,7 @@ const DEFAULT_PUBLIC_BASE_URL = "https://apps.packetagent.example";
 const DEFAULT_PRIVATE_BASE_URL = "http://localhost:8484";
 const DEFAULT_PACKAGE_VERSION = "0.1.0";
 
-const BASE_REQUIRED_ENV = [
-  "NODE_ENV",
-  "PORT",
-  "PACKETAGENT_PUBLISH_ROOT",
-  "PACKETAGENT_STORE",
-];
+const BASE_REQUIRED_ENV = ["NODE_ENV", "PORT", "PACKETAGENT_PUBLISH_ROOT", "PACKETAGENT_STORE"];
 
 const BASE_OPTIONAL_ENV = [
   "PACKETAGENT_ACCESS_LOG_MODE",
@@ -224,14 +224,9 @@ const BASE_OPTIONAL_ENV = [
   "PACKETAGENT_SCHEDULER_LEADER_MODE",
 ];
 
-const AGENT_REQUIRED_ENV = [
-  "PACKETAGENT_AGENT_BUNDLE_PATH",
-];
+const AGENT_REQUIRED_ENV = ["PACKETAGENT_AGENT_BUNDLE_PATH"];
 
-const AGENT_OPTIONAL_ENV = [
-  "PACKETAGENT_AGENT_RUN_TIMEOUT_MS",
-  "PACKETAGENT_AGENT_TOOL_ALLOWLIST",
-];
+const AGENT_OPTIONAL_ENV = ["PACKETAGENT_AGENT_RUN_TIMEOUT_MS", "PACKETAGENT_AGENT_TOOL_ALLOWLIST"];
 
 const ENV_PURPOSES: Record<string, string> = {
   NODE_ENV: "Set to production for hosted app and agent bundles.",
@@ -244,26 +239,46 @@ const ENV_PURPOSES: Record<string, string> = {
   PACKETAGENT_AGENT_TOOL_ALLOWLIST: "Restricts tools exposed to generated agent bundles.",
   PACKETAGENT_PRIVATE_APP_BASE_URL: "Internal operator URL used for admin smoke checks.",
   PACKETAGENT_PUBLIC_APP_BASE_URL: "External URL handed to public users after publish.",
-  PACKETAGENT_SCHEDULER_LEADER_MODE: "Coordinates background work when more than one app instance runs.",
+  PACKETAGENT_SCHEDULER_LEADER_MODE:
+    "Coordinates background work when more than one app instance runs.",
 };
 
-export function buildAppPublishReadiness(input: AppPublishReadinessInput = {}): AppPublishReadiness {
+export function buildAppPublishReadiness(
+  input: AppPublishReadinessInput = {},
+): AppPublishReadiness {
   const workspaceSlug = slugify(input.workspaceSlug) || DEFAULT_WORKSPACE_SLUG;
   const draftSlug = slugify(input.appName || input.draftId) || DEFAULT_DRAFT_SLUG;
   const bundleKind = input.bundleKind ?? "app";
-  const agentSlug = includesAgent(bundleKind) ? (slugify(input.agentName || input.draftId) || DEFAULT_AGENT_SLUG) : null;
+  const agentSlug = includesAgent(bundleKind)
+    ? slugify(input.agentName || input.draftId) || DEFAULT_AGENT_SLUG
+    : null;
   const localPublishRoot = normalizePath(input.localPublishRoot || DEFAULT_LOCAL_PUBLISH_ROOT);
   const localPublishPath = joinMetadataPath(localPublishRoot, workspaceSlug, draftSlug);
   const packageVersion = cleanString(input.packageVersion) || DEFAULT_PACKAGE_VERSION;
   const packageName = `${workspaceSlug}-${draftSlug}`;
   const packageId = `${workspaceSlug}/${draftSlug}/${bundleKind}`;
-  const publishId = slugify(input.publishId) || `${workspaceSlug}-${draftSlug}-${bundleKind}-publish`;
+  const publishId =
+    slugify(input.publishId) || `${workspaceSlug}-${draftSlug}-${bundleKind}-publish`;
   const previousPublishId = slugify(input.previousPublishId) || null;
-  const publicUrl = joinUrl(input.publicBaseUrl || DEFAULT_PUBLIC_BASE_URL, workspaceSlug, draftSlug);
-  const privateUrl = joinUrl(input.privateBaseUrl || DEFAULT_PRIVATE_BASE_URL, "app", workspaceSlug, draftSlug);
+  const publicUrl = joinUrl(
+    input.publicBaseUrl || DEFAULT_PUBLIC_BASE_URL,
+    workspaceSlug,
+    draftSlug,
+  );
+  const privateUrl = joinUrl(
+    input.privateBaseUrl || DEFAULT_PRIVATE_BASE_URL,
+    "app",
+    workspaceSlug,
+    draftSlug,
+  );
   const visibility = input.visibility ?? "private";
   const runtimeConfig = buildRuntimeConfig(localPublishPath, workspaceSlug, draftSlug, agentSlug);
-  const envChecklist = buildEnvChecklist(bundleKind, input.requiredEnv, input.optionalEnv, input.runtimeEnv);
+  const envChecklist = buildEnvChecklist(
+    bundleKind,
+    input.requiredEnv,
+    input.optionalEnv,
+    input.runtimeEnv,
+  );
   const publishIntegrations = inspectAppPublishIntegrations({
     ...input,
     env: { ...(input.runtimeEnv ?? {}), ...(input.env ?? {}) },
@@ -273,10 +288,20 @@ export function buildAppPublishReadiness(input: AppPublishReadinessInput = {}): 
     },
   });
   const buildCommands = buildPublishCommands(bundleKind, localPublishPath);
-  const artifactManifest = buildArtifactManifest(packageId, localPublishPath, bundleKind, agentSlug);
+  const artifactManifest = buildArtifactManifest(
+    packageId,
+    localPublishPath,
+    bundleKind,
+    agentSlug,
+  );
   const healthChecks = buildHealthChecks(privateUrl);
   const smokeChecks = buildSmokeChecks(privateUrl, publicUrl, bundleKind, agentSlug);
-  const dockerComposeExport = buildDockerComposeExport(workspaceSlug, draftSlug, localPublishPath, includesAgent(bundleKind));
+  const dockerComposeExport = buildDockerComposeExport(
+    workspaceSlug,
+    draftSlug,
+    localPublishPath,
+    includesAgent(bundleKind),
+  );
   const rollback = buildRollbackPlan(localPublishPath);
   const packagingNotes = buildPackagingNotes(bundleKind);
   const artifactPaths = artifactManifest.entries.map((entry) => entry.path);
@@ -289,7 +314,13 @@ export function buildAppPublishReadiness(input: AppPublishReadinessInput = {}): 
     publishId,
     localPublishPath,
     runtimeAssumptions: buildRuntimeAssumptions(bundleKind, input.runtimeAssumptions),
-    publishChecklist: buildPublishChecklist(envChecklist, publishIntegrations, healthChecks, smokeChecks, dockerComposeExport),
+    publishChecklist: buildPublishChecklist(
+      envChecklist,
+      publishIntegrations,
+      healthChecks,
+      smokeChecks,
+      dockerComposeExport,
+    ),
     packageContract: {
       version: "phase-71-lane-5",
       packageId,
@@ -319,7 +350,9 @@ export function buildAppPublishReadiness(input: AppPublishReadinessInput = {}): 
     healthCheck: {
       livePath: "/api/health/live",
       readyPath: "/api/health/ready",
-      command: healthChecks.find((check) => check.id === "ready")?.command ?? `curl -fsS ${privateUrl}/api/health/ready`,
+      command:
+        healthChecks.find((check) => check.id === "ready")?.command ??
+        `curl -fsS ${privateUrl}/api/health/ready`,
     },
     smokeCheck: {
       command: smokeChecks.map((check) => check.command).join(" && "),
@@ -332,15 +365,16 @@ export function buildAppPublishReadiness(input: AppPublishReadinessInput = {}): 
       visibility,
       publicUrl,
       privateUrl,
-      notes: visibility === "public"
-        ? [
-          "Share the public URL only after health and smoke checks pass.",
-          "Keep the private URL for operators and authenticated workspace review.",
-        ]
-        : [
-          "Hold the public URL until workspace approval changes visibility to public.",
-          "Use the private URL for reviewer handoff and smoke verification.",
-        ],
+      notes:
+        visibility === "public"
+          ? [
+              "Share the public URL only after health and smoke checks pass.",
+              "Keep the private URL for operators and authenticated workspace review.",
+            ]
+          : [
+              "Hold the public URL until workspace approval changes visibility to public.",
+              "Use the private URL for reviewer handoff and smoke verification.",
+            ],
     },
   };
 }
@@ -369,7 +403,10 @@ function buildRuntimeConfig(
   };
 }
 
-function buildPublishCommands(bundleKind: AppPublishBundleKind, localPublishPath: string): AppPublishBuildCommand[] {
+function buildPublishCommands(
+  bundleKind: AppPublishBundleKind,
+  localPublishPath: string,
+): AppPublishBuildCommand[] {
   return [
     {
       id: "install",
@@ -400,13 +437,16 @@ function buildPublishCommands(bundleKind: AppPublishBundleKind, localPublishPath
       description: "Record the deterministic publish artifact manifest used by one-click hosting.",
     },
     ...(includesAgent(bundleKind)
-      ? [{
-        id: "validate-agent-bundle",
-        command: `packetagent internal validate-agent-bundle --bundle ${localPublishPath}/agent`,
-        required: true,
-        produces: [`${localPublishPath}/agent/agent-manifest.json`],
-        description: "Validate generated agent prompts, tool policy, and runtime metadata before publish.",
-      }]
+      ? [
+          {
+            id: "validate-agent-bundle",
+            command: `packetagent internal validate-agent-bundle --bundle ${localPublishPath}/agent`,
+            required: true,
+            produces: [`${localPublishPath}/agent/agent-manifest.json`],
+            description:
+              "Validate generated agent prompts, tool policy, and runtime metadata before publish.",
+          },
+        ]
       : []),
   ];
 }
@@ -419,19 +459,19 @@ function buildArtifactManifest(
 ): AppPublishArtifactManifest {
   const agentEntries: AppPublishArtifactManifestEntry[] = includesAgent(bundleKind)
     ? [
-      {
-        path: `${localPublishPath}/agent/agent-manifest.json`,
-        kind: "manifest",
-        required: true,
-        description: `Generated agent manifest for ${agentSlug ?? DEFAULT_AGENT_SLUG}.`,
-      },
-      {
-        path: `${localPublishPath}/agent/prompts`,
-        kind: "generated_bundle",
-        required: true,
-        description: "Generated agent instructions, tool policy, and prompt assets.",
-      },
-    ]
+        {
+          path: `${localPublishPath}/agent/agent-manifest.json`,
+          kind: "manifest",
+          required: true,
+          description: `Generated agent manifest for ${agentSlug ?? DEFAULT_AGENT_SLUG}.`,
+        },
+        {
+          path: `${localPublishPath}/agent/prompts`,
+          kind: "generated_bundle",
+          required: true,
+          description: "Generated agent instructions, tool policy, and prompt assets.",
+        },
+      ]
     : [];
 
   return {
@@ -495,7 +535,8 @@ function buildHealthChecks(privateUrl: string): AppPublishGeneratedCheck[] {
       command: `curl -fsS ${privateUrl}/api/health/live`,
       expectedStatus: 200,
       expected: ["GET /api/health/live returns 200 with status live."],
-      failureAction: "Keep the previous publish pointer active and inspect the app container start logs.",
+      failureAction:
+        "Keep the previous publish pointer active and inspect the app container start logs.",
     },
     {
       id: "ready",
@@ -505,7 +546,8 @@ function buildHealthChecks(privateUrl: string): AppPublishGeneratedCheck[] {
       command: `curl -fsS ${privateUrl}/api/health/ready`,
       expectedStatus: 200,
       expected: ["GET /api/health/ready returns 200 with status ready."],
-      failureAction: "Do not shift public traffic; verify env, store connectivity, and publish artifact mounts.",
+      failureAction:
+        "Do not shift public traffic; verify env, store connectivity, and publish artifact mounts.",
     },
   ];
 }
@@ -524,8 +566,11 @@ function buildSmokeChecks(
       path: "/",
       command: `curl -fsS ${privateUrl}`,
       expectedStatus: 200,
-      expected: ["The generated app draft is reachable at the private handoff URL before public DNS is shared."],
-      failureAction: "Return an actionable failure with the private URL, publish package id, and failing status code.",
+      expected: [
+        "The generated app draft is reachable at the private handoff URL before public DNS is shared.",
+      ],
+      failureAction:
+        "Return an actionable failure with the private URL, publish package id, and failing status code.",
     },
     {
       id: "public-url-preflight",
@@ -538,16 +583,19 @@ function buildSmokeChecks(
       failureAction: "Keep the URL private and verify DNS or reverse-proxy routing before sharing.",
     },
     ...(includesAgent(bundleKind)
-      ? [{
-        id: "agent-manifest",
-        kind: "smoke" as const,
-        label: "Agent manifest",
-        path: `/agent/${agentSlug ?? DEFAULT_AGENT_SLUG}/manifest`,
-        command: `curl -fsS ${privateUrl}/agent/${agentSlug ?? DEFAULT_AGENT_SLUG}/manifest`,
-        expectedStatus: 200,
-        expected: ["The generated agent manifest is reachable from the private operator URL."],
-        failureAction: "Block publish handoff and return the missing agent manifest path as an actionable failure.",
-      }]
+      ? [
+          {
+            id: "agent-manifest",
+            kind: "smoke" as const,
+            label: "Agent manifest",
+            path: `/agent/${agentSlug ?? DEFAULT_AGENT_SLUG}/manifest`,
+            command: `curl -fsS ${privateUrl}/agent/${agentSlug ?? DEFAULT_AGENT_SLUG}/manifest`,
+            expectedStatus: 200,
+            expected: ["The generated agent manifest is reachable from the private operator URL."],
+            failureAction:
+              "Block publish handoff and return the missing agent manifest path as an actionable failure.",
+          },
+        ]
       : []),
   ];
 }
@@ -588,14 +636,16 @@ function buildDockerComposeExport(
         volumes: ["packetagent-db-data:/var/lib/postgresql/data"],
       },
       ...(withAgent
-        ? [{
-          name: "packetagent-agent",
-          imageHint: "node:22-alpine",
-          buildContext: ".",
-          envFile: ".env.publish",
-          volumes: [`${localPublishPath}/agent:/app/${localPublishPath}/agent:ro`],
-          dependsOn: ["packetagent-app"],
-        }]
+        ? [
+            {
+              name: "packetagent-agent",
+              imageHint: "node:22-alpine",
+              buildContext: ".",
+              envFile: ".env.publish",
+              volumes: [`${localPublishPath}/agent:/app/${localPublishPath}/agent:ro`],
+              dependsOn: ["packetagent-app"],
+            },
+          ]
         : []),
     ],
     networks: ["packetagent-publish"],
@@ -606,7 +656,9 @@ function buildDockerComposeExport(
       `Set PACKETAGENT_PUBLISH_MANIFEST_PATH to ${localPublishPath}/publish-artifacts.json inside the app container.`,
       "Expose PORT from the app service and route it through the hosting load balancer.",
       "Attach packetagent-db only when the selected PACKETAGENT_STORE posture needs managed Postgres.",
-      ...(withAgent ? ["Start packetagent-agent with the same read-only generated agent bundle metadata."] : []),
+      ...(withAgent
+        ? ["Start packetagent-agent with the same read-only generated agent bundle metadata."]
+        : []),
       "Run the ready health check before shifting public traffic.",
     ],
   };
@@ -631,35 +683,44 @@ function buildRuntimeAssumptions(
     {
       id: "hono-vite-runtime",
       summary: "Existing PacketAgent runtime hosts generated publishes.",
-      detail: "The publish package uses the existing Hono API/static server and Vite web build instead of introducing a separate generated-app runtime.",
+      detail:
+        "The publish package uses the existing Hono API/static server and Vite web build instead of introducing a separate generated-app runtime.",
     },
     {
       id: "local-self-hosted-urls",
       summary: "Private local URL is validated before public URL handoff.",
-      detail: "The builder runs health and smoke checks against the private self-hosted URL first, then exposes the public URL only after validation and workspace approval.",
+      detail:
+        "The builder runs health and smoke checks against the private self-hosted URL first, then exposes the public URL only after validation and workspace approval.",
     },
     {
       id: "env-secret-boundary",
       summary: "Publish metadata names env requirements but never stores secret values.",
-      detail: "Provider keys, webhook secrets, payment secrets, email credentials, and generated tokens stay in the existing environment/API-key surfaces and logs remain redacted.",
+      detail:
+        "Provider keys, webhook secrets, payment secrets, email credentials, and generated tokens stay in the existing environment/API-key surfaces and logs remain redacted.",
     },
     {
       id: "immutable-publish-bundle",
       summary: "Each publish bundle is treated as immutable.",
-      detail: "Rollback repoints hosting to the previous known-good bundle instead of mutating the failed bundle in place.",
+      detail:
+        "Rollback repoints hosting to the previous known-good bundle instead of mutating the failed bundle in place.",
     },
     ...(includesAgent(bundleKind)
-      ? [{
-        id: "agent-smoke-readiness",
-        summary: "Generated agent publishes require trigger and tool readiness.",
-        detail: "Agent smoke checks validate the generated manifest, provider readiness, enabled tools, trigger/webhook posture, and a safe sample input before public handoff.",
-      }]
+      ? [
+          {
+            id: "agent-smoke-readiness",
+            summary: "Generated agent publishes require trigger and tool readiness.",
+            detail:
+              "Agent smoke checks validate the generated manifest, provider readiness, enabled tools, trigger/webhook posture, and a safe sample input before public handoff.",
+          },
+        ]
       : []),
-    ...extraAssumptions.map((detail, index) => ({
-      id: `custom-assumption-${index + 1}`,
-      summary: "Generated publish assumption.",
-      detail: cleanString(detail),
-    })).filter((assumption) => assumption.detail.length > 0),
+    ...extraAssumptions
+      .map((detail, index) => ({
+        id: `custom-assumption-${index + 1}`,
+        summary: "Generated publish assumption.",
+        detail: cleanString(detail),
+      }))
+      .filter((assumption) => assumption.detail.length > 0),
   ];
 }
 
@@ -680,60 +741,71 @@ function buildPublishChecklist(
       label: "Environment checklist reviewed",
       required: true,
       expectation: "All required env vars are present through configured secret/env surfaces.",
-      failureGuidance: missingRequiredEnv.length > 0
-        ? `Missing required env keys: ${missingRequiredEnv.join(", ")}. Show key names and affected features without printing secret values.`
-        : "List missing env names and the feature they block without printing secret values.",
+      failureGuidance:
+        missingRequiredEnv.length > 0
+          ? `Missing required env keys: ${missingRequiredEnv.join(", ")}. Show key names and affected features without printing secret values.`
+          : "List missing env names and the feature they block without printing secret values.",
     },
     {
       id: "integration-readiness",
       label: "Integration readiness reviewed",
       required: true,
-      expectation: "Requested connectors are ready or their generated features are disabled before public handoff.",
-      failureGuidance: publishIntegrations.featureBlockers.length > 0
-        ? `Feature-scoped connector blockers: ${publishIntegrations.featureBlockers.join(" ")}`
-        : "Show connector names, missing secret names, affected generated features, and setup guidance without printing secret values.",
+      expectation:
+        "Requested connectors are ready or their generated features are disabled before public handoff.",
+      failureGuidance:
+        publishIntegrations.featureBlockers.length > 0
+          ? `Feature-scoped connector blockers: ${publishIntegrations.featureBlockers.join(" ")}`
+          : "Show connector names, missing secret names, affected generated features, and setup guidance without printing secret values.",
     },
     {
       id: "production-build",
       label: "Production build completed",
       required: true,
       expectation: "Required package build commands complete before publish handoff.",
-      failureGuidance: "Show the failed command, redacted logs, and the generated file or config most likely involved.",
+      failureGuidance:
+        "Show the failed command, redacted logs, and the generated file or config most likely involved.",
     },
     {
       id: "health-ready",
       label: "Health checks passed",
       required: true,
       expectation: healthChecks.map((check) => check.command).join(" && "),
-      failureGuidance: "Keep the previous publish current and show readiness diagnostics when a required health check fails.",
+      failureGuidance:
+        "Keep the previous publish current and show readiness diagnostics when a required health check fails.",
     },
     {
       id: "smoke-passed",
       label: "Smoke checks passed",
       required: true,
       expectation: smokeChecks.map((check) => check.label).join(", "),
-      failureGuidance: "Show failed check names, route/method, redacted response, and retry or rollback guidance.",
+      failureGuidance:
+        "Show failed check names, route/method, redacted response, and retry or rollback guidance.",
     },
     {
       id: "compose-exported",
       label: "Docker Compose export exists",
       required: true,
       expectation: `${dockerComposeExport.fileName} is exported for project ${dockerComposeExport.projectName}.`,
-      failureGuidance: "Keep publish blocked until the compose file can be regenerated or exported.",
+      failureGuidance:
+        "Keep publish blocked until the compose file can be regenerated or exported.",
     },
     {
       id: "history-recorded",
       label: "Publish history recorded",
       required: true,
-      expectation: "The publish entry records URL, status, logs, checks, compose export, and rollback target.",
-      failureGuidance: "Do not mark publish current when history cannot record the rollback target.",
+      expectation:
+        "The publish entry records URL, status, logs, checks, compose export, and rollback target.",
+      failureGuidance:
+        "Do not mark publish current when history cannot record the rollback target.",
     },
     {
       id: "rollback-ready",
       label: "Rollback target available",
       required: true,
-      expectation: "The last known-good publish remains available until the new publish passes validation.",
-      failureGuidance: "Show missing rollback target details and keep the URL private until an operator resolves it.",
+      expectation:
+        "The last known-good publish remains available until the new publish passes validation.",
+      failureGuidance:
+        "Show missing rollback target details and keep the URL private until an operator resolves it.",
     },
   ];
 }
@@ -745,7 +817,8 @@ function buildPublishHistorySemantics(
   return {
     currentPublishId: publishId,
     previousPublishId,
-    retention: "Keep at least the current publish and the last known-good publish until the new health and smoke checks pass.",
+    retention:
+      "Keep at least the current publish and the last known-good publish until the new health and smoke checks pass.",
     semantics: [
       "A publish becomes current only after required health and smoke checks pass or the user explicitly accepts a private failed preview.",
       "The previous publish remains the rollback target until the new publish is marked current.",
@@ -783,7 +856,9 @@ function buildPackagingNotes(bundleKind: AppPublishBundleKind): string[] {
     "Build the Vite client with npm run build:web and serve web/dist through the existing Hono static fallback.",
     "Keep generated app draft assets under the local publish path so package exports are deterministic.",
     ...(includesAgent(bundleKind)
-      ? ["Package generated agent prompts, tool policy, and manifest beside the app bundle for one-click self-hosted export."]
+      ? [
+          "Package generated agent prompts, tool policy, and manifest beside the app bundle for one-click self-hosted export.",
+        ]
       : []),
   ];
 }
@@ -819,9 +894,13 @@ function envChecklistItem(
   return {
     name,
     required,
-    purpose: ENV_PURPOSES[name] ?? `${required ? "Required" : "Optional"} publish setting for the generated app draft.`,
+    purpose:
+      ENV_PURPOSES[name] ??
+      `${required ? "Required" : "Optional"} publish setting for the generated app draft.`,
     source: envSource(name),
-    configured: Object.prototype.hasOwnProperty.call(runtimeEnv, name) ? cleanString(runtimeEnv[name]).length > 0 : null,
+    configured: Object.prototype.hasOwnProperty.call(runtimeEnv, name)
+      ? cleanString(runtimeEnv[name]).length > 0
+      : null,
   };
 }
 
@@ -836,7 +915,9 @@ function includesAgent(bundleKind: AppPublishBundleKind): boolean {
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
 function slugify(value?: string): string {
@@ -852,12 +933,17 @@ function normalizePath(value: string): string {
 }
 
 function joinMetadataPath(...parts: string[]): string {
-  return parts.map((part) => normalizePath(part).replace(/^\/+|\/+$/g, "")).filter(Boolean).join("/");
+  return parts
+    .map((part) => normalizePath(part).replace(/^\/+|\/+$/g, ""))
+    .filter(Boolean)
+    .join("/");
 }
 
 function joinUrl(baseUrl: string, ...parts: string[]): string {
   const normalizedBase = baseUrl.replace(/\/+$/g, "");
-  const normalizedParts = parts.map((part) => encodeURIComponent(slugify(part) || part)).filter(Boolean);
+  const normalizedParts = parts
+    .map((part) => encodeURIComponent(slugify(part) || part))
+    .filter(Boolean);
   return [normalizedBase, ...normalizedParts].join("/");
 }
 

@@ -6,7 +6,9 @@ import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./packetage
 test("retry activation emission is idempotent for a source run", async () => {
   resetStoreForTests();
   const auth = login({ email: "beta@packetagent.local", password: "demo12345" });
-  const failed = loadStore().agentRuns.find((entry) => entry.workspaceId === "beta" && entry.status === "failed");
+  const failed = loadStore().agentRuns.find(
+    (entry) => entry.workspaceId === "beta" && entry.status === "failed",
+  );
   assert.ok(failed, "expected a failed beta run");
 
   await retryAgentRun(auth.context, failed.id);
@@ -14,15 +16,26 @@ test("retry activation emission is idempotent for a source run", async () => {
 
   const store = loadStore();
   assert.equal(
-    store.activationSignals.filter((entry) => entry.workspaceId === "beta" && entry.kind === "retry" && entry.sourceId === failed.id).length,
+    store.activationSignals.filter(
+      (entry) =>
+        entry.workspaceId === "beta" && entry.kind === "retry" && entry.sourceId === failed.id,
+    ).length,
     1,
   );
   assert.equal(
-    store.activationSignals.find((entry) => entry.workspaceId === "beta" && entry.kind === "retry" && entry.sourceId === failed.id)?.origin,
+    store.activationSignals.find(
+      (entry) =>
+        entry.workspaceId === "beta" && entry.kind === "retry" && entry.sourceId === failed.id,
+    )?.origin,
     "user_entered",
   );
   assert.equal(
-    store.activities.filter((entry) => entry.workspaceId === "beta" && entry.event === "agent.run.retry" && entry.data.previousRunId === failed.id).length,
+    store.activities.filter(
+      (entry) =>
+        entry.workspaceId === "beta" &&
+        entry.event === "agent.run.retry" &&
+        entry.data.previousRunId === failed.id,
+    ).length,
     1,
   );
 });
@@ -57,6 +70,12 @@ test("activation snapshots normalize user facts and system signals while preserv
 
   assert.equal(snapshot.scopeChangeCount, 1);
   assert.equal(snapshot.retryCount, 1);
-  assert.deepEqual(store.activationSignals.map((entry) => entry.source).sort(), ["system_fact", "user_fact"]);
-  assert.deepEqual(store.activationSignals.map((entry) => entry.origin).sort(), ["system_observed", "user_entered"]);
+  assert.deepEqual(store.activationSignals.map((entry) => entry.source).sort(), [
+    "system_fact",
+    "user_fact",
+  ]);
+  assert.deepEqual(store.activationSignals.map((entry) => entry.origin).sort(), [
+    "system_observed",
+    "user_entered",
+  ]);
 });

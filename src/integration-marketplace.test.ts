@@ -26,22 +26,28 @@ test("integration marketplace exposes the phase 71 card set and safe payload sur
   const marketplace = buildIntegrationMarketplace({ readiness: baseReadiness });
 
   assert.equal(marketplace.version, "phase-71-lane-4");
-  assert.deepEqual(marketplace.cards.map((card) => card.id), [
-    "openai",
-    "anthropic",
-    "ollama-local",
-    "custom-api-provider",
-    "slack-webhook",
-    "email",
-    "github-webhook",
-    "browser-scraping",
-    "stripe-payments",
-    "database",
-  ]);
+  assert.deepEqual(
+    marketplace.cards.map((card) => card.id),
+    [
+      "openai",
+      "anthropic",
+      "ollama-local",
+      "custom-api-provider",
+      "slack-webhook",
+      "email",
+      "github-webhook",
+      "browser-scraping",
+      "stripe-payments",
+      "database",
+    ],
+  );
   assert.equal(marketplace.totals.count, 10);
   assert.ok(marketplace.cards.every((card) => card.config.secretsRedacted));
   assert.ok(marketplace.cards.every((card) => card.test.path.startsWith("/api/")));
-  assert.equal(marketplace.cards.some((card) => card.test.path === "/api/health/ready"), false);
+  assert.equal(
+    marketplace.cards.some((card) => card.test.path === "/api/health/ready"),
+    false,
+  );
   assert.ok(marketplace.cards.every((card) => /\/test$/.test(card.test.path)));
   assert.equal(JSON.stringify(marketplace).includes("sk-test-secret"), false);
 });

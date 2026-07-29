@@ -7,15 +7,8 @@ import {
   shouldUseFileTreeIteration,
   type AppIterationFileTreeOptions,
 } from "./app-iteration-service.js";
-import type {
-  AuthorAppOptions,
-  AuthorAppResult,
-  GeneratedFile,
-} from "./codegen/llm-author.js";
-import type {
-  ValidateOptions,
-  ValidationResult,
-} from "./codegen/validate.js";
+import type { AuthorAppOptions, AuthorAppResult, GeneratedFile } from "./codegen/llm-author.js";
+import type { ValidateOptions, ValidationResult } from "./codegen/validate.js";
 
 // ---------------------------------------------------------------------------
 // shouldUseFileTreeIteration — pure helper
@@ -37,22 +30,13 @@ test("shouldUseFileTreeIteration: true only when flag + source + non-empty files
   );
 
   // Wrong source — "llm" (structured tool) path.
-  assert.equal(
-    shouldUseFileTreeIteration({ flagOn: true, draftSource: "llm", files }),
-    false,
-  );
+  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: "llm", files }), false);
 
   // Wrong source — "template" path.
-  assert.equal(
-    shouldUseFileTreeIteration({ flagOn: true, draftSource: "template", files }),
-    false,
-  );
+  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: "template", files }), false);
 
   // Right source, undefined files.
-  assert.equal(
-    shouldUseFileTreeIteration({ flagOn: true, draftSource: "llm-filetree" }),
-    false,
-  );
+  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: "llm-filetree" }), false);
 
   // Right source, empty files array.
   assert.equal(
@@ -61,10 +45,7 @@ test("shouldUseFileTreeIteration: true only when flag + source + non-empty files
   );
 
   // Source undefined.
-  assert.equal(
-    shouldUseFileTreeIteration({ flagOn: true, draftSource: undefined, files }),
-    false,
-  );
+  assert.equal(shouldUseFileTreeIteration({ flagOn: true, draftSource: undefined, files }), false);
 });
 
 // ---------------------------------------------------------------------------
@@ -106,9 +87,7 @@ test("diffFileTrees: added / modified / deleted / unchanged", () => {
 // ---------------------------------------------------------------------------
 
 test("buildFileTreeIterationGoal embeds file contents and change request", () => {
-  const files: GeneratedFile[] = [
-    { path: "src/App.tsx", content: "function App(){}" },
-  ];
+  const files: GeneratedFile[] = [{ path: "src/App.tsx", content: "function App(){}" }];
   const goal = buildFileTreeIterationGoal(files, "Add a settings page");
   assert.ok(goal.includes("src/App.tsx"));
   assert.ok(goal.includes("function App(){}"));
@@ -120,11 +99,15 @@ test("buildFileTreeIterationGoal embeds file contents and change request", () =>
 // applyAppIterationViaFileTree — happy path with injected fakes
 // ---------------------------------------------------------------------------
 
-function makeAuthorFn(result: AuthorAppResult | null): typeof import("./codegen/llm-author.js").authorAppViaLLM {
+function makeAuthorFn(
+  result: AuthorAppResult | null,
+): typeof import("./codegen/llm-author.js").authorAppViaLLM {
   return async (_userGoal: string, _options: AuthorAppOptions, _emit) => result;
 }
 
-function makeValidateFn(result: ValidationResult): typeof import("./codegen/validate.js").validateFileTree {
+function makeValidateFn(
+  result: ValidationResult,
+): typeof import("./codegen/validate.js").validateFileTree {
   return async (_files: GeneratedFile[], _options: ValidateOptions = {}) => result;
 }
 
@@ -181,18 +164,20 @@ test("applyAppIterationViaFileTree: happy path diffs old vs new tree", async () 
 // ---------------------------------------------------------------------------
 
 test("applyAppIterationViaFileTree: validation errors propagate", async () => {
-  const oldFiles: GeneratedFile[] = [
-    { path: "src/App.tsx", content: "old" },
-  ];
-  const newFiles: GeneratedFile[] = [
-    { path: "src/App.tsx", content: "new" },
-  ];
+  const oldFiles: GeneratedFile[] = [{ path: "src/App.tsx", content: "old" }];
+  const newFiles: GeneratedFile[] = [{ path: "src/App.tsx", content: "new" }];
 
   const validation: ValidationResult = {
     ok: false,
     source: "real",
     errors: [
-      { file: "src/App.tsx", line: 3, message: "Cannot find name 'foo'.", severity: "error", phase: "typecheck" },
+      {
+        file: "src/App.tsx",
+        line: 3,
+        message: "Cannot find name 'foo'.",
+        severity: "error",
+        phase: "typecheck",
+      },
       { file: "<tsconfig>", message: "missing include", severity: "error", phase: "typecheck" },
     ],
     warnings: [],
@@ -200,15 +185,11 @@ test("applyAppIterationViaFileTree: validation errors propagate", async () => {
     phases: { typecheck: "failed", build: "skipped" },
   };
 
-  const out = await applyAppIterationViaFileTree(
-    oldFiles,
-    "Tweak app",
-    {
-      workspaceId: "ws-1",
-      authorFn: makeAuthorFn({ files: newFiles, summary: "tweaked", source: "llm" }),
-      validateFn: makeValidateFn(validation),
-    },
-  );
+  const out = await applyAppIterationViaFileTree(oldFiles, "Tweak app", {
+    workspaceId: "ws-1",
+    authorFn: makeAuthorFn({ files: newFiles, summary: "tweaked", source: "llm" }),
+    validateFn: makeValidateFn(validation),
+  });
 
   assert.ok(out);
   assert.ok(Array.isArray(out!.validationErrors));
@@ -251,27 +232,19 @@ test("applyAppIterationViaFileTree: empty files from orchestrator → null", asy
 });
 
 test("applyAppIterationViaFileTree: empty currentFiles → null (no fallback)", async () => {
-  const out = await applyAppIterationViaFileTree(
-    [],
-    "anything",
-    {
-      workspaceId: "ws-1",
-      authorFn: makeAuthorFn({ files: [{ path: "x", content: "y" }], summary: "s", source: "llm" }),
-      validateFn: makeValidateFn(VALID_OK),
-    },
-  );
+  const out = await applyAppIterationViaFileTree([], "anything", {
+    workspaceId: "ws-1",
+    authorFn: makeAuthorFn({ files: [{ path: "x", content: "y" }], summary: "s", source: "llm" }),
+    validateFn: makeValidateFn(VALID_OK),
+  });
   assert.equal(out, null);
 });
 
 test("applyAppIterationViaFileTree: empty change request → null", async () => {
-  const out = await applyAppIterationViaFileTree(
-    [{ path: "src/App.tsx", content: "a" }],
-    "   ",
-    {
-      workspaceId: "ws-1",
-      authorFn: makeAuthorFn({ files: [{ path: "x", content: "y" }], summary: "s", source: "llm" }),
-      validateFn: makeValidateFn(VALID_OK),
-    },
-  );
+  const out = await applyAppIterationViaFileTree([{ path: "src/App.tsx", content: "a" }], "   ", {
+    workspaceId: "ws-1",
+    authorFn: makeAuthorFn({ files: [{ path: "x", content: "y" }], summary: "s", source: "llm" }),
+    validateFn: makeValidateFn(VALID_OK),
+  });
   assert.equal(out, null);
 });

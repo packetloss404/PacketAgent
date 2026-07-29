@@ -24,7 +24,12 @@ test("builder publish dashboard is deterministic and composes preview and produc
         manifestPath: "data/published-apps/ops-team/release-desk/publish-artifacts.json",
         artifacts: [
           { path: "web/dist", kind: "build_output" as const, source: "build" as const },
-          { path: "data/published-apps/ops-team/release-desk/bundle", kind: "generated_bundle" as const, source: "generated_draft" as const, bytes: 4096 },
+          {
+            path: "data/published-apps/ops-team/release-desk/bundle",
+            kind: "generated_bundle" as const,
+            source: "generated_draft" as const,
+            bytes: 4096,
+          },
         ],
       },
       health: {
@@ -49,7 +54,10 @@ test("builder publish dashboard is deterministic and composes preview and produc
   assert.equal(first.urls.production.url, "https://apps.example.test/ops-team/release-desk");
   assert.equal(first.urls.production.status, "available");
   assert.equal(first.validation.validatedUrl.status, "valid");
-  assert.deepEqual(first.nextActions.map((action) => action.kind), ["publish"]);
+  assert.deepEqual(
+    first.nextActions.map((action) => action.kind),
+    ["publish"],
+  );
 });
 
 test("builder publish dashboard reports required env and validation blockers as next actions", () => {
@@ -83,11 +91,10 @@ test("builder publish dashboard reports required env and validation blockers as 
   assert.equal(dashboard.canPublishProduction, false);
   assert.equal(dashboard.environmentStatus.status, "blocked");
   assert.deepEqual(dashboard.environmentStatus.missingRequired, ["OPENAI_API_KEY"]);
-  assert.deepEqual(dashboard.nextActions.slice(0, 3).map((action) => action.kind), [
-    "configure_env",
-    "configure_integrations",
-    "run_build",
-  ]);
+  assert.deepEqual(
+    dashboard.nextActions.slice(0, 3).map((action) => action.kind),
+    ["configure_env", "configure_integrations", "run_build"],
+  );
   assert.ok(dashboard.nextActions.some((action) => action.kind === "run_health" && action.blocked));
   assert.equal(JSON.stringify(dashboard).includes("secret-token"), false);
   assert.match(dashboard.validation.productionBuild.message, /authorization=\[redacted\]/);
@@ -124,14 +131,30 @@ test("builder publish dashboard summarizes integration readiness without blockin
   assert.equal(dashboard.integrationSummary.canPublish, true);
   assert.equal(dashboard.integrationSummary.canUseAllRequestedIntegrations, false);
   assert.ok(dashboard.integrationSummary.blocked >= 2);
-  assert.ok(dashboard.integrationSummary.featureBlockers.some((blocker) => blocker.includes("Email delivery")));
-  assert.ok(dashboard.integrationSummary.featureBlockers.some((blocker) => blocker.includes("Stripe payments")));
-  assert.equal(dashboard.integrationSummary.featureBlockers.some((blocker) => blocker.includes("GitHub repository actions")), false);
-  assert.ok(dashboard.nextActions.some((action) =>
-    action.kind === "configure_integrations"
-    && action.blocked
-    && action.detail.includes("Stripe payments")
-  ));
+  assert.ok(
+    dashboard.integrationSummary.featureBlockers.some((blocker) =>
+      blocker.includes("Email delivery"),
+    ),
+  );
+  assert.ok(
+    dashboard.integrationSummary.featureBlockers.some((blocker) =>
+      blocker.includes("Stripe payments"),
+    ),
+  );
+  assert.equal(
+    dashboard.integrationSummary.featureBlockers.some((blocker) =>
+      blocker.includes("GitHub repository actions"),
+    ),
+    false,
+  );
+  assert.ok(
+    dashboard.nextActions.some(
+      (action) =>
+        action.kind === "configure_integrations" &&
+        action.blocked &&
+        action.detail.includes("Stripe payments"),
+    ),
+  );
 });
 
 test("builder publish dashboard orders history, redacts logs, and exposes rollback target", () => {
@@ -174,11 +197,17 @@ test("builder publish dashboard orders history, redacts logs, and exposes rollba
     maxLogEntries: 3,
   });
 
-  assert.deepEqual(dashboard.publishHistory.map((publish) => publish.id), [newer.id, older.id]);
+  assert.deepEqual(
+    dashboard.publishHistory.map((publish) => publish.id),
+    [newer.id, older.id],
+  );
   assert.equal(dashboard.currentPublish?.id, newer.id);
   assert.equal(dashboard.rollback.available, true);
   assert.equal(dashboard.rollback.targetPublishId, older.id);
-  assert.match(dashboard.rollback.command ?? "", new RegExp(`--to-publish=${older.id}|--to ${older.id}`));
+  assert.match(
+    dashboard.rollback.command ?? "",
+    new RegExp(`--to-publish=${older.id}|--to ${older.id}`),
+  );
   assert.equal(dashboard.logs.length, 3);
   assert.equal(dashboard.logs[0]?.publishId, newer.id);
   assert.match(dashboard.logs[0]?.message ?? "", /token=\[redacted\]/);
@@ -195,11 +224,8 @@ test("builder publish dashboard falls back to pending private production handoff
   assert.equal(dashboard.urls.production.visibility, "private");
   assert.equal(dashboard.urls.production.status, "pending");
   assert.equal(dashboard.rollback.available, false);
-  assert.deepEqual(dashboard.nextActions.map((action) => action.kind), [
-    "configure_env",
-    "run_build",
-    "run_health",
-    "run_smoke",
-    "validate_url",
-  ]);
+  assert.deepEqual(
+    dashboard.nextActions.map((action) => action.kind),
+    ["configure_env", "run_build", "run_health", "run_smoke", "validate_url"],
+  );
 });

@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SESSION_COOKIE_NAME } from "./auth-utils";
 import { app } from "./server";
-import {
-  generateAgentDraftFromPrompt,
-  login,
-} from "./packetagent-services";
+import { generateAgentDraftFromPrompt, login } from "./packetagent-services";
 import { resetStoreForTests } from "./packetagent-store";
 
 function authHeaders(cookieValue: string) {
@@ -36,10 +33,11 @@ test("agent prompt route returns webhook readiness for dry-run drafts", async ()
     method: "POST",
     headers: authHeaders(auth.cookieValue),
     body: JSON.stringify({
-      prompt: "Create an agent for incoming webhook request payloads that validates incident events and alerts the on-call owner.",
+      prompt:
+        "Create an agent for incoming webhook request payloads that validates incident events and alerts the on-call owner.",
     }),
   });
-  const body = await response.json() as {
+  const body = (await response.json()) as {
     created: boolean;
     draft: {
       agent: {
@@ -59,7 +57,10 @@ test("agent prompt route returns webhook readiness for dry-run drafts", async ()
   assert.equal(body.created, false);
   assert.equal(body.draft.agent.triggerKind, "webhook");
   assert.equal(body.draft.readiness.webhook.recommended, true);
-  assert.equal(body.draft.readiness.webhook.tokenManagementRoute, "/api/app/webhooks/agents/:agentId/rotate");
+  assert.equal(
+    body.draft.readiness.webhook.tokenManagementRoute,
+    "/api/app/webhooks/agents/:agentId/rotate",
+  );
   assert.match(body.draft.readiness.webhook.message, /create or rotate its webhook token/);
   assert.ok(body.draft.plan.some((step) => step.title === "Prepare webhook trigger readiness"));
 });

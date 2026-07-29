@@ -1,9 +1,28 @@
 export type BuilderPromptTurnRole = "user" | "assistant" | "system";
-export type BuilderPromptTurnKind = "prompt" | "clarification" | "regenerate" | "refine" | "decision" | "status";
+export type BuilderPromptTurnKind =
+  | "prompt"
+  | "clarification"
+  | "regenerate"
+  | "refine"
+  | "decision"
+  | "status";
 export type BuilderDecisionStatus = "pending" | "accepted" | "rejected";
 export type BuilderClarifyQuestionStatus = "open" | "answered" | "dismissed";
-export type BuilderRegenerateScope = "full_plan" | "agent" | "app" | "page" | "data_model" | "workflow" | "acceptance_checks";
-export type BuilderCandidateStatus = "none" | "drafting" | "needs_clarification" | "ready" | "applied" | "failed";
+export type BuilderRegenerateScope =
+  | "full_plan"
+  | "agent"
+  | "app"
+  | "page"
+  | "data_model"
+  | "workflow"
+  | "acceptance_checks";
+export type BuilderCandidateStatus =
+  | "none"
+  | "drafting"
+  | "needs_clarification"
+  | "ready"
+  | "applied"
+  | "failed";
 export type BuilderNextActionKind =
   | "collect_prompt"
   | "answer_clarifications"
@@ -170,7 +189,8 @@ export function buildBuilderSessionMemory(input: BuilderSessionMemoryInput): Bui
     status: input.candidate?.status ?? DEFAULT_CANDIDATE_STATUS,
     summary: cleanString(input.candidate?.summary) || undefined,
   });
-  const sessionTitle = cleanString(input.title) || titleFromPromptTurns(promptTurns) || DEFAULT_SESSION_TITLE;
+  const sessionTitle =
+    cleanString(input.title) || titleFromPromptTurns(promptTurns) || DEFAULT_SESSION_TITLE;
   const nextAction = deriveBuilderNextAction({
     promptTurns,
     decisions,
@@ -206,22 +226,36 @@ export function buildBuilderSessionMemory(input: BuilderSessionMemoryInput): Bui
   };
 }
 
-export function deriveBuilderNextAction(input: {
-  promptTurns?: BuilderPromptTurn[];
-  decisions?: BuilderDecision[];
-  clarifyQuestions?: BuilderClarifyQuestion[];
-  regenerateOptions?: BuilderRegenerateOption[];
-  candidate?: BuilderCandidateInput;
-} = {}): BuilderNextActionGuidance {
+export function deriveBuilderNextAction(
+  input: {
+    promptTurns?: BuilderPromptTurn[];
+    decisions?: BuilderDecision[];
+    clarifyQuestions?: BuilderClarifyQuestion[];
+    regenerateOptions?: BuilderRegenerateOption[];
+    candidate?: BuilderCandidateInput;
+  } = {},
+): BuilderNextActionGuidance {
   const promptTurns = input.promptTurns ?? [];
-  const openQuestions = (input.clarifyQuestions ?? []).filter((question) => question.status === "open");
-  const selectedRegenerateOptions = (input.regenerateOptions ?? []).filter((option) => option.selected);
-  const pendingDecisions = (input.decisions ?? []).filter((decision) => decision.status === "pending");
+  const openQuestions = (input.clarifyQuestions ?? []).filter(
+    (question) => question.status === "open",
+  );
+  const selectedRegenerateOptions = (input.regenerateOptions ?? []).filter(
+    (option) => option.selected,
+  );
+  const pendingDecisions = (input.decisions ?? []).filter(
+    (decision) => decision.status === "pending",
+  );
   const candidateStatus = input.candidate?.status ?? DEFAULT_CANDIDATE_STATUS;
   const hasUserPrompt = promptTurns.some((turn) => turn.role === "user" && turn.content.length > 0);
 
   if (!hasUserPrompt) {
-    return nextAction("collect_prompt", "Collect prompt", "Ask the user what they want to build before planning.", [], []);
+    return nextAction(
+      "collect_prompt",
+      "Collect prompt",
+      "Ask the user what they want to build before planning.",
+      [],
+      [],
+    );
   }
 
   if (openQuestions.length > 0 || candidateStatus === "needs_clarification") {
@@ -255,18 +289,42 @@ export function deriveBuilderNextAction(input: {
   }
 
   if (candidateStatus === "none") {
-    return nextAction("generate_candidate", "Generate candidate", "Create the first dry-run candidate from the saved prompt session.", [], []);
+    return nextAction(
+      "generate_candidate",
+      "Generate candidate",
+      "Create the first dry-run candidate from the saved prompt session.",
+      [],
+      [],
+    );
   }
 
   if (pendingDecisions.length > 0) {
-    return nextAction("review_decisions", "Review decisions", "Resolve pending builder decisions before apply or publish.", [], []);
+    return nextAction(
+      "review_decisions",
+      "Review decisions",
+      "Resolve pending builder decisions before apply or publish.",
+      [],
+      [],
+    );
   }
 
   if (candidateStatus === "ready") {
-    return nextAction("approve_or_refine", "Approve or refine", "Approve the current candidate or ask for a scoped refinement.", [], []);
+    return nextAction(
+      "approve_or_refine",
+      "Approve or refine",
+      "Approve the current candidate or ask for a scoped refinement.",
+      [],
+      [],
+    );
   }
 
-  return nextAction("continue_iteration", "Continue iteration", "Use the saved session memory for the next prompt, preview fix, or publish step.", [], []);
+  return nextAction(
+    "continue_iteration",
+    "Continue iteration",
+    "Use the saved session memory for the next prompt, preview fix, or publish step.",
+    [],
+    [],
+  );
 }
 
 function normalizePromptTurns(turns: BuilderPromptTurnInput[]): BuilderPromptTurn[] {
@@ -309,7 +367,9 @@ function normalizeDecisions(decisions: BuilderDecisionInput[]): BuilderDecision[
   return normalized.sort(compareTimelineRecords);
 }
 
-function normalizeProjectMemoryFacts(facts: BuilderProjectMemoryFactInput[]): BuilderProjectMemoryFact[] {
+function normalizeProjectMemoryFacts(
+  facts: BuilderProjectMemoryFactInput[],
+): BuilderProjectMemoryFact[] {
   const byKey = new Map<string, BuilderProjectMemoryFact>();
 
   facts.forEach((fact, index) => {
@@ -335,7 +395,9 @@ function normalizeProjectMemoryFacts(facts: BuilderProjectMemoryFactInput[]): Bu
   return [...byKey.values()].sort(compareMemoryFacts);
 }
 
-function normalizeClarifyQuestions(questions: BuilderClarifyQuestionInput[]): BuilderClarifyQuestion[] {
+function normalizeClarifyQuestions(
+  questions: BuilderClarifyQuestionInput[],
+): BuilderClarifyQuestion[] {
   const normalized: BuilderClarifyQuestion[] = [];
   questions.forEach((question, index) => {
     const text = cleanString(question.question);
@@ -355,7 +417,9 @@ function normalizeClarifyQuestions(questions: BuilderClarifyQuestionInput[]): Bu
   return normalized.sort(compareClarifyQuestions).slice(0, MAX_CLARIFY_QUESTIONS);
 }
 
-function normalizeRegenerateOptions(options: BuilderRegenerateOptionInput[]): BuilderRegenerateOption[] {
+function normalizeRegenerateOptions(
+  options: BuilderRegenerateOptionInput[],
+): BuilderRegenerateOption[] {
   const normalized: BuilderRegenerateOption[] = [];
   options.forEach((option, index) => {
     const label = cleanString(option.label);
@@ -366,13 +430,19 @@ function normalizeRegenerateOptions(options: BuilderRegenerateOptionInput[]): Bu
         id: cleanString(option.id) || `regenerate-${index + 1}`,
         label: label || "Regenerate candidate",
         scope: option.scope ?? "full_plan",
-        instruction: instruction || "Regenerate the current candidate using the saved session memory.",
+        instruction:
+          instruction || "Regenerate the current candidate using the saved session memory.",
         selected: option.selected === true,
         reason: cleanString(option.reason) || undefined,
       }) as BuilderRegenerateOption,
     );
   });
-  return normalized.sort((left, right) => left.scope.localeCompare(right.scope) || left.label.localeCompare(right.label) || left.id.localeCompare(right.id));
+  return normalized.sort(
+    (left, right) =>
+      left.scope.localeCompare(right.scope) ||
+      left.label.localeCompare(right.label) ||
+      left.id.localeCompare(right.id),
+  );
 }
 
 function buildPromptMemoryContext(input: {
@@ -386,11 +456,34 @@ function buildPromptMemoryContext(input: {
 }): string {
   const lines = [
     `Session: ${input.sessionTitle}`,
-    section("Prompt turns", input.promptTurns.map((turn) => `${turn.id} [${turn.role}/${turn.kind}]: ${turn.content}`)),
-    section("Decisions", input.decisions.map((decision) => `${decision.id} [${decision.status}]: ${decision.label} = ${decision.value}`)),
-    section("Project memory", input.projectMemoryFacts.map((fact) => `${fact.key}: ${fact.value}`)),
-    section("Clarifying questions", input.clarifyQuestions.map((question) => `${question.id} [${question.status}]: ${question.question}${question.answer ? ` Answer: ${question.answer}` : ""}`)),
-    section("Regenerate options", input.regenerateOptions.map((option) => `${option.id} [${option.scope}${option.selected ? ", selected" : ""}]: ${option.instruction}`)),
+    section(
+      "Prompt turns",
+      input.promptTurns.map((turn) => `${turn.id} [${turn.role}/${turn.kind}]: ${turn.content}`),
+    ),
+    section(
+      "Decisions",
+      input.decisions.map(
+        (decision) => `${decision.id} [${decision.status}]: ${decision.label} = ${decision.value}`,
+      ),
+    ),
+    section(
+      "Project memory",
+      input.projectMemoryFacts.map((fact) => `${fact.key}: ${fact.value}`),
+    ),
+    section(
+      "Clarifying questions",
+      input.clarifyQuestions.map(
+        (question) =>
+          `${question.id} [${question.status}]: ${question.question}${question.answer ? ` Answer: ${question.answer}` : ""}`,
+      ),
+    ),
+    section(
+      "Regenerate options",
+      input.regenerateOptions.map(
+        (option) =>
+          `${option.id} [${option.scope}${option.selected ? ", selected" : ""}]: ${option.instruction}`,
+      ),
+    ),
     `Next action: ${input.nextAction.label}. ${input.nextAction.guidance}`,
   ];
 
@@ -420,31 +513,51 @@ function nextAction(
 function titleFromPromptTurns(turns: BuilderPromptTurn[]): string | undefined {
   const firstUserPrompt = turns.find((turn) => turn.role === "user")?.content;
   if (!firstUserPrompt) return undefined;
-  return firstUserPrompt.length > 64 ? `${firstUserPrompt.slice(0, 61).trim()}...` : firstUserPrompt;
+  return firstUserPrompt.length > 64
+    ? `${firstUserPrompt.slice(0, 61).trim()}...`
+    : firstUserPrompt;
 }
 
-function compareTimelineRecords(left: { id: string; createdAt?: string }, right: { id: string; createdAt?: string }): number {
+function compareTimelineRecords(
+  left: { id: string; createdAt?: string },
+  right: { id: string; createdAt?: string },
+): number {
   return compareOptionalStrings(left.createdAt, right.createdAt) || left.id.localeCompare(right.id);
 }
 
-function compareMemoryFacts(left: BuilderProjectMemoryFact, right: BuilderProjectMemoryFact): number {
-  return Number(right.pinned) - Number(left.pinned)
-    || right.confidence - left.confidence
-    || left.key.localeCompare(right.key)
-    || left.id.localeCompare(right.id);
+function compareMemoryFacts(
+  left: BuilderProjectMemoryFact,
+  right: BuilderProjectMemoryFact,
+): number {
+  return (
+    Number(right.pinned) - Number(left.pinned) ||
+    right.confidence - left.confidence ||
+    left.key.localeCompare(right.key) ||
+    left.id.localeCompare(right.id)
+  );
 }
 
-function compareMemoryFactPriority(left: BuilderProjectMemoryFact, right: BuilderProjectMemoryFact): number {
-  return Number(right.pinned) - Number(left.pinned)
-    || right.confidence - left.confidence
-    || compareOptionalStrings(right.updatedAt, left.updatedAt)
-    || left.id.localeCompare(right.id);
+function compareMemoryFactPriority(
+  left: BuilderProjectMemoryFact,
+  right: BuilderProjectMemoryFact,
+): number {
+  return (
+    Number(right.pinned) - Number(left.pinned) ||
+    right.confidence - left.confidence ||
+    compareOptionalStrings(right.updatedAt, left.updatedAt) ||
+    left.id.localeCompare(right.id)
+  );
 }
 
-function compareClarifyQuestions(left: BuilderClarifyQuestion, right: BuilderClarifyQuestion): number {
-  return clarifyStatusRank(left.status) - clarifyStatusRank(right.status)
-    || compareOptionalStrings(left.askedAt, right.askedAt)
-    || left.id.localeCompare(right.id);
+function compareClarifyQuestions(
+  left: BuilderClarifyQuestion,
+  right: BuilderClarifyQuestion,
+): number {
+  return (
+    clarifyStatusRank(left.status) - clarifyStatusRank(right.status) ||
+    compareOptionalStrings(left.askedAt, right.askedAt) ||
+    left.id.localeCompare(right.id)
+  );
 }
 
 function clarifyStatusRank(status: BuilderClarifyQuestionStatus): number {
@@ -464,7 +577,13 @@ function clampConfidence(value: number | undefined): number {
 }
 
 function stableKey(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9:_/-]+/g, "-").replace(/^-+|-+$/g, "") || "fact";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9:_/-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "fact"
+  );
 }
 
 function cleanString(value: string | undefined): string {

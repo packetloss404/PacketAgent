@@ -72,7 +72,10 @@ test("listAgentRunsForWorkspaceIndexed returns workspace-scoped runs sorted by c
 
   const result = repository.list("ws_target");
 
-  assert.deepEqual(result.map((entry) => entry.id), ["run_c", "run_b", "run_a"]);
+  assert.deepEqual(
+    result.map((entry) => entry.id),
+    ["run_c", "run_b", "run_a"],
+  );
 });
 
 test("listAgentRunsForWorkspaceIndexed returns [] when the workspace has no runs", () => {
@@ -116,18 +119,44 @@ test("listAgentRunsForWorkspaceIndexed default limit is 50 and cap is 200", () =
 
 test("listAgentRunsForAgentIndexed filters to the (workspaceId, agentId) tuple", () => {
   const data = makeStore([
-    makeRecord({ id: "run_alpha_1", workspaceId: "ws_target", agentId: "agent_alpha", createdAt: "2026-04-26T01:00:00.000Z" }),
-    makeRecord({ id: "run_alpha_2", workspaceId: "ws_target", agentId: "agent_alpha", createdAt: "2026-04-26T02:00:00.000Z" }),
-    makeRecord({ id: "run_beta", workspaceId: "ws_target", agentId: "agent_beta", createdAt: "2026-04-26T03:00:00.000Z" }),
-    makeRecord({ id: "run_other", workspaceId: "ws_other", agentId: "agent_alpha", createdAt: "2026-04-26T04:00:00.000Z" }),
+    makeRecord({
+      id: "run_alpha_1",
+      workspaceId: "ws_target",
+      agentId: "agent_alpha",
+      createdAt: "2026-04-26T01:00:00.000Z",
+    }),
+    makeRecord({
+      id: "run_alpha_2",
+      workspaceId: "ws_target",
+      agentId: "agent_alpha",
+      createdAt: "2026-04-26T02:00:00.000Z",
+    }),
+    makeRecord({
+      id: "run_beta",
+      workspaceId: "ws_target",
+      agentId: "agent_beta",
+      createdAt: "2026-04-26T03:00:00.000Z",
+    }),
+    makeRecord({
+      id: "run_other",
+      workspaceId: "ws_other",
+      agentId: "agent_alpha",
+      createdAt: "2026-04-26T04:00:00.000Z",
+    }),
   ]);
   const repository = jsonAgentRunsRepository({ loadStore: () => data });
 
   const alphaRuns = repository.listForAgent("ws_target", "agent_alpha");
-  assert.deepEqual(alphaRuns.map((entry) => entry.id), ["run_alpha_2", "run_alpha_1"]);
+  assert.deepEqual(
+    alphaRuns.map((entry) => entry.id),
+    ["run_alpha_2", "run_alpha_1"],
+  );
 
   const betaRuns = repository.listForAgent("ws_target", "agent_beta");
-  assert.deepEqual(betaRuns.map((entry) => entry.id), ["run_beta"]);
+  assert.deepEqual(
+    betaRuns.map((entry) => entry.id),
+    ["run_beta"],
+  );
 
   const noneRuns = repository.listForAgent("ws_target", "agent_missing");
   assert.deepEqual(noneRuns, []);
@@ -135,8 +164,16 @@ test("listAgentRunsForAgentIndexed filters to the (workspaceId, agentId) tuple",
 
 test("findAgentRunForWorkspaceIndexed returns the matching row and null for cross-workspace lookups", () => {
   const data = makeStore([
-    makeRecord({ id: "run_match", workspaceId: "ws_target", createdAt: "2026-04-26T01:00:00.000Z" }),
-    makeRecord({ id: "run_other_ws", workspaceId: "ws_other", createdAt: "2026-04-26T02:00:00.000Z" }),
+    makeRecord({
+      id: "run_match",
+      workspaceId: "ws_target",
+      createdAt: "2026-04-26T01:00:00.000Z",
+    }),
+    makeRecord({
+      id: "run_other_ws",
+      workspaceId: "ws_other",
+      createdAt: "2026-04-26T02:00:00.000Z",
+    }),
   ]);
   const repository = jsonAgentRunsRepository({ loadStore: () => data });
 
@@ -153,10 +190,30 @@ test("findAgentRunForWorkspaceIndexed returns the matching row and null for cros
 test("listAgentRunsForWorkspaceIndexed reads from the SQLite repository when PACKETAGENT_STORE=sqlite", () => {
   withTempSqlite((dbPath) => {
     const seedRecords: AgentRunRecord[] = [
-      makeRecord({ id: "sqlite_a", workspaceId: "ws_target", agentId: "agent_alpha", createdAt: "2026-04-26T01:00:00.000Z" }),
-      makeRecord({ id: "sqlite_b", workspaceId: "ws_target", agentId: "agent_beta", createdAt: "2026-04-26T02:00:00.000Z" }),
-      makeRecord({ id: "sqlite_c", workspaceId: "ws_target", agentId: "agent_alpha", createdAt: "2026-04-26T03:00:00.000Z" }),
-      makeRecord({ id: "sqlite_other", workspaceId: "ws_other", agentId: "agent_alpha", createdAt: "2026-04-26T04:00:00.000Z" }),
+      makeRecord({
+        id: "sqlite_a",
+        workspaceId: "ws_target",
+        agentId: "agent_alpha",
+        createdAt: "2026-04-26T01:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_b",
+        workspaceId: "ws_target",
+        agentId: "agent_beta",
+        createdAt: "2026-04-26T02:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_c",
+        workspaceId: "ws_target",
+        agentId: "agent_alpha",
+        createdAt: "2026-04-26T03:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_other",
+        workspaceId: "ws_other",
+        agentId: "agent_alpha",
+        createdAt: "2026-04-26T04:00:00.000Z",
+      }),
     ];
 
     const seedingRepo = createAgentRunsRepository({ dbPath });
@@ -166,10 +223,16 @@ test("listAgentRunsForWorkspaceIndexed reads from the SQLite repository when PAC
     assert.equal(seedingRepo.count(), seedRecords.length);
 
     const descending = listAgentRunsForWorkspaceIndexed("ws_target");
-    assert.deepEqual(descending.map((entry) => entry.id), ["sqlite_c", "sqlite_b", "sqlite_a"]);
+    assert.deepEqual(
+      descending.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_b", "sqlite_a"],
+    );
 
     const filtered = listAgentRunsForAgentIndexed("ws_target", "agent_alpha");
-    assert.deepEqual(filtered.map((entry) => entry.id), ["sqlite_c", "sqlite_a"]);
+    assert.deepEqual(
+      filtered.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_a"],
+    );
 
     const found = findAgentRunForWorkspaceIndexed("ws_target", "sqlite_b");
     assert.equal(found?.id, "sqlite_b");

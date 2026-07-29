@@ -5,7 +5,8 @@ import { inspectAppPublishIntegrations } from "./app-publish-integrations";
 test("publish integrations produce targeted blockers for missing live setup", () => {
   const readiness = inspectAppPublishIntegrations({
     draft: {
-      summary: "OpenAI triage with signed Stripe checkout webhooks, Resend email receipts, browser scrape import, and GitHub issue sync.",
+      summary:
+        "OpenAI triage with signed Stripe checkout webhooks, Resend email receipts, browser scrape import, and GitHub issue sync.",
       dataModels: [{ name: "customer" }],
     },
     env: {
@@ -23,9 +24,17 @@ test("publish integrations produce targeted blockers for missing live setup", ()
   assert.ok(readiness.featureBlockers.some((blocker) => blocker.includes("Stripe payments")));
   assert.ok(readiness.featureBlockers.some((blocker) => blocker.includes("Database persistence")));
   assert.ok(readiness.featureBlockers.some((blocker) => blocker.includes("Browser scraping")));
-  assert.ok(readiness.featureBlockers.some((blocker) => blocker.includes("GitHub repository actions")));
-  assert.equal(readiness.connectorReadiness.find((connector) => connector.id === "openai")?.status, "ready");
-  assert.equal(readiness.connectorReadiness.find((connector) => connector.id === "email")?.status, "blocked");
+  assert.ok(
+    readiness.featureBlockers.some((blocker) => blocker.includes("GitHub repository actions")),
+  );
+  assert.equal(
+    readiness.connectorReadiness.find((connector) => connector.id === "openai")?.status,
+    "ready",
+  );
+  assert.equal(
+    readiness.connectorReadiness.find((connector) => connector.id === "email")?.status,
+    "blocked",
+  );
   assert.equal(JSON.stringify(readiness).includes("sk-live-secret-that-must-not-leak"), false);
   assert.equal(JSON.stringify(readiness).includes("sk_stripe_secret_that_must_not_leak"), false);
 });
@@ -33,7 +42,8 @@ test("publish integrations produce targeted blockers for missing live setup", ()
 test("publish integrations mark all requested live integrations ready when setup is present", () => {
   const readiness = inspectAppPublishIntegrations({
     draft: {
-      summary: "GPT summaries, signed webhook receiver, email notices, Stripe subscriptions, browser extraction, GitHub PR sync, and Postgres CRUD.",
+      summary:
+        "GPT summaries, signed webhook receiver, email notices, Stripe subscriptions, browser extraction, GitHub PR sync, and Postgres CRUD.",
       dataModels: [{ name: "subscription" }],
     },
     env: {
@@ -59,15 +69,10 @@ test("publish integrations mark all requested live integrations ready when setup
   assert.deepEqual(readiness.blockers, []);
   assert.deepEqual(readiness.featureBlockers, []);
   assert.deepEqual(readiness.warnings, []);
-  assert.deepEqual(readiness.checks.map((check) => check.status), [
-    "ready",
-    "ready",
-    "ready",
-    "ready",
-    "ready",
-    "ready",
-    "ready",
-  ]);
+  assert.deepEqual(
+    readiness.checks.map((check) => check.status),
+    ["ready", "ready", "ready", "ready", "ready", "ready", "ready"],
+  );
 });
 
 test("publish integrations separate database warnings from publish blockers", () => {
@@ -128,8 +133,17 @@ test("publish integrations keep missing connector secrets scoped to the affected
   assert.equal(readiness.canPublish, true);
   assert.equal(readiness.canUseAllRequestedIntegrations, false);
   assert.deepEqual(readiness.blockers, []);
-  assert.deepEqual(readiness.connectorReadiness.find((connector) => connector.id === "custom_api")?.missingSecrets, ["WEATHER_API_KEY"]);
-  assert.equal(readiness.connectorReadiness.find((connector) => connector.id === "github_webhook")?.status, "ready");
+  assert.deepEqual(
+    readiness.connectorReadiness.find((connector) => connector.id === "custom_api")?.missingSecrets,
+    ["WEATHER_API_KEY"],
+  );
+  assert.equal(
+    readiness.connectorReadiness.find((connector) => connector.id === "github_webhook")?.status,
+    "ready",
+  );
   assert.ok(readiness.featureBlockers.some((blocker) => blocker.includes("Weather lookup action")));
-  assert.equal(readiness.featureBlockers.some((blocker) => blocker.includes("GitHub repository actions")), false);
+  assert.equal(
+    readiness.featureBlockers.some((blocker) => blocker.includes("GitHub repository actions")),
+    false,
+  );
 });

@@ -7,7 +7,9 @@ import {
 } from "./invitation-email-reconciliation.js";
 import type { InvitationEmailDeliveryRecord, PacketAgentData } from "./packetagent-store.js";
 
-function makeDelivery(overrides: Partial<InvitationEmailDeliveryRecord> = {}): InvitationEmailDeliveryRecord {
+function makeDelivery(
+  overrides: Partial<InvitationEmailDeliveryRecord> = {},
+): InvitationEmailDeliveryRecord {
   return {
     id: "delivery-1",
     workspaceId: "workspace-1",
@@ -84,10 +86,11 @@ test("parseInvitationEmailReconciliationBody rejects non-objects", () => {
 });
 
 test("parseInvitationEmailReconciliationBody rejects missing or empty deliveryId", () => {
-  assert.deepEqual(
-    parseInvitationEmailReconciliationBody({ providerStatus: "delivered" }),
-    { ok: false, reason: "validation", field: "deliveryId" },
-  );
+  assert.deepEqual(parseInvitationEmailReconciliationBody({ providerStatus: "delivered" }), {
+    ok: false,
+    reason: "validation",
+    field: "deliveryId",
+  });
   assert.deepEqual(
     parseInvitationEmailReconciliationBody({ deliveryId: "   ", providerStatus: "delivered" }),
     { ok: false, reason: "validation", field: "deliveryId" },
@@ -152,7 +155,11 @@ test("applyInvitationEmailReconciliation returns delivery_not_found for unknown 
   const store = makeFakeStore([makeDelivery({ id: "other-delivery" })]);
   const result = applyInvitationEmailReconciliation(
     { deliveryId: "missing", providerStatus: "delivered" },
-    { loadStore: store.loadStore, mutateStore: store.mutateStore, now: () => "2026-04-26T00:00:00.000Z" },
+    {
+      loadStore: store.loadStore,
+      mutateStore: store.mutateStore,
+      now: () => "2026-04-26T00:00:00.000Z",
+    },
   );
   assert.deepEqual(result, { ok: false, reason: "delivery_not_found", deliveryId: "missing" });
 });
@@ -189,7 +196,11 @@ test("applyInvitationEmailReconciliation defaults appliedAt to now() when occurr
   const store = makeFakeStore([delivery]);
   const result = applyInvitationEmailReconciliation(
     { deliveryId: "delivery-now", providerStatus: "delivered" },
-    { loadStore: store.loadStore, mutateStore: store.mutateStore, now: () => "2026-04-26T11:11:11.000Z" },
+    {
+      loadStore: store.loadStore,
+      mutateStore: store.mutateStore,
+      now: () => "2026-04-26T11:11:11.000Z",
+    },
   );
   assert.equal(result.ok, true);
   if (!result.ok) return;

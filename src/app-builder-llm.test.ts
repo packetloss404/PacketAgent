@@ -15,14 +15,33 @@ const SAMPLE_TOOL_INPUT = {
   appName: "Boutique CRM",
   summary: "Internal CRM for boutique sales teams.",
   pageMap: [
-    { path: "/login", name: "Sign in", access: "public", purpose: "Authenticate users.", actions: ["sign in"] },
-    { path: "/leads", name: "Leads", access: "private", purpose: "List leads.", primaryEntity: "lead", actions: ["create lead"] },
+    {
+      path: "/login",
+      name: "Sign in",
+      access: "public",
+      purpose: "Authenticate users.",
+      actions: ["sign in"],
+    },
+    {
+      path: "/leads",
+      name: "Leads",
+      access: "private",
+      purpose: "List leads.",
+      primaryEntity: "lead",
+      actions: ["create lead"],
+    },
   ],
   components: [
     { name: "LeadTable", type: "list", usedOn: ["/leads"], responsibilities: ["list leads"] },
   ],
   apiRouteStubs: [
-    { method: "GET", path: "/api/app/generated/boutique-crm/leads", access: "private", purpose: "List leads.", responseShape: "lead[]" },
+    {
+      method: "GET",
+      path: "/api/app/generated/boutique-crm/leads",
+      access: "private",
+      purpose: "List leads.",
+      responseShape: "lead[]",
+    },
   ],
   dataSchema: {
     database: "postgres",
@@ -84,15 +103,25 @@ function streamingClient(opts: {
     }
     if (!opts.omitToolCall) {
       // Tool call block.
-      yield { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "tu_1", name: "submit_app_draft" } };
-      yield { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: toolInputJson } };
+      yield {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "tool_use", id: "tu_1", name: "submit_app_draft" },
+      };
+      yield {
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "input_json_delta", partial_json: toolInputJson },
+      };
       yield { type: "content_block_stop", index: 1 };
     }
     yield { type: "message_delta", usage: { output_tokens: 200 } };
   }
   return {
     messages: {
-      create: (async () => { throw new Error("not used in stream test"); }) as AnthropicClient["messages"]["create"],
+      create: (async () => {
+        throw new Error("not used in stream test");
+      }) as AnthropicClient["messages"]["create"],
       stream: (async () => events()) as unknown as AnthropicStream,
     },
   };
@@ -146,8 +175,12 @@ test("generateAppDraftViaLLM returns null when no provider key is configured", a
     const emitted: string[] = [];
     const result = await generateAppDraftViaLLM(
       "Build a CRM for sales teams to track leads and deals.",
-      { /* no apiKey override */ },
-      (text) => { emitted.push(text); },
+      {
+        /* no apiKey override */
+      },
+      (text) => {
+        emitted.push(text);
+      },
     );
     assert.equal(result, null);
     assert.equal(emitted.length, 0, "no prose should be emitted when there is no key");
@@ -160,7 +193,9 @@ test("generateAppDraftWithLLM falls back to the template generator when no key i
     const { draft, source } = await generateAppDraftWithLLM(
       "Build a CRM for sales teams to track leads and deals.",
       {},
-      (text) => { emitted.push(text); },
+      (text) => {
+        emitted.push(text);
+      },
     );
     assert.equal(source, "template");
     assert.equal(draft.templateId, "crm");
@@ -170,14 +205,17 @@ test("generateAppDraftWithLLM falls back to the template generator when no key i
 });
 
 test("generateAppDraftViaLLM streams prose deltas and returns the parsed tool input as an AppDraft", async () => {
-  const factory: AnthropicClientFactory = () => streamingClient({
-    proseChunks: ["I'll add ", "a Leads page, ", "then wire CRUD."],
-  });
+  const factory: AnthropicClientFactory = () =>
+    streamingClient({
+      proseChunks: ["I'll add ", "a Leads page, ", "then wire CRUD."],
+    });
   const emitted: string[] = [];
   const draft = await generateAppDraftViaLLM(
     "Build a CRM for boutique sales teams to track leads and deals.",
     { apiKey: "test-key", clientFactory: factory, preset: "smart" },
-    (text) => { emitted.push(text); },
+    (text) => {
+      emitted.push(text);
+    },
   );
   assert.ok(draft, "expected a draft from the LLM path");
   assert.equal(emitted.join(""), "I'll add a Leads page, then wire CRUD.");
@@ -195,13 +233,14 @@ test("generateAppDraftViaLLM streams prose deltas and returns the parsed tool in
 });
 
 test("generateAppDraftViaLLM returns null when the model never calls the tool", async () => {
-  const factory: AnthropicClientFactory = () => streamingClient({
-    proseChunks: ["just thinking out loud"],
-    omitToolCall: true,
+  const factory: AnthropicClientFactory = () =>
+    streamingClient({
+      proseChunks: ["just thinking out loud"],
+      omitToolCall: true,
+    });
+  const draft = await generateAppDraftViaLLM("Build a CRM for sales teams to track leads.", {
+    apiKey: "test-key",
+    clientFactory: factory,
   });
-  const draft = await generateAppDraftViaLLM(
-    "Build a CRM for sales teams to track leads.",
-    { apiKey: "test-key", clientFactory: factory },
-  );
   assert.equal(draft, null);
 });

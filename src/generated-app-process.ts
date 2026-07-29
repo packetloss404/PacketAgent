@@ -44,7 +44,9 @@ export function buildGeneratedAppPreviewReadiness(input: {
   process?: Partial<GeneratedAppPreviewRuntimeReadiness["process"]>;
 }): GeneratedAppPreviewRuntimeReadiness {
   const entrypoint = normalizeWorkspaceAssetPath(input.artifact.entrypoint) || "index.html";
-  const hasEntrypoint = input.artifact.files.some((file) => normalizeWorkspaceAssetPath(file.path) === entrypoint);
+  const hasEntrypoint = input.artifact.files.some(
+    (file) => normalizeWorkspaceAssetPath(file.path) === entrypoint,
+  );
 
   return {
     version: "generated-app-preview-runtime-v1",
@@ -73,7 +75,9 @@ export function resolveGeneratedAppPreviewFile(input: {
   const hasExplicitPath = Boolean(input.requestedPath?.trim());
   const requestedPath = normalizeWorkspaceAssetPath(input.requestedPath || "");
   const path = hasExplicitPath ? requestedPath : readiness.entrypoint;
-  const file = input.artifact.files.find((entry) => normalizeWorkspaceAssetPath(entry.path) === path);
+  const file = input.artifact.files.find(
+    (entry) => normalizeWorkspaceAssetPath(entry.path) === path,
+  );
 
   if (file) return { file, path, readiness };
   return { path, readiness };

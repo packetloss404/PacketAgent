@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  applyAppIterationViaLLM,
-  type GeneratedAppDraftLike,
-} from "./app-iteration-service.js";
+import { applyAppIterationViaLLM, type GeneratedAppDraftLike } from "./app-iteration-service.js";
 import { AnthropicProvider, type AnthropicClient } from "./providers/anthropic.js";
 
 function draftFixture(): GeneratedAppDraftLike {
@@ -19,7 +16,10 @@ function draftFixture(): GeneratedAppDraftLike {
   };
 }
 
-function makeStreamingProvider(toolInput: Record<string, unknown> | null, prose: string[]): AnthropicProvider {
+function makeStreamingProvider(
+  toolInput: Record<string, unknown> | null,
+  prose: string[],
+): AnthropicProvider {
   async function* events() {
     yield { type: "message_start", message: { usage: { input_tokens: 10, output_tokens: 0 } } };
     yield { type: "content_block_start", index: 0, content_block: { type: "text" } };
@@ -45,8 +45,12 @@ function makeStreamingProvider(toolInput: Record<string, unknown> | null, prose:
   }
   const fakeClient: AnthropicClient = {
     messages: {
-      create: (async () => { throw new Error("call should not be used in stream test"); }) as AnthropicClient["messages"]["create"],
-      stream: (async () => events()) as unknown as NonNullable<AnthropicClient["messages"]["stream"]>,
+      create: (async () => {
+        throw new Error("call should not be used in stream test");
+      }) as AnthropicClient["messages"]["create"],
+      stream: (async () => events()) as unknown as NonNullable<
+        AnthropicClient["messages"]["stream"]
+      >,
     },
   };
   return new AnthropicProvider({
@@ -100,12 +104,14 @@ test("applyAppIterationViaLLM streams prose deltas and parses the tool_use diff 
   const prose = ["I'll ", "add ", "a forgot-password link."];
   const toolInput = {
     changedSummary: "Add forgot-password link to /login",
-    files: [{
-      path: "app/pages/login.tsx",
-      changeType: "modified",
-      summary: "Add link",
-      diff: "+ <a href=\"/forgot\">Forgot?</a>",
-    }],
+    files: [
+      {
+        path: "app/pages/login.tsx",
+        changeType: "modified",
+        summary: "Add link",
+        diff: '+ <a href="/forgot">Forgot?</a>',
+      },
+    ],
   };
   const provider = makeStreamingProvider(toolInput, prose);
   const seen: string[] = [];
@@ -115,7 +121,9 @@ test("applyAppIterationViaLLM streams prose deltas and parses the tool_use diff 
     { kind: "page", path: "/login" },
     "add a forgot-password link",
     { workspaceId: "ws-1", provider },
-    (chunk) => { seen.push(chunk); },
+    (chunk) => {
+      seen.push(chunk);
+    },
   );
 
   assert.ok(result, "LLM result should not be null");
@@ -143,16 +151,32 @@ test("applyAppIterationViaLLM resolves the cheap preset to the haiku model", asy
   let observedModel = "";
   const fakeClient: AnthropicClient = {
     messages: {
-      create: (async () => { throw new Error("call should not be used"); }) as AnthropicClient["messages"]["create"],
+      create: (async () => {
+        throw new Error("call should not be used");
+      }) as AnthropicClient["messages"]["create"],
       stream: (async (params: { model: string }) => {
         observedModel = params.model;
         async function* events() {
-          yield { type: "message_start", message: { usage: { input_tokens: 1, output_tokens: 0 } } };
-          yield { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tu_1", name: "submit_iteration_diff" } };
-          yield { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify({
-            changedSummary: "ok",
-            files: [{ path: "a.ts", changeType: "added", summary: "s", diff: "+ x" }],
-          }) } };
+          yield {
+            type: "message_start",
+            message: { usage: { input_tokens: 1, output_tokens: 0 } },
+          };
+          yield {
+            type: "content_block_start",
+            index: 0,
+            content_block: { type: "tool_use", id: "tu_1", name: "submit_iteration_diff" },
+          };
+          yield {
+            type: "content_block_delta",
+            index: 0,
+            delta: {
+              type: "input_json_delta",
+              partial_json: JSON.stringify({
+                changedSummary: "ok",
+                files: [{ path: "a.ts", changeType: "added", summary: "s", diff: "+ x" }],
+              }),
+            },
+          };
           yield { type: "content_block_stop", index: 0 };
           yield { type: "message_stop" };
         }
@@ -164,12 +188,11 @@ test("applyAppIterationViaLLM resolves the cheap preset to the haiku model", asy
     apiKeyResolver: async () => "test-key",
     clientFactory: () => fakeClient,
   });
-  const result = await applyAppIterationViaLLM(
-    draftFixture(),
-    { kind: "page" },
-    "rename",
-    { workspaceId: "ws-1", preset: "cheap", provider },
-  );
+  const result = await applyAppIterationViaLLM(draftFixture(), { kind: "page" }, "rename", {
+    workspaceId: "ws-1",
+    preset: "cheap",
+    provider,
+  });
   assert.ok(result);
   assert.equal(observedModel, "claude-haiku-4-5-20251001");
 });

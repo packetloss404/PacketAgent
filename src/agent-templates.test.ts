@@ -39,10 +39,18 @@ test("agent templates only expose executable runtime tools or setup-required lab
     const setupRequired = new Set(template.setupRequiredTools ?? []);
     for (const tool of template.tools) {
       assert.ok(registered.has(tool), `${template.id} references non-runtime tool ${tool}`);
-      assert.equal(setupRequired.has(tool), false, `${template.id} duplicates executable tool ${tool} as setup-required`);
+      assert.equal(
+        setupRequired.has(tool),
+        false,
+        `${template.id} duplicates executable tool ${tool} as setup-required`,
+      );
     }
     for (const tool of setupRequired) {
-      assert.equal(registered.has(tool), false, `${template.id} marks registered tool ${tool} as setup-required`);
+      assert.equal(
+        registered.has(tool),
+        false,
+        `${template.id} marks registered tool ${tool} as setup-required`,
+      );
     }
   }
 });
@@ -62,27 +70,32 @@ test("agent input schema is validated and persisted", () => {
     instructions: "Capture typed inputs and validate them.",
     inputSchema: [
       { key: "topic", label: "Topic", type: "string", required: true },
-      { key: "depth", label: "Depth", type: "enum", required: true, options: ["quick", "deep"], defaultValue: "quick" },
+      {
+        key: "depth",
+        label: "Depth",
+        type: "enum",
+        required: true,
+        options: ["quick", "deep"],
+        defaultValue: "quick",
+      },
     ],
   });
 
   assert.equal(agent.inputSchema.length, 2);
 
   assert.throws(
-    () => updateAgent(auth.context, agent.id, {
-      inputSchema: [
-        { key: "bad-key!", label: "Bad", type: "string", required: false },
-      ],
-    } as any),
+    () =>
+      updateAgent(auth.context, agent.id, {
+        inputSchema: [{ key: "bad-key!", label: "Bad", type: "string", required: false }],
+      } as any),
     /input field keys must be/,
   );
 
   assert.throws(
-    () => updateAgent(auth.context, agent.id, {
-      inputSchema: [
-        { key: "mode", label: "Mode", type: "enum", required: true, options: [] },
-      ],
-    } as any),
+    () =>
+      updateAgent(auth.context, agent.id, {
+        inputSchema: [{ key: "mode", label: "Mode", type: "enum", required: true, options: [] }],
+      } as any),
     /enum field/,
   );
 });
@@ -108,8 +121,14 @@ test("runAgent validates required inputs and records logs", async () => {
   assert.equal(run.inputs?.evidence_url, "https://example.com/evidence");
   assert.match(run.output ?? "", /did not call a model, external provider, or runtime tools/i);
   assert.ok((run.logs ?? []).length >= 2);
-  assert.ok((run.logs ?? []).some((entry: { message: string }) => entry.message.includes("release_label")));
-  assert.ok((run.logs ?? []).some((entry: { message: string }) => entry.message.includes("No model or runtime tools were invoked")));
+  assert.ok(
+    (run.logs ?? []).some((entry: { message: string }) => entry.message.includes("release_label")),
+  );
+  assert.ok(
+    (run.logs ?? []).some((entry: { message: string }) =>
+      entry.message.includes("No model or runtime tools were invoked"),
+    ),
+  );
 });
 
 test("runAgent rejects invalid url and enum inputs", async () => {
@@ -119,13 +138,19 @@ test("runAgent rejects invalid url and enum inputs", async () => {
   const { agent } = createAgentFromTemplate(auth.context, "release_audit");
 
   await assert.rejects(
-    () => runAgent(auth.context, agent.id, { inputs: { release_label: "v1", evidence_url: "not-a-url" } }),
+    () =>
+      runAgent(auth.context, agent.id, {
+        inputs: { release_label: "v1", evidence_url: "not-a-url" },
+      }),
     /must be a valid http/,
   );
 
   const { agent: triage } = createAgentFromTemplate(auth.context, "support_triage");
   await assert.rejects(
-    () => runAgent(auth.context, triage.id, { inputs: { mailbox: "inbox", urgency_threshold: "extreme" } }),
+    () =>
+      runAgent(auth.context, triage.id, {
+        inputs: { mailbox: "inbox", urgency_threshold: "extreme" },
+      }),
     /must be one of/,
   );
 });

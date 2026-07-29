@@ -1,5 +1,9 @@
 import { now } from "./auth-utils";
-import { createInvitationEmailDelivery, type InvitationEmailDeliveryRecord, type PacketAgentData } from "./packetagent-store";
+import {
+  createInvitationEmailDelivery,
+  type InvitationEmailDeliveryRecord,
+  type PacketAgentData,
+} from "./packetagent-store";
 import {
   LOCAL_INVITATION_EMAIL_PROVIDER,
   resolveInvitationEmailMode,
@@ -36,7 +40,9 @@ export interface InvitationEmailDeliveryTestRecord extends InvitationEmailDelive
   sentAt?: string;
 }
 
-type InvitationEmailDeliveryAdapter = (request: InvitationEmailDeliveryRequest) => void | Promise<void>;
+type InvitationEmailDeliveryAdapter = (
+  request: InvitationEmailDeliveryRequest,
+) => void | Promise<void>;
 type InvitationEmailFetch = typeof fetch;
 
 let adapter: InvitationEmailDeliveryAdapter | null = null;
@@ -51,7 +57,9 @@ export async function deliverInvitationEmail(
   const mode = resolveInvitationEmailMode();
   const skipped = mode === "skip";
   let status: InvitationEmailDeliveryRecord["status"] = skipped ? "skipped" : "sent";
-  let error: string | undefined = skipped ? `${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=skip` : undefined;
+  let error: string | undefined = skipped
+    ? `${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=skip`
+    : undefined;
   let provider = LOCAL_INVITATION_EMAIL_PROVIDER;
 
   if (!skipped) {
@@ -69,17 +77,21 @@ export async function deliverInvitationEmail(
     }
   }
 
-  const delivery = createInvitationEmailDelivery(data, {
-    workspaceId: request.workspaceId,
-    invitationId: request.invitationId,
-    recipientEmail: request.email,
-    subject: request.subject,
-    status,
-    provider,
-    mode,
-    sentAt: status === "sent" ? timestamp : undefined,
-    error,
-  }, timestamp);
+  const delivery = createInvitationEmailDelivery(
+    data,
+    {
+      workspaceId: request.workspaceId,
+      invitationId: request.invitationId,
+      recipientEmail: request.email,
+      subject: request.subject,
+      status,
+      provider,
+      mode,
+      sentAt: status === "sent" ? timestamp : undefined,
+      error,
+    },
+    timestamp,
+  );
 
   recordsForTests.push({
     ...request,
@@ -94,7 +106,9 @@ export async function deliverInvitationEmail(
   return { id: delivery.id, status, action: request.action, error: error ?? null };
 }
 
-export function setInvitationEmailDeliveryAdapterForTests(nextAdapter: InvitationEmailDeliveryAdapter): void {
+export function setInvitationEmailDeliveryAdapterForTests(
+  nextAdapter: InvitationEmailDeliveryAdapter,
+): void {
   adapter = nextAdapter;
 }
 
@@ -117,7 +131,10 @@ async function sendInvitationEmailWebhook(
   webhook: ReturnType<typeof resolveInvitationEmailWebhookConfig>,
   fetchImplementation: InvitationEmailFetch,
 ): Promise<void> {
-  if (!webhook.url) throw new Error(`${PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV} is required when ${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=webhook`);
+  if (!webhook.url)
+    throw new Error(
+      `${PACKETAGENT_INVITATION_EMAIL_WEBHOOK_URL_ENV} is required when ${PACKETAGENT_INVITATION_EMAIL_MODE_ENV}=webhook`,
+    );
 
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (webhook.secret) headers[webhook.secretHeader] = webhook.secret;
@@ -137,5 +154,8 @@ async function sendInvitationEmailWebhook(
     }),
   });
 
-  if (!response.ok) throw new Error(`webhook invitation email provider returned ${response.status} ${response.statusText}`.trim());
+  if (!response.ok)
+    throw new Error(
+      `webhook invitation email provider returned ${response.status} ${response.statusText}`.trim(),
+    );
 }

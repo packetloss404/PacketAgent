@@ -24,13 +24,16 @@ function badRequest(message: string) {
   return Object.assign(new Error(message), { status: 400 });
 }
 
-async function validateJobInput(body: Partial<{
-  type: string;
-  payload: Record<string, unknown>;
-  scheduledAt: string;
-  cron: string;
-  maxAttempts: number;
-}>, workspaceId: string) {
+async function validateJobInput(
+  body: Partial<{
+    type: string;
+    payload: Record<string, unknown>;
+    scheduledAt: string;
+    cron: string;
+    maxAttempts: number;
+  }>,
+  workspaceId: string,
+) {
   if (body.scheduledAt !== undefined && Number.isNaN(Date.parse(body.scheduledAt))) {
     throw badRequest("scheduledAt must be a valid date");
   }
@@ -41,14 +44,19 @@ async function validateJobInput(body: Partial<{
       throw badRequest("cron must be a valid 5-field expression");
     }
   }
-  if (body.maxAttempts !== undefined && (!Number.isInteger(body.maxAttempts) || body.maxAttempts < 1)) {
+  if (
+    body.maxAttempts !== undefined &&
+    (!Number.isInteger(body.maxAttempts) || body.maxAttempts < 1)
+  ) {
     throw badRequest("maxAttempts must be a positive integer");
   }
   if (body.type === "agent.run") {
     const agentId = body.payload?.agentId;
     if (typeof agentId !== "string") throw badRequest("agent.run payload.agentId is required");
     const data = await loadStoreAsync();
-    const agent = (data.agents ?? []).find((entry) => entry.workspaceId === workspaceId && entry.id === agentId);
+    const agent = (data.agents ?? []).find(
+      (entry) => entry.workspaceId === workspaceId && entry.id === agentId,
+    );
     if (!agent) {
       throw badRequest("agent.run payload.agentId must reference an agent in this workspace");
     }

@@ -61,6 +61,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   deployment, generated-runtime, job, provider, repository, sandbox, security,
   service, store, tool, and Worker subdirectories, reducing the remaining
   Prettier backlog from 247 files to 123.
+- Formatted the first half of the top-level backend routes, services, generated
+  runtime, integrations, invitation delivery, and regression suites, reducing
+  the remaining Prettier backlog from 123 files to 46.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

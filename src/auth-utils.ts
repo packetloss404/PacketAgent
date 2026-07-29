@@ -38,7 +38,9 @@ export function buildSessionCookieValue(sessionId: string, secret: string): stri
   return `${sessionId}.${secret}`;
 }
 
-export function parseSessionCookieValue(cookieValue: string): { sessionId: string; secret: string } | null {
+export function parseSessionCookieValue(
+  cookieValue: string,
+): { sessionId: string; secret: string } | null {
   const [sessionId, secret] = cookieValue.split(".");
   if (!sessionId || !secret) return null;
   return { sessionId, secret };

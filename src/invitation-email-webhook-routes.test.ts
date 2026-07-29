@@ -73,7 +73,7 @@ test("returns 503 when no reconciliation secret is configured", async () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ deliveryId: "x", providerStatus: "delivered" }),
     });
-    const body = await response.json() as { error: string };
+    const body = (await response.json()) as { error: string };
 
     assert.equal(response.status, 503);
     assert.match(body.error, /reconciliation webhook is disabled/);
@@ -253,7 +253,7 @@ test("records provider status on the delivery row on success", async () => {
         occurredAt: "2026-04-26T11:00:00.000Z",
       }),
     });
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       ok: boolean;
       deliveryId: string;
       invitationId: string;
@@ -299,7 +299,7 @@ test("normalizes alias provider statuses on success", async () => {
         occurredAt: "2026-04-26T12:00:00.000Z",
       }),
     });
-    const body = await response.json() as { ok: boolean; providerStatus: string };
+    const body = (await response.json()) as { ok: boolean; providerStatus: string };
 
     assert.equal(response.status, 200);
     assert.equal(body.ok, true);

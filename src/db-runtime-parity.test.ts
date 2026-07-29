@@ -27,7 +27,9 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   const modules = await loadRuntimeModules();
   modules.store.resetStoreForTests();
   if (!existsSync(dbPath)) {
-    t.skip("SQLite store runtime is not wired yet: expected PACKETAGENT_STORE=sqlite to create PACKETAGENT_DB_PATH");
+    t.skip(
+      "SQLite store runtime is not wired yet: expected PACKETAGENT_STORE=sqlite to create PACKETAGENT_DB_PATH",
+    );
     return;
   }
 
@@ -37,22 +39,37 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
 
     const anonymous = await app.request("/api/auth/session");
     assert.equal(anonymous.status, 200);
-    assert.deepEqual(await anonymous.json(), { authenticated: false, user: null, workspace: null, onboarding: null });
+    assert.deepEqual(await anonymous.json(), {
+      authenticated: false,
+      user: null,
+      workspace: null,
+      onboarding: null,
+    });
 
     const registered = await app.request("/api/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "sqlite.auth@example.com", password: "demo12345", displayName: "New User" }),
+      body: JSON.stringify({
+        email: "sqlite.auth@example.com",
+        password: "demo12345",
+        displayName: "New User",
+      }),
     });
     const cookie = cookieValue(registered);
-    const registeredBody = await registered.json() as { authenticated: boolean; workspace: { name: string } };
+    const registeredBody = (await registered.json()) as {
+      authenticated: boolean;
+      workspace: { name: string };
+    };
     assert.equal(registered.status, 201);
     assert.equal(registeredBody.authenticated, true);
     assert.equal(registeredBody.workspace.name, "New workspace");
 
     const session = await app.request("/api/auth/session", { headers: authHeaders(cookie) });
     const bootstrap = await app.request("/api/app/bootstrap", { headers: authHeaders(cookie) });
-    const bootstrapBody = await bootstrap.json() as { activation: { status: { stage: string } }; activities: unknown[] };
+    const bootstrapBody = (await bootstrap.json()) as {
+      activation: { status: { stage: string } };
+      activities: unknown[];
+    };
 
     assert.equal(session.status, 200);
     assert.equal(bootstrap.status, 200);
@@ -63,7 +80,10 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   await t.test("RBAC, member listing, and invitation acceptance match JSON behavior", async () => {
     resetSqliteStore(modules);
     const app = createTestApp(modules);
-    const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
+    const alpha = modules.services.login({
+      email: "alpha@packetagent.local",
+      password: "demo12345",
+    });
     const beta = modules.services.login({ email: "beta@packetagent.local", password: "demo12345" });
 
     setAlphaRole(modules, "admin");
@@ -72,7 +92,9 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
       headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
       body: JSON.stringify({ email: "Beta@PacketAgent.Local", role: "member" }),
     });
-    const createdBody = await created.json() as { invitation: { token: string; email: string; role: string; status: string } };
+    const createdBody = (await created.json()) as {
+      invitation: { token: string; email: string; role: string; status: string };
+    };
 
     assert.equal(created.status, 201);
     assert.equal(createdBody.invitation.email, "beta@packetagent.local");
@@ -80,30 +102,52 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
     assert.equal(createdBody.invitation.status, "pending");
     assert.ok(createdBody.invitation.token);
 
-    const adminList = await app.request("/api/app/members", { headers: authHeaders(alpha.cookieValue) });
-    const adminBody = await adminList.json() as { invitations: Array<{ token?: string; tokenPreview?: string }> };
+    const adminList = await app.request("/api/app/members", {
+      headers: authHeaders(alpha.cookieValue),
+    });
+    const adminBody = (await adminList.json()) as {
+      invitations: Array<{ token?: string; tokenPreview?: string }>;
+    };
     assert.equal(adminList.status, 200);
     assert.equal(adminBody.invitations[0]?.token, undefined);
     assert.ok(adminBody.invitations[0]?.tokenPreview);
 
     setAlphaRole(modules, "viewer");
-    const viewerList = await app.request("/api/app/members", { headers: authHeaders(alpha.cookieValue) });
-    const viewerBody = await viewerList.json() as { invitations: Array<{ token?: string; tokenPreview?: string }> };
+    const viewerList = await app.request("/api/app/members", {
+      headers: authHeaders(alpha.cookieValue),
+    });
+    const viewerBody = (await viewerList.json()) as {
+      invitations: Array<{ token?: string; tokenPreview?: string }>;
+    };
     assert.equal(viewerList.status, 200);
     assert.equal(viewerBody.invitations[0]?.token, undefined);
     assert.ok(viewerBody.invitations[0]?.tokenPreview);
 
-    const accepted = await app.request(`/api/app/invitations/${createdBody.invitation.token}/accept`, {
-      method: "POST",
-      headers: authHeaders(beta.cookieValue),
-    });
-    const acceptedBody = await accepted.json() as { membership: { userId: string; role: string }; invitation: { status: string } };
+    const accepted = await app.request(
+      `/api/app/invitations/${createdBody.invitation.token}/accept`,
+      {
+        method: "POST",
+        headers: authHeaders(beta.cookieValue),
+      },
+    );
+    const acceptedBody = (await accepted.json()) as {
+      membership: { userId: string; role: string };
+      invitation: { status: string };
+    };
 
     assert.equal(accepted.status, 200);
     assert.equal(acceptedBody.membership.userId, "user_beta");
     assert.equal(acceptedBody.membership.role, "member");
     assert.equal(acceptedBody.invitation.status, "accepted");
-    assert.equal(modules.store.loadStore().memberships.some((entry: { workspaceId: string; userId: string }) => entry.workspaceId === "alpha" && entry.userId === "user_beta"), true);
+    assert.equal(
+      modules.store
+        .loadStore()
+        .memberships.some(
+          (entry: { workspaceId: string; userId: string }) =>
+            entry.workspaceId === "alpha" && entry.userId === "user_beta",
+        ),
+      true,
+    );
   });
 
   await t.test("workflow writes feed activation bootstrap state", async () => {
@@ -112,7 +156,11 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
     const registered = await app.request("/api/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "sqlite.workflow@example.com", password: "demo12345", displayName: "SQLite Workflow" }),
+      body: JSON.stringify({
+        email: "sqlite.workflow@example.com",
+        password: "demo12345",
+        displayName: "SQLite Workflow",
+      }),
     });
     const cookie = cookieValue(registered);
 
@@ -130,12 +178,17 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
     const plan = await app.request("/api/app/workflow/plan-mode/apply", {
       method: "POST",
       headers: { ...authHeaders(cookie), "content-type": "application/json" },
-      body: JSON.stringify({ planItems: [{ summary: "Exercise DB runtime writes", status: "doing" }] }),
+      body: JSON.stringify({
+        planItems: [{ summary: "Exercise DB runtime writes", status: "doing" }],
+      }),
     });
     assert.equal(plan.status, 200);
 
     const bootstrap = await app.request("/api/app/bootstrap", { headers: authHeaders(cookie) });
-    const body = await bootstrap.json() as { activation: { status: { stage: string; milestones: unknown[] } }; onboarding: { completedSteps: string[] } };
+    const body = (await bootstrap.json()) as {
+      activation: { status: { stage: string; milestones: unknown[] } };
+      onboarding: { completedSteps: string[] };
+    };
     assert.equal(bootstrap.status, 200);
     assert.ok(["implementation", "validation", "complete"].includes(body.activation.status.stage));
     assert.ok(body.activation.status.milestones.length > 0);
@@ -146,20 +199,31 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   await t.test("jobs can be enqueued, listed, and canceled", async () => {
     resetSqliteStore(modules);
     const app = createTestApp(modules);
-    const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
+    const alpha = modules.services.login({
+      email: "alpha@packetagent.local",
+      password: "demo12345",
+    });
 
     const created = await app.request("/api/app/jobs", {
       method: "POST",
       headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
-      body: JSON.stringify({ type: "test.sqlite", payload: { source: "db-parity" }, maxAttempts: 2 }),
+      body: JSON.stringify({
+        type: "test.sqlite",
+        payload: { source: "db-parity" },
+        maxAttempts: 2,
+      }),
     });
-    const createdBody = await created.json() as { job: { id: string; workspaceId: string; status: string; type: string; payload: unknown } };
+    const createdBody = (await created.json()) as {
+      job: { id: string; workspaceId: string; status: string; type: string; payload: unknown };
+    };
     assert.equal(created.status, 201);
     assert.equal(createdBody.job.workspaceId, "alpha");
     assert.equal(createdBody.job.status, "queued");
 
-    const list = await app.request("/api/app/jobs?status=queued&limit=10", { headers: authHeaders(alpha.cookieValue) });
-    const listBody = await list.json() as { jobs: Array<{ id: string }> };
+    const list = await app.request("/api/app/jobs?status=queued&limit=10", {
+      headers: authHeaders(alpha.cookieValue),
+    });
+    const listBody = (await list.json()) as { jobs: Array<{ id: string }> };
     assert.equal(list.status, 200);
     assert.ok(listBody.jobs.some((job) => job.id === createdBody.job.id));
 
@@ -167,7 +231,9 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
       method: "POST",
       headers: authHeaders(alpha.cookieValue),
     });
-    const canceledBody = await canceled.json() as { job: { status: string; cancelRequested: boolean } };
+    const canceledBody = (await canceled.json()) as {
+      job: { status: string; cancelRequested: boolean };
+    };
     assert.equal(canceled.status, 200);
     assert.equal(canceledBody.job.status, "canceled");
     assert.equal(canceledBody.job.cancelRequested, true);
@@ -176,7 +242,10 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   await t.test("agent creation and manual run basics persist", async () => {
     resetSqliteStore(modules);
     const app = createTestApp(modules);
-    const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
+    const alpha = modules.services.login({
+      email: "alpha@packetagent.local",
+      password: "demo12345",
+    });
 
     const created = await app.request("/api/app/agents", {
       method: "POST",
@@ -189,7 +258,7 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
         inputSchema: [{ key: "ticket", label: "Ticket", type: "string", required: true }],
       }),
     });
-    const createdBody = await created.json() as { agent: { id: string; name: string } };
+    const createdBody = (await created.json()) as { agent: { id: string; name: string } };
     assert.equal(created.status, 201);
     assert.equal(createdBody.agent.name, "SQLite parity agent");
 
@@ -198,7 +267,14 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
       headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
       body: JSON.stringify({ triggerKind: "manual", inputs: { ticket: "SQL-1" } }),
     });
-    const runBody = await run.json() as { run: { agentId: string; status: string; triggerKind: string; inputs: Record<string, unknown> } };
+    const runBody = (await run.json()) as {
+      run: {
+        agentId: string;
+        status: string;
+        triggerKind: string;
+        inputs: Record<string, unknown>;
+      };
+    };
     assert.equal(run.status, 201);
     assert.equal(runBody.run.agentId, createdBody.agent.id);
     assert.equal(runBody.run.status, "success");
@@ -209,20 +285,27 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
   await t.test("share token lifecycle and public share reads persist", async () => {
     resetSqliteStore(modules);
     const app = createTestApp(modules);
-    const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
+    const alpha = modules.services.login({
+      email: "alpha@packetagent.local",
+      password: "demo12345",
+    });
 
     const created = await app.request("/api/app/share", {
       method: "POST",
       headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
       body: JSON.stringify({ scope: "overview" }),
     });
-    const createdBody = await created.json() as { token: { id: string; token: string; scope: string; readCount: number } };
+    const createdBody = (await created.json()) as {
+      token: { id: string; token: string; scope: string; readCount: number };
+    };
     assert.equal(created.status, 201);
     assert.equal(createdBody.token.scope, "overview");
     assert.equal(createdBody.token.readCount, 0);
 
     const publicRead = await app.request(`/api/public/share/${createdBody.token.token}`);
-    const publicBody = await publicRead.json() as { shared: { scope: string; workspace: { id: string }; brief: unknown; planItems: unknown[] } };
+    const publicBody = (await publicRead.json()) as {
+      shared: { scope: string; workspace: { id: string }; brief: unknown; planItems: unknown[] };
+    };
     assert.equal(publicRead.status, 200);
     assert.equal(publicBody.shared.scope, "overview");
     assert.equal(publicBody.shared.workspace.id, "alpha");
@@ -230,7 +313,9 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
     assert.ok(Array.isArray(publicBody.shared.planItems));
 
     const list = await app.request("/api/app/share", { headers: authHeaders(alpha.cookieValue) });
-    const listBody = await list.json() as { tokens: Array<{ id: string; readCount: number; lastReadAt?: string }> };
+    const listBody = (await list.json()) as {
+      tokens: Array<{ id: string; readCount: number; lastReadAt?: string }>;
+    };
     const listed = listBody.tokens.find((token) => token.id === createdBody.token.id);
     assert.equal(list.status, 200);
     assert.equal(listed?.readCount, 1);
@@ -295,7 +380,15 @@ test("JSON default and SQLite opt-in keep invitation delivery skip mode aligned"
 });
 
 async function loadRuntimeModules() {
-  const [store, services, appRoutesModule, workflowRoutesModule, jobRoutesModule, shareRoutesModule, rbacModule] = await Promise.all([
+  const [
+    store,
+    services,
+    appRoutesModule,
+    workflowRoutesModule,
+    jobRoutesModule,
+    shareRoutesModule,
+    rbacModule,
+  ] = await Promise.all([
     import("./packetagent-store.js"),
     import("./packetagent-services.js"),
     import("./app-routes.js"),
@@ -304,7 +397,15 @@ async function loadRuntimeModules() {
     import("./share-routes.js"),
     import("./rbac.js"),
   ]);
-  return { store, services, appRoutesModule, workflowRoutesModule, jobRoutesModule, shareRoutesModule, rbacModule };
+  return {
+    store,
+    services,
+    appRoutesModule,
+    workflowRoutesModule,
+    jobRoutesModule,
+    shareRoutesModule,
+    rbacModule,
+  };
 }
 
 function createTestApp(modules: RuntimeModules) {
@@ -317,26 +418,42 @@ function createTestApp(modules: RuntimeModules) {
 
   app.get("/api/app/agents", (c) => {
     try {
-      return c.json(modules.services.listAgents(modules.rbacModule.requirePrivateWorkspaceRole(c, "viewer")));
+      return c.json(
+        modules.services.listAgents(modules.rbacModule.requirePrivateWorkspaceRole(c, "viewer")),
+      );
     } catch (error) {
       return errorResponse(c, error);
     }
   });
   app.post("/api/app/agents", async (c) => {
     try {
-      return c.json(modules.services.createAgent(modules.rbacModule.requirePrivateWorkspaceRole(c, "admin"), await readJsonBody(c)), 201);
+      return c.json(
+        modules.services.createAgent(
+          modules.rbacModule.requirePrivateWorkspaceRole(c, "admin"),
+          await readJsonBody(c),
+        ),
+        201,
+      );
     } catch (error) {
       return errorResponse(c, error);
     }
   });
   app.post("/api/app/agents/:agentId/runs", async (c) => {
     try {
-      const body = await readJsonBody(c) as { triggerKind?: string; inputs?: Record<string, unknown>; toolApproval?: unknown };
-      const result = await modules.services.runAgent(modules.rbacModule.requirePrivateWorkspaceRole(c, "member"), c.req.param("agentId"), {
-        triggerKind: body.triggerKind,
-        inputs: body.inputs ?? {},
-        toolApproval: body.toolApproval as never,
-      });
+      const body = (await readJsonBody(c)) as {
+        triggerKind?: string;
+        inputs?: Record<string, unknown>;
+        toolApproval?: unknown;
+      };
+      const result = await modules.services.runAgent(
+        modules.rbacModule.requirePrivateWorkspaceRole(c, "member"),
+        c.req.param("agentId"),
+        {
+          triggerKind: body.triggerKind,
+          inputs: body.inputs ?? {},
+          toolApproval: body.toolApproval as never,
+        },
+      );
       return c.json(result, "approval" in result ? 200 : 201);
     } catch (error) {
       return errorResponse(c, error);
@@ -361,51 +478,84 @@ async function runIndexedRouteScenario(modules: RuntimeModules, label: string) {
   const app = createTestApp(modules);
   const alpha = modules.services.login({ email: "alpha@packetagent.local", password: "demo12345" });
 
-  const session = await app.request("/api/auth/session", { headers: authHeaders(alpha.cookieValue) });
-  const sessionBody = await session.json() as { authenticated: boolean; user: { email: string }; workspace: { id: string } };
+  const session = await app.request("/api/auth/session", {
+    headers: authHeaders(alpha.cookieValue),
+  });
+  const sessionBody = (await session.json()) as {
+    authenticated: boolean;
+    user: { email: string };
+    workspace: { id: string };
+  };
 
   const invitation = await app.request("/api/app/invitations", {
     method: "POST",
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "indexed.parity@example.com", role: "member" }),
   });
-  const invitationBody = await invitation.json() as { invitation: { id: string; email: string; role: string; status: string; token?: string } };
+  const invitationBody = (await invitation.json()) as {
+    invitation: { id: string; email: string; role: string; status: string; token?: string };
+  };
 
-  const members = await app.request("/api/app/members", { headers: authHeaders(alpha.cookieValue) });
-  const membersBody = await members.json() as { invitations: Array<{ email: string; role: string; status: string; token?: string; tokenPreview?: string }> };
+  const members = await app.request("/api/app/members", {
+    headers: authHeaders(alpha.cookieValue),
+  });
+  const membersBody = (await members.json()) as {
+    invitations: Array<{
+      email: string;
+      role: string;
+      status: string;
+      token?: string;
+      tokenPreview?: string;
+    }>;
+  };
 
   const resent = await app.request(`/api/app/invitations/${invitationBody.invitation.id}/resend`, {
     method: "POST",
     headers: authHeaders(alpha.cookieValue),
   });
-  const resentBody = await resent.json() as { invitation: { token?: string; status: string } };
+  const resentBody = (await resent.json()) as { invitation: { token?: string; status: string } };
 
   const revoked = await app.request(`/api/app/invitations/${invitationBody.invitation.id}/revoke`, {
     method: "POST",
     headers: authHeaders(alpha.cookieValue),
   });
-  const revokedBody = await revoked.json() as { invitation: { status: string; revokedAt: string | null } };
+  const revokedBody = (await revoked.json()) as {
+    invitation: { status: string; revokedAt: string | null };
+  };
 
-  const revokedAccept = await app.request(`/api/app/invitations/${resentBody.invitation.token ?? "missing"}/accept`, {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
-  const invitationDeliveryCount = modules.store.loadStore().invitationEmailDeliveries
-    .filter((entry: { invitationId: string }) => entry.invitationId === invitationBody.invitation.id)
-    .length;
+  const revokedAccept = await app.request(
+    `/api/app/invitations/${resentBody.invitation.token ?? "missing"}/accept`,
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
+  const invitationDeliveryCount = modules.store
+    .loadStore()
+    .invitationEmailDeliveries.filter(
+      (entry: { invitationId: string }) => entry.invitationId === invitationBody.invitation.id,
+    ).length;
 
   const share = await app.request("/api/app/share", {
     method: "POST",
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ scope: "overview" }),
   });
-  const shareBody = await share.json() as { token: { id: string; token: string; scope: string; readCount: number } };
+  const shareBody = (await share.json()) as {
+    token: { id: string; token: string; scope: string; readCount: number };
+  };
 
   const publicShare = await app.request(`/api/public/share/${shareBody.token.token}`);
-  const publicShareBody = await publicShare.json() as { shared: { scope: string; workspace: { id: string } } };
+  const publicShareBody = (await publicShare.json()) as {
+    shared: { scope: string; workspace: { id: string } };
+  };
 
-  const shareList = await app.request("/api/app/share", { headers: authHeaders(alpha.cookieValue) });
-  const shareListBody = await shareList.json() as { tokens: Array<{ id: string; scope: string; readCount: number; lastReadAt?: string }> };
+  const shareList = await app.request("/api/app/share", {
+    headers: authHeaders(alpha.cookieValue),
+  });
+  const shareListBody = (await shareList.json()) as {
+    tokens: Array<{ id: string; scope: string; readCount: number; lastReadAt?: string }>;
+  };
   const listedToken = shareListBody.tokens.find((token) => token.id === shareBody.token.id);
 
   const crossOriginMutation = await app.request("/api/app/workspace", {
@@ -418,7 +568,7 @@ async function runIndexedRouteScenario(modules: RuntimeModules, label: string) {
     },
     body: JSON.stringify({ name: "Blocked", website: "", automationGoal: "" }),
   });
-  const crossOriginBody = await crossOriginMutation.json() as { error: string };
+  const crossOriginBody = (await crossOriginMutation.json()) as { error: string };
 
   const sameOriginMissingCsrf = await app.request("/api/app/workspace", {
     method: "PATCH",
@@ -430,7 +580,7 @@ async function runIndexedRouteScenario(modules: RuntimeModules, label: string) {
     },
     body: JSON.stringify({ name: "Blocked", website: "", automationGoal: "" }),
   });
-  const sameOriginMissingCsrfBody = await sameOriginMissingCsrf.json() as { error: string };
+  const sameOriginMissingCsrfBody = (await sameOriginMissingCsrf.json()) as { error: string };
 
   const rateLimitIp = "203.0.113.77";
   let rateLimitAttemptStatus = 0;
@@ -442,8 +592,9 @@ async function runIndexedRouteScenario(modules: RuntimeModules, label: string) {
     });
     rateLimitAttemptStatus = response.status;
   }
-  const rateLimitBucket = (modules.store.loadStore().rateLimits ?? [])
-    .find((entry: { id: string }) => entry.id.startsWith("auth:login:sha256:"));
+  const rateLimitBucket = (modules.store.loadStore().rateLimits ?? []).find(
+    (entry: { id: string }) => entry.id.startsWith("auth:login:sha256:"),
+  );
 
   return {
     session: {
@@ -461,9 +612,18 @@ async function runIndexedRouteScenario(modules: RuntimeModules, label: string) {
         status: invitationBody.invitation.status,
         hasToken: Boolean(invitationBody.invitation.token),
       },
-      listed: membersBody.invitations.some((entry) => entry.email === "indexed.parity@example.com" && entry.role === "member" && entry.status === "pending" && !entry.token && Boolean(entry.tokenPreview)),
+      listed: membersBody.invitations.some(
+        (entry) =>
+          entry.email === "indexed.parity@example.com" &&
+          entry.role === "member" &&
+          entry.status === "pending" &&
+          !entry.token &&
+          Boolean(entry.tokenPreview),
+      ),
       resendStatus: resent.status,
-      resendRotatedToken: Boolean(resentBody.invitation.token) && resentBody.invitation.token !== invitationBody.invitation.token,
+      resendRotatedToken:
+        Boolean(resentBody.invitation.token) &&
+        resentBody.invitation.token !== invitationBody.invitation.token,
       revokeStatus: revoked.status,
       revokedStatus: revokedBody.invitation.status,
       revokedAt: Boolean(revokedBody.invitation.revokedAt),
@@ -509,10 +669,18 @@ async function runInvitationDeliveryModeScenario(modules: RuntimeModules, label:
     headers: { ...authHeaders(alpha.cookieValue), "content-type": "application/json" },
     body: JSON.stringify({ email: "skip.delivery@example.com", role: "member" }),
   });
-  const createdBody = await created.json() as { invitation: { id: string }; emailDelivery: { status: string; error: string | null } };
-  const deliveries = modules.store.loadStore().invitationEmailDeliveries
-    .filter((entry: { invitationId: string }) => entry.invitationId === createdBody.invitation.id);
-  const delivery = deliveries[0] as { status: string; provider: string; mode: string; sentAt?: string; error?: string } | undefined;
+  const createdBody = (await created.json()) as {
+    invitation: { id: string };
+    emailDelivery: { status: string; error: string | null };
+  };
+  const deliveries = modules.store
+    .loadStore()
+    .invitationEmailDeliveries.filter(
+      (entry: { invitationId: string }) => entry.invitationId === createdBody.invitation.id,
+    );
+  const delivery = deliveries[0] as
+    | { status: string; provider: string; mode: string; sentAt?: string; error?: string }
+    | undefined;
 
   return {
     createStatus: created.status,
@@ -528,11 +696,15 @@ async function runInvitationDeliveryModeScenario(modules: RuntimeModules, label:
 }
 
 function setAlphaRole(modules: RuntimeModules, role: "owner" | "admin" | "member" | "viewer") {
-  modules.store.mutateStore((data: { memberships: Array<{ workspaceId: string; userId: string; role: string }> }) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
-    assert.ok(membership, "expected alpha membership");
-    membership.role = role;
-  });
+  modules.store.mutateStore(
+    (data: { memberships: Array<{ workspaceId: string; userId: string; role: string }> }) => {
+      const membership = data.memberships.find(
+        (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+      );
+      assert.ok(membership, "expected alpha membership");
+      membership.role = role;
+    },
+  );
 }
 
 function authHeaders(cookieValue: string) {
@@ -550,7 +722,9 @@ async function readJsonBody(c: Context): Promise<Record<string, unknown>> {
   const contentType = c.req.header("content-type") ?? "";
   if (!contentType.includes("application/json")) return {};
   const body = await c.req.json();
-  return body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {};
+  return body && typeof body === "object" && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : {};
 }
 
 function errorResponse(c: Context, error: unknown) {

@@ -20,20 +20,20 @@ import {
 test("resolveGeneratedAppWorkspacePath resolves the safe generated app workspace root", async (t) => {
   const rootDir = await temporaryRoot(t);
 
-  const paths = resolveGeneratedAppWorkspacePath({
-    workspaceSlug: "alpha",
-    appSlug: "ops-board",
-    checkpointId: "gapp_ckpt_001",
-  }, { rootDir });
+  const paths = resolveGeneratedAppWorkspacePath(
+    {
+      workspaceSlug: "alpha",
+      appSlug: "ops-board",
+      checkpointId: "gapp_ckpt_001",
+    },
+    { rootDir },
+  );
 
   assert.equal(
     paths.workspacePath,
     path.join(rootDir, "data", "generated-apps", "alpha", "ops-board", "workspace"),
   );
-  assert.equal(
-    paths.relativeWorkspacePath,
-    "data/generated-apps/alpha/ops-board/workspace",
-  );
+  assert.equal(paths.relativeWorkspacePath, "data/generated-apps/alpha/ops-board/workspace");
   assert.equal(
     paths.relativeManifestPath,
     "data/generated-apps/alpha/ops-board/workspace/.packetagent/generated-app-workspace-manifest.json",
@@ -57,46 +57,56 @@ test("workspace path resolution rejects traversal in workspace app and checkpoin
     /unsafe generated app appSlug/,
   );
   assert.throws(
-    () => resolveGeneratedAppWorkspacePath({ ...safe, checkpointId: "checkpoints/001" }, { rootDir }),
+    () =>
+      resolveGeneratedAppWorkspacePath({ ...safe, checkpointId: "checkpoints/001" }, { rootDir }),
     /unsafe generated app checkpointId/,
   );
 });
 
 test("writeGeneratedAppWorkspace writes source files and a manifest with hashes and sizes", async (t) => {
   const rootDir = await temporaryRoot(t);
-  const result = await writeGeneratedAppWorkspace({
-    workspaceSlug: "alpha",
-    workspaceId: "workspace_alpha",
-    appSlug: "ops-board",
-    appId: "gapp_ops",
-    checkpointId: "gapp_ckpt_001",
-    checkpointLabel: "Initial checkpoint",
-    checkpointCreatedAt: "2026-05-12T10:00:00.000Z",
-    writtenAt: "2026-05-12T10:01:00.000Z",
-    files: [
-      {
-        path: "index.html",
-        content: "<!doctype html><title>Ops Board</title>\n",
-        contentType: "text/html; charset=utf-8",
-        role: "entrypoint",
-      },
-      {
-        path: "src/App.tsx",
-        content: "export function App() { return <h1>Ops Board</h1>; }\n",
-        contentType: "text/typescript; charset=utf-8",
-        role: "source",
-      },
-    ],
-  }, { rootDir });
+  const result = await writeGeneratedAppWorkspace(
+    {
+      workspaceSlug: "alpha",
+      workspaceId: "workspace_alpha",
+      appSlug: "ops-board",
+      appId: "gapp_ops",
+      checkpointId: "gapp_ckpt_001",
+      checkpointLabel: "Initial checkpoint",
+      checkpointCreatedAt: "2026-05-12T10:00:00.000Z",
+      writtenAt: "2026-05-12T10:01:00.000Z",
+      files: [
+        {
+          path: "index.html",
+          content: "<!doctype html><title>Ops Board</title>\n",
+          contentType: "text/html; charset=utf-8",
+          role: "entrypoint",
+        },
+        {
+          path: "src/App.tsx",
+          content: "export function App() { return <h1>Ops Board</h1>; }\n",
+          contentType: "text/typescript; charset=utf-8",
+          role: "source",
+        },
+      ],
+    },
+    { rootDir },
+  );
 
   const appFilePath = path.join(result.paths.workspacePath, "src", "App.tsx");
-  const manifest = await readGeneratedAppWorkspaceManifest({
-    workspaceSlug: "alpha",
-    appSlug: "ops-board",
-    checkpointId: "gapp_ckpt_001",
-  }, { rootDir });
+  const manifest = await readGeneratedAppWorkspaceManifest(
+    {
+      workspaceSlug: "alpha",
+      appSlug: "ops-board",
+      checkpointId: "gapp_ckpt_001",
+    },
+    { rootDir },
+  );
 
-  assert.equal(await readFile(appFilePath, "utf8"), "export function App() { return <h1>Ops Board</h1>; }\n");
+  assert.equal(
+    await readFile(appFilePath, "utf8"),
+    "export function App() { return <h1>Ops Board</h1>; }\n",
+  );
   assert.equal(manifest.version, "generated-app-workspace.v1");
   assert.equal(manifest.workspacePath, result.paths.workspacePath);
   assert.equal(manifest.relativeWorkspacePath, "data/generated-apps/alpha/ops-board/workspace");
@@ -111,7 +121,10 @@ test("writeGeneratedAppWorkspace writes source files and a manifest with hashes 
   assert.deepEqual(manifest, result.manifest);
 
   const appEntry = manifest.files.find((file) => file.path === "src/App.tsx");
-  assert.equal(appEntry?.size, Buffer.byteLength("export function App() { return <h1>Ops Board</h1>; }\n", "utf8"));
+  assert.equal(
+    appEntry?.size,
+    Buffer.byteLength("export function App() { return <h1>Ops Board</h1>; }\n", "utf8"),
+  );
   assert.equal(appEntry?.sha256, sha256("export function App() { return <h1>Ops Board</h1>; }\n"));
   assert.equal(appEntry?.role, "source");
 });
@@ -123,18 +136,24 @@ test("workspace read and list helpers expose file contents and reject file path 
     appSlug: "ops-board",
     checkpointId: "gapp_ckpt_001",
   };
-  await writeGeneratedAppWorkspace({
-    ...metadata,
-    files: [
-      { path: "README.md", content: "# Ops Board\n", role: "docs" },
-      { path: "src/main.tsx", content: "console.log('ready');\n", role: "source" },
-    ],
-  }, { rootDir });
+  await writeGeneratedAppWorkspace(
+    {
+      ...metadata,
+      files: [
+        { path: "README.md", content: "# Ops Board\n", role: "docs" },
+        { path: "src/main.tsx", content: "console.log('ready');\n", role: "source" },
+      ],
+    },
+    { rootDir },
+  );
 
   const files = await listGeneratedAppWorkspaceFiles(metadata, { rootDir });
   const readme = await readGeneratedAppWorkspaceFile(metadata, "README.md", { rootDir });
 
-  assert.deepEqual(files.map((file) => file.path), ["README.md", "src/main.tsx"]);
+  assert.deepEqual(
+    files.map((file) => file.path),
+    ["README.md", "src/main.tsx"],
+  );
   assert.equal(readme.content, "# Ops Board\n");
   assert.equal(readme.contentType, "text/markdown; charset=utf-8");
   assert.equal(readme.sha256, sha256("# Ops Board\n"));
@@ -144,7 +163,11 @@ test("workspace read and list helpers expose file contents and reject file path 
     /cannot traverse directories/,
   );
   await assert.rejects(
-    () => writeGeneratedAppWorkspace({ ...metadata, files: [{ path: "src/../escape.ts", content: "" }] }, { rootDir }),
+    () =>
+      writeGeneratedAppWorkspace(
+        { ...metadata, files: [{ path: "src/../escape.ts", content: "" }] },
+        { rootDir },
+      ),
     /cannot traverse directories/,
   );
 });
@@ -170,16 +193,21 @@ test("writeGeneratedAppRuntimeWorkspace writes a runtime artifact into the gener
   });
 
   const appTsx = await readFile(path.join(result.paths.workspacePath, "src", "App.tsx"), "utf8");
-  const listed = await listGeneratedAppWorkspaceFiles({
-    workspaceSlug: "alpha",
-    appSlug: "ops-board",
-    checkpointId: "gapp_ckpt_001",
-  }, { rootDir });
+  const listed = await listGeneratedAppWorkspaceFiles(
+    {
+      workspaceSlug: "alpha",
+      appSlug: "ops-board",
+      checkpointId: "gapp_ckpt_001",
+    },
+    { rootDir },
+  );
 
   assert.ok(appTsx.includes("Ops Board"));
   assert.equal(result.manifest.writtenAt, "2026-05-12T10:01:00.000Z");
   assert.equal(result.manifest.files.length, artifact.files.length);
-  assert.ok(result.manifest.files.some((file) => file.path === "src/App.tsx" && file.role === "source"));
+  assert.ok(
+    result.manifest.files.some((file) => file.path === "src/App.tsx" && file.role === "source"),
+  );
   assert.deepEqual(
     listed.map((file) => file.path),
     result.manifest.files.map((file) => file.path).sort((left, right) => left.localeCompare(right)),

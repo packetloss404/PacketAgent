@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { buildAppPublishReadiness, type AppPublishReadinessInput } from "./app-publish-readiness.js";
+import {
+  buildAppPublishReadiness,
+  type AppPublishReadinessInput,
+} from "./app-publish-readiness.js";
 import type {
   GeneratedAppDockerComposeExportPayload,
   GeneratedAppPublishRecord,
@@ -46,7 +49,9 @@ export interface GeneratedAppPublishRollbackResultInput {
 
 const DEFAULT_TIMESTAMP = "1970-01-01T00:00:00.000Z";
 
-export function buildGeneratedAppPublishRecord(input: GeneratedAppPublishRecordInput): GeneratedAppPublishRecord {
+export function buildGeneratedAppPublishRecord(
+  input: GeneratedAppPublishRecordInput,
+): GeneratedAppPublishRecord {
   const createdAt = normalizeTimestamp(input.createdAt);
   const readiness = buildAppPublishReadiness({
     ...input,
@@ -54,19 +59,18 @@ export function buildGeneratedAppPublishRecord(input: GeneratedAppPublishRecordI
     draftId: input.appSlug ?? input.appId,
     workspaceSlug: input.workspaceSlug ?? input.workspaceId,
   });
-  const versionLabel = `publish-${createdAt.slice(0, 10)}-${stableHash([
-    input.workspaceId,
-    input.appId,
-    input.checkpointId,
-    readiness.localPublishPath,
-    createdAt,
-  ].join(":")).slice(0, 8)}`;
-  const id = `gapp_publish_${stableHash([
-    input.workspaceId,
-    input.appId,
-    input.checkpointId,
-    versionLabel,
-  ].join(":")).slice(0, 16)}`;
+  const versionLabel = `publish-${createdAt.slice(0, 10)}-${stableHash(
+    [
+      input.workspaceId,
+      input.appId,
+      input.checkpointId,
+      readiness.localPublishPath,
+      createdAt,
+    ].join(":"),
+  ).slice(0, 8)}`;
+  const id = `gapp_publish_${stableHash(
+    [input.workspaceId, input.appId, input.checkpointId, versionLabel].join(":"),
+  ).slice(0, 16)}`;
   const dockerComposeExport = buildDockerComposeExport({
     appSlug: readiness.draftSlug,
     workspaceSlug: readiness.workspaceSlug,
@@ -80,7 +84,9 @@ export function buildGeneratedAppPublishRecord(input: GeneratedAppPublishRecordI
     ...readiness.packaging.artifactPaths,
     `${readiness.localPublishPath}/${dockerComposeExport.fileName}`,
   ]);
-  const status: GeneratedAppPublishStatus = publishReady(input.buildStatus, input.smokeStatus) ? "published" : "failed";
+  const status: GeneratedAppPublishStatus = publishReady(input.buildStatus, input.smokeStatus)
+    ? "published"
+    : "failed";
   const publish: GeneratedAppPublishRecord = removeUndefined({
     id,
     appId: input.appId,
@@ -129,7 +135,9 @@ export function buildGeneratedAppPublishRecord(input: GeneratedAppPublishRecordI
   return publish;
 }
 
-export function generatedAppPublishRuntimePath(input: GeneratedAppPublishRuntimeRouteInput): string {
+export function generatedAppPublishRuntimePath(
+  input: GeneratedAppPublishRuntimeRouteInput,
+): string {
   const checkpointId = cleanString(input.checkpointId);
   const path = `/api/app/generated-apps/${encodeURIComponent(cleanString(input.appId) || "generated-app")}/preview`;
   return checkpointId ? `${path}?checkpointId=${encodeURIComponent(checkpointId)}` : path;
@@ -142,7 +150,9 @@ export function generatedAppPublishUrlForBase(
   const parsed = parseUrl(url);
   if (!parsed || !isPacketAgentRuntimeHost(parsed)) return url;
   parsed.pathname = generatedAppPublishRuntimePath(input).split("?")[0];
-  parsed.search = cleanString(input.checkpointId) ? `?checkpointId=${encodeURIComponent(cleanString(input.checkpointId))}` : "";
+  parsed.search = cleanString(input.checkpointId)
+    ? `?checkpointId=${encodeURIComponent(cleanString(input.checkpointId))}`
+    : "";
   parsed.hash = "";
   return parsed.toString();
 }
@@ -156,7 +166,9 @@ export function buildDockerComposeExport(input: {
   manifestPath?: string;
   bundlePath?: string;
 }): GeneratedAppDockerComposeExportPayload {
-  const manifestPath = normalizePath(input.manifestPath || `${input.localPublishPath}/publish-artifacts.json`);
+  const manifestPath = normalizePath(
+    input.manifestPath || `${input.localPublishPath}/publish-artifacts.json`,
+  );
   const bundlePath = normalizePath(input.bundlePath || `${input.localPublishPath}/bundle`);
   const containerPublishPath = `/app/data/published-apps/${input.workspaceSlug}/${input.appSlug}`;
   const environment = {
@@ -183,7 +195,7 @@ export function buildDockerComposeExport(input: {
     "    build: .",
     "    command: npm start",
     "    ports:",
-    "      - \"8484:8484\"",
+    '      - "8484:8484"',
     "    environment:",
     ...Object.entries(environment).map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`),
     "    volumes:",
@@ -224,12 +236,11 @@ export function buildDockerComposeExport(input: {
 export function createGeneratedAppPublishRollbackCommand(
   input: GeneratedAppPublishRollbackCommandInput,
 ): GeneratedAppPublishRollbackCommand {
-  const commandId = `publish_rollback_${stableHash([
-    input.current.id,
-    input.target.id,
-    input.requestedByUserId ?? "",
-    input.reason ?? "",
-  ].join(":")).slice(0, 16)}`;
+  const commandId = `publish_rollback_${stableHash(
+    [input.current.id, input.target.id, input.requestedByUserId ?? "", input.reason ?? ""].join(
+      ":",
+    ),
+  ).slice(0, 16)}`;
   const command = [
     "packetagent publish rollback",
     `--workspace=${input.current.workspaceId}`,
@@ -285,10 +296,13 @@ export function buildGeneratedAppPublishRollbackResult(
   });
 }
 
-export function orderGeneratedAppPublishHistory(history: GeneratedAppPublishRecord[]): GeneratedAppPublishRecord[] {
+export function orderGeneratedAppPublishHistory(
+  history: GeneratedAppPublishRecord[],
+): GeneratedAppPublishRecord[] {
   return [...history].sort((left, right) => {
-    return timestampMs(right.createdAt) - timestampMs(left.createdAt)
-      || left.id.localeCompare(right.id);
+    return (
+      timestampMs(right.createdAt) - timestampMs(left.createdAt) || left.id.localeCompare(right.id)
+    );
   });
 }
 
@@ -326,24 +340,34 @@ function publishLogs(input: {
       level: "info",
       message: `Published artifact manifest ${input.manifestPath} to ${input.localPublishPath}.`,
     },
-    ...(input.previousPublishId ? [{
-      at: input.createdAt,
-      level: "info" as const,
-      message: `Previous publish ${input.previousPublishId} retained as rollback target.`,
-    }] : []),
+    ...(input.previousPublishId
+      ? [
+          {
+            at: input.createdAt,
+            level: "info" as const,
+            message: `Previous publish ${input.previousPublishId} retained as rollback target.`,
+          },
+        ]
+      : []),
   ];
 }
 
-function rollbackMessage(status: GeneratedAppPublishRollbackStatus, publishId: string, error: string | undefined): string {
+function rollbackMessage(
+  status: GeneratedAppPublishRollbackStatus,
+  publishId: string,
+  error: string | undefined,
+): string {
   if (status === "succeeded") return `Rolled publish target back to ${publishId}.`;
   if (status === "noop") return `Publish target already points at ${publishId}.`;
-  if (status === "failed") return `Publish rollback to ${publishId} failed${error ? `: ${error}` : "."}`;
+  if (status === "failed")
+    return `Publish rollback to ${publishId} failed${error ? `: ${error}` : "."}`;
   return `Publish rollback to ${publishId} is pending confirmation.`;
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.map((value) => cleanString(value)).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right));
+  return [...new Set(values.map((value) => cleanString(value)).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right),
+  );
 }
 
 function stableStatus(value: string | undefined): string {
@@ -360,11 +384,13 @@ function parseUrl(value: string): URL | null {
 
 function isPacketAgentRuntimeHost(url: URL): boolean {
   const hostname = url.hostname.toLowerCase();
-  return hostname === "localhost"
-    || hostname === "127.0.0.1"
-    || hostname === "[::1]"
-    || hostname === "::1"
-    || hostname.endsWith(".localhost");
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname === "::1" ||
+    hostname.endsWith(".localhost")
+  );
 }
 
 function normalizePath(value: string): string {

@@ -1,14 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  inspectIntegrationSandbox,
-  redactIntegrationSandboxValue,
-} from "./integration-sandbox";
+import { inspectIntegrationSandbox, redactIntegrationSandboxValue } from "./integration-sandbox";
 
 test("integration sandbox reports deterministic runtime and preview failures without leaking secrets", () => {
   const report = inspectIntegrationSandbox({
     draft: {
-      summary: "GPT support app with Stripe checkout, webhook receipts, GitHub issue sync, browser scrape import, preview API routes, and Postgres records.",
+      summary:
+        "GPT support app with Stripe checkout, webhook receipts, GitHub issue sync, browser scrape import, preview API routes, and Postgres records.",
       pages: ["Dashboard", "Preview smoke page"],
       apiRoutes: [{ path: "/api/webhooks/stripe" }, { path: "/api/preview/run" }],
       dataModels: [{ name: "customer" }],
@@ -44,7 +42,8 @@ test("integration sandbox reports deterministic runtime and preview failures wit
 test("integration sandbox passes requested connectors when sandbox setup is present", () => {
   const report = inspectIntegrationSandbox({
     draft: {
-      summary: "OpenAI email notifications, signed webhooks, Stripe subscriptions, GitHub PR sync, browser scrape import, and preview runtime endpoints.",
+      summary:
+        "OpenAI email notifications, signed webhooks, Stripe subscriptions, GitHub PR sync, browser scrape import, and preview runtime endpoints.",
       pages: ["Previewed app"],
       apiRoutes: [{ path: "/api/preview/run" }, { path: "/api/webhooks/github" }],
       dataModels: [{ name: "subscription" }],
@@ -72,9 +71,9 @@ test("integration sandbox passes requested connectors when sandbox setup is pres
   assert.equal(report.canRunRuntimeSandbox, true);
   assert.equal(report.canRunPreviewSandbox, true);
   assert.deepEqual(report.failures, []);
-  assert.ok(report.results
-    .filter((result) => result.required)
-    .every((result) => result.status === "pass"));
+  assert.ok(
+    report.results.filter((result) => result.required).every((result) => result.status === "pass"),
+  );
 });
 
 test("integration sandbox supports explicit pending connector results and setup guidance", () => {

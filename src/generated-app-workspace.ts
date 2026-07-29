@@ -1,13 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import {
-  mkdir,
-  readFile,
-  readdir,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface GeneratedAppWorkspaceMetadata {
@@ -96,7 +88,9 @@ export function resolveGeneratedAppWorkspacePath(
   const appSlug = safePathSegment(metadata.appSlug, "appSlug");
   const checkpointId = safePathSegment(metadata.checkpointId, "checkpointId");
   const rootDir = path.resolve(options.rootDir ?? process.cwd());
-  const generatedAppsRoot = path.resolve(options.generatedAppsRoot ?? path.join(rootDir, "data", "generated-apps"));
+  const generatedAppsRoot = path.resolve(
+    options.generatedAppsRoot ?? path.join(rootDir, "data", "generated-apps"),
+  );
   const workspacePath = path.resolve(generatedAppsRoot, workspaceSlug, appSlug, "workspace");
 
   assertInsidePath(generatedAppsRoot, workspacePath, "generated app workspace path");
@@ -213,7 +207,10 @@ export function normalizeGeneratedAppWorkspaceFilePath(filePath: string): string
 }
 
 async function writeFileAtomically(destination: string, content: string) {
-  const tempPath = path.join(path.dirname(destination), `.${path.basename(destination)}.${process.pid}.${randomUUID()}.tmp`);
+  const tempPath = path.join(
+    path.dirname(destination),
+    `.${path.basename(destination)}.${process.pid}.${randomUUID()}.tmp`,
+  );
   await writeFile(tempPath, content, "utf8");
   try {
     await rename(tempPath, destination);
@@ -223,12 +220,15 @@ async function writeFileAtomically(destination: string, content: string) {
   }
 }
 
-function normalizeWorkspaceFiles(files: GeneratedAppWorkspaceWriteFile[]): GeneratedAppWorkspaceWriteFile[] {
+function normalizeWorkspaceFiles(
+  files: GeneratedAppWorkspaceWriteFile[],
+): GeneratedAppWorkspaceWriteFile[] {
   const seen = new Set<string>();
 
   return files.map((file) => {
     const filePath = normalizeWorkspaceFilePath(file.path);
-    if (seen.has(filePath)) throw new Error(`duplicate generated app workspace file path: ${filePath}`);
+    if (seen.has(filePath))
+      throw new Error(`duplicate generated app workspace file path: ${filePath}`);
     seen.add(filePath);
     return {
       path: filePath,
@@ -246,7 +246,10 @@ function resolveWorkspaceFilePath(workspacePath: string, filePath: string): stri
   return absoluteFilePath;
 }
 
-async function discoverWorkspaceFiles(workspacePath: string, prefix = ""): Promise<GeneratedAppWorkspaceFileManifestEntry[]> {
+async function discoverWorkspaceFiles(
+  workspacePath: string,
+  prefix = "",
+): Promise<GeneratedAppWorkspaceFileManifestEntry[]> {
   let entries;
   try {
     entries = await readdir(path.join(workspacePath, prefix), { withFileTypes: true });
@@ -257,11 +260,13 @@ async function discoverWorkspaceFiles(workspacePath: string, prefix = ""): Promi
 
   const files: GeneratedAppWorkspaceFileManifestEntry[] = [];
   for (const entry of entries) {
-    const relativePath = normalizeRelativePath(path.posix.join(prefix.replace(/\\/g, "/"), entry.name));
+    const relativePath = normalizeRelativePath(
+      path.posix.join(prefix.replace(/\\/g, "/"), entry.name),
+    );
     if (relativePath === ".packetagent" || relativePath.startsWith(".packetagent/")) continue;
     const absolutePath = path.join(workspacePath, relativePath);
     if (entry.isDirectory()) {
-      files.push(...await discoverWorkspaceFiles(workspacePath, relativePath));
+      files.push(...(await discoverWorkspaceFiles(workspacePath, relativePath)));
       continue;
     }
     if (!entry.isFile()) continue;
@@ -280,7 +285,8 @@ async function discoverWorkspaceFiles(workspacePath: string, prefix = ""): Promi
 function normalizeWorkspaceFilePath(filePath: string): string {
   const value = String(filePath ?? "").trim();
   if (!value) throw new Error("generated app workspace file path is required");
-  if (value.includes("\0")) throw new Error("generated app workspace file path cannot contain null bytes");
+  if (value.includes("\0"))
+    throw new Error("generated app workspace file path cannot contain null bytes");
 
   const withForwardSlashes = value.replace(/\\/g, "/");
   if (path.posix.isAbsolute(withForwardSlashes) || /^[a-zA-Z]:\//.test(withForwardSlashes)) {
@@ -298,11 +304,11 @@ function normalizeWorkspaceFilePath(filePath: string): string {
 function safePathSegment(value: string, label: string): string {
   const cleaned = String(value ?? "").trim();
   if (
-    !cleaned
-    || cleaned === "."
-    || cleaned === ".."
-    || cleaned.includes("\0")
-    || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(cleaned)
+    !cleaned ||
+    cleaned === "." ||
+    cleaned === ".." ||
+    cleaned.includes("\0") ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(cleaned)
   ) {
     throw new Error(`unsafe generated app ${label}: ${String(value ?? "")}`);
   }
@@ -317,7 +323,8 @@ function assertInsidePath(parentPath: string, childPath: string, label: string) 
 
 function contentTypeForPath(filePath: string): string {
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
-  if (filePath.endsWith(".tsx") || filePath.endsWith(".ts")) return "text/typescript; charset=utf-8";
+  if (filePath.endsWith(".tsx") || filePath.endsWith(".ts"))
+    return "text/typescript; charset=utf-8";
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
   if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
   if (filePath.endsWith(".md")) return "text/markdown; charset=utf-8";
@@ -341,7 +348,10 @@ function removeUndefined<T extends Record<string, unknown>>(record: T): T {
   return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined)) as T;
 }
 
-function compareWorkspaceFiles(left: GeneratedAppWorkspaceFileManifestEntry, right: GeneratedAppWorkspaceFileManifestEntry): number {
+function compareWorkspaceFiles(
+  left: GeneratedAppWorkspaceFileManifestEntry,
+  right: GeneratedAppWorkspaceFileManifestEntry,
+): number {
   return left.path.localeCompare(right.path);
 }
 

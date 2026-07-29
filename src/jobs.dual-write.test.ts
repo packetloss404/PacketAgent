@@ -14,7 +14,14 @@ import {
   sweepStaleRunningJobs,
   updateJob,
 } from "./jobs/store.js";
-import { clearStoreCacheForTests, loadStore, mutateStore, resetStoreForTests, type AgentRecord, type JobRecord } from "./packetagent-store.js";
+import {
+  clearStoreCacheForTests,
+  loadStore,
+  mutateStore,
+  resetStoreForTests,
+  type AgentRecord,
+  type JobRecord,
+} from "./packetagent-store.js";
 
 interface JobRow {
   id: string;
@@ -38,13 +45,17 @@ interface JobRow {
 function readDedicatedJobs(dbPath: string): JobRow[] {
   const db = new DatabaseSync(dbPath);
   try {
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       select id, workspace_id, type, payload, status, attempts, max_attempts,
         scheduled_at, started_at, completed_at, cron, result, error,
         cancel_requested, created_at, updated_at
       from jobs
       order by created_at, id
-    `).all() as unknown as JobRow[];
+    `,
+      )
+      .all() as unknown as JobRow[];
   } finally {
     db.close();
   }
@@ -53,7 +64,9 @@ function readDedicatedJobs(dbPath: string): JobRow[] {
 function readAppRecordJobs(dbPath: string): JobRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'jobs'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'jobs'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as JobRecord);
   } finally {
     db.close();
@@ -86,11 +99,13 @@ function withSqliteEnv(dbPath: string) {
 function seedAgentDirectly(dbPath: string, agent: AgentRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('agents', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(agent.id, agent.workspaceId, JSON.stringify(agent), agent.updatedAt);
+    `,
+    ).run(agent.id, agent.workspaceId, JSON.stringify(agent), agent.updatedAt);
   } finally {
     db.close();
   }
@@ -99,13 +114,15 @@ function seedAgentDirectly(dbPath: string, agent: AgentRecord): void {
 function seedDedicatedJobDirectly(dbPath: string, job: JobRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert or replace into jobs (
         id, workspace_id, type, payload, status, attempts, max_attempts,
         scheduled_at, started_at, completed_at, cron, result, error,
         cancel_requested, created_at, updated_at
       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
       job.id,
       job.workspaceId,
       job.type,
@@ -131,11 +148,13 @@ function seedDedicatedJobDirectly(dbPath: string, job: JobRecord): void {
 function seedAppRecordJobDirectly(dbPath: string, job: JobRecord): void {
   const db = new DatabaseSync(dbPath);
   try {
-    db.prepare(`
+    db.prepare(
+      `
       insert into app_records (collection, id, workspace_id, payload, updated_at)
       values ('jobs', ?, ?, json(?), ?)
       on conflict(collection, id) do update set workspace_id = excluded.workspace_id, payload = excluded.payload, updated_at = excluded.updated_at
-    `).run(job.id, job.workspaceId, JSON.stringify(job), job.updatedAt);
+    `,
+    ).run(job.id, job.workspaceId, JSON.stringify(job), job.updatedAt);
   } finally {
     db.close();
   }
@@ -156,7 +175,9 @@ function makeJobRecord(overrides: Partial<JobRecord> & { id: string }): JobRecor
     ...(overrides.cron !== undefined ? { cron: overrides.cron } : {}),
     ...(overrides.result !== undefined ? { result: overrides.result } : {}),
     ...(overrides.error !== undefined ? { error: overrides.error } : {}),
-    ...(overrides.cancelRequested !== undefined ? { cancelRequested: overrides.cancelRequested } : {}),
+    ...(overrides.cancelRequested !== undefined
+      ? { cancelRequested: overrides.cancelRequested }
+      : {}),
     createdAt: overrides.createdAt ?? "2026-04-25T12:00:00.000Z",
     updatedAt: overrides.updatedAt ?? "2026-04-25T12:00:00.000Z",
   };
@@ -311,10 +332,7 @@ test("claimNextJob claims a jobs-table-only row in SQLite mode", async () => {
     const afterUnrelatedMutation = findDedicatedJob(dbPath, queued.id);
     assert.equal(afterUnrelatedMutation?.status, "running");
     assert.equal(afterUnrelatedMutation?.attempts, 1);
-    assert.equal(
-      loadStore().jobs.find((entry) => entry.id === queued.id)?.status,
-      "running",
-    );
+    assert.equal(loadStore().jobs.find((entry) => entry.id === queued.id)?.status, "running");
   } finally {
     restore();
     rmSync(tempDir, { recursive: true, force: true });

@@ -3,7 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { buildGeneratedAppRuntimeModel, type GeneratedAppRuntimeDraft } from "./generated-app-runtime.js";
+import {
+  buildGeneratedAppRuntimeModel,
+  type GeneratedAppRuntimeDraft,
+} from "./generated-app-runtime.js";
 import { openGeneratedAppSqliteRuntime } from "./generated-app-runtime/sqlite.js";
 
 const draft: GeneratedAppRuntimeDraft = {
@@ -15,24 +18,28 @@ const draft: GeneratedAppRuntimeDraft = {
     name: "Runtime CRM",
     description: "Manage accounts.",
     pages: [],
-    dataSchema: [{
-      name: "account",
-      fields: [
-        { name: "id", type: "uuid", required: true },
-        { name: "name", type: "string", required: true },
-        { name: "status", type: "enum", required: true },
-      ],
-      relationships: [],
-    }],
+    dataSchema: [
+      {
+        name: "account",
+        fields: [
+          { name: "id", type: "uuid", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "status", type: "enum", required: true },
+        ],
+        relationships: [],
+      },
+    ],
     apiRoutes: [],
-    crudFlows: [{
-      entity: "account",
-      create: "Create accounts.",
-      read: "Read accounts.",
-      update: "Update accounts.",
-      delete: "Archive accounts.",
-      validation: ["name is required"],
-    }],
+    crudFlows: [
+      {
+        entity: "account",
+        create: "Create accounts.",
+        read: "Read accounts.",
+        update: "Update accounts.",
+        delete: "Archive accounts.",
+        validation: ["name is required"],
+      },
+    ],
     authDecisions: [],
   },
 };
@@ -42,7 +49,12 @@ test("generated app SQLite runtime persists CRUD records across opens", () => {
   try {
     const dbPath = join(root, "runtime.sqlite");
     const model = buildGeneratedAppRuntimeModel(draft);
-    let runtime = openGeneratedAppSqliteRuntime({ appId: "gapp_runtime", workspaceId: "alpha", model, dbPath });
+    let runtime = openGeneratedAppSqliteRuntime({
+      appId: "gapp_runtime",
+      workspaceId: "alpha",
+      model,
+      dbPath,
+    });
     const seeded = runtime.handleRequest({ method: "GET", path: "/accounts" });
     assert.equal(seeded.status, 200);
     assert.equal((seeded.body as unknown[]).length, 2);
@@ -56,7 +68,12 @@ test("generated app SQLite runtime persists CRUD records across opens", () => {
     const createdId = String((created.body as { id: string }).id);
     runtime.close();
 
-    runtime = openGeneratedAppSqliteRuntime({ appId: "gapp_runtime", workspaceId: "alpha", model, dbPath });
+    runtime = openGeneratedAppSqliteRuntime({
+      appId: "gapp_runtime",
+      workspaceId: "alpha",
+      model,
+      dbPath,
+    });
     const reopened = runtime.handleRequest({ method: "GET", path: `/accounts/${createdId}` });
     assert.equal(reopened.status, 200);
     assert.equal((reopened.body as { name?: string }).name, "Prairie Systems");
@@ -71,7 +88,10 @@ test("generated app SQLite runtime persists CRUD records across opens", () => {
     const archived = runtime.handleRequest({ method: "DELETE", path: `/accounts/${createdId}` });
     assert.equal(archived.status, 200);
     const listed = runtime.handleRequest({ method: "GET", path: "/accounts" });
-    assert.equal((listed.body as Array<{ id?: string }>).some((record) => record.id === createdId), false);
+    assert.equal(
+      (listed.body as Array<{ id?: string }>).some((record) => record.id === createdId),
+      false,
+    );
     runtime.close();
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -83,21 +103,32 @@ test("generated app SQLite runtime drops and reseeds data on schema signature ch
   try {
     const dbPath = join(root, "runtime.sqlite");
     const model = buildGeneratedAppRuntimeModel(draft);
-    let runtime = openGeneratedAppSqliteRuntime({ appId: "gapp_runtime", workspaceId: "alpha", model, dbPath });
-    runtime.handleRequest({ method: "POST", path: "/accounts", body: { name: "Transient Co", status: "active" } });
+    let runtime = openGeneratedAppSqliteRuntime({
+      appId: "gapp_runtime",
+      workspaceId: "alpha",
+      model,
+      dbPath,
+    });
+    runtime.handleRequest({
+      method: "POST",
+      path: "/accounts",
+      body: { name: "Transient Co", status: "active" },
+    });
     runtime.close();
 
     const changedDraft: GeneratedAppRuntimeDraft = {
       ...draft,
       app: {
         ...draft.app,
-        dataSchema: [{
-          ...draft.app.dataSchema[0]!,
-          fields: [
-            ...draft.app.dataSchema[0]!.fields,
-            { name: "ownerEmail", type: "string", required: false },
-          ],
-        }],
+        dataSchema: [
+          {
+            ...draft.app.dataSchema[0]!,
+            fields: [
+              ...draft.app.dataSchema[0]!.fields,
+              { name: "ownerEmail", type: "string", required: false },
+            ],
+          },
+        ],
       },
     };
     runtime = openGeneratedAppSqliteRuntime({
@@ -107,7 +138,10 @@ test("generated app SQLite runtime drops and reseeds data on schema signature ch
       dbPath,
     });
     const listed = runtime.handleRequest({ method: "GET", path: "/accounts" });
-    assert.equal((listed.body as Array<{ name?: string }>).some((record) => record.name === "Transient Co"), false);
+    assert.equal(
+      (listed.body as Array<{ name?: string }>).some((record) => record.name === "Transient Co"),
+      false,
+    );
     assert.equal((listed.body as unknown[]).length, 2);
     runtime.close();
   } finally {

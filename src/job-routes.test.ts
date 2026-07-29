@@ -97,7 +97,10 @@ test("job mutations use central browser csrf and same-origin guard", async () =>
 
   const sameOrigin = await app.request("/api/app/jobs", {
     method: "POST",
-    headers: { ...browserAuthHeaders(sessionCookie, csrfToken), "content-type": "application/json" },
+    headers: {
+      ...browserAuthHeaders(sessionCookie, csrfToken),
+      "content-type": "application/json",
+    },
     body: JSON.stringify({ type: "test.same-origin" }),
   });
   assert.equal(sameOrigin.status, 201);
@@ -136,7 +139,9 @@ test("job mutation origin checks only trust forwarded host when proxy trust is e
       body: JSON.stringify({ type: "test.forwarded-host-disabled" }),
     });
     assert.equal(spoofedForwardedHost.status, 403);
-    assert.deepEqual(await spoofedForwardedHost.json(), { error: "cross-origin requests are not allowed" });
+    assert.deepEqual(await spoofedForwardedHost.json(), {
+      error: "cross-origin requests are not allowed",
+    });
 
     process.env.PACKETAGENT_TRUST_PROXY = "true";
     const trustedForwardedHost = await app.request("/api/app/jobs", {
@@ -226,10 +231,15 @@ test("job list filters to the authenticated workspace with status and limit", as
   const response = await app.request("/api/app/jobs?status=queued&limit=1", {
     headers: authHeaders(alpha.cookieValue),
   });
-  const body = await response.json() as { jobs: { id: string; workspaceId: string; status: string; type: string }[] };
+  const body = (await response.json()) as {
+    jobs: { id: string; workspaceId: string; status: string; type: string }[];
+  };
 
   assert.equal(response.status, 200);
-  assert.deepEqual(body.jobs.map((job) => job.id), [newestAlpha.id]);
+  assert.deepEqual(
+    body.jobs.map((job) => job.id),
+    [newestAlpha.id],
+  );
   assert.equal(body.jobs[0]?.workspaceId, "alpha");
   assert.equal(body.jobs[0]?.status, "queued");
 });
@@ -274,7 +284,9 @@ test("job management requires an admin role but job reads allow viewers", async 
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const alphaJob = enqueueJob({ workspaceId: "alpha", type: "test.viewer" });
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "viewer";
   });
@@ -319,7 +331,16 @@ test("job creation stores optional scheduling fields in the authenticated worksp
       maxAttempts: 5,
     }),
   });
-  const body = await response.json() as { job: { workspaceId: string; type: string; payload: unknown; scheduledAt: string; cron: string; maxAttempts: number } };
+  const body = (await response.json()) as {
+    job: {
+      workspaceId: string;
+      type: string;
+      payload: unknown;
+      scheduledAt: string;
+      cron: string;
+      maxAttempts: number;
+    };
+  };
 
   assert.equal(response.status, 201);
   assert.equal(body.job.workspaceId, "alpha");
@@ -346,5 +367,7 @@ test("job creation rejects agent runs outside the authenticated workspace", asyn
   const body = await response.json();
 
   assert.equal(response.status, 400);
-  assert.deepEqual(body, { error: "agent.run payload.agentId must reference an agent in this workspace" });
+  assert.deepEqual(body, {
+    error: "agent.run payload.agentId must reference an agent in this workspace",
+  });
 });

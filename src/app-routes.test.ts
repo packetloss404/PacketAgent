@@ -81,7 +81,10 @@ function assertPathInside(parentPath: string, childPath: string) {
   if (resolve(parentPath) === resolve(childPath)) return;
   const scoped = relative(parentPath, childPath);
   if (scoped === "") return;
-  assert.ok(!scoped.startsWith("..") && !isAbsolute(scoped), `${childPath} should be inside ${parentPath}`);
+  assert.ok(
+    !scoped.startsWith("..") && !isAbsolute(scoped),
+    `${childPath} should be inside ${parentPath}`,
+  );
 }
 
 function cookieValue(response: Response) {
@@ -137,34 +140,47 @@ test("app activation route requires authentication", async () => {
 test("auth session routes run through the async managed store backend", async () => {
   const client = new FakeManagedPostgresClient();
 
-  await withManagedStoreEnv({
-    PACKETAGENT_STORE: "postgres",
-    PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
-  }, client, async (configs) => {
-    const app = createTestApp();
+  await withManagedStoreEnv(
+    {
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+    },
+    client,
+    async (configs) => {
+      const app = createTestApp();
 
-    const loginResponse = await app.request("/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "alpha@packetagent.local", password: "demo12345" }),
-    });
-    const loginBody = await loginResponse.json() as { authenticated: boolean; user: { id: string } };
+      const loginResponse = await app.request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "alpha@packetagent.local", password: "demo12345" }),
+      });
+      const loginBody = (await loginResponse.json()) as {
+        authenticated: boolean;
+        user: { id: string };
+      };
 
-    assert.equal(configs[0].envKey, "PACKETAGENT_DATABASE_URL");
-    assert.equal(loginResponse.status, 200);
-    assert.equal(loginBody.authenticated, true);
-    assert.equal(loginBody.user.id, "user_alpha");
+      assert.equal(configs[0].envKey, "PACKETAGENT_DATABASE_URL");
+      assert.equal(loginResponse.status, 200);
+      assert.equal(loginBody.authenticated, true);
+      assert.equal(loginBody.user.id, "user_alpha");
 
-    const sessionResponse = await app.request("/api/auth/session", {
-      headers: authHeaders(cookieValue(loginResponse)),
-    });
-    const sessionBody = await sessionResponse.json() as { authenticated: boolean; user: { id: string } };
+      const sessionResponse = await app.request("/api/auth/session", {
+        headers: authHeaders(cookieValue(loginResponse)),
+      });
+      const sessionBody = (await sessionResponse.json()) as {
+        authenticated: boolean;
+        user: { id: string };
+      };
 
-    assert.equal(sessionResponse.status, 200);
-    assert.equal(sessionBody.authenticated, true);
-    assert.equal(sessionBody.user.id, "user_alpha");
-    assert.equal(client.storedData().sessions.some((entry) => entry.userId === "user_alpha"), true);
-  });
+      assert.equal(sessionResponse.status, 200);
+      assert.equal(sessionBody.authenticated, true);
+      assert.equal(sessionBody.user.id, "user_alpha");
+      assert.equal(
+        client.storedData().sessions.some((entry) => entry.userId === "user_alpha"),
+        true,
+      );
+    },
+  );
 });
 
 test("app activation detail is scoped to the authenticated workspace", async () => {
@@ -175,7 +191,10 @@ test("app activation detail is scoped to the authenticated workspace", async () 
   const response = await app.request("/api/app/activation", {
     headers: authHeaders(alpha.cookieValue),
   });
-  const body = await response.json() as { workspace: { id: string }; activities: { workspaceId: string }[] };
+  const body = (await response.json()) as {
+    workspace: { id: string };
+    activities: { workspaceId: string }[];
+  };
 
   assert.equal(response.status, 200);
   assert.equal(body.workspace.id, "alpha");
@@ -223,7 +242,7 @@ test("model routing presets route exposes safe workspace-scoped presets", async 
   const response = await app.request("/api/app/model-routing-presets", {
     headers: authHeaders(alpha.cookieValue),
   });
-  const body = await response.json() as {
+  const body = (await response.json()) as {
     routingPresets?: {
       version?: string;
       presets?: {
@@ -238,7 +257,11 @@ test("model routing presets route exposes safe workspace-scoped presets", async 
   assert.equal(body.routingPresets?.version, "phase-72-lane-4");
   assert.equal(body.routingPresets?.presets?.fast?.primary?.provider, "openai");
   assert.equal(body.routingPresets?.presets?.fast?.primary?.model, "gpt-4.1-mini");
-  assert.ok(body.routingPresets?.presets?.fast?.primary?.envHints?.includes("PACKETAGENT_MODEL_PRESET_FAST"));
+  assert.ok(
+    body.routingPresets?.presets?.fast?.primary?.envHints?.includes(
+      "PACKETAGENT_MODEL_PRESET_FAST",
+    ),
+  );
   assert.equal(JSON.stringify(body).includes("sk-route-secret"), false);
 
   const aliasResponse = await app.request("/api/app/llm/routing-presets", {
@@ -261,7 +284,7 @@ test("integration marketplace route exposes cards, readiness, config, and test p
   const response = await app.request("/api/app/integration-marketplace", {
     headers: authHeaders(alpha.cookieValue),
   });
-  const body = await response.json() as {
+  const body = (await response.json()) as {
     marketplace?: {
       version?: string;
       cards?: Array<{
@@ -277,9 +300,21 @@ test("integration marketplace route exposes cards, readiness, config, and test p
   assert.equal(response.status, 200);
   assert.equal(body.marketplace?.version, "phase-71-lane-4");
   assert.equal(cards.length, 10);
-  assert.ok(cards.some((card) => card.id === "openai" && card.config.requiredEnv.includes("OPENAI_API_KEY")));
-  assert.ok(cards.some((card) => card.id === "database" && card.config.requiredEnv.includes("DATABASE_URL")));
-  assert.ok(cards.some((card) => card.id === "stripe-payments" && card.test.path.includes("stripe-payments")));
+  assert.ok(
+    cards.some(
+      (card) => card.id === "openai" && card.config.requiredEnv.includes("OPENAI_API_KEY"),
+    ),
+  );
+  assert.ok(
+    cards.some(
+      (card) => card.id === "database" && card.config.requiredEnv.includes("DATABASE_URL"),
+    ),
+  );
+  assert.ok(
+    cards.some(
+      (card) => card.id === "stripe-payments" && card.test.path.includes("stripe-payments"),
+    ),
+  );
   assert.ok(cards.every((card) => card.config.secretsRedacted));
   assert.equal(JSON.stringify(body).includes("sk-route-secret"), false);
 
@@ -315,7 +350,7 @@ test("integration marketplace advertised test routes use deterministic sandbox c
     headers,
     body: JSON.stringify({ provider: "openai", prompt: "Reply with ok." }),
   });
-  const llmBody = await llmResponse.json() as {
+  const llmBody = (await llmResponse.json()) as {
     test?: { connectorId?: string; deterministic?: boolean; liveNetworkCalls?: boolean };
     sandbox?: { version?: string };
   };
@@ -331,7 +366,7 @@ test("integration marketplace advertised test routes use deterministic sandbox c
     headers,
     body: JSON.stringify({ dryRun: true, sample: { id: "cs_test_123" } }),
   });
-  const stripeBody = await stripeResponse.json() as { test?: { connectorId?: string } };
+  const stripeBody = (await stripeResponse.json()) as { test?: { connectorId?: string } };
 
   assert.equal(stripeResponse.status, 200);
   assert.equal(stripeBody.test?.connectorId, "payment");
@@ -341,7 +376,10 @@ test("integration marketplace advertised test routes use deterministic sandbox c
     headers,
     body: JSON.stringify({ dryRun: true, sample: { to: "ops@example.test" } }),
   });
-  const emailBody = await emailResponse.json() as { test?: { connectorId?: string; status?: string }; sandbox?: unknown };
+  const emailBody = (await emailResponse.json()) as {
+    test?: { connectorId?: string; status?: string };
+    sandbox?: unknown;
+  };
 
   assert.equal(emailResponse.status, 200);
   assert.equal(emailBody.test?.connectorId, "email");
@@ -389,11 +427,17 @@ test("activity list and detail do not expose another workspace", async () => {
   const listResponse = await app.request("/api/app/activity", {
     headers: authHeaders(alpha.cookieValue),
   });
-  const listBody = await listResponse.json() as { activities: { id: string; workspaceId: string }[] };
+  const listBody = (await listResponse.json()) as {
+    activities: { id: string; workspaceId: string }[];
+  };
 
   assert.equal(listResponse.status, 200);
-  assert.ok(listBody.activities.some((activity) => activity.id === "activity_alpha_newer_route_test"));
-  assert.ok(!listBody.activities.some((activity) => activity.id === "activity_beta_private_route_test"));
+  assert.ok(
+    listBody.activities.some((activity) => activity.id === "activity_alpha_newer_route_test"),
+  );
+  assert.ok(
+    !listBody.activities.some((activity) => activity.id === "activity_beta_private_route_test"),
+  );
   assert.ok(listBody.activities.every((activity) => activity.workspaceId === "alpha"));
 
   const detailResponse = await app.request("/api/app/activity/activity_beta_private_route_test", {
@@ -454,7 +498,7 @@ test("generated apps list is workspace-scoped and returns lightweight summaries"
   const response = await app.request("/api/app/generated-apps", {
     headers: authHeaders(alpha.cookieValue),
   });
-  const body = await response.json() as {
+  const body = (await response.json()) as {
     generatedApps?: Array<Record<string, unknown>>;
   };
 
@@ -488,10 +532,11 @@ test("builder agent draft can be approved into an agent", async () => {
     method: "POST",
     headers,
     body: JSON.stringify({
-      prompt: "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
+      prompt:
+        "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
     }),
   });
-  const draftBody = await draftResponse.json() as { draft?: { agent?: { name?: string } } };
+  const draftBody = (await draftResponse.json()) as { draft?: { agent?: { name?: string } } };
 
   assert.equal(draftResponse.status, 200);
   assert.equal(draftBody.draft?.agent?.name, "Release audit agent");
@@ -501,17 +546,26 @@ test("builder agent draft can be approved into an agent", async () => {
     headers,
     body: JSON.stringify({ draft: draftBody.draft, runPreview: true }),
   });
-  const approveBody = await approveResponse.json() as { agent?: { id?: string }; firstRun?: { status?: string } };
+  const approveBody = (await approveResponse.json()) as {
+    agent?: { id?: string };
+    firstRun?: { status?: string };
+  };
 
   assert.equal(approveResponse.status, 201);
   assert.ok(approveBody.agent?.id);
   assert.equal(approveBody.firstRun?.status, "success");
   assert.ok(loadStore().agents.some((agent) => agent.id === approveBody.agent?.id));
 
-  const agentPublishStateResponse = await app.request(`/api/app/builder/publish/state?agentId=${approveBody.agent?.id}`, {
-    headers,
-  });
-  const agentPublishState = await agentPublishStateResponse.json() as { agentId?: string; canPublish?: boolean };
+  const agentPublishStateResponse = await app.request(
+    `/api/app/builder/publish/state?agentId=${approveBody.agent?.id}`,
+    {
+      headers,
+    },
+  );
+  const agentPublishState = (await agentPublishStateResponse.json()) as {
+    agentId?: string;
+    canPublish?: boolean;
+  };
 
   assert.equal(agentPublishStateResponse.status, 200);
   assert.equal(agentPublishState.agentId, approveBody.agent?.id);
@@ -520,9 +574,13 @@ test("builder agent draft can be approved into an agent", async () => {
   const agentPublishResponse = await app.request("/api/app/builder/publishes", {
     method: "POST",
     headers,
-    body: JSON.stringify({ agentId: approveBody.agent?.id, target: "agent", visibility: "private" }),
+    body: JSON.stringify({
+      agentId: approveBody.agent?.id,
+      target: "agent",
+      visibility: "private",
+    }),
   });
-  const agentPublish = await agentPublishResponse.json() as {
+  const agentPublish = (await agentPublishResponse.json()) as {
     published?: boolean;
     publishId?: string;
     state?: { agentId?: string; publishedUrl?: string; status?: string };
@@ -535,10 +593,13 @@ test("builder agent draft can be approved into an agent", async () => {
   assert.equal(agentPublish.state?.status, "published");
   assert.match(agentPublish.state?.publishedUrl ?? "", /localhost:8484/);
 
-  const persistedAgentStateResponse = await app.request(`/api/app/builder/publish/state?agentId=${approveBody.agent?.id}`, {
-    headers,
-  });
-  const persistedAgentState = await persistedAgentStateResponse.json() as {
+  const persistedAgentStateResponse = await app.request(
+    `/api/app/builder/publish/state?agentId=${approveBody.agent?.id}`,
+    {
+      headers,
+    },
+  );
+  const persistedAgentState = (await persistedAgentStateResponse.json()) as {
     agentId?: string;
     currentPublishId?: string;
     publishedUrl?: string;
@@ -564,10 +625,11 @@ test("builder app draft can be generated and applied with smoke metadata", async
     method: "POST",
     headers,
     body: JSON.stringify({
-      prompt: "Build a public booking app with services, appointment slots, staff calendars, and admin controls.",
+      prompt:
+        "Build a public booking app with services, appointment slots, staff calendars, and admin controls.",
     }),
   });
-  const draftBody = await draftResponse.json() as {
+  const draftBody = (await draftResponse.json()) as {
     draft?: {
       intent?: string;
       app?: {
@@ -575,7 +637,12 @@ test("builder app draft can be generated and applied with smoke metadata", async
         slug?: string;
         pages?: Array<{ route: string; access: string; components: string[] }>;
         dataSchema?: Array<{ name: string }>;
-        apiRoutes?: Array<{ path: string; access: string; authRequired: boolean; requiredRole?: string }>;
+        apiRoutes?: Array<{
+          path: string;
+          access: string;
+          authRequired: boolean;
+          requiredRole?: string;
+        }>;
       };
       smokeBuildStatus?: { status?: string; checks?: unknown[]; blockers?: string[] };
     };
@@ -584,10 +651,29 @@ test("builder app draft can be generated and applied with smoke metadata", async
   assert.equal(draftResponse.status, 200);
   assert.equal(draftBody.draft?.intent, "booking");
   assert.ok(draftBody.draft?.app?.slug);
-  assert.ok(draftBody.draft?.app?.pages?.some((page) => page.route === "/book" && page.access === "public" && page.components.length > 0));
+  assert.ok(
+    draftBody.draft?.app?.pages?.some(
+      (page) => page.route === "/book" && page.access === "public" && page.components.length > 0,
+    ),
+  );
   assert.ok(draftBody.draft?.app?.dataSchema?.some((entity) => entity.name === "appointment"));
-  assert.ok(draftBody.draft?.app?.apiRoutes?.some((route) => route.path.includes("/api/app/generated/") && route.path.includes("/appointments") && route.authRequired));
-  assert.ok(draftBody.draft?.app?.apiRoutes?.some((route) => route.path.includes("/services") && route.access === "admin" && route.authRequired && route.requiredRole === "admin"));
+  assert.ok(
+    draftBody.draft?.app?.apiRoutes?.some(
+      (route) =>
+        route.path.includes("/api/app/generated/") &&
+        route.path.includes("/appointments") &&
+        route.authRequired,
+    ),
+  );
+  assert.ok(
+    draftBody.draft?.app?.apiRoutes?.some(
+      (route) =>
+        route.path.includes("/services") &&
+        route.access === "admin" &&
+        route.authRequired &&
+        route.requiredRole === "admin",
+    ),
+  );
   assert.equal(draftBody.draft?.smokeBuildStatus?.status, "pending");
   assert.ok((draftBody.draft?.smokeBuildStatus?.checks?.length ?? 0) > 0);
   assert.deepEqual(draftBody.draft?.smokeBuildStatus?.blockers, []);
@@ -597,7 +683,7 @@ test("builder app draft can be generated and applied with smoke metadata", async
     headers,
     body: JSON.stringify({ draft: draftBody.draft, runSmoke: true }),
   });
-  const applyBody = await applyResponse.json() as {
+  const applyBody = (await applyResponse.json()) as {
     created?: boolean;
     applied?: boolean;
     app?: { id?: string; status?: string; previewUrl?: string };
@@ -615,7 +701,11 @@ test("builder app draft can be generated and applied with smoke metadata", async
   assert.ok(applyBody.checkpoint?.id);
   assert.equal(applyBody.smokeBuild?.status, "pass");
   assert.ok((applyBody.smokeBuild?.checks?.length ?? 0) > 0);
-  assert.ok(loadStore().generatedApps?.some((entry) => entry.id === applyBody.app?.id && entry.checkpointId === applyBody.checkpoint?.id));
+  assert.ok(
+    loadStore().generatedApps?.some(
+      (entry) => entry.id === applyBody.app?.id && entry.checkpointId === applyBody.checkpoint?.id,
+    ),
+  );
 });
 
 test("builder app-draft/apply stores generated source files for the current checkpoint", async () => {
@@ -629,16 +719,17 @@ test("builder app-draft/apply stores generated source files for the current chec
       method: "POST",
       headers,
       body: JSON.stringify({
-        prompt: "Build a public booking app with service selection, appointment slots, and staff scheduling.",
+        prompt:
+          "Build a public booking app with service selection, appointment slots, and staff scheduling.",
       }),
     });
-    const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+    const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
     const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
       method: "POST",
       headers,
       body: JSON.stringify({ draft, runSmoke: true }),
     });
-    const applied = await applyResponse.json() as {
+    const applied = (await applyResponse.json()) as {
       app?: { id?: string; slug?: string; previewUrl?: string };
       checkpoint?: { id?: string };
       sourceFiles?: Array<{ path: string; role: string; sha256: string }>;
@@ -648,17 +739,31 @@ test("builder app-draft/apply stores generated source files for the current chec
         slug?: string;
         path?: string;
         checkpointPath?: string;
-        manifest?: { path?: string; fileCount?: number; entrypoint?: string; checkpointId?: string };
+        manifest?: {
+          path?: string;
+          fileCount?: number;
+          entrypoint?: string;
+          checkpointId?: string;
+        };
       };
     };
 
     assert.equal(applyResponse.status, 201);
     assert.ok(applied.app?.id);
     assert.ok(applied.checkpoint?.id);
-    assert.match(applied.app?.previewUrl ?? "", new RegExp(`/builder/preview/alpha/${applied.app.id}$`));
+    assert.match(
+      applied.app?.previewUrl ?? "",
+      new RegExp(`/builder/preview/alpha/${applied.app.id}$`),
+    );
     assert.equal(applied.artifact?.entrypoint, "index.html");
-    assert.ok(applied.sourceFiles?.some((file) => file.path === "index.html" && file.role === "entrypoint" && file.sha256));
-    assert.ok(applied.sourceFiles?.some((file) => file.path === "src/App.tsx" && file.role === "source"));
+    assert.ok(
+      applied.sourceFiles?.some(
+        (file) => file.path === "index.html" && file.role === "entrypoint" && file.sha256,
+      ),
+    );
+    assert.ok(
+      applied.sourceFiles?.some((file) => file.path === "src/App.tsx" && file.role === "source"),
+    );
 
     assert.equal(applied.workspace?.id, "alpha");
     assert.equal(applied.workspace?.slug, "alpha-workspace");
@@ -685,10 +790,15 @@ test("builder app-draft/apply stores generated source files for the current chec
     assert.equal(manifest.files?.length, applied.workspace.manifest.fileCount);
 
     const stored = loadStore().generatedApps?.find((entry) => entry.id === applied.app?.id) as
-      | ({ sourceFiles?: Array<{ path: string }>; checkpoints?: Array<{ id: string; sourceFiles?: Array<{ path: string }> }> })
+      | {
+          sourceFiles?: Array<{ path: string }>;
+          checkpoints?: Array<{ id: string; sourceFiles?: Array<{ path: string }> }>;
+        }
       | undefined;
     assert.ok(stored);
-    const currentCheckpoint = stored.checkpoints?.find((checkpoint) => checkpoint.id === applied.checkpoint?.id);
+    const currentCheckpoint = stored.checkpoints?.find(
+      (checkpoint) => checkpoint.id === applied.checkpoint?.id,
+    );
     assert.ok(currentCheckpoint?.sourceFiles?.some((file) => file.path === "src/App.tsx"));
     assert.ok(stored.sourceFiles?.some((file) => file.path === "index.html"));
   });
@@ -703,15 +813,20 @@ test("generated app source routes are workspace-scoped", async () => {
   const draftResponse = await app.request("/api/app/builder/app-draft", {
     method: "POST",
     headers,
-    body: JSON.stringify({ prompt: "Build a CRM app for accounts, contacts, deals, and renewal notes." }),
+    body: JSON.stringify({
+      prompt: "Build a CRM app for accounts, contacts, deals, and renewal notes.",
+    }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as { app: { id: string }; checkpoint: { id: string } };
+  const applied = (await applyResponse.json()) as {
+    app: { id: string };
+    checkpoint: { id: string };
+  };
   assert.equal(applyResponse.status, 201);
 
   mutateStore((data) => {
@@ -725,30 +840,54 @@ test("generated app source routes are workspace-scoped", async () => {
       prompt: "Build private beta source app.",
       templateId: "crm",
       status: "built",
-      draft: { prompt: "secret", intent: "crm", summary: "secret", app: { slug: "beta-secret-source", name: "Beta Secret Source" } },
+      draft: {
+        prompt: "secret",
+        intent: "crm",
+        summary: "secret",
+        app: { slug: "beta-secret-source", name: "Beta Secret Source" },
+      },
       checkpointId: "gapp_ckpt_beta_source_route_test",
-      sourceFiles: [{
-        path: "index.html",
-        content: "beta secret artifact",
-        contentType: "text/html; charset=utf-8",
-        size: 20,
-        sha256: "beta-secret",
-        role: "entrypoint",
-      }],
+      sourceFiles: [
+        {
+          path: "index.html",
+          content: "beta secret artifact",
+          contentType: "text/html; charset=utf-8",
+          size: 20,
+          sha256: "beta-secret",
+          role: "entrypoint",
+        },
+      ],
       createdByUserId: "user_beta",
       createdAt: "2026-05-02T11:00:00.000Z",
       updatedAt: "2026-05-02T11:00:00.000Z",
-    } satisfies GeneratedAppRecord & { sourceFiles: Array<{ path: string; content: string; contentType: string; size: number; sha256: string; role: "entrypoint" }> };
+    } satisfies GeneratedAppRecord & {
+      sourceFiles: Array<{
+        path: string;
+        content: string;
+        contentType: string;
+        size: number;
+        sha256: string;
+        role: "entrypoint";
+      }>;
+    };
     data.generatedApps.push(betaApp);
   });
 
-  const sourceResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/source?checkpointId=${applied.checkpoint.id}`, {
-    headers: authHeaders(alpha.cookieValue),
-  });
-  const sourceBody = await sourceResponse.json() as {
+  const sourceResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/source?checkpointId=${applied.checkpoint.id}`,
+    {
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
+  const sourceBody = (await sourceResponse.json()) as {
     app?: { id?: string };
     checkpoint?: { id?: string };
-    workspace?: { id?: string; slug?: string; path?: string; manifest?: { path?: string; checkpointId?: string } };
+    workspace?: {
+      id?: string;
+      slug?: string;
+      path?: string;
+      manifest?: { path?: string; checkpointId?: string };
+    };
     files?: Array<{ path?: string; content?: string }>;
   };
 
@@ -759,13 +898,20 @@ test("generated app source routes are workspace-scoped", async () => {
   assert.equal(sourceBody.workspace?.slug, "alpha-workspace");
   assert.ok(sourceBody.workspace?.path?.includes("alpha-workspace"));
   assert.equal(sourceBody.workspace?.manifest?.checkpointId, applied.checkpoint.id);
-  assert.ok(sourceBody.files?.some((file) => file.path === "index.html" && file.content?.includes("generated-app-data")));
+  assert.ok(
+    sourceBody.files?.some(
+      (file) => file.path === "index.html" && file.content?.includes("generated-app-data"),
+    ),
+  );
   assert.equal(JSON.stringify(sourceBody).includes("beta secret artifact"), false);
 
-  const betaResponse = await app.request("/api/app/generated-apps/gapp_beta_source_route_test/source", {
-    headers: authHeaders(alpha.cookieValue),
-  });
-  const betaBody = await betaResponse.json() as { error?: string };
+  const betaResponse = await app.request(
+    "/api/app/generated-apps/gapp_beta_source_route_test/source",
+    {
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
+  const betaBody = (await betaResponse.json()) as { error?: string };
   assert.equal(betaResponse.status, 404);
   assert.equal(betaBody.error, "generated app not found");
 });
@@ -787,39 +933,53 @@ test("generated app runtime API persists records through per-app SQLite", async 
       headers,
       body: JSON.stringify({ prompt: "Build a CRM app for accounts and deals." }),
     });
-    const draftBody = await draftResponse.json() as { draft?: unknown };
+    const draftBody = (await draftResponse.json()) as { draft?: unknown };
     const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
       method: "POST",
       headers,
       body: JSON.stringify({ draft: draftBody.draft }),
     });
-    const applied = await applyResponse.json() as { app: { id: string } };
+    const applied = (await applyResponse.json()) as { app: { id: string } };
 
-    const firstListResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/api/account`, { headers });
-    const firstList = await firstListResponse.json() as Array<{ id?: string; name?: string }>;
+    const firstListResponse = await app.request(
+      `/api/app/generated-apps/${applied.app.id}/api/account`,
+      { headers },
+    );
+    const firstList = (await firstListResponse.json()) as Array<{ id?: string; name?: string }>;
     assert.equal(firstListResponse.status, 200);
-    assert.equal(firstListResponse.headers.get("x-packetagent-generated-app-runtime"), "server-sqlite-process");
+    assert.equal(
+      firstListResponse.headers.get("x-packetagent-generated-app-runtime"),
+      "server-sqlite-process",
+    );
     assert.ok(firstListResponse.headers.get("x-packetagent-generated-app-runtime-pid"));
     assert.ok(firstList.some((record) => record.name === "Account 1"));
 
-    const createResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/api/account`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        name: "Shared Farm Co",
-        ownerId: "user_test",
-        status: "active",
-        createdAt: "2026-05-18T12:00:00.000Z",
-      }),
-    });
-    const created = await createResponse.json() as { id?: string; name?: string };
+    const createResponse = await app.request(
+      `/api/app/generated-apps/${applied.app.id}/api/account`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          name: "Shared Farm Co",
+          ownerId: "user_test",
+          status: "active",
+          createdAt: "2026-05-18T12:00:00.000Z",
+        }),
+      },
+    );
+    const created = (await createResponse.json()) as { id?: string; name?: string };
     assert.equal(createResponse.status, 201);
     assert.equal(created.name, "Shared Farm Co");
 
-    const secondListResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/api/account`, { headers });
-    const secondList = await secondListResponse.json() as Array<{ id?: string; name?: string }>;
+    const secondListResponse = await app.request(
+      `/api/app/generated-apps/${applied.app.id}/api/account`,
+      { headers },
+    );
+    const secondList = (await secondListResponse.json()) as Array<{ id?: string; name?: string }>;
     assert.equal(secondListResponse.status, 200);
-    assert.ok(secondList.some((record) => record.id === created.id && record.name === "Shared Farm Co"));
+    assert.ok(
+      secondList.some((record) => record.id === created.id && record.name === "Shared Farm Co"),
+    );
   } finally {
     await shutdownDefaultGeneratedAppRuntimeProcessPool();
     if (previousRuntimeRoot === undefined) delete process.env.PACKETAGENT_GENERATED_APP_RUNTIME_DIR;
@@ -840,15 +1000,17 @@ test("builder preview refresh rewrites generated app workspace files", async () 
     const draftResponse = await app.request("/api/app/builder/app-draft", {
       method: "POST",
       headers,
-      body: JSON.stringify({ prompt: "Build a project dashboard app for tasks, risks, milestones, and approvals." }),
+      body: JSON.stringify({
+        prompt: "Build a project dashboard app for tasks, risks, milestones, and approvals.",
+      }),
     });
-    const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+    const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
     const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
       method: "POST",
       headers,
       body: JSON.stringify({ draft, runSmoke: false }),
     });
-    const applied = await applyResponse.json() as {
+    const applied = (await applyResponse.json()) as {
       app?: { id?: string };
       workspace?: { checkpointPath?: string };
     };
@@ -863,7 +1025,7 @@ test("builder preview refresh rewrites generated app workspace files", async () 
       headers,
       body: JSON.stringify({ appId: applied.app.id, runSmoke: false }),
     });
-    const refreshed = await refreshResponse.json() as {
+    const refreshed = (await refreshResponse.json()) as {
       workspace?: {
         id?: string;
         slug?: string;
@@ -899,18 +1061,26 @@ test("generated app preview route resolves by actual app id or slug", async () =
   const draftResponse = await app.request("/api/app/builder/app-draft", {
     method: "POST",
     headers,
-    body: JSON.stringify({ prompt: "Build a task tracker app for launch projects, assignees, comments, and review queues." }),
+    body: JSON.stringify({
+      prompt:
+        "Build a task tracker app for launch projects, assignees, comments, and review queues.",
+    }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as { app: { id: string; slug: string; previewUrl?: string } };
+  const applied = (await applyResponse.json()) as {
+    app: { id: string; slug: string; previewUrl?: string };
+  };
 
   assert.equal(applyResponse.status, 201);
-  assert.match(applied.app.previewUrl ?? "", new RegExp(`/builder/preview/alpha/${applied.app.id}(?:/|$)`));
+  assert.match(
+    applied.app.previewUrl ?? "",
+    new RegExp(`/builder/preview/alpha/${applied.app.id}(?:/|$)`),
+  );
 
   mutateStore((data) => {
     const generated = data.generatedApps?.find((entry) => entry.id === applied.app.id);
@@ -941,28 +1111,45 @@ test("generated app preview route resolves by actual app id or slug", async () =
   assert.equal(byIdResponse.headers.get("x-packetagent-generated-app-live"), "false");
   assert.match(byIdHtml, new RegExp(`data-app-id="${applied.app.id}"`));
 
-  const sourceFileResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/preview/src/App.tsx`, {
-    headers: authHeaders(alpha.cookieValue),
-  });
+  const sourceFileResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/preview/src/App.tsx`,
+    {
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
   const sourceFileBody = await sourceFileResponse.text();
   assert.equal(sourceFileResponse.status, 200);
   // TSX is transformed to JS at serve time so browsers accept it as a module script.
   assert.match(sourceFileResponse.headers.get("content-type") ?? "", /application\/javascript/);
   assert.match(sourceFileBody, /function GeneratedApp/);
 
-  const assetResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/preview/assets/preview.css`, {
-    headers: authHeaders(alpha.cookieValue),
-  });
+  const assetResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/preview/assets/preview.css`,
+    {
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
   const assetBody = await assetResponse.text();
   assert.equal(assetResponse.status, 200);
   assert.match(assetResponse.headers.get("content-type") ?? "", /text\/css/);
   assert.equal(assetBody, "body { color: rgb(12, 34, 56); }");
 
-  const readinessResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/preview?format=json`, {
-    headers: authHeaders(alpha.cookieValue),
-  });
-  const readinessBody = await readinessResponse.json() as {
-    preview?: { path?: string; runtime?: { mode?: string; live?: boolean; servedBy?: string; process?: { status?: string; command?: string } } };
+  const readinessResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/preview?format=json`,
+    {
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
+  const readinessBody = (await readinessResponse.json()) as {
+    preview?: {
+      path?: string;
+      runtime?: {
+        mode?: string;
+        live?: boolean;
+        servedBy?: string;
+        process?: { status?: string; command?: string };
+      };
+    };
     artifact?: { files?: Array<{ path?: string }> };
   };
   assert.equal(readinessResponse.status, 200);
@@ -982,10 +1169,13 @@ test("generated app preview route resolves by actual app id or slug", async () =
   assert.equal(bySlugResponse.headers.get("x-packetagent-generated-app-id"), applied.app.id);
   assert.match(bySlugHtml, new RegExp(`data-app-slug="${applied.app.slug}"`));
 
-  const publishStateResponse = await app.request(`/api/app/builder/publish/state?appId=${applied.app.slug}`, {
-    headers: authHeaders(alpha.cookieValue),
-  });
-  const publishState = await publishStateResponse.json() as { appId?: string };
+  const publishStateResponse = await app.request(
+    `/api/app/builder/publish/state?appId=${applied.app.slug}`,
+    {
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
+  const publishState = (await publishStateResponse.json()) as { appId?: string };
   assert.equal(publishStateResponse.status, 200);
   assert.equal(publishState.appId, applied.app.id);
 });
@@ -1015,39 +1205,44 @@ test(
   "builder app-draft/apply runs smoke through the sandbox when PACKETAGENT_SANDBOX_SMOKE_ENABLED=1",
   { skip: sandboxSmokeSkipReason ?? false },
   async () => {
-  resetStoreForTests();
-  const original = process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED;
-  process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED = "1";
-  try {
-    const app = createTestApp();
-    const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
-    const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
+    resetStoreForTests();
+    const original = process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED;
+    process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED = "1";
+    try {
+      const app = createTestApp();
+      const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
+      const headers = { ...authHeaders(alpha.cookieValue), "Content-Type": "application/json" };
 
-    const draftResponse = await app.request("/api/app/builder/app-draft", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ prompt: "Build a public booking app." }),
-    });
-    const draftBody = await draftResponse.json() as { draft?: unknown };
+      const draftResponse = await app.request("/api/app/builder/app-draft", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ prompt: "Build a public booking app." }),
+      });
+      const draftBody = (await draftResponse.json()) as { draft?: unknown };
 
-    const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ draft: draftBody.draft, runSmoke: true }),
-    });
-    const applyBody = await applyResponse.json() as {
-      smokeBuild?: { status?: string; message?: string; checks?: Array<{ name?: string; detail?: string }> };
-    };
+      const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ draft: draftBody.draft, runSmoke: true }),
+      });
+      const applyBody = (await applyResponse.json()) as {
+        smokeBuild?: {
+          status?: string;
+          message?: string;
+          checks?: Array<{ name?: string; detail?: string }>;
+        };
+      };
 
-    assert.equal(applyResponse.status, 201);
-    assert.match(applyBody.smokeBuild?.message ?? "", /verified via sandbox/);
-    const firstCheckDetail = applyBody.smokeBuild?.checks?.[0]?.detail ?? "";
-    assert.match(firstCheckDetail, /sandbox: exit/);
-  } finally {
-    if (original === undefined) delete process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED;
-    else process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED = original;
-  }
-});
+      assert.equal(applyResponse.status, 201);
+      assert.match(applyBody.smokeBuild?.message ?? "", /verified via sandbox/);
+      const firstCheckDetail = applyBody.smokeBuild?.checks?.[0]?.detail ?? "";
+      assert.match(firstCheckDetail, /sandbox: exit/);
+    } finally {
+      if (original === undefined) delete process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED;
+      else process.env.PACKETAGENT_SANDBOX_SMOKE_ENABLED = original;
+    }
+  },
+);
 
 test("builder app iteration can generate a diff, apply it, and rollback checkpoints", async () => {
   resetStoreForTests();
@@ -1059,16 +1254,17 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
     method: "POST",
     headers,
     body: JSON.stringify({
-      prompt: "Build a booking app with public booking, services, appointment slots, and admin controls.",
+      prompt:
+        "Build a booking app with public booking, services, appointment slots, and admin controls.",
     }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as {
+  const applied = (await applyResponse.json()) as {
     app: { id: string; previewUrl?: string };
     checkpoint: { id: string };
     draft: Record<string, unknown>;
@@ -1076,9 +1272,7 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
   const initialRecord = loadStore().generatedApps?.find((entry) => entry.id === applied.app.id);
   const initialSourceSha = initialRecord?.checkpoints
     ?.find((checkpoint) => checkpoint.id === applied.checkpoint.id)
-    ?.sourceFiles
-    ?.find((file) => file.path === "src/App.tsx")
-    ?.sha256;
+    ?.sourceFiles?.find((file) => file.path === "src/App.tsx")?.sha256;
   assert.ok(initialSourceSha);
 
   const iterationResponse = await app.request("/api/app/builder/app-iteration", {
@@ -1089,14 +1283,27 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
       checkpointId: applied.checkpoint.id,
       draft: applied.draft,
       target: { id: "page:/book", kind: "page", label: "Booking", path: "/book" },
-      prompt: "Add clearer confirmation copy to the booking page after a customer picks an appointment slot.",
+      prompt:
+        "Add clearer confirmation copy to the booking page after a customer picks an appointment slot.",
     }),
   });
-  const iteration = await iterationResponse.json() as {
+  const iteration = (await iterationResponse.json()) as {
     id?: string;
     status?: string;
-    files?: Array<{ diff: string; path: string; source?: string; beforeSha256?: string; afterSha256?: string }>;
-    sourceDiffFiles?: Array<{ diff: string; path: string; source?: string; beforeSha256?: string; afterSha256?: string }>;
+    files?: Array<{
+      diff: string;
+      path: string;
+      source?: string;
+      beforeSha256?: string;
+      afterSha256?: string;
+    }>;
+    sourceDiffFiles?: Array<{
+      diff: string;
+      path: string;
+      source?: string;
+      beforeSha256?: string;
+      afterSha256?: string;
+    }>;
     sourceFiles?: Array<{ path: string; sha256: string }>;
     draft?: { app?: { pages?: Array<{ route: string; purpose: string; actions: string[] }> } };
     preview?: { status?: string };
@@ -1106,11 +1313,34 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
   assert.equal(iterationResponse.status, 200);
   assert.equal(iteration.status, "generated");
   assert.ok(iteration.id);
-  assert.ok(iteration.files?.some((file) => file.path.includes("page") && file.diff.includes("confirmation copy")));
-  assert.ok(iteration.files?.some((file) => file.path === "src/App.tsx" && file.source === "runtime" && file.beforeSha256 !== file.afterSha256));
-  assert.ok(iteration.sourceDiffFiles?.some((file) => file.path === "src/App.tsx" && file.diff.includes("sha256:")));
-  assert.ok(iteration.sourceFiles?.some((file) => file.path === "src/App.tsx" && file.sha256 !== initialSourceSha));
-  assert.ok(iteration.draft?.app?.pages?.some((page) => page.route === "/book" && page.purpose.includes("Iteration request")));
+  assert.ok(
+    iteration.files?.some(
+      (file) => file.path.includes("page") && file.diff.includes("confirmation copy"),
+    ),
+  );
+  assert.ok(
+    iteration.files?.some(
+      (file) =>
+        file.path === "src/App.tsx" &&
+        file.source === "runtime" &&
+        file.beforeSha256 !== file.afterSha256,
+    ),
+  );
+  assert.ok(
+    iteration.sourceDiffFiles?.some(
+      (file) => file.path === "src/App.tsx" && file.diff.includes("sha256:"),
+    ),
+  );
+  assert.ok(
+    iteration.sourceFiles?.some(
+      (file) => file.path === "src/App.tsx" && file.sha256 !== initialSourceSha,
+    ),
+  );
+  assert.ok(
+    iteration.draft?.app?.pages?.some(
+      (page) => page.route === "/book" && page.purpose.includes("Iteration request"),
+    ),
+  );
   assert.equal(iteration.preview?.status, "pending");
   assert.ok(iteration.rollback?.checkpointId);
 
@@ -1127,15 +1357,23 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
       runSmoke: true,
     }),
   });
-  const appliedIteration = await applyIterationResponse.json() as {
+  const appliedIteration = (await applyIterationResponse.json()) as {
     applied?: boolean;
     checkpoint?: { id?: string };
     previewUrl?: string;
-    diff?: { status?: string; draft?: unknown; sourceDiffFiles?: Array<{ path: string; beforeSha256?: string; afterSha256?: string }> };
+    diff?: {
+      status?: string;
+      draft?: unknown;
+      sourceDiffFiles?: Array<{ path: string; beforeSha256?: string; afterSha256?: string }>;
+    };
     sourceDiffFiles?: Array<{ path: string; beforeSha256?: string; afterSha256?: string }>;
     sourceFiles?: Array<{ path: string; sha256: string }>;
     smoke?: { status?: string };
-    workspace?: { path?: string; checkpointPath?: string; manifest?: { path?: string; checkpointId?: string } };
+    workspace?: {
+      path?: string;
+      checkpointPath?: string;
+      manifest?: { path?: string; checkpointId?: string };
+    };
   };
 
   assert.equal(applyIterationResponse.status, 201);
@@ -1144,7 +1382,14 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
   assert.equal(appliedIteration.smoke?.status, "pass");
   assert.match(appliedIteration.previewUrl ?? "", /\/builder\/preview\/alpha\//);
   assert.notEqual(appliedIteration.checkpoint?.id, applied.checkpoint.id);
-  assert.ok(appliedIteration.sourceDiffFiles?.some((file) => file.path === "src/App.tsx" && file.beforeSha256 === initialSourceSha && file.afterSha256 !== initialSourceSha));
+  assert.ok(
+    appliedIteration.sourceDiffFiles?.some(
+      (file) =>
+        file.path === "src/App.tsx" &&
+        file.beforeSha256 === initialSourceSha &&
+        file.afterSha256 !== initialSourceSha,
+    ),
+  );
   assert.ok(appliedIteration.diff?.sourceDiffFiles?.some((file) => file.path === "src/App.tsx"));
   assert.ok(appliedIteration.workspace?.path?.includes("alpha-workspace"));
   assert.equal(appliedIteration.workspace?.manifest?.checkpointId, appliedIteration.checkpoint?.id);
@@ -1156,27 +1401,40 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
   const iteratedRecord = loadStore().generatedApps?.find((entry) => entry.id === applied.app.id);
   const iteratedSourceSha = iteratedRecord?.checkpoints
     ?.find((checkpoint) => checkpoint.id === appliedIteration.checkpoint?.id)
-    ?.sourceFiles
-    ?.find((file) => file.path === "src/App.tsx")
-    ?.sha256;
+    ?.sourceFiles?.find((file) => file.path === "src/App.tsx")?.sha256;
   assert.ok(iteratedSourceSha);
   assert.notEqual(iteratedSourceSha, initialSourceSha);
 
-  const checkpointResponse = await app.request(`/api/app/builder/checkpoints?appId=${applied.app.id}`, {
-    headers,
-  });
-  const checkpointBody = await checkpointResponse.json() as { checkpoints?: Array<{ id: string; source: string }> };
+  const checkpointResponse = await app.request(
+    `/api/app/builder/checkpoints?appId=${applied.app.id}`,
+    {
+      headers,
+    },
+  );
+  const checkpointBody = (await checkpointResponse.json()) as {
+    checkpoints?: Array<{ id: string; source: string }>;
+  };
 
   assert.equal(checkpointResponse.status, 200);
-  assert.ok(checkpointBody.checkpoints?.some((checkpoint) => checkpoint.id === applied.checkpoint.id));
-  assert.ok(checkpointBody.checkpoints?.some((checkpoint) => checkpoint.id === appliedIteration.checkpoint?.id && checkpoint.source === "iteration"));
+  assert.ok(
+    checkpointBody.checkpoints?.some((checkpoint) => checkpoint.id === applied.checkpoint.id),
+  );
+  assert.ok(
+    checkpointBody.checkpoints?.some(
+      (checkpoint) =>
+        checkpoint.id === appliedIteration.checkpoint?.id && checkpoint.source === "iteration",
+    ),
+  );
 
-  const rollbackResponse = await app.request(`/api/app/builder/checkpoints/${applied.checkpoint.id}/rollback`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ appId: applied.app.id, reason: "test rollback" }),
-  });
-  const rollbackBody = await rollbackResponse.json() as {
+  const rollbackResponse = await app.request(
+    `/api/app/builder/checkpoints/${applied.checkpoint.id}/rollback`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ appId: applied.app.id, reason: "test rollback" }),
+    },
+  );
+  const rollbackBody = (await rollbackResponse.json()) as {
     rolledBack?: boolean;
     checkpoint?: { id?: string };
     preview?: { message?: string };
@@ -1187,14 +1445,16 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
   assert.equal(rollbackBody.rolledBack, true);
   assert.ok(rollbackBody.checkpoint?.id);
   assert.ok(rollbackBody.preview?.message?.includes(applied.checkpoint.id));
-  assert.ok(rollbackBody.sourceFiles?.some((file) => file.path === "src/App.tsx" && file.sha256 === initialSourceSha));
+  assert.ok(
+    rollbackBody.sourceFiles?.some(
+      (file) => file.path === "src/App.tsx" && file.sha256 === initialSourceSha,
+    ),
+  );
 
   const rolledBackRecord = loadStore().generatedApps?.find((entry) => entry.id === applied.app.id);
   const rollbackSourceSha = rolledBackRecord?.checkpoints
     ?.find((checkpoint) => checkpoint.id === rollbackBody.checkpoint?.id)
-    ?.sourceFiles
-    ?.find((file) => file.path === "src/App.tsx")
-    ?.sha256;
+    ?.sourceFiles?.find((file) => file.path === "src/App.tsx")?.sha256;
   assert.equal(rollbackSourceSha, initialSourceSha);
   assert.notEqual(rollbackSourceSha, iteratedSourceSha);
 });
@@ -1212,13 +1472,13 @@ test("builder canonical changes routes validate target app and expose preview, f
       prompt: "Build a CRM app for companies, contacts, opportunities, and follow-up notes.",
     }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as {
+  const applied = (await applyResponse.json()) as {
     app: { id: string };
     checkpoint: { id: string };
     draft: Record<string, unknown>;
@@ -1231,12 +1491,23 @@ test("builder canonical changes routes validate target app and expose preview, f
       appId: applied.app.id,
       checkpointId: applied.checkpoint.id,
       draft: applied.draft,
-      target: { id: "api:GET:/api/app/generated/crm/contacts", kind: "api_route", label: "GET contacts", path: "/api/app/generated/crm/contacts" },
-      prompt: "Add a draft-safe GitHub issue export action without running live repository operations.",
+      target: {
+        id: "api:GET:/api/app/generated/crm/contacts",
+        kind: "api_route",
+        label: "GET contacts",
+        path: "/api/app/generated/crm/contacts",
+      },
+      prompt:
+        "Add a draft-safe GitHub issue export action without running live repository operations.",
     }),
   });
-  const changeDraft = await changeDraftResponse.json() as {
-    changeSet?: { id?: string; status?: string; tools?: { requestedCategories?: string[]; canProceed?: boolean }; draft?: Record<string, unknown> };
+  const changeDraft = (await changeDraftResponse.json()) as {
+    changeSet?: {
+      id?: string;
+      status?: string;
+      tools?: { requestedCategories?: string[]; canProceed?: boolean };
+      draft?: Record<string, unknown>;
+    };
   };
 
   assert.equal(changeDraftResponse.status, 200);
@@ -1256,7 +1527,7 @@ test("builder canonical changes routes validate target app and expose preview, f
       prompt: "Create live Stripe checkout and charge customers for subscriptions.",
     }),
   });
-  const blockedDraft = await blockedDraftResponse.json() as { changeSet?: { status?: string } };
+  const blockedDraft = (await blockedDraftResponse.json()) as { changeSet?: { status?: string } };
 
   assert.equal(blockedDraftResponse.status, 200);
   assert.equal(blockedDraft.changeSet?.status, "blocked");
@@ -1271,7 +1542,7 @@ test("builder canonical changes routes validate target app and expose preview, f
       runSmoke: true,
     }),
   });
-  const blockedApplyBody = await blockedApplyResponse.json() as { error?: string };
+  const blockedApplyBody = (await blockedApplyResponse.json()) as { error?: string };
 
   assert.equal(blockedApplyResponse.status, 409);
   assert.match(blockedApplyBody.error ?? "", /blocked change set/);
@@ -1286,7 +1557,7 @@ test("builder canonical changes routes validate target app and expose preview, f
       runSmoke: true,
     }),
   });
-  const directDraftApplyBody = await directDraftApplyResponse.json() as { error?: string };
+  const directDraftApplyBody = (await directDraftApplyResponse.json()) as { error?: string };
 
   assert.equal(directDraftApplyResponse.status, 400);
   assert.match(directDraftApplyBody.error ?? "", /reviewed diff or changeSet/);
@@ -1301,13 +1572,16 @@ test("builder canonical changes routes validate target app and expose preview, f
         ...changeDraft.changeSet,
         draft: {
           ...(changeDraft.changeSet?.draft ?? {}),
-          app: { ...((changeDraft.changeSet?.draft as { app?: Record<string, unknown> })?.app ?? {}), slug: "different-app" },
+          app: {
+            ...((changeDraft.changeSet?.draft as { app?: Record<string, unknown> })?.app ?? {}),
+            slug: "different-app",
+          },
         },
       },
       runSmoke: true,
     }),
   });
-  const mismatchBody = await mismatchResponse.json() as { error?: string };
+  const mismatchBody = (await mismatchResponse.json()) as { error?: string };
 
   assert.equal(mismatchResponse.status, 409);
   assert.match(mismatchBody.error ?? "", /does not match/);
@@ -1323,7 +1597,7 @@ test("builder canonical changes routes validate target app and expose preview, f
       refreshPreview: true,
     }),
   });
-  const changeApply = await changeApplyResponse.json() as {
+  const changeApply = (await changeApplyResponse.json()) as {
     applied?: boolean;
     changeSet?: { status?: string };
     checkpoint?: { id?: string };
@@ -1337,9 +1611,16 @@ test("builder canonical changes routes validate target app and expose preview, f
   const refreshResponse = await app.request("/api/app/builder/preview/refresh", {
     method: "POST",
     headers,
-    body: JSON.stringify({ appId: applied.app.id, checkpointId: changeApply.checkpoint?.id, runSmoke: true }),
+    body: JSON.stringify({
+      appId: applied.app.id,
+      checkpointId: changeApply.checkpoint?.id,
+      runSmoke: true,
+    }),
   });
-  const refreshBody = await refreshResponse.json() as { preview?: { status?: string }; smoke?: { status?: string } };
+  const refreshBody = (await refreshResponse.json()) as {
+    preview?: { status?: string };
+    smoke?: { status?: string };
+  };
 
   assert.equal(refreshResponse.status, 200);
   assert.equal(refreshBody.preview?.status, "ready");
@@ -1355,16 +1636,21 @@ test("builder canonical changes routes validate target app and expose preview, f
       errorContext: { source: "runtime", message: "ReferenceError: contact is not defined" },
     }),
   });
-  const fixBody = await fixResponse.json() as { prompt?: string };
+  const fixBody = (await fixResponse.json()) as { prompt?: string };
 
   assert.equal(fixResponse.status, 200);
   assert.match(fixBody.prompt ?? "", /ReferenceError/);
   assert.match(fixBody.prompt ?? "", /Checkpoint/);
 
-  const agentCheckpointResponse = await app.request("/api/app/builder/checkpoints?agentId=agent_alpha_support", {
-    headers,
-  });
-  const agentCheckpointBody = await agentCheckpointResponse.json() as { checkpoints?: Array<{ agentId?: string }> };
+  const agentCheckpointResponse = await app.request(
+    "/api/app/builder/checkpoints?agentId=agent_alpha_support",
+    {
+      headers,
+    },
+  );
+  const agentCheckpointBody = (await agentCheckpointResponse.json()) as {
+    checkpoints?: Array<{ agentId?: string }>;
+  };
 
   assert.equal(agentCheckpointResponse.status, 200);
   assert.equal(agentCheckpointBody.checkpoints?.[0]?.agentId, "agent_alpha_support");
@@ -1386,16 +1672,17 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
     method: "POST",
     headers,
     body: JSON.stringify({
-      prompt: "Build a booking app with public booking, appointment slots, services, and admin controls.",
+      prompt:
+        "Build a booking app with public booking, appointment slots, services, and admin controls.",
     }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as {
+  const applied = (await applyResponse.json()) as {
     app: { id: string };
     checkpoint: { id: string };
   };
@@ -1412,7 +1699,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
       privateBaseUrl: "http://localhost:8484/",
     }),
   });
-  const firstPublish = await firstPublishResponse.json() as {
+  const firstPublish = (await firstPublishResponse.json()) as {
     published?: boolean;
     publish?: {
       id: string;
@@ -1430,32 +1717,47 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   assert.equal(firstPublishResponse.status, 201);
   assert.equal(firstPublish.published, true);
   assert.equal(firstPublish.publish?.status, "published");
-  assert.match(firstPublish.publish?.localPublishPath ?? "", /^exports\/packetagent\/alpha-workspace\//);
+  assert.match(
+    firstPublish.publish?.localPublishPath ?? "",
+    /^exports\/packetagent\/alpha-workspace\//,
+  );
   assert.equal(firstPublish.publish?.workspacePath, firstPublish.publish?.localPublishPath);
   assert.equal(firstPublish.publish?.manifest?.fileName, "publish-artifacts.json");
-  assert.ok(firstPublish.history?.some((entry) =>
-    entry.id === firstPublish.publish?.id
-    && entry.workspacePath === firstPublish.publish?.localPublishPath
-    && entry.manifest?.fileName === "publish-artifacts.json"
-  ));
-  assert.match(firstPublish.publish?.privateUrl ?? "", new RegExp(`/api/app/generated-apps/${applied.app.id}/preview`));
+  assert.ok(
+    firstPublish.history?.some(
+      (entry) =>
+        entry.id === firstPublish.publish?.id &&
+        entry.workspacePath === firstPublish.publish?.localPublishPath &&
+        entry.manifest?.fileName === "publish-artifacts.json",
+    ),
+  );
+  assert.match(
+    firstPublish.publish?.privateUrl ?? "",
+    new RegExp(`/api/app/generated-apps/${applied.app.id}/preview`),
+  );
   assert.match(firstPublish.dockerComposeExport?.yaml ?? "", /packetagent-app:/);
   assert.ok(firstPublish.dockerComposeExport?.services?.includes("packetagent-app"));
   assert.ok((firstPublish.publish?.logs.length ?? 0) >= 3);
 
-  const privatePreviewUrl = new URL(firstPublish.publish?.privateUrl ?? "http://localhost/").pathname
-    + new URL(firstPublish.publish?.privateUrl ?? "http://localhost/").search;
+  const privatePreviewUrl =
+    new URL(firstPublish.publish?.privateUrl ?? "http://localhost/").pathname +
+    new URL(firstPublish.publish?.privateUrl ?? "http://localhost/").search;
   const privatePreviewResponse = await app.request(privatePreviewUrl, {
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(privatePreviewResponse.status, 200);
-  assert.match(privatePreviewResponse.headers.get("x-packetagent-generated-app-id") ?? "", new RegExp(`^${applied.app.id}$`));
+  assert.match(
+    privatePreviewResponse.headers.get("x-packetagent-generated-app-id") ?? "",
+    new RegExp(`^${applied.app.id}$`),
+  );
 
   const failedCheckpointId = "gapp_ckpt_publish_failed_test";
   mutateStore((data) => {
     const generated = data.generatedApps?.find((entry) => entry.id === applied.app.id);
     assert.ok(generated);
-    const baseCheckpoint = generated.checkpoints?.find((checkpoint) => checkpoint.id === applied.checkpoint.id);
+    const baseCheckpoint = generated.checkpoints?.find(
+      (checkpoint) => checkpoint.id === applied.checkpoint.id,
+    );
     assert.ok(baseCheckpoint);
     generated.checkpoints = [
       ...(generated.checkpoints ?? []),
@@ -1481,17 +1783,30 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
       publicBaseUrl: "https://apps.example.test/",
     }),
   });
-  const failedPublish = await failedPublishResponse.json() as { error?: string; validation?: { canPublish?: boolean } };
+  const failedPublish = (await failedPublishResponse.json()) as {
+    error?: string;
+    validation?: { canPublish?: boolean };
+  };
 
   assert.equal(failedPublishResponse.status, 409);
   assert.equal(failedPublish.error, "publish validation failed");
   assert.equal(failedPublish.validation?.canPublish, false);
-  assert.equal(loadStore().generatedApps?.find((entry) => entry.id === applied.app.id)?.currentPublishId, firstPublish.publish?.id);
+  assert.equal(
+    loadStore().generatedApps?.find((entry) => entry.id === applied.app.id)?.currentPublishId,
+    firstPublish.publish?.id,
+  );
 
-  const stateResponse = await app.request(`/api/app/builder/publish/state?appId=${applied.app.id}`, {
-    headers,
-  });
-  const state = await stateResponse.json() as { publishedUrl?: string; history?: unknown[]; readiness?: { workspaceSlug?: string; localPublishPath?: string } };
+  const stateResponse = await app.request(
+    `/api/app/builder/publish/state?appId=${applied.app.id}`,
+    {
+      headers,
+    },
+  );
+  const state = (await stateResponse.json()) as {
+    publishedUrl?: string;
+    history?: unknown[];
+    readiness?: { workspaceSlug?: string; localPublishPath?: string };
+  };
 
   assert.equal(stateResponse.status, 200);
   assert.match(state.publishedUrl ?? "", /apps\.example\.test/);
@@ -1499,10 +1814,13 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   assert.match(state.readiness?.localPublishPath ?? "", /alpha-workspace/);
   assert.ok((state.history?.length ?? 0) >= 1);
 
-  const composeResponse = await app.request(`/api/app/builder/publish/docker-compose?appId=${applied.app.id}`, {
-    headers,
-  });
-  const compose = await composeResponse.json() as { fileName?: string; contents?: string };
+  const composeResponse = await app.request(
+    `/api/app/builder/publish/docker-compose?appId=${applied.app.id}`,
+    {
+      headers,
+    },
+  );
+  const compose = (await composeResponse.json()) as { fileName?: string; contents?: string };
 
   assert.equal(composeResponse.status, 200);
   assert.equal(compose.fileName, "docker-compose.publish.yml");
@@ -1517,7 +1835,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
       visibility: "private",
     }),
   });
-  const secondPublish = await secondPublishResponse.json() as {
+  const secondPublish = (await secondPublishResponse.json()) as {
     published?: boolean;
     publish?: {
       id: string;
@@ -1534,16 +1852,24 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   assert.equal(secondPublish.publish?.previousPublishId, firstPublish.publish?.id);
   assert.equal(secondPublish.publish?.rollbackCommand?.toPublishId, firstPublish.publish?.id);
   assert.match(secondPublish.rollbackToPrevious?.command ?? "", /packetagent publish rollback/);
-  assert.match(secondPublish.state?.publishedUrl ?? "", new RegExp(`/api/app/generated-apps/${applied.app.id}/preview`));
+  assert.match(
+    secondPublish.state?.publishedUrl ?? "",
+    new RegExp(`/api/app/generated-apps/${applied.app.id}/preview`),
+  );
 
-  const rollbackResponse = await app.request(`/api/app/builder/publish/${secondPublish.publish?.id}/rollback`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ appId: applied.app.id, reason: "test publish rollback" }),
-  });
-  const rollback = await rollbackResponse.json() as {
+  const rollbackResponse = await app.request(
+    `/api/app/builder/publish/${secondPublish.publish?.id}/rollback`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ appId: applied.app.id, reason: "test publish rollback" }),
+    },
+  );
+  const rollback = (await rollbackResponse.json()) as {
     rolledBack?: boolean;
-    rollback?: { result?: { status?: string; restoredPublishId?: string; supersededPublishId?: string } };
+    rollback?: {
+      result?: { status?: string; restoredPublishId?: string; supersededPublishId?: string };
+    };
     app?: { currentPublishId?: string };
     history?: Array<{ id: string; status: string; rollbackResult?: { status?: string } }>;
   };
@@ -1554,11 +1880,23 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   assert.equal(rollback.rollback?.result?.restoredPublishId, firstPublish.publish?.id);
   assert.equal(rollback.rollback?.result?.supersededPublishId, secondPublish.publish?.id);
   assert.equal(rollback.app?.currentPublishId, firstPublish.publish?.id);
-  assert.ok(rollback.history?.some((entry) => entry.id === secondPublish.publish?.id && entry.status === "rolled_back" && entry.rollbackResult?.status === "succeeded"));
+  assert.ok(
+    rollback.history?.some(
+      (entry) =>
+        entry.id === secondPublish.publish?.id &&
+        entry.status === "rolled_back" &&
+        entry.rollbackResult?.status === "succeeded",
+    ),
+  );
 
   const stored = loadStore().generatedApps?.find((entry) => entry.id === applied.app.id);
   assert.equal(stored?.currentPublishId, firstPublish.publish?.id);
-  assert.ok(stored?.publishHistory?.some((entry) => entry.id === secondPublish.publish?.id && entry.rollbackResult?.status === "succeeded"));
+  assert.ok(
+    stored?.publishHistory?.some(
+      (entry) =>
+        entry.id === secondPublish.publish?.id && entry.rollbackResult?.status === "succeeded",
+    ),
+  );
 });
 
 test("builder publish prepare and compose export require workspace management", async () => {
@@ -1570,26 +1908,36 @@ test("builder publish prepare and compose export require workspace management", 
   const draftResponse = await app.request("/api/app/builder/app-draft", {
     method: "POST",
     headers,
-    body: JSON.stringify({ prompt: "Build a public booking app with services and appointment slots." }),
+    body: JSON.stringify({
+      prompt: "Build a public booking app with services and appointment slots.",
+    }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as { app: { id: string }; checkpoint: { id: string } };
+  const applied = (await applyResponse.json()) as {
+    app: { id: string };
+    checkpoint: { id: string };
+  };
   assert.equal(applyResponse.status, 201);
 
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "viewer";
   });
 
-  const stateResponse = await app.request(`/api/app/builder/publish/state?appId=${applied.app.id}`, {
-    headers,
-  });
+  const stateResponse = await app.request(
+    `/api/app/builder/publish/state?appId=${applied.app.id}`,
+    {
+      headers,
+    },
+  );
   assert.equal(stateResponse.status, 200);
 
   const prepareResponse = await app.request("/api/app/builder/publish/prepare", {
@@ -1597,14 +1945,17 @@ test("builder publish prepare and compose export require workspace management", 
     headers,
     body: JSON.stringify({ appId: applied.app.id, checkpointId: applied.checkpoint.id }),
   });
-  const prepareBody = await prepareResponse.json() as { error?: string };
+  const prepareBody = (await prepareResponse.json()) as { error?: string };
   assert.equal(prepareResponse.status, 403);
   assert.match(prepareBody.error ?? "", /admin/);
 
-  const composeResponse = await app.request(`/api/app/builder/publish/docker-compose?appId=${applied.app.id}`, {
-    headers,
-  });
-  const composeBody = await composeResponse.json() as { error?: string };
+  const composeResponse = await app.request(
+    `/api/app/builder/publish/docker-compose?appId=${applied.app.id}`,
+    {
+      headers,
+    },
+  );
+  const composeBody = (await composeResponse.json()) as { error?: string };
   assert.equal(composeResponse.status, 403);
   assert.match(composeBody.error ?? "", /admin/);
 });
@@ -1622,13 +1973,16 @@ test("builder publish blocks when the generated workspace artifact is missing", 
     headers,
     body: JSON.stringify({ prompt: "Build a public booking app for artifact validation." }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as { app: { id: string }; checkpoint: { id: string } };
+  const applied = (await applyResponse.json()) as {
+    app: { id: string };
+    checkpoint: { id: string };
+  };
   assert.equal(applyResponse.status, 201);
 
   mutateStore((data) => {
@@ -1652,7 +2006,7 @@ test("builder publish blocks when the generated workspace artifact is missing", 
       privateBaseUrl: "http://localhost:8484",
     }),
   });
-  const publish = await publishResponse.json() as {
+  const publish = (await publishResponse.json()) as {
     error?: string;
     validation?: {
       canPublish?: boolean;
@@ -1665,11 +2019,21 @@ test("builder publish blocks when the generated workspace artifact is missing", 
   assert.equal(publish.error, "publish validation failed");
   assert.equal(publish.validation?.canPublish, false);
   assert.equal(publish.validation?.artifactPresence?.status, "fail");
-  assert.ok(publish.validation?.artifactPresence?.missingArtifacts?.some((path) => path.endsWith("/bundle")));
-  assert.ok(publish.validation?.actionableFailures?.some((failure) =>
-    failure.stage === "artifact" && /No generated app bundle/.test(failure.message ?? "")
-  ));
-  assert.equal(loadStore().generatedApps?.find((entry) => entry.id === applied.app.id)?.currentPublishId, undefined);
+  assert.ok(
+    publish.validation?.artifactPresence?.missingArtifacts?.some((path) =>
+      path.endsWith("/bundle"),
+    ),
+  );
+  assert.ok(
+    publish.validation?.actionableFailures?.some(
+      (failure) =>
+        failure.stage === "artifact" && /No generated app bundle/.test(failure.message ?? ""),
+    ),
+  );
+  assert.equal(
+    loadStore().generatedApps?.find((entry) => entry.id === applied.app.id)?.currentPublishId,
+    undefined,
+  );
 });
 
 test("builder publish blocks requested integrations that are not ready", async (t) => {
@@ -1705,15 +2069,21 @@ test("builder publish blocks requested integrations that are not ready", async (
   const draftResponse = await app.request("/api/app/builder/app-draft", {
     method: "POST",
     headers,
-    body: JSON.stringify({ prompt: "Build an ops app that sends Stripe payment receipts over email and syncs GitHub issues." }),
+    body: JSON.stringify({
+      prompt:
+        "Build an ops app that sends Stripe payment receipts over email and syncs GitHub issues.",
+    }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as { app: { id: string }; checkpoint: { id: string } };
+  const applied = (await applyResponse.json()) as {
+    app: { id: string };
+    checkpoint: { id: string };
+  };
   assert.equal(applyResponse.status, 201);
 
   const prepareResponse = await app.request("/api/app/builder/publish/prepare", {
@@ -1721,9 +2091,13 @@ test("builder publish blocks requested integrations that are not ready", async (
     headers,
     body: JSON.stringify({ appId: applied.app.id, checkpointId: applied.checkpoint.id }),
   });
-  const prepare = await prepareResponse.json() as {
+  const prepare = (await prepareResponse.json()) as {
     ready?: boolean;
-    integrations?: { canPublish?: boolean; canUseAllRequestedIntegrations?: boolean; featureBlockers?: string[] };
+    integrations?: {
+      canPublish?: boolean;
+      canUseAllRequestedIntegrations?: boolean;
+      featureBlockers?: string[];
+    };
     state?: { canPublish?: boolean; nextActions?: string[] };
   };
   assert.equal(prepareResponse.status, 200);
@@ -1731,22 +2105,35 @@ test("builder publish blocks requested integrations that are not ready", async (
   assert.equal(prepare.integrations?.canUseAllRequestedIntegrations, false);
   assert.equal(prepare.ready, false);
   assert.equal(prepare.state?.canPublish, false);
-  assert.ok(prepare.integrations?.featureBlockers?.some((blocker) => blocker.includes("Email delivery")));
-  assert.ok(prepare.integrations?.featureBlockers?.some((blocker) => blocker.includes("Stripe payments")));
-  assert.ok(prepare.state?.nextActions?.some((action) => action.includes("Email delivery") || action.includes("Stripe payments")));
+  assert.ok(
+    prepare.integrations?.featureBlockers?.some((blocker) => blocker.includes("Email delivery")),
+  );
+  assert.ok(
+    prepare.integrations?.featureBlockers?.some((blocker) => blocker.includes("Stripe payments")),
+  );
+  assert.ok(
+    prepare.state?.nextActions?.some(
+      (action) => action.includes("Email delivery") || action.includes("Stripe payments"),
+    ),
+  );
 
   const publishResponse = await app.request("/api/app/builder/publish", {
     method: "POST",
     headers,
     body: JSON.stringify({ appId: applied.app.id, checkpointId: applied.checkpoint.id }),
   });
-  const publish = await publishResponse.json() as { error?: string; integrations?: { canUseAllRequestedIntegrations?: boolean } };
+  const publish = (await publishResponse.json()) as {
+    error?: string;
+    integrations?: { canUseAllRequestedIntegrations?: boolean };
+  };
   assert.equal(publishResponse.status, 409);
   assert.equal(publish.error, "publish validation failed");
   assert.equal(publish.integrations?.canUseAllRequestedIntegrations, false);
 });
 
-async function readSseEvents(stream: ReadableStream<Uint8Array>): Promise<Array<{ type: string; [k: string]: unknown }>> {
+async function readSseEvents(
+  stream: ReadableStream<Uint8Array>,
+): Promise<Array<{ type: string; [k: string]: unknown }>> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   const events: Array<{ type: string; [k: string]: unknown }> = [];
@@ -1807,7 +2194,10 @@ test("builder app-draft/stream emits step events, a draft event, and done", asyn
     assert.ok(types.includes("step"), "expected at least one step event");
     assert.ok(types.includes("draft"), "expected a draft event");
     assert.equal(types[types.length - 1], "done");
-    const draftEvent = events.find((e) => e.type === "draft") as { type: "draft"; draft: { app: { name: string; slug: string } } };
+    const draftEvent = events.find((e) => e.type === "draft") as {
+      type: "draft";
+      draft: { app: { name: string; slug: string } };
+    };
     assert.ok(draftEvent.draft.app.name);
     assert.ok(draftEvent.draft.app.slug);
   } finally {
@@ -1832,8 +2222,13 @@ test("builder app-draft/stream echoes the chosen routing preset in step events",
     });
     assert.equal(response.status, 200);
     const events = await readSseEvents(response.body!);
-    const stepTexts = events.filter((e) => e.type === "step").map((e) => (e as unknown as { text: string }).text);
-    assert.ok(stepTexts.some((text) => text.toLowerCase().includes("fast preset")), `expected a step mentioning the fast preset, got: ${stepTexts.join(" | ")}`);
+    const stepTexts = events
+      .filter((e) => e.type === "step")
+      .map((e) => (e as unknown as { text: string }).text);
+    assert.ok(
+      stepTexts.some((text) => text.toLowerCase().includes("fast preset")),
+      `expected a step mentioning the fast preset, got: ${stepTexts.join(" | ")}`,
+    );
   } finally {
     if (previous === undefined) delete process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS;
     else process.env.PACKETAGENT_BUILDER_CHAT_STEP_MS = previous;
@@ -1858,8 +2253,14 @@ test("builder app-draft/stream narrates the template fallback path with prose ev
     });
     assert.equal(response.status, 200);
     const events = await readSseEvents(response.body!);
-    const proseEvents = events.filter((e) => e.type === "prose") as Array<{ type: "prose"; text: string }>;
-    assert.ok(proseEvents.length >= 3, `expected at least 3 prose events, got ${proseEvents.length}`);
+    const proseEvents = events.filter((e) => e.type === "prose") as Array<{
+      type: "prose";
+      text: string;
+    }>;
+    assert.ok(
+      proseEvents.length >= 3,
+      `expected at least 3 prose events, got ${proseEvents.length}`,
+    );
     const draftEvent = events.find((e) => e.type === "draft") as
       | { type: "draft"; source: string; draft: { app: { name: string } } }
       | undefined;
@@ -1886,27 +2287,45 @@ test("checkpoint branch creates a new app with previousCheckpointId chain", asyn
     headers,
     body: JSON.stringify({ prompt: "Build a public booking app with services and appointments." }),
   });
-  const draftBody = await draftResponse.json() as { draft: unknown };
+  const draftBody = (await draftResponse.json()) as { draft: unknown };
   const authoredFiles = [
-    { path: "index.html", content: "<div id=\"root\"></div>" },
-    { path: "src/App.tsx", content: "export default function App(){ return <main>Branched booking app</main>; }\n" },
-    { path: "package.json", content: "{\"scripts\":{\"build\":\"vite build\"},\"dependencies\":{\"@vitejs/plugin-react\":\"latest\",\"vite\":\"latest\",\"typescript\":\"latest\",\"react\":\"latest\",\"react-dom\":\"latest\"},\"devDependencies\":{}}\n" },
+    { path: "index.html", content: '<div id="root"></div>' },
+    {
+      path: "src/App.tsx",
+      content: "export default function App(){ return <main>Branched booking app</main>; }\n",
+    },
+    {
+      path: "package.json",
+      content:
+        '{"scripts":{"build":"vite build"},"dependencies":{"@vitejs/plugin-react":"latest","vite":"latest","typescript":"latest","react":"latest","react-dom":"latest"},"devDependencies":{}}\n',
+    },
   ];
 
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
-    body: JSON.stringify({ draft: draftBody.draft, source: "llm-filetree", files: authoredFiles, runSmoke: true }),
+    body: JSON.stringify({
+      draft: draftBody.draft,
+      source: "llm-filetree",
+      files: authoredFiles,
+      runSmoke: true,
+    }),
   });
-  const applied = await applyResponse.json() as { app: { id: string; name: string }; checkpoint: { id: string } };
+  const applied = (await applyResponse.json()) as {
+    app: { id: string; name: string };
+    checkpoint: { id: string };
+  };
   assert.equal(applyResponse.status, 201);
 
-  const branchResponse = await app.request(`/api/app/builder/checkpoints/${applied.checkpoint.id}/branch`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ appId: applied.app.id }),
-  });
-  const branched = await branchResponse.json() as {
+  const branchResponse = await app.request(
+    `/api/app/builder/checkpoints/${applied.checkpoint.id}/branch`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ appId: applied.app.id }),
+    },
+  );
+  const branched = (await branchResponse.json()) as {
     branched: boolean;
     app: { id: string; name: string; slug: string };
     checkpoint: { id: string; appId: string };
@@ -1926,14 +2345,22 @@ test("checkpoint branch creates a new app with previousCheckpointId chain", asyn
   const branchApp = stored.find((entry) => entry.id === branched.app.id);
   assert.ok(sourceApp, "source app survives");
   assert.ok(branchApp, "branch app exists");
-  const branchInitial = (branchApp.checkpoints ?? []).find((checkpoint) => checkpoint.id === branched.checkpoint.id);
+  const branchInitial = (branchApp.checkpoints ?? []).find(
+    (checkpoint) => checkpoint.id === branched.checkpoint.id,
+  );
   assert.ok(branchInitial, "branch app has its own initial checkpoint");
   assert.equal(branchInitial.source, "branch");
   assert.equal(branchInitial.previousCheckpointId, applied.checkpoint.id);
   assert.equal(branchInitial.codegenSource, "llm-filetree");
-  assert.equal(branchInitial.sourceFiles?.find((file) => file.path === "src/App.tsx")?.content, authoredFiles[1]?.content);
+  assert.equal(
+    branchInitial.sourceFiles?.find((file) => file.path === "src/App.tsx")?.content,
+    authoredFiles[1]?.content,
+  );
   assert.equal(branchApp.codegenSource, "llm-filetree");
-  assert.equal(branchApp.sourceFiles?.find((file) => file.path === "src/App.tsx")?.content, authoredFiles[1]?.content);
+  assert.equal(
+    branchApp.sourceFiles?.find((file) => file.path === "src/App.tsx")?.content,
+    authoredFiles[1]?.content,
+  );
 });
 
 test("checkpoint branch requires authentication", async () => {
@@ -1961,7 +2388,7 @@ test("builder app-iteration/stream emits step events, a diff event, and done", a
       headers,
       body: JSON.stringify({ prompt: "Build a small CRM for renewals and contacts." }),
     });
-    const draftBody = await draftResponse.json() as { draft: unknown };
+    const draftBody = (await draftResponse.json()) as { draft: unknown };
 
     const response = await app.request("/api/app/builder/app-iteration/stream", {
       method: "POST",
@@ -1981,7 +2408,10 @@ test("builder app-iteration/stream emits step events, a diff event, and done", a
     assert.ok(types.includes("step"), "expected at least one step event");
     assert.ok(types.includes("diff"), "expected a diff event");
     assert.equal(types[types.length - 1], "done");
-    const diffEvent = events.find((e) => e.type === "diff") as { type: "diff"; iteration: { id: string; files: unknown[] } };
+    const diffEvent = events.find((e) => e.type === "diff") as {
+      type: "diff";
+      iteration: { id: string; files: unknown[] };
+    };
     assert.ok(diffEvent.iteration.id);
     assert.ok(Array.isArray(diffEvent.iteration.files));
   } finally {
@@ -2001,14 +2431,43 @@ test("host-info route requires authentication and reports LAN ips for share affo
   const restore = setHostInfoSourcesForTests({
     networkInterfaces: () => ({
       lo: [
-        { address: "127.0.0.1", netmask: "255.0.0.0", family: "IPv4", mac: "00:00:00:00:00:00", internal: true, cidr: "127.0.0.1/8" },
+        {
+          address: "127.0.0.1",
+          netmask: "255.0.0.0",
+          family: "IPv4",
+          mac: "00:00:00:00:00:00",
+          internal: true,
+          cidr: "127.0.0.1/8",
+        },
       ],
       en0: [
-        { address: "192.168.4.21", netmask: "255.255.255.0", family: "IPv4", mac: "aa:bb:cc:dd:ee:ff", internal: false, cidr: "192.168.4.21/24" },
-        { address: "fe80::1", netmask: "ffff:ffff:ffff:ffff::", family: "IPv6", mac: "aa:bb:cc:dd:ee:ff", internal: false, cidr: "fe80::1/64", scopeid: 4 },
+        {
+          address: "192.168.4.21",
+          netmask: "255.255.255.0",
+          family: "IPv4",
+          mac: "aa:bb:cc:dd:ee:ff",
+          internal: false,
+          cidr: "192.168.4.21/24",
+        },
+        {
+          address: "fe80::1",
+          netmask: "ffff:ffff:ffff:ffff::",
+          family: "IPv6",
+          mac: "aa:bb:cc:dd:ee:ff",
+          internal: false,
+          cidr: "fe80::1/64",
+          scopeid: 4,
+        },
       ],
       eth1: [
-        { address: "10.0.0.7", netmask: "255.255.255.0", family: "IPv4", mac: "11:22:33:44:55:66", internal: false, cidr: "10.0.0.7/24" },
+        {
+          address: "10.0.0.7",
+          netmask: "255.255.255.0",
+          family: "IPv4",
+          mac: "11:22:33:44:55:66",
+          internal: false,
+          cidr: "10.0.0.7/24",
+        },
       ],
     }),
     resolvePort: () => 9090,
@@ -2016,8 +2475,10 @@ test("host-info route requires authentication and reports LAN ips for share affo
   t.after(() => restore());
 
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
-  const response = await app.request("/api/app/host-info", { headers: authHeaders(alpha.cookieValue) });
-  const body = await response.json() as { lanIps: string[]; port: number };
+  const response = await app.request("/api/app/host-info", {
+    headers: authHeaders(alpha.cookieValue),
+  });
+  const body = (await response.json()) as { lanIps: string[]; port: number };
 
   assert.equal(response.status, 200);
   assert.equal(body.port, 9090);
@@ -2030,7 +2491,14 @@ test("host-info route returns empty lanIps when no external IPv4 interfaces are 
   const restore = setHostInfoSourcesForTests({
     networkInterfaces: () => ({
       lo: [
-        { address: "127.0.0.1", netmask: "255.0.0.0", family: "IPv4", mac: "00:00:00:00:00:00", internal: true, cidr: "127.0.0.1/8" },
+        {
+          address: "127.0.0.1",
+          netmask: "255.0.0.0",
+          family: "IPv4",
+          mac: "00:00:00:00:00:00",
+          internal: true,
+          cidr: "127.0.0.1/8",
+        },
       ],
     }),
     resolvePort: () => 8484,
@@ -2038,8 +2506,10 @@ test("host-info route returns empty lanIps when no external IPv4 interfaces are 
   t.after(() => restore());
 
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
-  const response = await app.request("/api/app/host-info", { headers: authHeaders(alpha.cookieValue) });
-  const body = await response.json() as { lanIps: string[]; port: number };
+  const response = await app.request("/api/app/host-info", {
+    headers: authHeaders(alpha.cookieValue),
+  });
+  const body = (await response.json()) as { lanIps: string[]; port: number };
 
   assert.equal(response.status, 200);
   assert.equal(body.port, 8484);
@@ -2056,13 +2526,13 @@ async function setupGeneratedAppForPreviewTokenTests() {
     headers,
     body: JSON.stringify({ prompt: "Build a small invoice tracker for freelancers and clients." }),
   });
-  const { draft } = await draftResponse.json() as { draft: Record<string, unknown> };
+  const { draft } = (await draftResponse.json()) as { draft: Record<string, unknown> };
   const applyResponse = await app.request("/api/app/builder/app-draft/apply", {
     method: "POST",
     headers,
     body: JSON.stringify({ draft, runSmoke: true }),
   });
-  const applied = await applyResponse.json() as { app: { id: string; slug: string } };
+  const applied = (await applyResponse.json()) as { app: { id: string; slug: string } };
   assert.equal(applyResponse.status, 201);
   return { app, alpha, headers, applied };
 }
@@ -2085,7 +2555,7 @@ test("preview-token endpoint mints a token with a future expiry and a previewUrl
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(response.status, 200);
-  const body = await response.json() as { token: string; expiresAt: string; previewUrl: string };
+  const body = (await response.json()) as { token: string; expiresAt: string; previewUrl: string };
   assert.match(body.token, /^tk_/);
   assert.ok(body.token.includes(applied.app.id));
   const expiresAtMs = Date.parse(body.expiresAt);
@@ -2122,21 +2592,27 @@ test("preview-token endpoint rejects appIds outside the caller's workspace", asy
       updatedAt: "2026-05-02T12:00:00.000Z",
     });
   });
-  const response = await app.request("/api/app/generated-apps/gapp_beta_preview_token_test/preview-token", {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
+  const response = await app.request(
+    "/api/app/generated-apps/gapp_beta_preview_token_test/preview-token",
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), { error: "generated app not found" });
 });
 
 test("preview route accepts a freshly minted token without a session cookie", async () => {
   const { app, alpha, applied } = await setupGeneratedAppForPreviewTokenTests();
-  const tokenResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/preview-token`, {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
-  const tokenBody = await tokenResponse.json() as { token: string };
+  const tokenResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/preview-token`,
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
+  const tokenBody = (await tokenResponse.json()) as { token: string };
 
   // Note: NO cookie header here — this is what a phone on the LAN does.
   const previewResponse = await app.request(
@@ -2154,12 +2630,17 @@ test("preview route rejects an expired token with a friendly 401", async () => {
   // Build an expired token directly via HMAC (mirrors the server's tk_<appId>.<expirySec>.<hmac> shape).
   const crypto = await import("node:crypto");
   const secret =
-    process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET?.trim()
-    || process.env.PACKETAGENT_MASTER_KEY?.trim()
-    || "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
+    process.env.PACKETAGENT_PREVIEW_TOKEN_SECRET?.trim() ||
+    process.env.PACKETAGENT_MASTER_KEY?.trim() ||
+    "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
   const expirySec = Math.floor(Date.now() / 1000) - 60;
-  const hmac = crypto.createHmac("sha256", secret).update(`${applied.app.id}.${expirySec}`).digest("base64")
-    .replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const hmac = crypto
+    .createHmac("sha256", secret)
+    .update(`${applied.app.id}.${expirySec}`)
+    .digest("base64")
+    .replace(/=+$/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
   const token = `tk_${applied.app.id}.${expirySec}.${hmac}`;
 
   const previewResponse = await app.request(
@@ -2171,11 +2652,14 @@ test("preview route rejects an expired token with a friendly 401", async () => {
 
 test("preview route rejects a tampered or wrong-app token with a friendly 401", async () => {
   const { app, alpha, applied } = await setupGeneratedAppForPreviewTokenTests();
-  const tokenResponse = await app.request(`/api/app/generated-apps/${applied.app.id}/preview-token`, {
-    method: "POST",
-    headers: authHeaders(alpha.cookieValue),
-  });
-  const tokenBody = await tokenResponse.json() as { token: string };
+  const tokenResponse = await app.request(
+    `/api/app/generated-apps/${applied.app.id}/preview-token`,
+    {
+      method: "POST",
+      headers: authHeaders(alpha.cookieValue),
+    },
+  );
+  const tokenBody = (await tokenResponse.json()) as { token: string };
 
   // Tampered: flip the last character of the hmac portion.
   const flipped = tokenBody.token.slice(0, -1) + (tokenBody.token.endsWith("A") ? "B" : "A");
@@ -2272,7 +2756,7 @@ test("preview-token minting refuses the baked-in fallback secret in production",
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(refused.status, 500);
-  const refusedBody = await refused.json() as { error: string };
+  const refusedBody = (await refused.json()) as { error: string };
   assert.match(refusedBody.error, /preview tokens are unavailable/);
 
   // Once a real secret is configured, production minting works again.
@@ -2282,7 +2766,7 @@ test("preview-token minting refuses the baked-in fallback secret in production",
     headers: authHeaders(alpha.cookieValue),
   });
   assert.equal(ok.status, 200);
-  const okBody = await ok.json() as { token: string };
+  const okBody = (await ok.json()) as { token: string };
   assert.match(okBody.token, /^tk_/);
 });
 
@@ -2306,8 +2790,13 @@ test("preview verification refuses fallback-forged tokens in production", async 
   const crypto = await import("node:crypto");
   const fallback = "packetagent-preview-token-dev-fallback-DO-NOT-USE-IN-PROD";
   const expirySec = Math.floor(Date.now() / 1000) + 3600;
-  const hmac = crypto.createHmac("sha256", fallback).update(`${applied.app.id}.${expirySec}`).digest("base64")
-    .replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const hmac = crypto
+    .createHmac("sha256", fallback)
+    .update(`${applied.app.id}.${expirySec}`)
+    .digest("base64")
+    .replace(/=+$/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
   const forged = `tk_${applied.app.id}.${expirySec}.${hmac}`;
 
   // In production with no real secret, verification must refuse (401), not

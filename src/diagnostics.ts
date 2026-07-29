@@ -26,12 +26,23 @@ function extractJson(content: string): unknown {
   const candidate = fenced ? fenced[1] : trimmed;
   const start = candidate.indexOf("{");
   if (start === -1) throw new Error("no JSON in diagnostic output");
-  let depth = 0, inStr = false, esc = false;
+  let depth = 0,
+    inStr = false,
+    esc = false;
   for (let i = start; i < candidate.length; i++) {
     const ch = candidate[i];
-    if (esc) { esc = false; continue; }
-    if (ch === "\\") { esc = true; continue; }
-    if (ch === '"') { inStr = !inStr; continue; }
+    if (esc) {
+      esc = false;
+      continue;
+    }
+    if (ch === "\\") {
+      esc = true;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = !inStr;
+      continue;
+    }
     if (inStr) continue;
     if (ch === "{") depth++;
     else if (ch === "}") {
@@ -63,21 +74,30 @@ Diagnose. Respond with the JSON shape described.`;
 
   try {
     const result = await recordedCall(
-      { workspaceId: input.workspaceId, routeKey: "agent.summary", provider: route.provider, model: route.model },
-      () => router.call({
+      {
         workspaceId: input.workspaceId,
         routeKey: "agent.summary",
-        messages: [
-          { role: "system", content: DIAGNOSE_SYSTEM },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.1,
-        maxTokens: 600,
-      }),
+        provider: route.provider,
+        model: route.model,
+      },
+      () =>
+        router.call({
+          workspaceId: input.workspaceId,
+          routeKey: "agent.summary",
+          messages: [
+            { role: "system", content: DIAGNOSE_SYSTEM },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.1,
+          maxTokens: 600,
+        }),
     );
     let parsed: { summary?: unknown; likelyCause?: unknown; suggestion?: unknown };
-    try { parsed = extractJson(result.content) as typeof parsed; }
-    catch { return null; }
+    try {
+      parsed = extractJson(result.content) as typeof parsed;
+    } catch {
+      return null;
+    }
     return {
       summary: String(parsed.summary ?? ""),
       likelyCause: String(parsed.likelyCause ?? ""),

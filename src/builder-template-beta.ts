@@ -75,7 +75,8 @@ const BETA_TEMPLATE_DEFINITIONS: readonly BuilderTemplateBetaDefinition[] = [
     id: "sales_crm",
     bundleId: "beta-sales-crm",
     appTemplateId: "crm",
-    appPrompt: "Build a CRM for sales teams to manage leads, accounts, deals, pipeline follow-up, and Slack webhook handoffs.",
+    appPrompt:
+      "Build a CRM for sales teams to manage leads, accounts, deals, pipeline follow-up, and Slack webhook handoffs.",
     agentPrompts: [
       "Build an agent that reviews CRM deal changes each morning, summarizes stalled opportunities, and sends Slack webhook alerts to sales operators.",
       "Build an agent that monitors new CRM leads, scores urgency, and emails owners with the next best follow-up.",
@@ -90,7 +91,8 @@ const BETA_TEMPLATE_DEFINITIONS: readonly BuilderTemplateBetaDefinition[] = [
     id: "booking_ops",
     bundleId: "beta-booking-ops",
     appTemplateId: "booking",
-    appPrompt: "Create a booking app for clinics with providers, appointment slots, public booking, calendar scheduling, and email confirmations.",
+    appPrompt:
+      "Create a booking app for clinics with providers, appointment slots, public booking, calendar scheduling, and email confirmations.",
     agentPrompts: [
       "Build an agent that scans tomorrow's bookings, flags double-booking risks, and emails the clinic operations owner.",
       "Build a webhook agent that receives booking changes, verifies the appointment payload, and records a concise status summary.",
@@ -105,7 +107,8 @@ const BETA_TEMPLATE_DEFINITIONS: readonly BuilderTemplateBetaDefinition[] = [
     id: "internal_ops",
     bundleId: "beta-internal-ops",
     appTemplateId: "internal_dashboard",
-    appPrompt: "Ship an internal dashboard for operations KPIs, reports, monitoring alerts, analytics, custom API pulls, and database persistence.",
+    appPrompt:
+      "Ship an internal dashboard for operations KPIs, reports, monitoring alerts, analytics, custom API pulls, and database persistence.",
     agentPrompts: [
       "Create a daily operations agent that calls a custom external API, summarizes KPI drift, and opens escalation notes for critical alerts.",
       "Create an agent that prepares a weekly internal dashboard brief from reports, alerts, and resolved incidents.",
@@ -120,7 +123,8 @@ const BETA_TEMPLATE_DEFINITIONS: readonly BuilderTemplateBetaDefinition[] = [
     id: "customer_success",
     bundleId: "beta-customer-success",
     appTemplateId: "customer_portal",
-    appPrompt: "Create a customer portal with self-service requests, documents, invoices, customer login, Stripe checkout, and GitHub issue sync.",
+    appPrompt:
+      "Create a customer portal with self-service requests, documents, invoices, customer login, Stripe checkout, and GitHub issue sync.",
     agentPrompts: [
       "Build an agent that watches customer portal requests, creates GitHub issues for bugs, sends Slack alerts, and emails owners.",
       "Build an agent that reviews Stripe billing notes and customer documents before summarizing account risks.",
@@ -153,7 +157,9 @@ export function expandBuilderTemplateBeta(
   };
 }
 
-export function buildGeneratedTestManifest(bundles: BuilderTemplateBetaBundle[]): GeneratedTestManifest {
+export function buildGeneratedTestManifest(
+  bundles: BuilderTemplateBetaBundle[],
+): GeneratedTestManifest {
   const checks = bundles.flatMap((bundle) => buildBundleChecks(bundle));
   const reliabilityCleanupGuidance = uniqueSorted([
     ...bundles.flatMap((bundle) => bundle.reliabilityCleanupGuidance),
@@ -177,7 +183,9 @@ function expandDefinition(
 ): BuilderTemplateBetaBundle {
   const appPrompt = withContext(definition.appPrompt, promptContext);
   const app = generateAppDraftFromPrompt(appPrompt);
-  const agents = definition.agentPrompts.map((prompt) => generateAgentDraftFromPrompt(withContext(prompt, promptContext)));
+  const agents = definition.agentPrompts.map((prompt) =>
+    generateAgentDraftFromPrompt(withContext(prompt, promptContext)),
+  );
 
   return {
     id: definition.bundleId,
@@ -193,11 +201,12 @@ function expandDefinition(
 function buildBundleChecks(bundle: BuilderTemplateBetaBundle): GeneratedTestCheck[] {
   const integrationEnvVars = uniqueSorted([
     ...bundle.app.integrationMetadata.requested.flatMap((integration) => integration.envVars),
-    ...bundle.agents.flatMap((agent) => agent.integrationMetadata.requested.flatMap((integration) => integration.envVars)),
+    ...bundle.agents.flatMap((agent) =>
+      agent.integrationMetadata.requested.flatMap((integration) => integration.envVars),
+    ),
   ]);
-  const integrationEnvSummary = integrationEnvVars.length > 0
-    ? integrationEnvVars.join(", ")
-    : "no provider env vars";
+  const integrationEnvSummary =
+    integrationEnvVars.length > 0 ? integrationEnvVars.join(", ") : "no provider env vars";
 
   return [
     {
@@ -226,9 +235,7 @@ function buildBundleChecks(bundle: BuilderTemplateBetaBundle): GeneratedTestChec
         "Repeating expansion with the same prompt returns identical app and agent bundle data.",
         "CRUD route contracts cover create, read, update, and delete for generated entities.",
       ],
-      cleanup: [
-        "Reset in-memory draft mutations before comparing repeated expansions.",
-      ],
+      cleanup: ["Reset in-memory draft mutations before comparing repeated expansions."],
     },
     {
       id: `${bundle.id}:access`,
@@ -271,7 +278,9 @@ function selectDefinitions(
 
   const requested = new Set(categories);
   const selected = BETA_TEMPLATE_DEFINITIONS.filter((definition) => requested.has(definition.id));
-  const unknown = categories.filter((category) => !BETA_TEMPLATE_DEFINITIONS.some((definition) => definition.id === category));
+  const unknown = categories.filter(
+    (category) => !BETA_TEMPLATE_DEFINITIONS.some((definition) => definition.id === category),
+  );
   if (unknown.length > 0) {
     throw new Error(`unknown beta template categories: ${uniqueSorted(unknown).join(", ")}`);
   }
@@ -279,7 +288,9 @@ function selectDefinitions(
 }
 
 function cleanPromptContext(value: string | undefined): string {
-  return String(value ?? "").trim().replace(/\s+/g, " ");
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function withContext(prompt: string, context: string): string {

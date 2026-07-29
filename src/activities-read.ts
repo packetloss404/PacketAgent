@@ -16,17 +16,21 @@ export function listActivitiesForWorkspaceViaRepository(
   limit?: number,
   deps: ActivitiesReadDeps = {},
 ): ActivityRecord[] {
-  const repo = deps.repository ?? createActivitiesRepository({
-    loadStore: deps.loadStore,
-    mutateStore: deps.mutateStore,
-  });
+  const repo =
+    deps.repository ??
+    createActivitiesRepository({
+      loadStore: deps.loadStore,
+      mutateStore: deps.mutateStore,
+    });
 
   if (process.env.PACKETAGENT_STORE !== "sqlite") {
     return repo.list({ workspaceId, limit });
   }
 
   const primary = repo.list({ workspaceId }).filter((entry) => entry.workspaceId === workspaceId);
-  const fallback = legacyActivitiesFromStore(deps).filter((entry) => entry.workspaceId === workspaceId);
+  const fallback = legacyActivitiesFromStore(deps).filter(
+    (entry) => entry.workspaceId === workspaceId,
+  );
   return mergeSortAndLimit(primary, fallback, limit);
 }
 

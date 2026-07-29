@@ -219,7 +219,8 @@ export interface PreviewFixPromptHandoff {
   };
 }
 
-const SECRET_PATTERN = /\b(api[_-]?key|authorization|bearer|secret|token|password)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/gi;
+const SECRET_PATTERN =
+  /\b(api[_-]?key|authorization|bearer|secret|token|password)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/gi;
 const MAX_LOG_EXCERPT_LENGTH = 1_200;
 
 export function derivePreviewRefreshState(input: PreviewRefreshStateInput): PreviewRefreshState {
@@ -240,11 +241,12 @@ export function derivePreviewRefreshState(input: PreviewRefreshStateInput): Prev
     revision: cleanString(input.refreshRequest?.revision),
     requestedAt,
   });
-  const hasPendingRequest = Boolean(requestedAt) && compareTimestamp(requestedAt, current.refreshedAt) > 0;
+  const hasPendingRequest =
+    Boolean(requestedAt) && compareTimestamp(requestedAt, current.refreshedAt) > 0;
   const hasBuildTarget = Boolean(target.buildId || target.revision);
   const targetChanged = Boolean(
-    (target.buildId && target.buildId !== current.buildId)
-      || (target.revision && target.revision !== current.revision),
+    (target.buildId && target.buildId !== current.buildId) ||
+    (target.revision && target.revision !== current.revision),
   );
   const missingRefresh = buildStatus.canPreview && hasBuildTarget && !current.refreshedAt;
   const needsRefresh = targetChanged || missingRefresh;
@@ -293,7 +295,9 @@ export function derivePreviewRefreshState(input: PreviewRefreshStateInput): Prev
       needsRefresh: true,
       canRequestRefresh: false,
       canUsePreview: false,
-      reason: hasPendingRequest ? "Preview refresh has been requested and has not completed." : buildStatus.summary,
+      reason: hasPendingRequest
+        ? "Preview refresh has been requested and has not completed."
+        : buildStatus.summary,
       buildPhase: buildStatus.phase,
       target,
       current,
@@ -310,7 +314,9 @@ export function derivePreviewRefreshState(input: PreviewRefreshStateInput): Prev
       needsRefresh: true,
       canRequestRefresh: buildStatus.canPreview,
       canUsePreview: Boolean(current.refreshedAt && previewUrl),
-      reason: targetChanged ? "Generated app build changed since the preview was rendered." : "Preview has not rendered the current build yet.",
+      reason: targetChanged
+        ? "Generated app build changed since the preview was rendered."
+        : "Preview has not rendered the current build yet.",
       buildPhase: buildStatus.phase,
       target,
       current,
@@ -356,7 +362,9 @@ export function buildSmokeRerunRequest(input: SmokeRerunRequestInput): SmokeReru
   const attempt = positiveInteger(input.attempt) ?? 1;
   const reason = input.reason ?? "manual";
   const checksById = new Map(input.checks.map((check) => [check.id, check]));
-  const requestedIds = input.checkIds ? uniqueSorted(input.checkIds.map(stableCheckId)) : uniqueSorted(input.checks.map((check) => check.id));
+  const requestedIds = input.checkIds
+    ? uniqueSorted(input.checkIds.map(stableCheckId))
+    : uniqueSorted(input.checks.map((check) => check.id));
   const unknownCheckIds = requestedIds.filter((id) => !checksById.has(id));
   const selectedChecks = requestedIds
     .map((id) => checksById.get(id))
@@ -407,9 +415,10 @@ export function buildSmokeRerunResult(input: SmokeRerunResultInput): SmokeRerunR
       };
     }
 
-    const normalizedError = outcome.status === "failed" || outcome.status === "timed-out"
-      ? normalizeError(outcome.error ?? `${check.label} ${outcome.status}`)
-      : undefined;
+    const normalizedError =
+      outcome.status === "failed" || outcome.status === "timed-out"
+        ? normalizeError(outcome.error ?? `${check.label} ${outcome.status}`)
+        : undefined;
 
     return removeUndefined({
       checkId: check.id,
@@ -432,7 +441,9 @@ export function buildSmokeRerunResult(input: SmokeRerunResultInput): SmokeRerunR
   const failedCheckIds = results
     .filter((result) => result.status === "failed" || result.status === "timed-out")
     .map((result) => result.checkId);
-  const unknownOutcomeCheckIds = uniqueSorted([...outcomesById.keys()].filter((checkId) => !requestIds.has(checkId)));
+  const unknownOutcomeCheckIds = uniqueSorted(
+    [...outcomesById.keys()].filter((checkId) => !requestIds.has(checkId)),
+  );
   const status: SmokeRerunResultStatus = !input.request.canRun
     ? "blocked"
     : failedCheckIds.length > 0
@@ -465,17 +476,21 @@ export function capturePreviewError(input: PreviewErrorCaptureInput): PreviewErr
   const smokeCheckId = cleanString(input.smokeCheckId);
   const buildId = cleanString(input.buildId);
   const capturedAt = cleanString(input.capturedAt);
-  const fingerprint = shortHash([
-    input.source,
-    input.appId,
-    buildId,
-    smokeCheckId,
-    routePath,
-    location?.filePath,
-    location?.line,
-    normalized.name,
-    normalized.message,
-  ].filter((value) => value !== undefined).join("|"));
+  const fingerprint = shortHash(
+    [
+      input.source,
+      input.appId,
+      buildId,
+      smokeCheckId,
+      routePath,
+      location?.filePath,
+      location?.line,
+      normalized.name,
+      normalized.message,
+    ]
+      .filter((value) => value !== undefined)
+      .join("|"),
+  );
 
   return removeUndefined({
     kind: "preview-error-capture" as const,
@@ -497,15 +512,21 @@ export function capturePreviewError(input: PreviewErrorCaptureInput): PreviewErr
   });
 }
 
-export function capturePreviewBuildError(input: Omit<PreviewErrorCaptureInput, "source">): PreviewErrorCapture {
+export function capturePreviewBuildError(
+  input: Omit<PreviewErrorCaptureInput, "source">,
+): PreviewErrorCapture {
   return capturePreviewError({ ...input, source: "build" });
 }
 
-export function capturePreviewRuntimeError(input: Omit<PreviewErrorCaptureInput, "source">): PreviewErrorCapture {
+export function capturePreviewRuntimeError(
+  input: Omit<PreviewErrorCaptureInput, "source">,
+): PreviewErrorCapture {
   return capturePreviewError({ ...input, source: "runtime" });
 }
 
-export function buildPreviewFixPromptHandoff(input: PreviewFixPromptHandoffInput): PreviewFixPromptHandoff {
+export function buildPreviewFixPromptHandoff(
+  input: PreviewFixPromptHandoffInput,
+): PreviewFixPromptHandoff {
   const capture = input.capture;
   const readinessHandoff = buildRuntimeErrorHandoff({
     appId: capture.appId,
@@ -522,10 +543,14 @@ export function buildPreviewFixPromptHandoff(input: PreviewFixPromptHandoffInput
     },
   } satisfies RuntimeErrorHandoffInput);
   const routeContext = (input.routeMap ?? [])
-    .map((route) => `${normalizePath(route.path) ?? route.path}${route.title ? ` (${route.title.trim()})` : ""}`)
+    .map(
+      (route) =>
+        `${normalizePath(route.path) ?? route.path}${route.title ? ` (${route.title.trim()})` : ""}`,
+    )
     .sort()
     .join(", ");
-  const failedCheckIds = input.smokeResult?.failedCheckIds ?? (capture.smokeCheckId ? [capture.smokeCheckId] : []);
+  const failedCheckIds =
+    input.smokeResult?.failedCheckIds ?? (capture.smokeCheckId ? [capture.smokeCheckId] : []);
   const contextLines = [
     input.appName ? `App name: ${input.appName.trim()}` : undefined,
     input.originalPrompt ? `Original prompt: ${redact(input.originalPrompt.trim())}` : undefined,
@@ -542,9 +567,13 @@ export function buildPreviewFixPromptHandoff(input: PreviewFixPromptHandoffInput
     `App id: ${capture.appId}`,
     `Failure fingerprint: ${capture.fingerprint}`,
     `Error: ${capture.message}`,
-    contextLines.length > 0 ? `Context:\n${contextLines.map((line) => `- ${line}`).join("\n")}` : undefined,
+    contextLines.length > 0
+      ? `Context:\n${contextLines.map((line) => `- ${line}`).join("\n")}`
+      : undefined,
     "Return a minimal generated-app patch, preserve the original app intent, and include the smoke or build verification to rerun.",
-  ].filter(Boolean).join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   return {
     kind: "builder-fix-prompt-handoff",
@@ -579,7 +608,10 @@ function refreshState(
   });
 }
 
-function buildSmokeErrorCaptures(request: SmokeRerunRequest, outcomes: SmokeRerunOutcomeInput[]): PreviewErrorCapture[] {
+function buildSmokeErrorCaptures(
+  request: SmokeRerunRequest,
+  outcomes: SmokeRerunOutcomeInput[],
+): PreviewErrorCapture[] {
   const checksById = new Map(request.checks.map((check) => [check.id, check]));
   return outcomes
     .filter((outcome) => outcome.status === "failed" || outcome.status === "timed-out")
@@ -601,9 +633,11 @@ function buildSmokeErrorCaptures(request: SmokeRerunRequest, outcomes: SmokeReru
 }
 
 function compareSmokeChecks(left: AppSmokeCheck, right: AppSmokeCheck): number {
-  return left.id.localeCompare(right.id)
-    || left.path.localeCompare(right.path)
-    || left.method.localeCompare(right.method);
+  return (
+    left.id.localeCompare(right.id) ||
+    left.path.localeCompare(right.path) ||
+    left.method.localeCompare(right.method)
+  );
 }
 
 function copySmokeCheck(check: AppSmokeCheck): AppSmokeCheck {
@@ -638,10 +672,14 @@ function normalizeLogs(logs: string | string[] | undefined): string | undefined 
   const joined = Array.isArray(logs) ? logs.join("\n") : logs;
   const redacted = redact(String(joined ?? "").trim());
   if (!redacted) return undefined;
-  return redacted.length > MAX_LOG_EXCERPT_LENGTH ? `${redacted.slice(0, MAX_LOG_EXCERPT_LENGTH).trim()}...` : redacted;
+  return redacted.length > MAX_LOG_EXCERPT_LENGTH
+    ? `${redacted.slice(0, MAX_LOG_EXCERPT_LENGTH).trim()}...`
+    : redacted;
 }
 
-function normalizeLocation(location: PreviewErrorCaptureInput["location"]): PreviewErrorCapture["location"] | undefined {
+function normalizeLocation(
+  location: PreviewErrorCaptureInput["location"],
+): PreviewErrorCapture["location"] | undefined {
   if (!location) return undefined;
   return removeUndefined({
     filePath: cleanString(location.filePath),
@@ -654,10 +692,7 @@ function normalizePath(path: string | undefined): string | undefined {
   const trimmed = cleanString(path);
   if (!trimmed) return undefined;
   const [pathname, query = ""] = trimmed.split("?", 2);
-  const normalized = pathname
-    .replace(/\\/g, "/")
-    .replace(/\/+/g, "/")
-    .replace(/\/$/g, "");
+  const normalized = pathname.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/g, "");
   const prefixed = normalized.startsWith("/") ? normalized : `/${normalized}`;
   return `${prefixed || "/"}${query ? `?${query}` : ""}`;
 }
@@ -667,7 +702,9 @@ function formatLocation(location: NonNullable<PreviewErrorCapture["location"]>):
     location.filePath,
     location.line ? `line ${location.line}` : undefined,
     location.column ? `column ${location.column}` : undefined,
-  ].filter(Boolean).join(", ");
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
 function countStatus(results: SmokeRerunCheckResult[], status: SmokeRerunCheckStatus): number {
@@ -689,7 +726,13 @@ function stableCheckId(value: string): string {
 }
 
 function stableKey(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9:_/-]+/g, "-").replace(/^-+|-+$/g, "") || "generated";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9:_/-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "generated"
+  );
 }
 
 function shortHash(value: string): string {
@@ -702,11 +745,15 @@ function shortHash(value: string): string {
 }
 
 function positiveInteger(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : undefined;
 }
 
 function nonNegativeInteger(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : undefined;
 }
 
 function cleanString(value: string | undefined): string | undefined {

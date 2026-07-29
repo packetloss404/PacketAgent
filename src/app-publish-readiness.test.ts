@@ -34,12 +34,23 @@ test("app publish readiness package contract is deterministic for the same draft
   assert.equal(first.workspaceSlug, "alpha-workspace");
   assert.equal(first.draftSlug, "release-audit-console");
   assert.equal(first.localPublishPath, "exports/packetagent/alpha-workspace/release-audit-console");
-  assert.equal(first.urlHandoff.publicUrl, "https://publish.example.test/apps/alpha-workspace/release-audit-console");
-  assert.equal(first.urlHandoff.privateUrl, "http://localhost:8484/app/alpha-workspace/release-audit-console");
+  assert.equal(
+    first.urlHandoff.publicUrl,
+    "https://publish.example.test/apps/alpha-workspace/release-audit-console",
+  );
+  assert.equal(
+    first.urlHandoff.privateUrl,
+    "http://localhost:8484/app/alpha-workspace/release-audit-console",
+  );
   assert.equal(first.envChecklist.find((item) => item.name === "NODE_ENV")?.configured, true);
-  assert.equal(first.envChecklist.find((item) => item.name === "OPENAI_API_KEY")?.configured, false);
+  assert.equal(
+    first.envChecklist.find((item) => item.name === "OPENAI_API_KEY")?.configured,
+    false,
+  );
   assert.equal(first.publishIntegrations.version, "phase-71-lane-5");
-  assert.ok(first.publishIntegrations.featureBlockers.some((blocker) => blocker.includes("OPENAI_API_KEY")));
+  assert.ok(
+    first.publishIntegrations.featureBlockers.some((blocker) => blocker.includes("OPENAI_API_KEY")),
+  );
   assert.match(first.rollback.command, /--to release-publish-41$/);
 });
 
@@ -54,7 +65,9 @@ test("app publish readiness captures runtime config and generated checks", () =>
   assert.equal(readiness.runtimeConfig.appRouteBase, "/app/beta/ops-board");
   assert.equal(readiness.runtimeConfig.agentRouteBase, null);
   assert.equal(readiness.runtimeConfig.generatedBundlePath, "data/published-apps/beta/ops-board");
-  assert.ok(readiness.runtimeAssumptions.some((assumption) => assumption.id === "local-self-hosted-urls"));
+  assert.ok(
+    readiness.runtimeAssumptions.some((assumption) => assumption.id === "local-self-hosted-urls"),
+  );
   assert.ok(readiness.packaging.notes.some((note) => note.includes("Hono server")));
   assert.ok(readiness.packaging.notes.some((note) => note.includes("Vite client")));
   assert.deepEqual(readiness.packaging.buildCommands.slice(0, 3), [
@@ -62,13 +75,19 @@ test("app publish readiness captures runtime config and generated checks", () =>
     "npm run build:web",
     "npm run typecheck",
   ]);
-  assert.ok(readiness.packageContract.buildCommands.some((step) => step.id === "write-publish-manifest"));
+  assert.ok(
+    readiness.packageContract.buildCommands.some((step) => step.id === "write-publish-manifest"),
+  );
   assert.equal(readiness.healthCheck.livePath, "/api/health/live");
   assert.equal(readiness.healthCheck.readyPath, "/api/health/ready");
   assert.match(readiness.healthCheck.command, /\/api\/health\/ready$/);
-  assert.ok(readiness.packageContract.healthChecks.every((check) => check.failureAction.length > 0));
+  assert.ok(
+    readiness.packageContract.healthChecks.every((check) => check.failureAction.length > 0),
+  );
   assert.ok(readiness.publishChecklist.some((item) => item.id === "health-ready" && item.required));
-  assert.ok(readiness.packageContract.smokeChecks.some((check) => check.id === "private-handoff-url"));
+  assert.ok(
+    readiness.packageContract.smokeChecks.some((check) => check.id === "private-handoff-url"),
+  );
   assert.ok(readiness.smokeCheck.expected.some((check) => check.includes("private handoff URL")));
   assert.match(readiness.rollbackNote, /last known-good directory/);
 });
@@ -79,8 +98,12 @@ test("app publish readiness sorts and deduplicates environment checklist entries
     optionalEnv: ["A_OPTIONAL", "PORT", "Z_REQUIRED"],
   });
 
-  const requiredNames = readiness.envChecklist.filter((item) => item.required).map((item) => item.name);
-  const optionalNames = readiness.envChecklist.filter((item) => !item.required).map((item) => item.name);
+  const requiredNames = readiness.envChecklist
+    .filter((item) => item.required)
+    .map((item) => item.name);
+  const optionalNames = readiness.envChecklist
+    .filter((item) => !item.required)
+    .map((item) => item.name);
 
   assert.deepEqual(requiredNames, [
     "DATABASE_URL",
@@ -110,15 +133,39 @@ test("app publish readiness includes publish artifact manifest and docker compos
   assert.equal(readiness.publishArtifactManifest.fileName, "publish-artifacts.json");
   assert.equal(readiness.publishArtifactManifest.packageId, "beta/ops-board/app");
   assert.ok(readiness.publishArtifactManifest.entries.some((entry) => entry.path === "web/dist"));
-  assert.ok(readiness.publishArtifactManifest.entries.some((entry) => entry.path === "data/published-apps/beta/ops-board/bundle" && entry.kind === "generated_bundle"));
-  assert.ok(readiness.publishArtifactManifest.entries.some((entry) => entry.path.endsWith("/runtime-config.json")));
+  assert.ok(
+    readiness.publishArtifactManifest.entries.some(
+      (entry) =>
+        entry.path === "data/published-apps/beta/ops-board/bundle" &&
+        entry.kind === "generated_bundle",
+    ),
+  );
+  assert.ok(
+    readiness.publishArtifactManifest.entries.some((entry) =>
+      entry.path.endsWith("/runtime-config.json"),
+    ),
+  );
   assert.equal(readiness.dockerComposeExport.fileName, "docker-compose.publish.yml");
   assert.equal(readiness.dockerComposeExport.projectName, "packetagent-beta-ops-board");
   assert.deepEqual(readiness.dockerComposeExport.networks, ["packetagent-publish"]);
-  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-app" && service.healthcheck));
-  assert.equal(readiness.dockerComposeExport.services.find((service) => service.name === "packetagent-app")?.environment?.PACKETAGENT_APP_BUNDLE_PATH, "/app/data/published-apps/beta/ops-board/bundle");
-  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-db"));
-  assert.ok(readiness.dockerComposeExport.outline.some((step) => step.includes("data/published-apps/beta/ops-board/bundle")));
+  assert.ok(
+    readiness.dockerComposeExport.services.some(
+      (service) => service.name === "packetagent-app" && service.healthcheck,
+    ),
+  );
+  assert.equal(
+    readiness.dockerComposeExport.services.find((service) => service.name === "packetagent-app")
+      ?.environment?.PACKETAGENT_APP_BUNDLE_PATH,
+    "/app/data/published-apps/beta/ops-board/bundle",
+  );
+  assert.ok(
+    readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-db"),
+  );
+  assert.ok(
+    readiness.dockerComposeExport.outline.some((step) =>
+      step.includes("data/published-apps/beta/ops-board/bundle"),
+    ),
+  );
 });
 
 test("app publish readiness includes lane 1 checklist assumptions and publish history", () => {
@@ -126,7 +173,9 @@ test("app publish readiness includes lane 1 checklist assumptions and publish hi
     appName: "Customer Portal",
     workspaceSlug: "Northwind",
     previousPublishId: "Last Good",
-    runtimeAssumptions: ["The customer portal is routed through an operator-managed reverse proxy."],
+    runtimeAssumptions: [
+      "The customer portal is routed through an operator-managed reverse proxy.",
+    ],
     runtimeEnv: {
       NODE_ENV: "production",
       PORT: "8484",
@@ -135,23 +184,36 @@ test("app publish readiness includes lane 1 checklist assumptions and publish hi
     },
   });
 
-  assert.deepEqual(readiness.publishChecklist.map((item) => item.id), [
-    "env-ready",
-    "integration-readiness",
-    "production-build",
-    "health-ready",
-    "smoke-passed",
-    "compose-exported",
-    "history-recorded",
-    "rollback-ready",
-  ]);
-  assert.equal(readiness.publishChecklist.every((item) => item.required), true);
-  assert.ok(readiness.runtimeAssumptions.some((assumption) => assumption.detail.includes("reverse proxy")));
+  assert.deepEqual(
+    readiness.publishChecklist.map((item) => item.id),
+    [
+      "env-ready",
+      "integration-readiness",
+      "production-build",
+      "health-ready",
+      "smoke-passed",
+      "compose-exported",
+      "history-recorded",
+      "rollback-ready",
+    ],
+  );
+  assert.equal(
+    readiness.publishChecklist.every((item) => item.required),
+    true,
+  );
+  assert.ok(
+    readiness.runtimeAssumptions.some((assumption) => assumption.detail.includes("reverse proxy")),
+  );
   assert.equal(readiness.publishHistory.currentPublishId, "northwind-customer-portal-app-publish");
   assert.equal(readiness.publishHistory.previousPublishId, "last-good");
-  assert.ok(readiness.publishHistory.semantics.some((semantic) => semantic.includes("rollback target")));
+  assert.ok(
+    readiness.publishHistory.semantics.some((semantic) => semantic.includes("rollback target")),
+  );
   assert.ok(readiness.rollback.restores.includes("last known-good publish bundle"));
-  assert.match(readiness.rollback.command, /packetagent publish rollback --workspace northwind --app customer-portal --to last-good$/);
+  assert.match(
+    readiness.rollback.command,
+    /packetagent publish rollback --workspace northwind --app customer-portal --to last-good$/,
+  );
 });
 
 test("app publish readiness includes feature-scoped connector blockers in the publish checklist", () => {
@@ -164,7 +226,9 @@ test("app publish readiness includes feature-scoped connector blockers in the pu
     connectedConnectors: ["github"],
   });
 
-  const integrationItem = readiness.publishChecklist.find((item) => item.id === "integration-readiness");
+  const integrationItem = readiness.publishChecklist.find(
+    (item) => item.id === "integration-readiness",
+  );
 
   assert.equal(readiness.publishIntegrations.canPublish, true);
   assert.equal(readiness.publishIntegrations.canUseAllRequestedIntegrations, false);
@@ -172,7 +236,10 @@ test("app publish readiness includes feature-scoped connector blockers in the pu
   assert.equal(integrationItem?.required, true);
   assert.match(integrationItem?.failureGuidance ?? "", /Feature-scoped connector blockers/);
   assert.match(integrationItem?.failureGuidance ?? "", /Email delivery|Stripe payments/);
-  assert.equal((integrationItem?.failureGuidance ?? "").includes("GitHub repository actions"), false);
+  assert.equal(
+    (integrationItem?.failureGuidance ?? "").includes("GitHub repository actions"),
+    false,
+  );
 });
 
 test("app publish readiness wires runtime env into integration publish checks without leaking values", () => {
@@ -190,20 +257,40 @@ test("app publish readiness wires runtime env into integration publish checks wi
       PACKETAGENT_STORE: "postgres",
     },
     draft: {
-      summary: "OpenAI assistant that sends email webhook notifications and persists customer records.",
+      summary:
+        "OpenAI assistant that sends email webhook notifications and persists customer records.",
       dataModels: [{ name: "customer" }],
     },
     email: { providerConfigured: true },
     database: { configured: true, migrationsReady: true, writable: true },
   });
 
-  assert.equal(readiness.publishIntegrations.checks.find((check) => check.category === "provider_keys")?.status, "ready");
-  assert.equal(readiness.publishIntegrations.checks.find((check) => check.category === "webhook")?.status, "ready");
-  assert.equal(readiness.publishIntegrations.checks.find((check) => check.category === "email")?.status, "ready");
-  assert.equal(readiness.publishIntegrations.checks.find((check) => check.category === "database")?.status, "ready");
+  assert.equal(
+    readiness.publishIntegrations.checks.find((check) => check.category === "provider_keys")
+      ?.status,
+    "ready",
+  );
+  assert.equal(
+    readiness.publishIntegrations.checks.find((check) => check.category === "webhook")?.status,
+    "ready",
+  );
+  assert.equal(
+    readiness.publishIntegrations.checks.find((check) => check.category === "email")?.status,
+    "ready",
+  );
+  assert.equal(
+    readiness.publishIntegrations.checks.find((check) => check.category === "database")?.status,
+    "ready",
+  );
   assert.equal(JSON.stringify(readiness.publishIntegrations).includes("sk-secret-value"), false);
-  assert.equal(JSON.stringify(readiness.publishIntegrations).includes("webhook-secret-value"), false);
-  assert.equal(JSON.stringify(readiness.publishIntegrations).includes("postgres://packetagent:secret"), false);
+  assert.equal(
+    JSON.stringify(readiness.publishIntegrations).includes("webhook-secret-value"),
+    false,
+  );
+  assert.equal(
+    JSON.stringify(readiness.publishIntegrations).includes("postgres://packetagent:secret"),
+    false,
+  );
 });
 
 test("app publish readiness expands app agent bundle contract", () => {
@@ -217,12 +304,28 @@ test("app publish readiness expands app agent bundle contract", () => {
   assert.equal(readiness.packageContract.bundleKind, "app_agent");
   assert.equal(readiness.agentSlug, "incident-helper");
   assert.equal(readiness.runtimeConfig.agentRouteBase, "/agent/ops-team/incident-helper");
-  assert.ok(readiness.envChecklist.some((item) => item.name === "PACKETAGENT_AGENT_BUNDLE_PATH" && item.required));
-  assert.ok(readiness.envChecklist.some((item) => item.name === "PACKETAGENT_AGENT_TOOL_ALLOWLIST" && !item.required));
-  assert.ok(readiness.packageContract.buildCommands.some((step) => step.id === "validate-agent-bundle"));
-  assert.ok(readiness.publishArtifactManifest.entries.some((entry) => entry.path.endsWith("/agent/agent-manifest.json")));
+  assert.ok(
+    readiness.envChecklist.some(
+      (item) => item.name === "PACKETAGENT_AGENT_BUNDLE_PATH" && item.required,
+    ),
+  );
+  assert.ok(
+    readiness.envChecklist.some(
+      (item) => item.name === "PACKETAGENT_AGENT_TOOL_ALLOWLIST" && !item.required,
+    ),
+  );
+  assert.ok(
+    readiness.packageContract.buildCommands.some((step) => step.id === "validate-agent-bundle"),
+  );
+  assert.ok(
+    readiness.publishArtifactManifest.entries.some((entry) =>
+      entry.path.endsWith("/agent/agent-manifest.json"),
+    ),
+  );
   assert.ok(readiness.packageContract.smokeChecks.some((check) => check.id === "agent-manifest"));
-  assert.ok(readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-agent"));
+  assert.ok(
+    readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-agent"),
+  );
 });
 
 test("app publish readiness defaults to private URL handoff", () => {
@@ -230,7 +333,13 @@ test("app publish readiness defaults to private URL handoff", () => {
 
   assert.equal(readiness.urlHandoff.visibility, "private");
   assert.equal(readiness.localPublishPath, "data/published-apps/workspace/generated-app");
-  assert.equal(readiness.urlHandoff.publicUrl, "https://apps.packetagent.example/workspace/generated-app");
-  assert.equal(readiness.urlHandoff.privateUrl, "http://localhost:8484/app/workspace/generated-app");
+  assert.equal(
+    readiness.urlHandoff.publicUrl,
+    "https://apps.packetagent.example/workspace/generated-app",
+  );
+  assert.equal(
+    readiness.urlHandoff.privateUrl,
+    "http://localhost:8484/app/workspace/generated-app",
+  );
   assert.ok(readiness.urlHandoff.notes.some((note) => note.includes("Hold the public URL")));
 });

@@ -100,7 +100,17 @@ test("builder beta timeline consolidates runtime and preview events in determini
   assert.equal(timeline.status, "ready");
   assert.deepEqual(
     timeline.entries.map((entry) => entry.id),
-    ["prompt-1", "prompt-2", "change-1", "preview-1", "build-1", "smoke-1", "publish-1", "integration-1", "action-1"],
+    [
+      "prompt-1",
+      "prompt-2",
+      "change-1",
+      "preview-1",
+      "build-1",
+      "smoke-1",
+      "publish-1",
+      "integration-1",
+      "action-1",
+    ],
   );
   assert.deepEqual(
     timeline.entries.map((entry) => entry.order),
@@ -210,7 +220,10 @@ test("builder beta timeline reports blocked failures and redacts transcript secr
     first.entries.map((entry) => entry.id),
     second.entries.map((entry) => entry.id),
   );
-  assert.doesNotMatch(renderBuilderBetaTimelineTranscript(first), /abc123|sk-test-123|super-secret/);
+  assert.doesNotMatch(
+    renderBuilderBetaTimelineTranscript(first),
+    /abc123|sk-test-123|super-secret/,
+  );
 });
 
 test("builder beta timeline surfaces integration setup and invalid timestamps deterministically", () => {

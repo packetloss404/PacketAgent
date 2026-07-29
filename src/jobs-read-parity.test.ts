@@ -3,18 +3,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import {
-  findJobIndexed,
-  listJobsForWorkspaceIndexed,
-} from "./packetagent-store.js";
-import {
-  createJobsRepository,
-  jsonJobsRepository,
-} from "./repositories/jobs-repo.js";
-import {
-  findJobViaRepository,
-  listJobsForWorkspaceViaRepository,
-} from "./jobs-read.js";
+import { findJobIndexed, listJobsForWorkspaceIndexed } from "./packetagent-store.js";
+import { createJobsRepository, jsonJobsRepository } from "./repositories/jobs-repo.js";
+import { findJobViaRepository, listJobsForWorkspaceViaRepository } from "./jobs-read.js";
 import type { JobRecord, JobStatus, PacketAgentData } from "./packetagent-store.js";
 
 function makeStore(records: JobRecord[] = []): PacketAgentData {
@@ -75,7 +66,10 @@ test("listJobsForWorkspaceIndexed returns workspace-scoped jobs sorted by create
 
   const result = listJobsForWorkspaceViaRepository("ws_target", {}, { repository });
 
-  assert.deepEqual(result.map((entry) => entry.id), ["job_c", "job_b", "job_a"]);
+  assert.deepEqual(
+    result.map((entry) => entry.id),
+    ["job_c", "job_b", "job_a"],
+  );
 });
 
 test("listJobsForWorkspaceIndexed returns [] when the workspace has no jobs", () => {
@@ -119,27 +113,73 @@ test("listJobsForWorkspaceIndexed default limit is 50 and cap is 200", () => {
 
 test("listJobsForWorkspaceIndexed filters by status", () => {
   const data = makeStore([
-    makeRecord({ id: "job_q1", workspaceId: "ws_target", status: "queued", createdAt: "2026-04-26T01:00:00.000Z" }),
-    makeRecord({ id: "job_q2", workspaceId: "ws_target", status: "queued", createdAt: "2026-04-26T02:00:00.000Z" }),
-    makeRecord({ id: "job_running", workspaceId: "ws_target", status: "running", createdAt: "2026-04-26T03:00:00.000Z" }),
-    makeRecord({ id: "job_done", workspaceId: "ws_target", status: "success", createdAt: "2026-04-26T04:00:00.000Z" }),
+    makeRecord({
+      id: "job_q1",
+      workspaceId: "ws_target",
+      status: "queued",
+      createdAt: "2026-04-26T01:00:00.000Z",
+    }),
+    makeRecord({
+      id: "job_q2",
+      workspaceId: "ws_target",
+      status: "queued",
+      createdAt: "2026-04-26T02:00:00.000Z",
+    }),
+    makeRecord({
+      id: "job_running",
+      workspaceId: "ws_target",
+      status: "running",
+      createdAt: "2026-04-26T03:00:00.000Z",
+    }),
+    makeRecord({
+      id: "job_done",
+      workspaceId: "ws_target",
+      status: "success",
+      createdAt: "2026-04-26T04:00:00.000Z",
+    }),
   ]);
   const repository = jsonJobsRepository({ loadStore: () => data });
 
-  const queued = listJobsForWorkspaceViaRepository("ws_target", { status: "queued" }, { repository });
-  assert.deepEqual(queued.map((entry) => entry.id), ["job_q2", "job_q1"]);
+  const queued = listJobsForWorkspaceViaRepository(
+    "ws_target",
+    { status: "queued" },
+    { repository },
+  );
+  assert.deepEqual(
+    queued.map((entry) => entry.id),
+    ["job_q2", "job_q1"],
+  );
 
-  const running = listJobsForWorkspaceViaRepository("ws_target", { status: "running" }, { repository });
-  assert.deepEqual(running.map((entry) => entry.id), ["job_running"]);
+  const running = listJobsForWorkspaceViaRepository(
+    "ws_target",
+    { status: "running" },
+    { repository },
+  );
+  assert.deepEqual(
+    running.map((entry) => entry.id),
+    ["job_running"],
+  );
 
-  const failed = listJobsForWorkspaceViaRepository("ws_target", { status: "failed" }, { repository });
+  const failed = listJobsForWorkspaceViaRepository(
+    "ws_target",
+    { status: "failed" },
+    { repository },
+  );
   assert.deepEqual(failed, []);
 });
 
 test("findJobIndexed requires the matching workspace and returns null for cross-workspace reads", () => {
   const data = makeStore([
-    makeRecord({ id: "job_match", workspaceId: "ws_target", createdAt: "2026-04-26T01:00:00.000Z" }),
-    makeRecord({ id: "job_other_ws", workspaceId: "ws_other", createdAt: "2026-04-26T02:00:00.000Z" }),
+    makeRecord({
+      id: "job_match",
+      workspaceId: "ws_target",
+      createdAt: "2026-04-26T01:00:00.000Z",
+    }),
+    makeRecord({
+      id: "job_other_ws",
+      workspaceId: "ws_other",
+      createdAt: "2026-04-26T02:00:00.000Z",
+    }),
   ]);
   const repository = jsonJobsRepository({ loadStore: () => data });
 
@@ -157,10 +197,30 @@ test("findJobIndexed requires the matching workspace and returns null for cross-
 test("listJobsForWorkspaceIndexed reads from the SQLite repository when PACKETAGENT_STORE=sqlite", () => {
   withTempSqlite((dbPath) => {
     const seedRecords: JobRecord[] = [
-      makeRecord({ id: "sqlite_a", workspaceId: "ws_target", status: "queued", createdAt: "2026-04-26T01:00:00.000Z" }),
-      makeRecord({ id: "sqlite_b", workspaceId: "ws_target", status: "running", createdAt: "2026-04-26T02:00:00.000Z" }),
-      makeRecord({ id: "sqlite_c", workspaceId: "ws_target", status: "queued", createdAt: "2026-04-26T03:00:00.000Z" }),
-      makeRecord({ id: "sqlite_other", workspaceId: "ws_other", status: "queued", createdAt: "2026-04-26T04:00:00.000Z" }),
+      makeRecord({
+        id: "sqlite_a",
+        workspaceId: "ws_target",
+        status: "queued",
+        createdAt: "2026-04-26T01:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_b",
+        workspaceId: "ws_target",
+        status: "running",
+        createdAt: "2026-04-26T02:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_c",
+        workspaceId: "ws_target",
+        status: "queued",
+        createdAt: "2026-04-26T03:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_other",
+        workspaceId: "ws_other",
+        status: "queued",
+        createdAt: "2026-04-26T04:00:00.000Z",
+      }),
     ];
 
     const seedingRepo = createJobsRepository({ dbPath });
@@ -170,10 +230,16 @@ test("listJobsForWorkspaceIndexed reads from the SQLite repository when PACKETAG
     assert.equal(seedingRepo.count(), seedRecords.length);
 
     const descending = listJobsForWorkspaceIndexed("ws_target");
-    assert.deepEqual(descending.map((entry) => entry.id), ["sqlite_c", "sqlite_b", "sqlite_a"]);
+    assert.deepEqual(
+      descending.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_b", "sqlite_a"],
+    );
 
     const queuedOnly = listJobsForWorkspaceIndexed("ws_target", { status: "queued" });
-    assert.deepEqual(queuedOnly.map((entry) => entry.id), ["sqlite_c", "sqlite_a"]);
+    assert.deepEqual(
+      queuedOnly.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_a"],
+    );
 
     const found = findJobIndexed("ws_target", "sqlite_b");
     assert.equal(found?.id, "sqlite_b");

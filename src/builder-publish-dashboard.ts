@@ -1,6 +1,4 @@
-import {
-  orderGeneratedAppPublishHistory,
-} from "./app-publish-history.js";
+import { orderGeneratedAppPublishHistory } from "./app-publish-history.js";
 import {
   buildAppPublishReadiness,
   type AppPublishReadiness,
@@ -111,14 +109,17 @@ export interface BuilderPublishDashboard {
 const DEFAULT_PREVIEW_URL = "/builder/preview/workspace/generated-app";
 const DEFAULT_MAX_LOG_ENTRIES = 8;
 
-export function buildBuilderPublishDashboard(input: BuilderPublishDashboardInput = {}): BuilderPublishDashboard {
+export function buildBuilderPublishDashboard(
+  input: BuilderPublishDashboardInput = {},
+): BuilderPublishDashboard {
   const readiness = buildAppPublishReadiness(input);
   const validation = buildAppPublishValidation({
     ...input.validation,
     url: {
-      url: readiness.urlHandoff.visibility === "public"
-        ? readiness.urlHandoff.publicUrl
-        : readiness.urlHandoff.privateUrl,
+      url:
+        readiness.urlHandoff.visibility === "public"
+          ? readiness.urlHandoff.publicUrl
+          : readiness.urlHandoff.privateUrl,
       visibility: readiness.urlHandoff.visibility,
       ...input.validation?.url,
     },
@@ -132,7 +133,10 @@ export function buildBuilderPublishDashboard(input: BuilderPublishDashboardInput
     preview: buildPreviewUrl(input.previewUrl, readiness),
     production: buildProductionUrl(readiness, validation),
   };
-  const logs = buildLogs(publishHistory, positiveInteger(input.maxLogEntries) ?? DEFAULT_MAX_LOG_ENTRIES);
+  const logs = buildLogs(
+    publishHistory,
+    positiveInteger(input.maxLogEntries) ?? DEFAULT_MAX_LOG_ENTRIES,
+  );
   const nextActions = buildNextActions({
     readiness,
     validation,
@@ -140,10 +144,11 @@ export function buildBuilderPublishDashboard(input: BuilderPublishDashboardInput
     integrationSummary,
     rollback,
   });
-  const canPublishProduction = validation.canPublish
-    && environmentStatus.status !== "blocked"
-    && readiness.publishIntegrations.canPublish
-    && readiness.publishIntegrations.canUseAllRequestedIntegrations;
+  const canPublishProduction =
+    validation.canPublish &&
+    environmentStatus.status !== "blocked" &&
+    readiness.publishIntegrations.canPublish &&
+    readiness.publishIntegrations.canUseAllRequestedIntegrations;
   const status: BuilderPublishDashboardStatus = canPublishProduction
     ? "ready"
     : nextActions.some((action) => action.blocked)
@@ -174,7 +179,10 @@ function buildPreviewUrl(
 ): BuilderPublishDashboardUrl {
   return {
     label: "preview",
-    url: cleanString(previewUrl) || `/builder/preview/${readiness.workspaceSlug}/${readiness.draftSlug}` || DEFAULT_PREVIEW_URL,
+    url:
+      cleanString(previewUrl) ||
+      `/builder/preview/${readiness.workspaceSlug}/${readiness.draftSlug}` ||
+      DEFAULT_PREVIEW_URL,
     visibility: "private",
     status: "available",
     description: "Builder preview URL for draft review before production publish.",
@@ -185,22 +193,26 @@ function buildProductionUrl(
   readiness: AppPublishReadiness,
   validation: AppPublishValidation,
 ): BuilderPublishDashboardUrl {
-  const url = readiness.urlHandoff.visibility === "public"
-    ? readiness.urlHandoff.publicUrl
-    : readiness.urlHandoff.privateUrl;
+  const url =
+    readiness.urlHandoff.visibility === "public"
+      ? readiness.urlHandoff.publicUrl
+      : readiness.urlHandoff.privateUrl;
 
   return {
     label: "production",
     url,
     visibility: readiness.urlHandoff.visibility,
-    status: validation.validatedUrl.status === "valid"
-      ? "available"
-      : validation.validatedUrl.status === "blocked" || validation.validatedUrl.status === "invalid"
-        ? "blocked"
-        : "pending",
-    description: readiness.urlHandoff.visibility === "public"
-      ? "Public production URL after build, health, and smoke gates pass."
-      : "Private production URL for operator validation before public handoff.",
+    status:
+      validation.validatedUrl.status === "valid"
+        ? "available"
+        : validation.validatedUrl.status === "blocked" ||
+            validation.validatedUrl.status === "invalid"
+          ? "blocked"
+          : "pending",
+    description:
+      readiness.urlHandoff.visibility === "public"
+        ? "Public production URL after build, health, and smoke gates pass."
+        : "Private production URL for operator validation before public handoff.",
   };
 }
 
@@ -213,7 +225,12 @@ function buildEnvironmentStatus(readiness: AppPublishReadiness): BuilderPublishE
     .sort((left, right) => left.localeCompare(right));
 
   return {
-    status: missingRequired.length > 0 ? "blocked" : required.some((item) => item.configured === null) ? "pending" : "ready",
+    status:
+      missingRequired.length > 0
+        ? "blocked"
+        : required.some((item) => item.configured === null)
+          ? "pending"
+          : "ready",
     configuredRequired: required.filter((item) => item.configured === true).length,
     totalRequired: required.length,
     missingRequired,
@@ -243,7 +260,9 @@ function selectCurrentPublish(
 ): GeneratedAppPublishRecord | null {
   const requested = cleanString(currentPublishId);
   if (requested) return publishHistory.find((publish) => publish.id === requested) ?? null;
-  return publishHistory.find((publish) => publish.status === "published") ?? publishHistory[0] ?? null;
+  return (
+    publishHistory.find((publish) => publish.status === "published") ?? publishHistory[0] ?? null
+  );
 }
 
 function buildRollbackDashboard(
@@ -253,11 +272,15 @@ function buildRollbackDashboard(
 ): BuilderPublishRollbackDashboard {
   const explicitCommand = currentPublish?.rollbackCommand;
   const target = explicitCommand
-    ? publishHistory.find((publish) => publish.id === explicitCommand.toPublishId) ?? null
+    ? (publishHistory.find((publish) => publish.id === explicitCommand.toPublishId) ?? null)
     : findRollbackTarget(currentPublish, publishHistory);
-  const targetPublishId = explicitCommand?.toPublishId ?? target?.id ?? readiness.publishHistory.previousPublishId;
-  const command = explicitCommand?.command
-    ?? (targetPublishId ? readiness.rollback.command.replace(/ --to .+$/, ` --to ${targetPublishId}`) : null);
+  const targetPublishId =
+    explicitCommand?.toPublishId ?? target?.id ?? readiness.publishHistory.previousPublishId;
+  const command =
+    explicitCommand?.command ??
+    (targetPublishId
+      ? readiness.rollback.command.replace(/ --to .+$/, ` --to ${targetPublishId}`)
+      : null);
 
   return {
     available: Boolean(targetPublishId),
@@ -273,10 +296,11 @@ function findRollbackTarget(
   currentPublish: GeneratedAppPublishRecord | null,
   publishHistory: GeneratedAppPublishRecord[],
 ): GeneratedAppPublishRecord | null {
-  return publishHistory.find((publish) =>
-    publish.id !== currentPublish?.id
-    && publish.status === "published"
-  ) ?? null;
+  return (
+    publishHistory.find(
+      (publish) => publish.id !== currentPublish?.id && publish.status === "published",
+    ) ?? null
+  );
 }
 
 function buildLogs(
@@ -284,15 +308,20 @@ function buildLogs(
   maxLogEntries: number,
 ): BuilderPublishLogLine[] {
   return publishHistory
-    .flatMap((publish) => publish.logs.map((log) => ({
-      at: normalizeTimestamp(log.at),
-      level: log.level,
-      publishId: publish.id,
-      message: redactSensitiveString(log.message),
-    })))
-    .sort((left, right) => timestampMs(right.at) - timestampMs(left.at)
-      || left.publishId.localeCompare(right.publishId)
-      || left.message.localeCompare(right.message))
+    .flatMap((publish) =>
+      publish.logs.map((log) => ({
+        at: normalizeTimestamp(log.at),
+        level: log.level,
+        publishId: publish.id,
+        message: redactSensitiveString(log.message),
+      })),
+    )
+    .sort(
+      (left, right) =>
+        timestampMs(right.at) - timestampMs(left.at) ||
+        left.publishId.localeCompare(right.publishId) ||
+        left.message.localeCompare(right.message),
+    )
     .slice(0, maxLogEntries);
 }
 
@@ -312,22 +341,27 @@ function buildNextActions(input: {
       label: "Review publish environment",
       required: true,
       blocked: input.environmentStatus.status === "blocked",
-      detail: input.environmentStatus.missingRequired.length > 0
-        ? `Configure required env keys: ${input.environmentStatus.missingRequired.join(", ")}.`
-        : "Confirm required env keys are configured in the runtime environment.",
+      detail:
+        input.environmentStatus.missingRequired.length > 0
+          ? `Configure required env keys: ${input.environmentStatus.missingRequired.join(", ")}.`
+          : "Confirm required env keys are configured in the runtime environment.",
     });
   }
 
-  if (!input.integrationSummary.canUseAllRequestedIntegrations || input.integrationSummary.warnings > 0) {
+  if (
+    !input.integrationSummary.canUseAllRequestedIntegrations ||
+    input.integrationSummary.warnings > 0
+  ) {
     actions.push({
       id: "configure-integrations",
       kind: "configure_integrations",
       label: "Review integration readiness",
       required: true,
       blocked: !input.integrationSummary.canUseAllRequestedIntegrations,
-      detail: input.integrationSummary.featureBlockers.length > 0
-        ? input.integrationSummary.featureBlockers.join(" ")
-        : "Resolve connector warnings before public handoff.",
+      detail:
+        input.integrationSummary.featureBlockers.length > 0
+          ? input.integrationSummary.featureBlockers.join(" ")
+          : "Resolve connector warnings before public handoff.",
     });
   }
 
@@ -355,27 +389,52 @@ function buildNextActions(input: {
     });
   }
 
-  return actions.sort((left, right) =>
-    Number(right.blocked) - Number(left.blocked)
-    || Number(right.required) - Number(left.required)
-    || actionOrder(left.kind) - actionOrder(right.kind)
-    || left.id.localeCompare(right.id)
+  return actions.sort(
+    (left, right) =>
+      Number(right.blocked) - Number(left.blocked) ||
+      Number(right.required) - Number(left.required) ||
+      actionOrder(left.kind) - actionOrder(right.kind) ||
+      left.id.localeCompare(right.id),
   );
 }
 
 function validationActions(validation: AppPublishValidation): BuilderPublishNextAction[] {
   return [
-    ...statusAction("run-build", "run_build", "Run production build", validation.productionBuild.status, validation.productionBuild.message),
-    ...statusAction("run-health", "run_health", "Run health checks", validation.healthCheck.status, validation.healthCheck.message),
-    ...statusAction("run-smoke", "run_smoke", "Run smoke checks", validation.smokeCheck.status, validation.smokeCheck.message),
-    ...(validation.validatedUrl.status === "valid" ? [] : [{
-      id: "validate-url",
-      kind: "validate_url" as const,
-      label: "Validate production URL",
-      required: true,
-      blocked: validation.validatedUrl.status === "blocked" || validation.validatedUrl.status === "invalid",
-      detail: validation.validatedUrl.message,
-    }]),
+    ...statusAction(
+      "run-build",
+      "run_build",
+      "Run production build",
+      validation.productionBuild.status,
+      validation.productionBuild.message,
+    ),
+    ...statusAction(
+      "run-health",
+      "run_health",
+      "Run health checks",
+      validation.healthCheck.status,
+      validation.healthCheck.message,
+    ),
+    ...statusAction(
+      "run-smoke",
+      "run_smoke",
+      "Run smoke checks",
+      validation.smokeCheck.status,
+      validation.smokeCheck.message,
+    ),
+    ...(validation.validatedUrl.status === "valid"
+      ? []
+      : [
+          {
+            id: "validate-url",
+            kind: "validate_url" as const,
+            label: "Validate production URL",
+            required: true,
+            blocked:
+              validation.validatedUrl.status === "blocked" ||
+              validation.validatedUrl.status === "invalid",
+            detail: validation.validatedUrl.message,
+          },
+        ]),
   ];
 }
 
@@ -388,14 +447,16 @@ function statusAction(
 ): BuilderPublishNextAction[] {
   if (status === "pass") return [];
 
-  return [{
-    id,
-    kind,
-    label,
-    required: true,
-    blocked: status === "fail",
-    detail,
-  }];
+  return [
+    {
+      id,
+      kind,
+      label,
+      required: true,
+      blocked: status === "fail",
+      detail,
+    },
+  ];
 }
 
 function actionOrder(kind: BuilderPublishDashboardActionKind): number {
@@ -416,7 +477,9 @@ function cleanString(value: string | undefined): string {
 }
 
 function positiveInteger(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : undefined;
 }
 
 function normalizeTimestamp(value: string): string {

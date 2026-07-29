@@ -1,26 +1,44 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  buildBuilderSessionMemory,
-  deriveBuilderNextAction,
-} from "./builder-session-memory";
+import { buildBuilderSessionMemory, deriveBuilderNextAction } from "./builder-session-memory";
 
 test("buildBuilderSessionMemory captures saved prompt session state deterministically", () => {
   const memory = buildBuilderSessionMemory({
     sessionId: "session_123",
     title: "  Support portal builder  ",
     promptTurns: [
-      { id: "turn-b", role: "assistant", content: "I can draft that.", createdAt: "2026-05-03T10:01:00.000Z" },
-      { id: "turn-a", role: "user", content: "Build a support portal with ticket triage.", createdAt: "2026-05-03T10:00:00.000Z" },
+      {
+        id: "turn-b",
+        role: "assistant",
+        content: "I can draft that.",
+        createdAt: "2026-05-03T10:01:00.000Z",
+      },
+      {
+        id: "turn-a",
+        role: "user",
+        content: "Build a support portal with ticket triage.",
+        createdAt: "2026-05-03T10:00:00.000Z",
+      },
       { id: "empty", role: "user", content: "   ", createdAt: "2026-05-03T10:02:00.000Z" },
     ],
     decisions: [
-      { id: "decision-private", label: "Route privacy", value: "private workspace routes", status: "accepted" },
+      {
+        id: "decision-private",
+        label: "Route privacy",
+        value: "private workspace routes",
+        status: "accepted",
+      },
       { id: "decision-model", label: "Model preset", value: "smart", status: "pending" },
     ],
     projectMemoryFacts: [
       { id: "older", key: "Audience", value: "Support managers", confidence: 0.7 },
-      { id: "newer", key: "audience", value: "Support leads and agents", confidence: 0.9, pinned: true },
+      {
+        id: "newer",
+        key: "audience",
+        value: "Support leads and agents",
+        confidence: 0.9,
+        pinned: true,
+      },
       { id: "sla", key: "SLA", value: "Flag tickets older than 24 hours", confidence: 0.8 },
     ],
     candidate: { id: "candidate_1", status: "ready", summary: "Support portal plan" },
@@ -31,12 +49,18 @@ test("buildBuilderSessionMemory captures saved prompt session state deterministi
   assert.equal(memory.session.title, "Support portal builder");
   assert.equal(memory.session.promptTurnCount, 2);
   assert.equal(memory.session.latestTurnId, "turn-b");
-  assert.deepEqual(memory.promptTurns.map((turn) => turn.id), ["turn-a", "turn-b"]);
-  assert.deepEqual(memory.decisions.map((decision) => decision.id), ["decision-model", "decision-private"]);
-  assert.deepEqual(memory.projectMemoryFacts.map((fact) => `${fact.key}:${fact.value}`), [
-    "audience:Support leads and agents",
-    "SLA:Flag tickets older than 24 hours",
-  ]);
+  assert.deepEqual(
+    memory.promptTurns.map((turn) => turn.id),
+    ["turn-a", "turn-b"],
+  );
+  assert.deepEqual(
+    memory.decisions.map((decision) => decision.id),
+    ["decision-model", "decision-private"],
+  );
+  assert.deepEqual(
+    memory.projectMemoryFacts.map((fact) => `${fact.key}:${fact.value}`),
+    ["audience:Support leads and agents", "SLA:Flag tickets older than 24 hours"],
+  );
   assert.equal(memory.nextAction.kind, "review_decisions");
   assert.match(memory.promptContext, /Session: Support portal builder/);
   assert.match(memory.promptContext, /Project memory:/);
@@ -58,7 +82,10 @@ test("open clarifying questions block regenerate and are capped at three", () =>
     candidate: { status: "needs_clarification" },
   });
 
-  assert.deepEqual(memory.clarifyQuestions.map((question) => question.id), ["q1", "q2", "q3"]);
+  assert.deepEqual(
+    memory.clarifyQuestions.map((question) => question.id),
+    ["q1", "q2", "q3"],
+  );
   assert.equal(memory.nextAction.kind, "answer_clarifications");
   assert.deepEqual(memory.nextAction.blockingQuestionIds, ["q1", "q2", "q3"]);
   assert.deepEqual(memory.nextAction.selectedRegenerateOptionIds, []);
@@ -70,14 +97,29 @@ test("selected regenerate options guide a scoped regenerate loop", () => {
     sessionId: "session_regen",
     promptTurns: [{ role: "user", content: "Make a booking app." }],
     regenerateOptions: [
-      { id: "checks", label: "Acceptance checks", scope: "acceptance_checks", instruction: "Make checks more concrete.", selected: true },
+      {
+        id: "checks",
+        label: "Acceptance checks",
+        scope: "acceptance_checks",
+        instruction: "Make checks more concrete.",
+        selected: true,
+      },
       { id: "pages", label: "Page map", scope: "page", instruction: "Try a simpler page map." },
-      { id: "data", label: "Data model", scope: "data_model", instruction: "Use fewer entities.", selected: true },
+      {
+        id: "data",
+        label: "Data model",
+        scope: "data_model",
+        instruction: "Use fewer entities.",
+        selected: true,
+      },
     ],
     candidate: { id: "candidate_ready", status: "ready" },
   });
 
-  assert.deepEqual(memory.regenerateOptions.map((option) => option.id), ["checks", "data", "pages"]);
+  assert.deepEqual(
+    memory.regenerateOptions.map((option) => option.id),
+    ["checks", "data", "pages"],
+  );
   assert.equal(memory.nextAction.kind, "regenerate_candidate");
   assert.deepEqual(memory.nextAction.selectedRegenerateOptionIds, ["checks", "data"]);
   assert.match(memory.promptContext, /checks \[acceptance_checks, selected\]/);
@@ -126,8 +168,14 @@ test("missing titles fall back to first user prompt and generated ids", () => {
   });
 
   assert.equal(memory.session.id, "builder-session");
-  assert.equal(memory.session.title, "Create a lightweight inventory tracker for laptops and monitors.");
-  assert.deepEqual(memory.promptTurns.map((turn) => turn.id), ["turn-1", "turn-2"]);
+  assert.equal(
+    memory.session.title,
+    "Create a lightweight inventory tracker for laptops and monitors.",
+  );
+  assert.deepEqual(
+    memory.promptTurns.map((turn) => turn.id),
+    ["turn-1", "turn-2"],
+  );
   assert.equal(memory.decisions[0]?.id, "decision-1");
   assert.equal(memory.decisions[0]?.label, "Builder decision");
   assert.equal(memory.projectMemoryFacts[0]?.id, "memory-primary-object");

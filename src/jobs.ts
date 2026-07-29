@@ -31,7 +31,10 @@ export interface RecomputeActivationDeps extends StoreJobDeps {
     snapshot: ActivationSignalSnapshot,
     priorMilestones: ReadonlyArray<ActivationMilestoneRecord>,
   ) => ActivationStatusDto;
-  loadSnapshot?: (data: PacketAgentData, workspaceId: string) => ActivationSignalSnapshot | Promise<ActivationSignalSnapshot>;
+  loadSnapshot?: (
+    data: PacketAgentData,
+    workspaceId: string,
+  ) => ActivationSignalSnapshot | Promise<ActivationSignalSnapshot>;
 }
 
 export interface RecomputeActivationOptions {
@@ -75,7 +78,8 @@ export async function recomputeActivationReadModels(
   options: RecomputeActivationOptions = {},
 ): Promise<RecomputeActivationResult> {
   const initialData = deps.loadStore();
-  const workspaceIds = options.workspaceIds ?? initialData.workspaces.map((workspace) => workspace.id);
+  const workspaceIds =
+    options.workspaceIds ?? initialData.workspaces.map((workspace) => workspace.id);
   const statuses: ActivationStatusDto[] = [];
 
   for (const workspaceId of workspaceIds) {
@@ -125,8 +129,22 @@ function normalizeLegacyActivationSignals(deps: StoreJobDeps, workspaceId: strin
     if (!facts) return;
     const timestamp = facts.now;
     if (!timestamp) return;
-    recordLegacySignalCount(data, workspaceId, "retry", "retryCount", facts.retryCount ?? 0, timestamp);
-    recordLegacySignalCount(data, workspaceId, "scope_change", "scopeChangeCount", facts.scopeChangeCount ?? 0, timestamp);
+    recordLegacySignalCount(
+      data,
+      workspaceId,
+      "retry",
+      "retryCount",
+      facts.retryCount ?? 0,
+      timestamp,
+    );
+    recordLegacySignalCount(
+      data,
+      workspaceId,
+      "scope_change",
+      "scopeChangeCount",
+      facts.scopeChangeCount ?? 0,
+      timestamp,
+    );
   });
 }
 
@@ -138,20 +156,27 @@ function recordLegacySignalCount(
   count: number,
   timestamp: string,
 ): void {
-  if (data.activationSignals.some((entry) => entry.workspaceId === workspaceId && entry.kind === kind)) return;
+  if (
+    data.activationSignals.some((entry) => entry.workspaceId === workspaceId && entry.kind === kind)
+  )
+    return;
   for (let index = 0; index < count; index += 1) {
-    upsertActivationSignal(data, {
-      workspaceId,
-      kind,
-      source: "user_fact",
-      origin: "user_entered",
-      stableKey: `${workspaceId}:${kind}:legacy_fact:${index}`,
-      data: {
-        origin: "legacy_fact",
-        factName,
-        factIndex: index,
+    upsertActivationSignal(
+      data,
+      {
+        workspaceId,
+        kind,
+        source: "user_fact",
+        origin: "user_entered",
+        stableKey: `${workspaceId}:${kind}:legacy_fact:${index}`,
+        data: {
+          origin: "legacy_fact",
+          factName,
+          factIndex: index,
+        },
       },
-    }, timestamp);
+      timestamp,
+    );
   }
 }
 
@@ -160,11 +185,19 @@ export async function repairActivationReadModels(
   options: RecomputeActivationOptions = {},
 ): Promise<RepairActivationReadModelsResult> {
   const initialData = deps.loadStore();
-  const workspaceIds = options.workspaceIds ?? initialData.workspaces.map((workspace) => workspace.id);
-  const before = new Map(workspaceIds.map((workspaceId) => [workspaceId, initialData.activationReadModels[workspaceId] ?? null]));
+  const workspaceIds =
+    options.workspaceIds ?? initialData.workspaces.map((workspace) => workspace.id);
+  const before = new Map(
+    workspaceIds.map((workspaceId) => [
+      workspaceId,
+      initialData.activationReadModels[workspaceId] ?? null,
+    ]),
+  );
   const recompute = await recomputeActivationReadModels(deps, options);
   const repairedWorkspaceIds = recompute.statuses
-    .filter((status) => !activationStatusEquals(before.get(status.subject.workspaceId) ?? null, status))
+    .filter(
+      (status) => !activationStatusEquals(before.get(status.subject.workspaceId) ?? null, status),
+    )
     .map((status) => status.subject.workspaceId);
 
   return {
@@ -251,14 +284,21 @@ export async function runJobsCli(argv = process.argv.slice(2)): Promise<number> 
       writeUsage();
       return 1;
     }
-    const result = reconcileInvitationEmails({ workspaceId, invitationId, deliveryId, markResolved, requeue });
+    const result = reconcileInvitationEmails({
+      workspaceId,
+      invitationId,
+      deliveryId,
+      markResolved,
+      requeue,
+    });
     console.log(JSON.stringify(result, null, 2));
     return 0;
   }
 
   if (command === "snapshot-job-metrics") {
     const retentionRaw = parseStringFlag(args, "--retention-days=");
-    const retentionDays = retentionRaw !== undefined ? Number.parseInt(retentionRaw, 10) : undefined;
+    const retentionDays =
+      retentionRaw !== undefined ? Number.parseInt(retentionRaw, 10) : undefined;
     if (retentionDays !== undefined && (!Number.isInteger(retentionDays) || retentionDays < 0)) {
       console.error("--retention-days must be a non-negative integer");
       writeUsage();
@@ -283,7 +323,10 @@ function parseWorkspaceIds(args: string[]): string[] | undefined {
   if (!workspaceArg) return undefined;
   const value = workspaceArg.slice("--workspace-ids=".length).trim();
   if (!value) return undefined;
-  return value.split(",").map((entry) => entry.trim()).filter(Boolean);
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function parseStringFlag(args: string[], prefix: string): string | undefined {
@@ -294,24 +337,32 @@ function parseStringFlag(args: string[], prefix: string): string | undefined {
 }
 
 function normalizeTimestamp(value: Date | string | number): number {
-  const timestamp = value instanceof Date ? value.getTime() : typeof value === "number" ? value : Date.parse(value);
+  const timestamp =
+    value instanceof Date ? value.getTime() : typeof value === "number" ? value : Date.parse(value);
   if (!Number.isFinite(timestamp)) {
     throw new Error("cleanup-sessions requires a valid reference time");
   }
   return timestamp;
 }
 
-function activationStatusEquals(left: ActivationStatusDto | null, right: ActivationStatusDto): boolean {
+function activationStatusEquals(
+  left: ActivationStatusDto | null,
+  right: ActivationStatusDto,
+): boolean {
   return Boolean(left) && JSON.stringify(left) === JSON.stringify(right);
 }
 
 function writeUsage(): void {
-  console.error("Usage: node --import tsx src/jobs.ts <recompute-activation|repair-activation-read-models|cleanup-sessions|export-workspace|reconcile-invitation-emails|snapshot-job-metrics>");
+  console.error(
+    "Usage: node --import tsx src/jobs.ts <recompute-activation|repair-activation-read-models|cleanup-sessions|export-workspace|reconcile-invitation-emails|snapshot-job-metrics>",
+  );
   console.error("Options:");
   console.error("  recompute-activation --workspace-ids=alpha,beta");
   console.error("  repair-activation-read-models --workspace-ids=alpha,beta");
   console.error("  export-workspace --workspace-id=alpha");
-  console.error("  reconcile-invitation-emails [--workspace-id=alpha] [--invitation-id=inv] [--delivery-id=del] [--mark-resolved] [--requeue]");
+  console.error(
+    "  reconcile-invitation-emails [--workspace-id=alpha] [--invitation-id=inv] [--delivery-id=del] [--mark-resolved] [--requeue]",
+  );
   console.error("  snapshot-job-metrics [--retention-days=30]");
 }
 
@@ -323,10 +374,12 @@ function isExecutedDirectly(): boolean {
 
 if (isExecutedDirectly()) {
   migrateLegacyDefaultDataFiles();
-  runJobsCli().then((exitCode) => {
-    process.exitCode = exitCode;
-  }).catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
+  runJobsCli()
+    .then((exitCode) => {
+      process.exitCode = exitCode;
+    })
+    .catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    });
 }

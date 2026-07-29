@@ -12,7 +12,12 @@ const READY_ARTIFACTS = {
   manifestPath: "data/published-apps/alpha/ops-board/publish-artifacts.json",
   artifacts: [
     { path: "web/dist", kind: "build_output" as const, source: "build" as const },
-    { path: "data/published-apps/alpha/ops-board/bundle", kind: "generated_bundle" as const, source: "generated_draft" as const, bytes: 4096 },
+    {
+      path: "data/published-apps/alpha/ops-board/bundle",
+      kind: "generated_bundle" as const,
+      source: "generated_draft" as const,
+      bytes: 4096,
+    },
   ],
 };
 
@@ -76,8 +81,15 @@ test("publish validation blocks without generated app artifact presence", () => 
   assert.equal(validation.canPublish, false);
   assert.equal(validation.status, "blocked");
   assert.equal(validation.artifactPresence.status, "fail");
-  assert.deepEqual(validation.artifactPresence.missingArtifacts, ["data/published-apps/alpha/missing-app/bundle"]);
-  assert.ok(validation.actionableFailures.some((failure) => failure.stage === "artifact" && failure.message.includes("No generated app bundle")));
+  assert.deepEqual(validation.artifactPresence.missingArtifacts, [
+    "data/published-apps/alpha/missing-app/bundle",
+  ]);
+  assert.ok(
+    validation.actionableFailures.some(
+      (failure) =>
+        failure.stage === "artifact" && failure.message.includes("No generated app bundle"),
+    ),
+  );
 });
 
 test("production build failures are deterministic, redacted, and actionable", () => {
@@ -103,7 +115,10 @@ test("production build failures are deterministic, redacted, and actionable", ()
   assert.match(validation.productionBuild.message, /authorization=\[redacted\]/);
   assert.doesNotMatch(validation.productionBuild.message, /abc123/);
   assert.equal(validation.validatedUrl.status, "blocked");
-  assert.deepEqual(validation.actionableFailures.map((failure) => failure.stage), ["build", "url"]);
+  assert.deepEqual(
+    validation.actionableFailures.map((failure) => failure.stage),
+    ["build", "url"],
+  );
   assert.match(validation.actionableFailures[0]?.action ?? "", /npm run build:web/);
 });
 
@@ -126,10 +141,11 @@ test("health check failures identify the failing probe and next action", () => {
   assert.equal(validation.healthCheck.live.status, "pass");
   assert.equal(validation.healthCheck.ready.status, "fail");
   assert.match(validation.healthCheck.ready.message, /HTTP 503/);
-  assert.ok(validation.actionableFailures.some((failure) =>
-    failure.stage === "health"
-    && failure.action.includes("/api/health/ready")
-  ));
+  assert.ok(
+    validation.actionableFailures.some(
+      (failure) => failure.stage === "health" && failure.action.includes("/api/health/ready"),
+    ),
+  );
 });
 
 test("smoke validation reports failed and pending checks without running external commands", () => {
@@ -144,7 +160,12 @@ test("smoke validation reports failed and pending checks without running externa
       requiredCheckCount: 3,
       checks: [
         { id: "page:/settings", label: "Open settings", status: "pending" },
-        { id: "api:get:accounts", label: "GET accounts", status: "fail", message: "token=secret-value returned 500" },
+        {
+          id: "api:get:accounts",
+          label: "GET accounts",
+          status: "fail",
+          message: "token=secret-value returned 500",
+        },
         { id: "page:/", label: "Open home", status: "pass" },
       ],
     },
@@ -156,12 +177,14 @@ test("smoke validation reports failed and pending checks without running externa
   assert.equal(validation.smokeCheck.totalChecks, 3);
   assert.equal(validation.smokeCheck.passedChecks, 1);
   assert.equal(validation.smokeCheck.failedChecks, 1);
-  assert.deepEqual(validation.smokeCheck.checks.map((check) => check.id), [
-    "api:get:accounts",
-    "page:/",
-    "page:/settings",
-  ]);
-  assert.match(validation.actionableFailures.find((failure) => failure.stage === "smoke")?.message ?? "", /token=\[redacted\]/);
+  assert.deepEqual(
+    validation.smokeCheck.checks.map((check) => check.id),
+    ["api:get:accounts", "page:/", "page:/settings"],
+  );
+  assert.match(
+    validation.actionableFailures.find((failure) => failure.stage === "smoke")?.message ?? "",
+    /token=\[redacted\]/,
+  );
 });
 
 test("publish URL validation builds URLs and rejects non-HTTPS public handoff", () => {
@@ -201,16 +224,30 @@ test("derivePublishArtifactStatus records manifest details for concrete bundle h
     phase: "passed",
     expectedArtifacts: ["web/dist", "exports/packetagent/alpha/booking/bundle"],
   });
-  const status = derivePublishArtifactStatus({
-    manifestPath: "exports/packetagent/alpha/booking/publish-artifacts.json",
-    artifacts: [
-      { path: "exports\\packetagent\\alpha\\booking\\bundle\\", kind: "generated_bundle", source: "generated_draft", bytes: 2048 },
-      { path: "web/dist", kind: "build_output", source: "build" },
-    ],
-  }, build);
+  const status = derivePublishArtifactStatus(
+    {
+      manifestPath: "exports/packetagent/alpha/booking/publish-artifacts.json",
+      artifacts: [
+        {
+          path: "exports\\packetagent\\alpha\\booking\\bundle\\",
+          kind: "generated_bundle",
+          source: "generated_draft",
+          bytes: 2048,
+        },
+        { path: "web/dist", kind: "build_output", source: "build" },
+      ],
+    },
+    build,
+  );
 
   assert.equal(status.status, "pass");
   assert.equal(status.manifestPath, "exports/packetagent/alpha/booking/publish-artifacts.json");
-  assert.deepEqual(status.expectedArtifacts, ["exports/packetagent/alpha/booking/bundle", "web/dist"]);
-  assert.equal(status.observedArtifacts.find((artifact) => artifact.kind === "generated_bundle")?.bytes, 2048);
+  assert.deepEqual(status.expectedArtifacts, [
+    "exports/packetagent/alpha/booking/bundle",
+    "web/dist",
+  ]);
+  assert.equal(
+    status.observedArtifacts.find((artifact) => artifact.kind === "generated_bundle")?.bytes,
+    2048,
+  );
 });

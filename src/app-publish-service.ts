@@ -5,7 +5,12 @@ export type AppPublishValidationStatus = "pending" | "ready" | "blocked";
 export type AppPublishCheckStatus = "pending" | "running" | "pass" | "fail";
 export type AppPublishCommandPhase = "not_run" | "queued" | "running" | "passed" | "failed";
 export type AppPublishVisibility = "private" | "public";
-export type AppPublishArtifactValidationKind = "source" | "build_output" | "generated_bundle" | "manifest" | "config";
+export type AppPublishArtifactValidationKind =
+  | "source"
+  | "build_output"
+  | "generated_bundle"
+  | "manifest"
+  | "config";
 
 export interface AppPublishFailure {
   stage: AppPublishValidationStage;
@@ -38,7 +43,13 @@ export interface PublishArtifactObservation {
   required?: boolean;
   present?: boolean;
   bytes?: number;
-  source?: "build" | "preview_snapshot" | "generated_draft" | "publish_manifest" | "operator" | "disk";
+  source?:
+    | "build"
+    | "preview_snapshot"
+    | "generated_draft"
+    | "publish_manifest"
+    | "operator"
+    | "disk";
   description?: string;
 }
 
@@ -157,7 +168,9 @@ const DEFAULT_EXPECTED_ARTIFACTS = ["web/dist"];
 const DEFAULT_LIVE_PATH = "/api/health/live";
 const DEFAULT_READY_PATH = "/api/health/ready";
 
-export function deriveProductionBuildStatus(input: ProductionBuildValidationInput = {}): ProductionBuildStatus {
+export function deriveProductionBuildStatus(
+  input: ProductionBuildValidationInput = {},
+): ProductionBuildStatus {
   const phase = normalizeBuildPhase(input.phase, input.exitCode);
   const command = input.command?.trim() || DEFAULT_BUILD_COMMAND;
   const expectedArtifacts = uniqueSorted(input.expectedArtifacts ?? DEFAULT_EXPECTED_ARTIFACTS);
@@ -183,11 +196,15 @@ export function deriveProductionBuildStatus(input: ProductionBuildValidationInpu
       command,
       expectedArtifacts,
       message: detail ? `Production build failed: ${detail}` : "Production build failed.",
-      failures: [{
-        stage: "build",
-        message: detail ? `Production build failed: ${detail}` : "Production build did not complete successfully.",
-        action: `Run \`${command}\`, fix the first build error, and retry publish validation.`,
-      }],
+      failures: [
+        {
+          stage: "build",
+          message: detail
+            ? `Production build failed: ${detail}`
+            : "Production build did not complete successfully.",
+          action: `Run \`${command}\`, fix the first build error, and retry publish validation.`,
+        },
+      ],
     };
   }
 
@@ -210,11 +227,13 @@ export function deriveProductionBuildStatus(input: ProductionBuildValidationInpu
     command,
     expectedArtifacts,
     message: "Production build has not run for this publish attempt.",
-    failures: [{
-      stage: "build",
-      message: "Production build has not run.",
-      action: `Run \`${command}\` before sharing a self-hosted URL.`,
-    }],
+    failures: [
+      {
+        stage: "build",
+        message: "Production build has not run.",
+        action: `Run \`${command}\` before sharing a self-hosted URL.`,
+      },
+    ],
   };
 }
 
@@ -225,15 +244,20 @@ export function derivePublishArtifactStatus(
   const expectedArtifacts = uniqueSorted(input.expectedArtifacts ?? build.expectedArtifacts);
   const manifestPath = input.manifestPath?.trim() || "publish-artifacts.json";
   const observedArtifacts = uniqueArtifacts(input.artifacts ?? []);
-  const observedByPath = new Map(observedArtifacts.map((artifact) => [normalizeArtifactPath(artifact.path), artifact]));
+  const observedByPath = new Map(
+    observedArtifacts.map((artifact) => [normalizeArtifactPath(artifact.path), artifact]),
+  );
   const requiredExpected = expectedArtifacts.map(normalizeArtifactPath).filter(Boolean);
   const missingArtifacts = requiredExpected.filter((path) => {
     const observed = observedByPath.get(path);
     return !observed || observed.present === false;
   });
-  const hasGeneratedArtifact = observedArtifacts.some((artifact) =>
-    artifact.present !== false
-    && (artifact.kind === "generated_bundle" || artifact.source === "generated_draft" || artifact.source === "preview_snapshot")
+  const hasGeneratedArtifact = observedArtifacts.some(
+    (artifact) =>
+      artifact.present !== false &&
+      (artifact.kind === "generated_bundle" ||
+        artifact.source === "generated_draft" ||
+        artifact.source === "preview_snapshot"),
   );
   const failures: AppPublishFailure[] = [];
 
@@ -270,7 +294,8 @@ export function derivePublishArtifactStatus(
     failures.push({
       stage: "artifact",
       message: "No generated app bundle artifact was observed for this publish.",
-      action: "Run the generated app build/preview step that emits the bundle artifact before publishing.",
+      action:
+        "Run the generated app build/preview step that emits the bundle artifact before publishing.",
     });
   }
 
@@ -283,9 +308,10 @@ export function derivePublishArtifactStatus(
     expectedArtifacts,
     observedArtifacts,
     missingArtifacts,
-    message: status === "pass"
-      ? `Publish artifact manifest ${manifestPath} includes ${observedArtifacts.length} observed artifact${observedArtifacts.length === 1 ? "" : "s"}.`
-      : "Publish artifact validation is blocked.",
+    message:
+      status === "pass"
+        ? `Publish artifact manifest ${manifestPath} includes ${observedArtifacts.length} observed artifact${observedArtifacts.length === 1 ? "" : "s"}.`
+        : "Publish artifact validation is blocked.",
     failures,
   };
 }
@@ -301,7 +327,11 @@ export function deriveHealthCheckStatus(input: HealthCheckValidationInput = {}):
       : "pending";
   const failures = [
     ...probeFailures(live, "health", "Start the published app and retry the live health check."),
-    ...probeFailures(ready, "health", "Fix readiness dependencies, then retry GET /api/health/ready."),
+    ...probeFailures(
+      ready,
+      "health",
+      "Fix readiness dependencies, then retry GET /api/health/ready.",
+    ),
   ];
 
   return {
@@ -309,11 +339,12 @@ export function deriveHealthCheckStatus(input: HealthCheckValidationInput = {}):
     status,
     live,
     ready,
-    message: status === "pass"
-      ? "Live and ready health checks passed."
-      : status === "fail"
-        ? "Health validation is blocked."
-        : "Health validation has not completed.",
+    message:
+      status === "pass"
+        ? "Live and ready health checks passed."
+        : status === "fail"
+          ? "Health validation is blocked."
+          : "Health validation has not completed.",
     failures,
   };
 }
@@ -324,13 +355,16 @@ export function deriveSmokeCheckStatus(input: SmokeCheckValidationInput = {}): S
   const totalChecks = checks.length;
   const passedChecks = checks.filter((check) => check.status === "pass").length;
   const failed = checks.filter((check) => check.status === "fail");
-  const pendingChecks = checks.filter((check) => check.status === "pending" || check.status === "skipped").length;
+  const pendingChecks = checks.filter(
+    (check) => check.status === "pending" || check.status === "skipped",
+  ).length;
   const missingChecks = requiredCheckCount !== undefined && totalChecks < requiredCheckCount;
-  const status = failed.length > 0
-    ? "fail"
-    : totalChecks > 0 && pendingChecks === 0 && !missingChecks
-      ? "pass"
-      : "pending";
+  const status =
+    failed.length > 0
+      ? "fail"
+      : totalChecks > 0 && pendingChecks === 0 && !missingChecks
+        ? "pass"
+        : "pending";
   const failures = failed.map((check) => ({
     stage: "smoke" as const,
     message: `${check.label?.trim() || check.id} failed${check.message ? `: ${redactSensitiveString(check.message)}` : "."}`,
@@ -355,11 +389,12 @@ export function deriveSmokeCheckStatus(input: SmokeCheckValidationInput = {}): S
     failedChecks: failed.length,
     pendingChecks,
     checks,
-    message: status === "pass"
-      ? `Smoke checks passed (${passedChecks}/${totalChecks}).`
-      : status === "fail"
-        ? `Smoke checks failed (${failed.length}/${totalChecks}).`
-        : "Smoke checks are pending.",
+    message:
+      status === "pass"
+        ? `Smoke checks passed (${passedChecks}/${totalChecks}).`
+        : status === "fail"
+          ? `Smoke checks failed (${failed.length}/${totalChecks}).`
+          : "Smoke checks are pending.",
     failures,
   };
 }
@@ -378,11 +413,13 @@ export function deriveValidatedPublishUrl(
       status: "pending",
       visibility,
       message: "Publish URL has not been assigned.",
-      failures: [{
-        stage: "url",
-        message: "Publish URL is missing.",
-        action: "Provide the self-hosted base URL or generated publish URL before handoff.",
-      }],
+      failures: [
+        {
+          stage: "url",
+          message: "Publish URL is missing.",
+          action: "Provide the self-hosted base URL or generated publish URL before handoff.",
+        },
+      ],
     };
   }
 
@@ -394,11 +431,13 @@ export function deriveValidatedPublishUrl(
       visibility,
       url: candidate,
       message: "Publish URL must be an absolute HTTP or HTTPS URL.",
-      failures: [{
-        stage: "url",
-        message: `Publish URL is invalid: ${redactSensitiveString(candidate)}`,
-        action: "Use an absolute http:// or https:// URL for the self-hosted app.",
-      }],
+      failures: [
+        {
+          stage: "url",
+          message: `Publish URL is invalid: ${redactSensitiveString(candidate)}`,
+          action: "Use an absolute http:// or https:// URL for the self-hosted app.",
+        },
+      ],
     };
   }
 
@@ -409,11 +448,13 @@ export function deriveValidatedPublishUrl(
       visibility,
       url: parsed.toString(),
       message: "Public publish URLs must use HTTPS.",
-      failures: [{
-        stage: "url",
-        message: "Public publish URL is not HTTPS.",
-        action: "Configure TLS for the public host, then validate the HTTPS URL.",
-      }],
+      failures: [
+        {
+          stage: "url",
+          message: "Public publish URL is not HTTPS.",
+          action: "Configure TLS for the public host, then validate the HTTPS URL.",
+        },
+      ],
     };
   }
 
@@ -424,11 +465,13 @@ export function deriveValidatedPublishUrl(
       visibility,
       url: parsed.toString(),
       message: "Publish URL is formed, but validation blockers remain.",
-      failures: [{
-        stage: "url",
-        message: "Publish URL cannot be marked valid until build, health, and smoke checks pass.",
-        action: "Resolve the validation blockers above, then rerun publish validation.",
-      }],
+      failures: [
+        {
+          stage: "url",
+          message: "Publish URL cannot be marked valid until build, health, and smoke checks pass.",
+          action: "Resolve the validation blockers above, then rerun publish validation.",
+        },
+      ],
     };
   }
 
@@ -453,13 +496,18 @@ export function deriveValidatedPublishUrl(
   };
 }
 
-export function buildAppPublishValidation(input: AppPublishValidationInput = {}): AppPublishValidation {
+export function buildAppPublishValidation(
+  input: AppPublishValidationInput = {},
+): AppPublishValidation {
   const productionBuild = deriveProductionBuildStatus(input.build);
-  const artifactPresence = derivePublishArtifactStatus({
-    expectedArtifacts: input.artifacts?.expectedArtifacts ?? productionBuild.expectedArtifacts,
-    artifacts: input.artifacts?.artifacts,
-    manifestPath: input.artifacts?.manifestPath,
-  }, productionBuild);
+  const artifactPresence = derivePublishArtifactStatus(
+    {
+      expectedArtifacts: input.artifacts?.expectedArtifacts ?? productionBuild.expectedArtifacts,
+      artifacts: input.artifacts?.artifacts,
+      manifestPath: input.artifacts?.manifestPath,
+    },
+    productionBuild,
+  );
   const healthCheck = deriveHealthCheckStatus(input.health);
   const smokeCheck = deriveSmokeCheckStatus(input.smoke);
   const validatedUrl = deriveValidatedPublishUrl(input.url, [
@@ -475,14 +523,18 @@ export function buildAppPublishValidation(input: AppPublishValidationInput = {})
     ...smokeCheck.failures,
     ...validatedUrl.failures,
   ];
-  const canPublish = productionBuild.status === "pass"
-    && artifactPresence.status === "pass"
-    && healthCheck.status === "pass"
-    && smokeCheck.status === "pass"
-    && validatedUrl.status === "valid";
+  const canPublish =
+    productionBuild.status === "pass" &&
+    artifactPresence.status === "pass" &&
+    healthCheck.status === "pass" &&
+    smokeCheck.status === "pass" &&
+    validatedUrl.status === "valid";
   const status = canPublish
     ? "ready"
-    : actionableFailures.length > 0 && actionableFailures.some((failure) => failure.stage !== "smoke" || smokeCheck.status === "fail")
+    : actionableFailures.length > 0 &&
+        actionableFailures.some(
+          (failure) => failure.stage !== "smoke" || smokeCheck.status === "fail",
+        )
       ? "blocked"
       : "pending";
 
@@ -499,21 +551,32 @@ export function buildAppPublishValidation(input: AppPublishValidationInput = {})
   };
 }
 
-function normalizeBuildPhase(phase: AppPublishCommandPhase | undefined, exitCode: number | undefined): AppPublishCommandPhase {
+function normalizeBuildPhase(
+  phase: AppPublishCommandPhase | undefined,
+  exitCode: number | undefined,
+): AppPublishCommandPhase {
   if (typeof exitCode === "number") return exitCode === 0 ? "passed" : "failed";
   return phase ?? "not_run";
 }
 
-function deriveProbeStatus(input: AppPublishHttpProbeInput | undefined, defaultPath: string, expectedBodyStatus: string): HealthProbeStatus {
+function deriveProbeStatus(
+  input: AppPublishHttpProbeInput | undefined,
+  defaultPath: string,
+  expectedBodyStatus: string,
+): HealthProbeStatus {
   const path = input?.path?.trim() || defaultPath;
   const statusCode = input?.statusCode;
   const bodyStatus = input?.bodyStatus;
   const detail = firstFailureDetail(input?.error);
-  const status = input?.ok === false || detail || (typeof statusCode === "number" && (statusCode < 200 || statusCode >= 300)) || (bodyStatus !== undefined && bodyStatus !== expectedBodyStatus)
-    ? "fail"
-    : typeof statusCode === "number" || input?.ok === true
-      ? "pass"
-      : "pending";
+  const status =
+    input?.ok === false ||
+    detail ||
+    (typeof statusCode === "number" && (statusCode < 200 || statusCode >= 300)) ||
+    (bodyStatus !== undefined && bodyStatus !== expectedBodyStatus)
+      ? "fail"
+      : typeof statusCode === "number" || input?.ok === true
+        ? "pass"
+        : "pending";
 
   return {
     path,
@@ -533,14 +596,21 @@ function probeMessage(
   expectedBodyStatus: string,
   detail: string | undefined,
 ): string {
-  if (status === "pass") return `${path} returned healthy status${statusCode ? ` ${statusCode}` : ""}.`;
+  if (status === "pass")
+    return `${path} returned healthy status${statusCode ? ` ${statusCode}` : ""}.`;
   if (detail) return `${path} failed: ${detail}`;
-  if (typeof statusCode === "number" && (statusCode < 200 || statusCode >= 300)) return `${path} returned HTTP ${statusCode}.`;
-  if (bodyStatus !== undefined && bodyStatus !== expectedBodyStatus) return `${path} returned status ${bodyStatus}; expected ${expectedBodyStatus}.`;
+  if (typeof statusCode === "number" && (statusCode < 200 || statusCode >= 300))
+    return `${path} returned HTTP ${statusCode}.`;
+  if (bodyStatus !== undefined && bodyStatus !== expectedBodyStatus)
+    return `${path} returned status ${bodyStatus}; expected ${expectedBodyStatus}.`;
   return `${path} has not been checked.`;
 }
 
-function probeFailures(probe: HealthProbeStatus, stage: AppPublishValidationStage, action: string): AppPublishFailure[] {
+function probeFailures(
+  probe: HealthProbeStatus,
+  stage: AppPublishValidationStage,
+  action: string,
+): AppPublishFailure[] {
   return probe.status === "fail" || probe.status === "pending"
     ? [{ stage, message: probe.message, action }]
     : [];
@@ -592,13 +662,20 @@ function uniqueArtifacts(values: PublishArtifactObservation[]): PublishArtifactO
 }
 
 function normalizeArtifactPath(value: string): string {
-  return String(value ?? "").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+  return String(value ?? "")
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/+$/g, "");
 }
 
 function positiveInteger(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : undefined;
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) =>
+    left.localeCompare(right),
+  );
 }

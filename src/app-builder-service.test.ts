@@ -12,7 +12,8 @@ test("generateAppDraftFromPrompt rejects short prompts", () => {
 });
 
 test("generateAppDraftFromPrompt returns deterministic CRM draft", () => {
-  const prompt = "Build a CRM for boutique sales teams to track leads, accounts, deals, and pipeline follow-up.";
+  const prompt =
+    "Build a CRM for boutique sales teams to track leads, accounts, deals, and pipeline follow-up.";
 
   const first = generateAppDraftFromPrompt(prompt);
   const second = generateAppDraftFromPrompt(prompt);
@@ -25,7 +26,14 @@ test("generateAppDraftFromPrompt returns deterministic CRM draft", () => {
   assert.ok(first.dataSchema.entities.some((entity) => entity.name === "deal"));
   assert.ok(first.seedData.deal.length > 0);
   assert.ok(first.crudFlows.some((flow) => flow.entity === "lead"));
-  assert.ok(first.apiRouteStubs.some((route) => route.method === "POST" && route.path.includes("/api/app/generated/") && route.path.endsWith("/deals")));
+  assert.ok(
+    first.apiRouteStubs.some(
+      (route) =>
+        route.method === "POST" &&
+        route.path.includes("/api/app/generated/") &&
+        route.path.endsWith("/deals"),
+    ),
+  );
 });
 
 test("booking heuristic exposes public booking and admin service management", () => {
@@ -37,8 +45,15 @@ test("booking heuristic exposes public booking and admin service management", ()
   assert.ok(draft.auth.publicRoutes.includes("/book"));
   assert.ok(draft.auth.roleRoutes[0].routes.includes("/settings/services"));
   assert.ok(draft.dataSchema.entities.some((entity) => entity.name === "appointment"));
-  assert.ok(draft.apiRouteStubs.some((route) => route.path.includes("/api/app/generated/") && route.path.endsWith("/appointments/:id")));
-  assert.ok(draft.acceptanceChecks.some((check) => check.includes("prevents two confirmed appointments")));
+  assert.ok(
+    draft.apiRouteStubs.some(
+      (route) =>
+        route.path.includes("/api/app/generated/") && route.path.endsWith("/appointments/:id"),
+    ),
+  );
+  assert.ok(
+    draft.acceptanceChecks.some((check) => check.includes("prevents two confirmed appointments")),
+  );
 });
 
 test("internal dashboard heuristic includes metrics, reports, alerts, and private dashboard", () => {
@@ -94,12 +109,28 @@ test("phase 71 integration prompts add setup metadata without changing core app 
     draft.integrationMetadata.requested.map((integration) => integration.id),
     ["slack_webhook", "email", "github", "stripe", "database"],
   );
-  assert.ok(draft.integrationMetadata.setupGuidance.some((entry) => entry.includes("STRIPE_SECRET_KEY")));
+  assert.ok(
+    draft.integrationMetadata.setupGuidance.some((entry) => entry.includes("STRIPE_SECRET_KEY")),
+  );
   assert.ok(draft.components.some((component) => component.name === "IntegrationSetupPanel"));
-  assert.ok(draft.apiRouteStubs.some((route) => route.path.endsWith("/integrations/github/setup") && route.purpose.includes("GITHUB_TOKEN")));
-  assert.ok(draft.apiRouteStubs.some((route) => route.path.endsWith("/integrations/stripe/actions") && route.purpose.includes("Stripe")));
+  assert.ok(
+    draft.apiRouteStubs.some(
+      (route) =>
+        route.path.endsWith("/integrations/github/setup") && route.purpose.includes("GITHUB_TOKEN"),
+    ),
+  );
+  assert.ok(
+    draft.apiRouteStubs.some(
+      (route) =>
+        route.path.endsWith("/integrations/stripe/actions") && route.purpose.includes("Stripe"),
+    ),
+  );
   assert.ok(draft.dataSchema.notes.some((note) => note.includes("PACKETAGENT_DATABASE_URL")));
-  assert.ok(draft.acceptanceChecks.some((check) => check.includes("without blocking unrelated app features")));
+  assert.ok(
+    draft.acceptanceChecks.some((check) =>
+      check.includes("without blocking unrelated app features"),
+    ),
+  );
 });
 
 test("phase 71 custom API prompts add generated setup routes and env guidance", () => {
@@ -107,10 +138,22 @@ test("phase 71 custom API prompts add generated setup routes and env guidance", 
     "Build an internal dashboard that calls a custom external REST API with an API key and stores returned records.",
   );
 
-  assert.ok(draft.integrationMetadata.requested.some((integration) => integration.id === "custom_api"));
-  assert.ok(draft.integrationMetadata.setupGuidance.some((entry) => entry.includes("CUSTOM_API_BASE_URL")));
-  assert.ok(draft.apiRouteStubs.some((route) => route.path.endsWith("/integrations/custom_api/setup") && route.purpose.includes("CUSTOM_API_KEY")));
-  assert.ok(draft.acceptanceChecks.some((check) => check.includes("Custom API provider setup guidance")));
+  assert.ok(
+    draft.integrationMetadata.requested.some((integration) => integration.id === "custom_api"),
+  );
+  assert.ok(
+    draft.integrationMetadata.setupGuidance.some((entry) => entry.includes("CUSTOM_API_BASE_URL")),
+  );
+  assert.ok(
+    draft.apiRouteStubs.some(
+      (route) =>
+        route.path.endsWith("/integrations/custom_api/setup") &&
+        route.purpose.includes("CUSTOM_API_KEY"),
+    ),
+  );
+  assert.ok(
+    draft.acceptanceChecks.some((check) => check.includes("Custom API provider setup guidance")),
+  );
 });
 
 test("generateAppSourceArtifactBundle creates a deterministic minimal app source tree", () => {
@@ -156,9 +199,9 @@ test("generated app source includes pages, app name, and seed data", () => {
   const readme = bundle.files.find((file) => file.path === "README.md");
 
   assert.ok(appFile?.contents.includes(draft.appName));
-  assert.ok(pageDataFile?.contents.includes("\"route\": \"/crm/deals/:dealId\""));
-  assert.ok(pageDataFile?.contents.includes("\"components\""));
-  assert.ok(seedFile?.contents.includes("\"deal_001\""));
+  assert.ok(pageDataFile?.contents.includes('"route": "/crm/deals/:dealId"'));
+  assert.ok(pageDataFile?.contents.includes('"components"'));
+  assert.ok(seedFile?.contents.includes('"deal_001"'));
   assert.ok(readme?.contents.includes(`# ${draft.appName}`));
   assert.ok(readme?.contents.includes("Pipeline"));
 });
@@ -174,8 +217,8 @@ test("generated app source includes API and data contracts without route-stub wo
   assert.ok(apiFile?.contents.includes("export const apiRoutes"));
   assert.ok(apiFile?.contents.includes("export const dataContracts"));
   assert.ok(apiFile?.contents.includes("handleGeneratedApiRequest"));
-  assert.ok(apiFile?.contents.includes("\"name\": \"metricSnapshot\""));
-  assert.ok(apiFile?.contents.includes("\"requiredFields\""));
+  assert.ok(apiFile?.contents.includes('"name": "metricSnapshot"'));
+  assert.ok(apiFile?.contents.includes('"requiredFields"'));
   assert.ok(apiFile?.contents.includes("/api/app/generated/"));
   assert.equal(/route[-\s]?stub|stub/i.test(allGeneratedText), false);
 });
@@ -226,8 +269,7 @@ function withScrubbedEnv(
   // Exclude the keyless ollama provider so a fresh dev machine without
   // any API keys configured behaves identically to CI: the resolver
   // returns null, and `authorAppViaLLM` returns null in turn.
-  process.env.PACKETAGENT_PROVIDER_PRIORITY =
-    "anthropic,openai,minimax,gemini,openrouter";
+  process.env.PACKETAGENT_PROVIDER_PRIORITY = "anthropic,openai,minimax,gemini,openrouter";
   for (const [key, value] of Object.entries(overrides)) {
     process.env[key] = value;
   }
@@ -239,9 +281,7 @@ function withScrubbedEnv(
     }
     // Clean up overrides that weren't in the scrub list.
     for (const key of Object.keys(overrides)) {
-      if (
-        !(PROVIDER_KEY_ENV_FOR_DEFAULT_ON as readonly string[]).includes(key)
-      ) {
+      if (!(PROVIDER_KEY_ENV_FOR_DEFAULT_ON as readonly string[]).includes(key)) {
         delete process.env[key];
       }
     }
@@ -273,47 +313,37 @@ test("generateAppDraftWithLLM default-on: file-tree path tried first, falls thro
 });
 
 test("generateAppDraftWithLLM legacy escape hatch: PACKETAGENT_LEGACY_TEMPLATES=1 skips the file-tree path", async () => {
-  await withScrubbedEnv(
-    { PACKETAGENT_LEGACY_TEMPLATES: "1" },
-    async () => {
-      const emitted: string[] = [];
-      // With the kill switch set, behaviour reverts to the pre-Track-B
-      // contract: structured-tool path → template fallback. No file-tree
-      // path runs, so no codegen prose is emitted even with a provider
-      // key (and certainly not without one).
-      const { draft, source } = await generateAppDraftWithLLM(
-        "Build a CRM for sales teams to track leads and deals.",
-        {},
-        (text) => {
-          emitted.push(text);
-        },
-      );
-      assert.equal(source, "template");
-      assert.equal(draft.templateId, "crm");
-      assert.equal(
-        emitted.length,
-        0,
-        "legacy template path emits no prose deltas",
-      );
-    },
-  );
+  await withScrubbedEnv({ PACKETAGENT_LEGACY_TEMPLATES: "1" }, async () => {
+    const emitted: string[] = [];
+    // With the kill switch set, behaviour reverts to the pre-Track-B
+    // contract: structured-tool path → template fallback. No file-tree
+    // path runs, so no codegen prose is emitted even with a provider
+    // key (and certainly not without one).
+    const { draft, source } = await generateAppDraftWithLLM(
+      "Build a CRM for sales teams to track leads and deals.",
+      {},
+      (text) => {
+        emitted.push(text);
+      },
+    );
+    assert.equal(source, "template");
+    assert.equal(draft.templateId, "crm");
+    assert.equal(emitted.length, 0, "legacy template path emits no prose deltas");
+  });
 });
 
 test("generateAppDraftWithLLM backward compat: PACKETAGENT_FILETREE_CODEGEN=1 is a no-op", async () => {
   // Setting the old opt-in flag must not change behaviour now that the
   // path is on by default. With no provider key the result is the same
   // template fallback as the default-on test above.
-  await withScrubbedEnv(
-    { PACKETAGENT_FILETREE_CODEGEN: "1" },
-    async () => {
-      const { draft, source } = await generateAppDraftWithLLM(
-        "Build a CRM for sales teams to track leads and deals.",
-        {},
-      );
-      assert.equal(source, "template");
-      assert.equal(draft.templateId, "crm");
-    },
-  );
+  await withScrubbedEnv({ PACKETAGENT_FILETREE_CODEGEN: "1" }, async () => {
+    const { draft, source } = await generateAppDraftWithLLM(
+      "Build a CRM for sales teams to track leads and deals.",
+      {},
+    );
+    assert.equal(source, "template");
+    assert.equal(draft.templateId, "crm");
+  });
 });
 
 test("generateAppDraftWithLLM file-tree path returns files and validation errors", async () => {
@@ -323,15 +353,26 @@ test("generateAppDraftWithLLM file-tree path returns files and validation errors
       {
         fileTreeAuthorFn: async () => ({
           files: [
-            { path: "index.html", content: "<div id=\"root\"></div>" },
-            { path: "src/App.tsx", content: "export default function App(){ return <main>Maintenance</main>; }" },
+            { path: "index.html", content: '<div id="root"></div>' },
+            {
+              path: "src/App.tsx",
+              content: "export default function App(){ return <main>Maintenance</main>; }",
+            },
           ],
           summary: "Maintenance dashboard",
           source: "llm",
           validation: {
             ok: false,
             source: "real",
-            errors: [{ file: "src/App.tsx", line: 1, message: "JSX namespace missing", severity: "error", phase: "typecheck" }],
+            errors: [
+              {
+                file: "src/App.tsx",
+                line: 1,
+                message: "JSX namespace missing",
+                severity: "error",
+                phase: "typecheck",
+              },
+            ],
             warnings: [],
             durationMs: 15,
             phases: { typecheck: "failed", build: "skipped" },

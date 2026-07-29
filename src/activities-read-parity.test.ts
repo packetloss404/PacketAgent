@@ -100,53 +100,108 @@ function withTempSqlite<T>(fn: (dbPath: string) => T): T {
 test("listActivitiesForWorkspaceViaRepository returns workspace-scoped rows via repository", () => {
   withStoreMode(undefined, () => {
     const records = [
-      makeRecord({ id: "activity_old", workspaceId: "ws_target", occurredAt: "2026-04-26T01:00:00.000Z" }),
-      makeRecord({ id: "activity_other", workspaceId: "ws_other", occurredAt: "2026-04-26T04:00:00.000Z" }),
-      makeRecord({ id: "activity_new", workspaceId: "ws_target", occurredAt: "2026-04-26T03:00:00.000Z" }),
+      makeRecord({
+        id: "activity_old",
+        workspaceId: "ws_target",
+        occurredAt: "2026-04-26T01:00:00.000Z",
+      }),
+      makeRecord({
+        id: "activity_other",
+        workspaceId: "ws_other",
+        occurredAt: "2026-04-26T04:00:00.000Z",
+      }),
+      makeRecord({
+        id: "activity_new",
+        workspaceId: "ws_target",
+        occurredAt: "2026-04-26T03:00:00.000Z",
+      }),
     ];
     const repository = memoryActivitiesRepository(records);
 
     const result = listActivitiesForWorkspaceViaRepository("ws_target", undefined, { repository });
 
-    assert.deepEqual(result.map((entry) => entry.id), ["activity_new", "activity_old"]);
+    assert.deepEqual(
+      result.map((entry) => entry.id),
+      ["activity_new", "activity_old"],
+    );
   });
 });
 
 test("listActivitiesForWorkspaceViaRepository sorts and applies activity limit semantics in SQLite mode", () => {
   withStoreMode("sqlite", () => {
     const records = [
-      makeRecord({ id: "activity_tie_a", workspaceId: "ws_target", occurredAt: "2026-04-26T02:00:00.000Z" }),
-      makeRecord({ id: "activity_old", workspaceId: "ws_target", occurredAt: "2026-04-26T01:00:00.000Z" }),
-      makeRecord({ id: "activity_late", workspaceId: "ws_target", occurredAt: "2026-04-26T03:00:00.000Z" }),
-      makeRecord({ id: "activity_tie_b", workspaceId: "ws_target", occurredAt: "2026-04-26T02:00:00.000Z" }),
-      makeRecord({ id: "activity_other", workspaceId: "ws_other", occurredAt: "2026-04-26T04:00:00.000Z" }),
+      makeRecord({
+        id: "activity_tie_a",
+        workspaceId: "ws_target",
+        occurredAt: "2026-04-26T02:00:00.000Z",
+      }),
+      makeRecord({
+        id: "activity_old",
+        workspaceId: "ws_target",
+        occurredAt: "2026-04-26T01:00:00.000Z",
+      }),
+      makeRecord({
+        id: "activity_late",
+        workspaceId: "ws_target",
+        occurredAt: "2026-04-26T03:00:00.000Z",
+      }),
+      makeRecord({
+        id: "activity_tie_b",
+        workspaceId: "ws_target",
+        occurredAt: "2026-04-26T02:00:00.000Z",
+      }),
+      makeRecord({
+        id: "activity_other",
+        workspaceId: "ws_other",
+        occurredAt: "2026-04-26T04:00:00.000Z",
+      }),
     ];
     const repository = unsortedActivitiesRepository(records);
     const deps = { repository, loadStore: () => makeStore([]) };
 
     const limited = listActivitiesForWorkspaceViaRepository("ws_target", 3, deps);
-    assert.deepEqual(limited.map((entry) => entry.id), ["activity_late", "activity_tie_b", "activity_tie_a"]);
+    assert.deepEqual(
+      limited.map((entry) => entry.id),
+      ["activity_late", "activity_tie_b", "activity_tie_a"],
+    );
 
     const zeroLimit = listActivitiesForWorkspaceViaRepository("ws_target", 0, deps);
-    assert.deepEqual(zeroLimit.map((entry) => entry.id), [
-      "activity_late",
-      "activity_tie_b",
-      "activity_tie_a",
-      "activity_old",
-    ]);
+    assert.deepEqual(
+      zeroLimit.map((entry) => entry.id),
+      ["activity_late", "activity_tie_b", "activity_tie_a", "activity_old"],
+    );
 
     const negativeLimit = listActivitiesForWorkspaceViaRepository("ws_target", -1, deps);
-    assert.deepEqual(negativeLimit.map((entry) => entry.id), zeroLimit.map((entry) => entry.id));
+    assert.deepEqual(
+      negativeLimit.map((entry) => entry.id),
+      zeroLimit.map((entry) => entry.id),
+    );
   });
 });
 
 test("listActivitiesForWorkspaceIndexed reads from the SQLite activities repository with existing signature", () => {
   withTempSqlite((dbPath) => {
     const seedRecords = [
-      makeRecord({ id: "sqlite_a", workspaceId: "ws_sqlite", occurredAt: "2026-04-26T01:00:00.000Z" }),
-      makeRecord({ id: "sqlite_b", workspaceId: "ws_sqlite", occurredAt: "2026-04-26T02:00:00.000Z" }),
-      makeRecord({ id: "sqlite_c", workspaceId: "ws_sqlite", occurredAt: "2026-04-26T03:00:00.000Z" }),
-      makeRecord({ id: "sqlite_other", workspaceId: "ws_other", occurredAt: "2026-04-26T04:00:00.000Z" }),
+      makeRecord({
+        id: "sqlite_a",
+        workspaceId: "ws_sqlite",
+        occurredAt: "2026-04-26T01:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_b",
+        workspaceId: "ws_sqlite",
+        occurredAt: "2026-04-26T02:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_c",
+        workspaceId: "ws_sqlite",
+        occurredAt: "2026-04-26T03:00:00.000Z",
+      }),
+      makeRecord({
+        id: "sqlite_other",
+        workspaceId: "ws_other",
+        occurredAt: "2026-04-26T04:00:00.000Z",
+      }),
     ];
 
     const seedingRepo = createActivitiesRepository({ dbPath });
@@ -156,10 +211,16 @@ test("listActivitiesForWorkspaceIndexed reads from the SQLite activities reposit
     assert.equal(seedingRepo.count(), seedRecords.length);
 
     const limited = listActivitiesForWorkspaceIndexed("ws_sqlite", 2);
-    assert.deepEqual(limited.map((entry) => entry.id), ["sqlite_c", "sqlite_b"]);
+    assert.deepEqual(
+      limited.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_b"],
+    );
 
     const allRows = listActivitiesForWorkspaceIndexed("ws_sqlite");
-    assert.deepEqual(allRows.map((entry) => entry.id), ["sqlite_c", "sqlite_b", "sqlite_a"]);
+    assert.deepEqual(
+      allRows.map((entry) => entry.id),
+      ["sqlite_c", "sqlite_b", "sqlite_a"],
+    );
   });
 });
 
@@ -181,25 +242,39 @@ test("listActivitiesForWorkspaceViaRepository merges and de-dupes JSON fallback 
     seedingRepo.upsert(sharedRepoRecord);
 
     const fallbackData = makeStore([
-      makeRecord({ id: "json_only", workspaceId: "ws_merge", occurredAt: "2026-04-26T05:00:00.000Z" }),
+      makeRecord({
+        id: "json_only",
+        workspaceId: "ws_merge",
+        occurredAt: "2026-04-26T05:00:00.000Z",
+      }),
       makeRecord({
         id: "shared_activity",
         workspaceId: "ws_merge",
         event: "activity.fallback",
         occurredAt: "2026-04-26T07:00:00.000Z",
       }),
-      makeRecord({ id: "json_other", workspaceId: "ws_other", occurredAt: "2026-04-26T08:00:00.000Z" }),
+      makeRecord({
+        id: "json_other",
+        workspaceId: "ws_other",
+        occurredAt: "2026-04-26T08:00:00.000Z",
+      }),
     ]);
 
     const merged = listActivitiesForWorkspaceViaRepository("ws_merge", undefined, {
       loadStore: () => fallbackData,
     });
-    assert.deepEqual(merged.map((entry) => entry.id), ["sqlite_repo", "json_only", "shared_activity"]);
+    assert.deepEqual(
+      merged.map((entry) => entry.id),
+      ["sqlite_repo", "json_only", "shared_activity"],
+    );
     assert.equal(merged.find((entry) => entry.id === "shared_activity")?.event, "activity.repo");
 
     const limited = listActivitiesForWorkspaceViaRepository("ws_merge", 2, {
       loadStore: () => fallbackData,
     });
-    assert.deepEqual(limited.map((entry) => entry.id), ["sqlite_repo", "json_only"]);
+    assert.deepEqual(
+      limited.map((entry) => entry.id),
+      ["sqlite_repo", "json_only"],
+    );
   });
 });

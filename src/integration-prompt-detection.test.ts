@@ -7,12 +7,20 @@ import {
 
 test("detects Phase 71 requested integrations from prompt and draft text", () => {
   const result = inspectIntegrationPromptDetection({
-    prompt: "Build with OpenAI GPT summaries, Claude fallback, Ollama local mode, custom API enrichment, Slack webhook alerts, email receipts, GitHub webhook issue sync, browser scraping, Stripe payments, and database CRUD.",
+    prompt:
+      "Build with OpenAI GPT summaries, Claude fallback, Ollama local mode, custom API enrichment, Slack webhook alerts, email receipts, GitHub webhook issue sync, browser scraping, Stripe payments, and database CRUD.",
     draft: {
       features: [
-        { id: "ai-summary", summary: "Use GPT and Claude to summarize tickets with Ollama fallback." },
+        {
+          id: "ai-summary",
+          summary: "Use GPT and Claude to summarize tickets with Ollama fallback.",
+        },
         { id: "billing", summary: "Stripe checkout and payment subscription screens." },
-        { id: "ops", summary: "Slack webhook alerts, GitHub webhook events, email receipts, and custom API enrichment." },
+        {
+          id: "ops",
+          summary:
+            "Slack webhook alerts, GitHub webhook events, email receipts, and custom API enrichment.",
+        },
         { id: "research", summary: "Browser scrape vendor websites." },
         { id: "records", summary: "Database tables for customer CRUD." },
       ],
@@ -33,7 +41,13 @@ test("detects Phase 71 requested integrations from prompt and draft text", () =>
     "stripe_payments",
     "database",
   ]);
-  assert.deepEqual(result.affectedFeatureIds, ["ai-summary", "billing", "ops", "records", "research"]);
+  assert.deepEqual(result.affectedFeatureIds, [
+    "ai-summary",
+    "billing",
+    "ops",
+    "records",
+    "research",
+  ]);
   assert.ok(result.missingSetupPrompts.some((prompt) => prompt.includes("OPENAI_API_KEY")));
   assert.ok(result.missingSetupPrompts.some((prompt) => prompt.includes("ANTHROPIC_API_KEY")));
   assert.ok(result.missingSetupPrompts.some((prompt) => prompt.includes("OLLAMA_BASE_URL")));
@@ -59,14 +73,22 @@ test("missing setup blocks only affected feature ids", () => {
   assert.deepEqual(result.affectedFeatureIds, ["billing"]);
   assert.deepEqual(result.blockedFeatureIds, ["billing"]);
   assert.deepEqual(result.unblockedFeatureIds, ["faq"]);
-  assert.deepEqual(result.featureBlocks.map((block) => block.featureId), ["billing"]);
-  assert.ok(result.featureBlocks[0]?.missingSetupPrompts.some((prompt) => prompt.includes("STRIPE_WEBHOOK_SECRET")));
+  assert.deepEqual(
+    result.featureBlocks.map((block) => block.featureId),
+    ["billing"],
+  );
+  assert.ok(
+    result.featureBlocks[0]?.missingSetupPrompts.some((prompt) =>
+      prompt.includes("STRIPE_WEBHOOK_SECRET"),
+    ),
+  );
   assert.equal(JSON.stringify(result).includes("secret-that-must-not-leak"), false);
 });
 
 test("ready setup returns requested integrations without setup prompts", () => {
   const result = inspectIntegrationPromptDetection({
-    prompt: "Use OpenAI for classification, send email notifications, scrape a URL, and save records to Postgres.",
+    prompt:
+      "Use OpenAI for classification, send email notifications, scrape a URL, and save records to Postgres.",
     draft: {
       features: [
         { id: "classify", summary: "OpenAI classification." },
@@ -96,9 +118,7 @@ test("static prompts do not request integrations", () => {
   const result = inspectIntegrationPromptDetection({
     prompt: "Create a static onboarding checklist page with sections and acceptance criteria.",
     draft: {
-      features: [
-        { id: "checklist", summary: "Static checklist content." },
-      ],
+      features: [{ id: "checklist", summary: "Static checklist content." }],
     },
   });
 

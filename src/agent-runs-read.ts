@@ -1,4 +1,7 @@
-import { createAgentRunsRepository, type AgentRunsRepository } from "./repositories/agent-runs-repo.js";
+import {
+  createAgentRunsRepository,
+  type AgentRunsRepository,
+} from "./repositories/agent-runs-repo.js";
 import { loadStore as defaultLoadStore } from "./packetagent-store.js";
 import type { AgentRunRecord, PacketAgentData } from "./packetagent-store.js";
 
@@ -16,13 +19,17 @@ export function listAgentRunsForWorkspaceViaRepository(
   limit?: number,
   deps: AgentRunsReadDeps = {},
 ): AgentRunRecord[] {
-  const repo = deps.repository ?? createAgentRunsRepository({
-    loadStore: deps.loadStore,
-    mutateStore: deps.mutateStore,
-  });
+  const repo =
+    deps.repository ??
+    createAgentRunsRepository({
+      loadStore: deps.loadStore,
+      mutateStore: deps.mutateStore,
+    });
   const primary = repo.list(workspaceId, limit);
   if (process.env.PACKETAGENT_STORE !== "sqlite") return primary;
-  const fallback = legacyAgentRunsFromStore(deps).filter((entry) => entry.workspaceId === workspaceId);
+  const fallback = legacyAgentRunsFromStore(deps).filter(
+    (entry) => entry.workspaceId === workspaceId,
+  );
   return mergeAndLimit(primary, fallback, limit);
 }
 
@@ -32,10 +39,12 @@ export function listAgentRunsForAgentViaRepository(
   limit?: number,
   deps: AgentRunsReadDeps = {},
 ): AgentRunRecord[] {
-  const repo = deps.repository ?? createAgentRunsRepository({
-    loadStore: deps.loadStore,
-    mutateStore: deps.mutateStore,
-  });
+  const repo =
+    deps.repository ??
+    createAgentRunsRepository({
+      loadStore: deps.loadStore,
+      mutateStore: deps.mutateStore,
+    });
   const primary = repo.listForAgent(workspaceId, agentId, limit);
   if (process.env.PACKETAGENT_STORE !== "sqlite") return primary;
   const fallback = legacyAgentRunsFromStore(deps).filter(
@@ -49,15 +58,20 @@ export function findAgentRunForWorkspaceViaRepository(
   runId: string,
   deps: AgentRunsReadDeps = {},
 ): AgentRunRecord | null {
-  const repo = deps.repository ?? createAgentRunsRepository({
-    loadStore: deps.loadStore,
-    mutateStore: deps.mutateStore,
-  });
+  const repo =
+    deps.repository ??
+    createAgentRunsRepository({
+      loadStore: deps.loadStore,
+      mutateStore: deps.mutateStore,
+    });
   const found = repo.find(workspaceId, runId);
   if (found) return found;
   if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
-  return legacyAgentRunsFromStore(deps)
-    .find((entry) => entry.workspaceId === workspaceId && entry.id === runId) ?? null;
+  return (
+    legacyAgentRunsFromStore(deps).find(
+      (entry) => entry.workspaceId === workspaceId && entry.id === runId,
+    ) ?? null
+  );
 }
 
 function legacyAgentRunsFromStore(deps: AgentRunsReadDeps): AgentRunRecord[] {

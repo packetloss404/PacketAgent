@@ -85,7 +85,10 @@ export const APP_BUILDER_TOOL_INPUT_SCHEMA: Record<string, unknown> = {
         required: ["name", "type", "usedOn", "responsibilities"],
         properties: {
           name: { type: "string" },
-          type: { type: "string", enum: ["layout", "list", "form", "detail", "chart", "navigation"] },
+          type: {
+            type: "string",
+            enum: ["layout", "list", "form", "detail", "chart", "navigation"],
+          },
           usedOn: { type: "array", items: { type: "string" } },
           responsibilities: { type: "array", items: { type: "string" } },
         },
@@ -129,7 +132,16 @@ export const APP_BUILDER_TOOL_INPUT_SCHEMA: Record<string, unknown> = {
                     name: { type: "string" },
                     type: {
                       type: "string",
-                      enum: ["uuid", "string", "text", "number", "boolean", "date", "datetime", "enum"],
+                      enum: [
+                        "uuid",
+                        "string",
+                        "text",
+                        "number",
+                        "boolean",
+                        "date",
+                        "datetime",
+                        "enum",
+                      ],
                     },
                     required: { type: "boolean" },
                     enumValues: { type: "array", items: { type: "string" } },
@@ -200,7 +212,18 @@ export const APP_BUILDER_TOOL_INPUT_SCHEMA: Record<string, unknown> = {
             properties: {
               id: {
                 type: "string",
-                enum: ["openai", "anthropic", "ollama", "custom_api", "slack_webhook", "email", "github", "browser", "stripe", "database"],
+                enum: [
+                  "openai",
+                  "anthropic",
+                  "ollama",
+                  "custom_api",
+                  "slack_webhook",
+                  "email",
+                  "github",
+                  "browser",
+                  "stripe",
+                  "database",
+                ],
               },
               label: { type: "string" },
               envVars: { type: "array", items: { type: "string" } },

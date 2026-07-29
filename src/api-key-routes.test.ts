@@ -22,7 +22,9 @@ test("api key reads allow viewers but management requires admin", async () => {
   const app = createTestApp();
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
   mutateStore((data) => {
-    const membership = data.memberships.find((entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha");
+    const membership = data.memberships.find(
+      (entry) => entry.workspaceId === "alpha" && entry.userId === "user_alpha",
+    );
     assert.ok(membership);
     membership.role = "viewer";
   });
@@ -51,7 +53,12 @@ test("api key deletion is scoped to the authenticated workspace", async () => {
   resetStoreForTests();
   const app = createTestApp();
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
-  const betaKey = upsertApiKey({ workspaceId: "beta", provider: "openai", label: "Beta OpenAI", value: "sk-beta" });
+  const betaKey = upsertApiKey({
+    workspaceId: "beta",
+    provider: "openai",
+    label: "Beta OpenAI",
+    value: "sk-beta",
+  });
 
   const response = await app.request(`/api/app/api-keys/${betaKey.id}`, {
     method: "DELETE",

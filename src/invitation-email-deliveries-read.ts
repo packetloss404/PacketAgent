@@ -16,10 +16,12 @@ export function listInvitationEmailDeliveriesViaRepository(
   invitationId?: string,
   deps: InvitationEmailDeliveriesReadDeps = {},
 ): InvitationEmailDeliveryRecord[] {
-  const repo = deps.repository ?? createInvitationEmailDeliveriesRepository({
-    loadStore: deps.loadStore,
-    mutateStore: deps.mutateStore,
-  });
+  const repo =
+    deps.repository ??
+    createInvitationEmailDeliveriesRepository({
+      loadStore: deps.loadStore,
+      mutateStore: deps.mutateStore,
+    });
   const primary = repo.list({ workspaceId, invitationId });
   if (process.env.PACKETAGENT_STORE !== "sqlite") return primary;
   const fallback = legacyDeliveriesFromStore(deps).filter((entry) => {
@@ -30,7 +32,9 @@ export function listInvitationEmailDeliveriesViaRepository(
   return mergeAndSort(primary, fallback);
 }
 
-function legacyDeliveriesFromStore(deps: InvitationEmailDeliveriesReadDeps): InvitationEmailDeliveryRecord[] {
+function legacyDeliveriesFromStore(
+  deps: InvitationEmailDeliveriesReadDeps,
+): InvitationEmailDeliveryRecord[] {
   const load = deps.loadStore ?? defaultLoadStore;
   try {
     const data = load();

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildGeneratedAppRuntimeModel, type GeneratedAppRuntimeDraft } from "./generated-app-runtime.js";
+import {
+  buildGeneratedAppRuntimeModel,
+  type GeneratedAppRuntimeDraft,
+} from "./generated-app-runtime.js";
 import {
   GeneratedAppRuntimeProcessPool,
   type GeneratedAppRuntimeWorkerFactory,
@@ -15,24 +18,28 @@ const draft: GeneratedAppRuntimeDraft = {
     name: "Runtime CRM",
     description: "Manage accounts.",
     pages: [],
-    dataSchema: [{
-      name: "account",
-      fields: [
-        { name: "id", type: "uuid", required: true },
-        { name: "name", type: "string", required: true },
-        { name: "status", type: "enum", required: true },
-      ],
-      relationships: [],
-    }],
+    dataSchema: [
+      {
+        name: "account",
+        fields: [
+          { name: "id", type: "uuid", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "status", type: "enum", required: true },
+        ],
+        relationships: [],
+      },
+    ],
     apiRoutes: [],
-    crudFlows: [{
-      entity: "account",
-      create: "Create accounts.",
-      read: "Read accounts.",
-      update: "Update accounts.",
-      delete: "Archive accounts.",
-      validation: ["name is required"],
-    }],
+    crudFlows: [
+      {
+        entity: "account",
+        create: "Create accounts.",
+        read: "Read accounts.",
+        update: "Update accounts.",
+        delete: "Archive accounts.",
+        validation: ["name is required"],
+      },
+    ],
     authDecisions: [],
   },
 };
@@ -53,8 +60,20 @@ test("generated app runtime process pool reuses a warm worker for the same app s
   t.after(() => pool.shutdown());
 
   const model = buildGeneratedAppRuntimeModel(draft);
-  await pool.request({ appId: "gapp_1", workspaceId: "alpha", model, method: "GET", path: "account" });
-  const second = await pool.request({ appId: "gapp_1", workspaceId: "alpha", model, method: "GET", path: "account" });
+  await pool.request({
+    appId: "gapp_1",
+    workspaceId: "alpha",
+    model,
+    method: "GET",
+    path: "account",
+  });
+  const second = await pool.request({
+    appId: "gapp_1",
+    workspaceId: "alpha",
+    model,
+    method: "GET",
+    path: "account",
+  });
 
   assert.equal(starts, 1);
   assert.equal(second.process.pid, 10_001);
@@ -80,21 +99,35 @@ test("generated app runtime process pool restarts an app when the schema signatu
   t.after(() => pool.shutdown());
 
   const model = buildGeneratedAppRuntimeModel(draft);
-  await pool.request({ appId: "gapp_1", workspaceId: "alpha", model, method: "GET", path: "account" });
+  await pool.request({
+    appId: "gapp_1",
+    workspaceId: "alpha",
+    model,
+    method: "GET",
+    path: "account",
+  });
   const changedModel = buildGeneratedAppRuntimeModel({
     ...draft,
     app: {
       ...draft.app,
-      dataSchema: [{
-        ...draft.app.dataSchema[0]!,
-        fields: [
-          ...draft.app.dataSchema[0]!.fields,
-          { name: "ownerEmail", type: "string", required: false },
-        ],
-      }],
+      dataSchema: [
+        {
+          ...draft.app.dataSchema[0]!,
+          fields: [
+            ...draft.app.dataSchema[0]!.fields,
+            { name: "ownerEmail", type: "string", required: false },
+          ],
+        },
+      ],
     },
   });
-  const changed = await pool.request({ appId: "gapp_1", workspaceId: "alpha", model: changedModel, method: "GET", path: "account" });
+  const changed = await pool.request({
+    appId: "gapp_1",
+    workspaceId: "alpha",
+    model: changedModel,
+    method: "GET",
+    path: "account",
+  });
 
   assert.equal(starts, 2);
   assert.equal(changed.process.pid, 20_002);
@@ -107,7 +140,7 @@ test("generated app runtime process pool evicts least-recently-used workers", as
   let clock = Date.parse("2026-05-18T12:00:00.000Z");
   const pool = new GeneratedAppRuntimeProcessPool({
     maxProcesses: 2,
-    now: () => new Date(clock += 1000),
+    now: () => new Date((clock += 1000)),
     workerFactory: async (config) => {
       starts += 1;
       return {
@@ -123,13 +156,37 @@ test("generated app runtime process pool evicts least-recently-used workers", as
   t.after(() => pool.shutdown());
 
   const model = buildGeneratedAppRuntimeModel(draft);
-  await pool.request({ appId: "gapp_a", workspaceId: "alpha", model, method: "GET", path: "account" });
-  await pool.request({ appId: "gapp_b", workspaceId: "alpha", model, method: "GET", path: "account" });
-  await pool.request({ appId: "gapp_c", workspaceId: "alpha", model, method: "GET", path: "account" });
+  await pool.request({
+    appId: "gapp_a",
+    workspaceId: "alpha",
+    model,
+    method: "GET",
+    path: "account",
+  });
+  await pool.request({
+    appId: "gapp_b",
+    workspaceId: "alpha",
+    model,
+    method: "GET",
+    path: "account",
+  });
+  await pool.request({
+    appId: "gapp_c",
+    workspaceId: "alpha",
+    model,
+    method: "GET",
+    path: "account",
+  });
 
   assert.equal(starts, 3);
   assert.deepEqual(stoppedApps, ["gapp_a"]);
-  assert.deepEqual(pool.snapshot().map((entry) => entry.appId).sort(), ["gapp_b", "gapp_c"]);
+  assert.deepEqual(
+    pool
+      .snapshot()
+      .map((entry) => entry.appId)
+      .sort(),
+    ["gapp_b", "gapp_c"],
+  );
 });
 
 test("generated app runtime process pool restarts and retries after a worker crash", async (t) => {
@@ -151,7 +208,13 @@ test("generated app runtime process pool restarts and retries after a worker cra
   t.after(() => pool.shutdown());
 
   const model = buildGeneratedAppRuntimeModel(draft);
-  const result = await pool.request({ appId: "gapp_1", workspaceId: "alpha", model, method: "GET", path: "account" });
+  const result = await pool.request({
+    appId: "gapp_1",
+    workspaceId: "alpha",
+    model,
+    method: "GET",
+    path: "account",
+  });
 
   assert.equal(starts, 2);
   assert.equal((result.body as { recovered?: boolean }).recovered, true);

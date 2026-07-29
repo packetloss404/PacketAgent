@@ -20,7 +20,11 @@ export type IntegrationMarketplaceCategory =
   | "payments"
   | "data";
 
-export type IntegrationMarketplaceReadinessStatus = "ready" | "needs_config" | "available" | "blocked";
+export type IntegrationMarketplaceReadinessStatus =
+  | "ready"
+  | "needs_config"
+  | "available"
+  | "blocked";
 export type IntegrationMarketplaceFieldKind = "string" | "secret" | "url" | "boolean" | "select";
 export type IntegrationMarketplaceTestMethod = "GET" | "POST";
 
@@ -97,7 +101,10 @@ interface CardDefinition {
   optionalEnv?: string[];
   fields: IntegrationMarketplaceField[];
   test: IntegrationMarketplaceTestPayload;
-  readiness: (input: NormalizedMarketplaceInput, definition: CardDefinition) => IntegrationMarketplaceReadiness;
+  readiness: (
+    input: NormalizedMarketplaceInput,
+    definition: CardDefinition,
+  ) => IntegrationMarketplaceReadiness;
 }
 
 interface NormalizedMarketplaceInput {
@@ -160,7 +167,8 @@ const CARDS: CardDefinition[] = [
     id: "custom-api-provider",
     title: "Custom API provider",
     category: "model_provider",
-    summary: "Connect an OpenAI-compatible or internal model API without adding a first-class provider.",
+    summary:
+      "Connect an OpenAI-compatible or internal model API without adding a first-class provider.",
     useCases: ["private gateways", "OpenAI-compatible APIs", "vendor pilots"],
     mode: "workspace_provider",
     requiredEnv: ["CUSTOM_PROVIDER_BASE_URL"],
@@ -177,7 +185,8 @@ const CARDS: CardDefinition[] = [
     id: "slack-webhook",
     title: "Slack/webhook",
     category: "notification",
-    summary: "Send agent alerts and workflow notifications to Slack or compatible incoming webhooks.",
+    summary:
+      "Send agent alerts and workflow notifications to Slack or compatible incoming webhooks.",
     useCases: ["team alerts", "incident handoff", "approval notifications"],
     mode: "external",
     requiredEnv: ["SLACK_WEBHOOK_URL"],
@@ -192,7 +201,8 @@ const CARDS: CardDefinition[] = [
     id: "email",
     title: "Email",
     category: "notification",
-    summary: "Deliver invitations, receipts, reports, and generated-app notifications through an email provider.",
+    summary:
+      "Deliver invitations, receipts, reports, and generated-app notifications through an email provider.",
     useCases: ["invites", "receipts", "reports", "notifications"],
     mode: "env",
     requiredEnv: ["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_TOKEN", "SMTP_URL"],
@@ -202,7 +212,12 @@ const CARDS: CardDefinition[] = [
       stringField("EMAIL_FROM", "From address", false, "PacketAgent <notify@example.test>"),
     ],
     test: webhookTest("email", { to: "ops@example.test", subject: "PacketAgent email test" }),
-    readiness: anyEnvReadiness(["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_TOKEN", "SMTP_URL"]),
+    readiness: anyEnvReadiness([
+      "RESEND_API_KEY",
+      "SENDGRID_API_KEY",
+      "POSTMARK_TOKEN",
+      "SMTP_URL",
+    ]),
   },
   {
     id: "github-webhook",
@@ -217,7 +232,10 @@ const CARDS: CardDefinition[] = [
       secretField("GITHUB_WEBHOOK_SECRET", "Webhook secret"),
       secretField("GITHUB_TOKEN", "Repository token", false),
     ],
-    test: webhookTest("github-webhook", { action: "opened", repository: { full_name: "example/repo" } }),
+    test: webhookTest("github-webhook", {
+      action: "opened",
+      repository: { full_name: "example/repo" },
+    }),
     readiness: envReadiness(["GITHUB_WEBHOOK_SECRET"], ["GITHUB_TOKEN", "GH_TOKEN"]),
   },
   {
@@ -230,7 +248,12 @@ const CARDS: CardDefinition[] = [
     requiredEnv: [],
     optionalEnv: ["BROWSER_SCRAPING_ALLOWED_DOMAINS"],
     fields: [
-      stringField("BROWSER_SCRAPING_ALLOWED_DOMAINS", "Allowed domains", false, "example.test, docs.example.test"),
+      stringField(
+        "BROWSER_SCRAPING_ALLOWED_DOMAINS",
+        "Allowed domains",
+        false,
+        "example.test, docs.example.test",
+      ),
       booleanField("BROWSER_SCRAPING_RESPECT_ROBOTS", "Respect robots.txt", false),
     ],
     test: {
@@ -256,7 +279,10 @@ const CARDS: CardDefinition[] = [
       secretField("STRIPE_WEBHOOK_SECRET", "Webhook secret"),
       stringField("STRIPE_PRICE_ID", "Default price ID", false, "price_..."),
     ],
-    test: webhookTest("stripe-payments", { type: "checkout.session.completed", data: { object: { id: "cs_test_123" } } }),
+    test: webhookTest("stripe-payments", {
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_test_123" } },
+    }),
     readiness: envReadiness(["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"], ["STRIPE_PRICE_ID"]),
   },
   {
@@ -283,7 +309,9 @@ const CARDS: CardDefinition[] = [
   },
 ];
 
-export function buildIntegrationMarketplace(input: IntegrationMarketplaceInput = {}): IntegrationMarketplaceSurface {
+export function buildIntegrationMarketplace(
+  input: IntegrationMarketplaceInput = {},
+): IntegrationMarketplaceSurface {
   const normalized = normalizeInput(input);
   const cards = CARDS.map((definition) => cardFromDefinition(definition, normalized));
   return {
@@ -299,7 +327,10 @@ export function buildIntegrationMarketplace(input: IntegrationMarketplaceInput =
   };
 }
 
-function cardFromDefinition(definition: CardDefinition, input: NormalizedMarketplaceInput): IntegrationMarketplaceCard {
+function cardFromDefinition(
+  definition: CardDefinition,
+  input: NormalizedMarketplaceInput,
+): IntegrationMarketplaceCard {
   return {
     id: definition.id,
     title: definition.title,
@@ -323,8 +354,12 @@ function normalizeInput(input: IntegrationMarketplaceInput): NormalizedMarketpla
     readiness: input.readiness,
     env: input.env ?? {},
     toolNames: new Set(input.readiness?.tools.names.map((name) => name.toLowerCase()) ?? []),
-    missingProviderKinds: new Set(input.readiness?.providers.missingProviderKinds.map((name) => name.toLowerCase()) ?? []),
-    missingApiKeyProviders: new Set(input.readiness?.providers.missingApiKeys.map((entry) => entry.provider.toLowerCase()) ?? []),
+    missingProviderKinds: new Set(
+      input.readiness?.providers.missingProviderKinds.map((name) => name.toLowerCase()) ?? [],
+    ),
+    missingApiKeyProviders: new Set(
+      input.readiness?.providers.missingApiKeys.map((entry) => entry.provider.toLowerCase()) ?? [],
+    ),
     providerReadyCount: input.readiness?.providers.readyCount ?? 0,
   };
 }
@@ -334,11 +369,16 @@ function providerReadiness(provider: string, requiredEnv: string[]) {
     const missingEnv = requiredEnv.filter((name) => !hasValue(input.env[name]));
     const missingProviderRecord = input.missingProviderKinds.has(provider);
     const missingApiKey = input.missingApiKeyProviders.has(provider);
-    const ready = !missingProviderRecord && !missingApiKey && (missingEnv.length === 0 || input.providerReadyCount > 0);
+    const ready =
+      !missingProviderRecord &&
+      !missingApiKey &&
+      (missingEnv.length === 0 || input.providerReadyCount > 0);
     const blockers = [
       ...(missingProviderRecord ? [`Add a ${provider} workspace provider record.`] : []),
       ...(missingApiKey ? [`Store or confirm the ${provider} API key for this workspace.`] : []),
-      ...(missingEnv.length > 0 && input.providerReadyCount === 0 ? missingEnv.map((name) => `Set ${name} or configure a workspace provider.`) : []),
+      ...(missingEnv.length > 0 && input.providerReadyCount === 0
+        ? missingEnv.map((name) => `Set ${name} or configure a workspace provider.`)
+        : []),
     ];
     return readinessResult(ready ? "ready" : "needs_config", blockers, []);
   };
@@ -347,29 +387,52 @@ function providerReadiness(provider: string, requiredEnv: string[]) {
 function envReadiness(requiredEnv: string[], optionalEnv: string[] = []) {
   return (input: NormalizedMarketplaceInput): IntegrationMarketplaceReadiness => {
     const missing = requiredEnv.filter((name) => !hasValue(input.env[name]));
-    const warnings = optionalEnv.filter((name) => !hasValue(input.env[name])).map((name) => `${name} is optional but recommended for live tests.`);
-    return readinessResult(missing.length === 0 ? "ready" : "needs_config", missing.map((name) => `Set ${name}.`), missing.length === 0 ? warnings : []);
+    const warnings = optionalEnv
+      .filter((name) => !hasValue(input.env[name]))
+      .map((name) => `${name} is optional but recommended for live tests.`);
+    return readinessResult(
+      missing.length === 0 ? "ready" : "needs_config",
+      missing.map((name) => `Set ${name}.`),
+      missing.length === 0 ? warnings : [],
+    );
   };
 }
 
 function anyEnvReadiness(envNames: string[]) {
   return (input: NormalizedMarketplaceInput): IntegrationMarketplaceReadiness => {
     const ready = envNames.some((name) => hasValue(input.env[name]));
-    return readinessResult(ready ? "ready" : "needs_config", ready ? [] : [`Set one of ${envNames.join(", ")}.`], []);
+    return readinessResult(
+      ready ? "ready" : "needs_config",
+      ready ? [] : [`Set one of ${envNames.join(", ")}.`],
+      [],
+    );
   };
 }
 
 function browserReadiness(input: NormalizedMarketplaceInput): IntegrationMarketplaceReadiness {
   const ready = ["browser", "browser-use", "playwright"].some((name) => input.toolNames.has(name));
-  return readinessResult(ready ? "ready" : "available", [], ready ? [] : ["Enable browser-use or Playwright before live scraping."]);
+  return readinessResult(
+    ready ? "ready" : "available",
+    [],
+    ready ? [] : ["Enable browser-use or Playwright before live scraping."],
+  );
 }
 
 function databaseReadiness(input: NormalizedMarketplaceInput): IntegrationMarketplaceReadiness {
-  const store = String(input.env.PACKETAGENT_STORE ?? "").trim().toLowerCase();
-  const hasDatabaseUrl = ["DATABASE_URL", "PACKETAGENT_DATABASE_URL", "PACKETAGENT_MANAGED_DATABASE_URL"].some((name) => hasValue(input.env[name]));
+  const store = String(input.env.PACKETAGENT_STORE ?? "")
+    .trim()
+    .toLowerCase();
+  const hasDatabaseUrl = [
+    "DATABASE_URL",
+    "PACKETAGENT_DATABASE_URL",
+    "PACKETAGENT_MANAGED_DATABASE_URL",
+  ].some((name) => hasValue(input.env[name]));
   const ready = hasDatabaseUrl || (store.length > 0 && store !== "memory");
   const blockers = ready ? [] : ["Set a database URL or use a non-memory PACKETAGENT_STORE."];
-  const warnings = ready && store === "file" ? ["File-backed storage is local-only; use Postgres for multi-instance deployments."] : [];
+  const warnings =
+    ready && store === "file"
+      ? ["File-backed storage is local-only; use Postgres for multi-instance deployments."]
+      : [];
   return readinessResult(ready ? "ready" : "needs_config", blockers, warnings);
 }
 
@@ -397,7 +460,10 @@ function providerTest(provider: string, model: string): IntegrationMarketplaceTe
   };
 }
 
-function webhookTest(kind: string, sample: Record<string, unknown>): IntegrationMarketplaceTestPayload {
+function webhookTest(
+  kind: string,
+  sample: Record<string, unknown>,
+): IntegrationMarketplaceTestPayload {
   return {
     method: "POST",
     path: `/api/app/integrations/${kind}/test`,
@@ -408,14 +474,31 @@ function webhookTest(kind: string, sample: Record<string, unknown>): Integration
 }
 
 function secretField(env: string, label: string, required = true): IntegrationMarketplaceField {
-  return { key: env.toLowerCase(), label, kind: "secret", required, env, placeholder: "stored server-side" };
+  return {
+    key: env.toLowerCase(),
+    label,
+    kind: "secret",
+    required,
+    env,
+    placeholder: "stored server-side",
+  };
 }
 
-function stringField(env: string, label: string, required: boolean, placeholder: string): IntegrationMarketplaceField {
+function stringField(
+  env: string,
+  label: string,
+  required: boolean,
+  placeholder: string,
+): IntegrationMarketplaceField {
   return { key: env.toLowerCase(), label, kind: "string", required, env, placeholder };
 }
 
-function urlField(env: string, label: string, required: boolean, placeholder: string): IntegrationMarketplaceField {
+function urlField(
+  env: string,
+  label: string,
+  required: boolean,
+  placeholder: string,
+): IntegrationMarketplaceField {
   return { key: env.toLowerCase(), label, kind: "url", required, env, placeholder };
 }
 
@@ -423,7 +506,12 @@ function booleanField(key: string, label: string, required: boolean): Integratio
   return { key: key.toLowerCase(), label, kind: "boolean", required, env: key };
 }
 
-function selectField(env: string, label: string, required: boolean, options: string[]): IntegrationMarketplaceField {
+function selectField(
+  env: string,
+  label: string,
+  required: boolean,
+  options: string[],
+): IntegrationMarketplaceField {
   return { key: env.toLowerCase(), label, kind: "select", required, env, options };
 }
 

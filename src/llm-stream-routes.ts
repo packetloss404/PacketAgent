@@ -42,7 +42,10 @@ llmStreamRoutes.post("/stream", async (c) => {
   }
 
   if (!body.routeKey || !Array.isArray(body.messages) || body.messages.length === 0) {
-    return errorResponse(c, Object.assign(new Error("routeKey and non-empty messages are required"), { status: 400 }));
+    return errorResponse(
+      c,
+      Object.assign(new Error("routeKey and non-empty messages are required"), { status: 400 }),
+    );
   }
 
   const streamId = c.req.header("x-stream-id") ?? crypto.randomUUID();
@@ -80,7 +83,10 @@ llmStreamRoutes.post("/stream", async (c) => {
       );
       for await (const chunk of recorded) {
         if (chunk.error) {
-          await sse.writeSSE({ event: "error", data: JSON.stringify({ error: redactSensitiveString(chunk.error) }) });
+          await sse.writeSSE({
+            event: "error",
+            data: JSON.stringify({ error: redactSensitiveString(chunk.error) }),
+          });
           continue;
         }
         await sse.writeSSE({ event: "chunk", data: JSON.stringify(chunk) });

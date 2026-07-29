@@ -19,7 +19,11 @@ test("buildAppPreviewSnapshotMetadata creates deterministic checkpoint-tied meta
     buildStatus: "success",
     smokeStatus: "passed",
     previewUrl: "http://localhost:5173/builder/preview/alpha/booking",
-    generatedFiles: ["web/src/generated/Booking.tsx", "web/src/generated/Booking.tsx", "src/generated/routes.ts"],
+    generatedFiles: [
+      "web/src/generated/Booking.tsx",
+      "web/src/generated/Booking.tsx",
+      "src/generated/routes.ts",
+    ],
     artifactPaths: ["dist/manifest.json", "data/snapshots/booking.json"],
     createdByUserId: "user_alpha",
     source: "builder" as const,
@@ -35,8 +39,14 @@ test("buildAppPreviewSnapshotMetadata creates deterministic checkpoint-tied meta
   assert.equal(first.checkpoint.savedAt, "2026-05-03T15:00:00.000Z");
   assert.equal(first.build.status, "passed");
   assert.equal(first.build.smokeStatus, "pass");
-  assert.deepEqual(first.build.generatedFiles, ["src/generated/routes.ts", "web/src/generated/Booking.tsx"]);
-  assert.deepEqual(first.build.artifactPaths, ["data/snapshots/booking.json", "dist/manifest.json"]);
+  assert.deepEqual(first.build.generatedFiles, [
+    "src/generated/routes.ts",
+    "web/src/generated/Booking.tsx",
+  ]);
+  assert.deepEqual(first.build.artifactPaths, [
+    "data/snapshots/booking.json",
+    "dist/manifest.json",
+  ]);
   assert.equal(first.publishHandoff.ready, true);
 });
 
@@ -55,7 +65,9 @@ test("snapshot metadata defaults stable ids and artifact paths when optional fie
     "data/generated-apps/alpha/ops-board/checkpoints/ckpt-one/preview-snapshot.json",
   ]);
   assert.equal(snapshot.publishHandoff.ready, false);
-  assert.ok(snapshot.publishHandoff.blockers.some((blocker) => blocker.includes("Preview build must pass")));
+  assert.ok(
+    snapshot.publishHandoff.blockers.some((blocker) => blocker.includes("Preview build must pass")),
+  );
 });
 
 test("compareAppPreviewSnapshots classifies new, advanced, regressed, and diverged snapshots", () => {
@@ -142,7 +154,10 @@ test("rollback command and result expose stable command/result shapes", () => {
 
   assert.equal(command.kind, "preview-snapshot-rollback");
   assert.match(command.commandId, /^preview_rollback_[a-f0-9]{16}$/);
-  assert.equal(command.command, "packetagent preview rollback --workspace=alpha --app=gapp_booking --from-checkpoint=ckpt-bad --to-checkpoint=ckpt-good");
+  assert.equal(
+    command.command,
+    "packetagent preview rollback --workspace=alpha --app=gapp_booking --from-checkpoint=ckpt-bad --to-checkpoint=ckpt-good",
+  );
   assert.equal(command.requiresConfirmation, true);
   assert.equal(command.expectedResult.restoredCheckpointId, "ckpt-good");
   assert.equal(command.expectedResult.previewUrl, "http://localhost:5173/preview/booking");
@@ -213,16 +228,20 @@ test("retention ordering is newest first and keeps publish-ready snapshots", () 
 
   const retention = orderAppPreviewSnapshotRetention(snapshots, { keepLatest: 1 });
 
-  assert.deepEqual(retention.map((entry) => entry.checkpointId), [
-    "ckpt-new-fail",
-    "ckpt-mid-warn",
-    "ckpt-old-ready",
-  ]);
-  assert.deepEqual(retention.map((entry) => entry.reason), [
-    "latest-1",
-    "outside-retention-window",
-    "publish-ready",
-  ]);
-  assert.deepEqual(retention.map((entry) => entry.retain), [true, false, true]);
-  assert.deepEqual(retention.map((entry) => entry.retentionRank), [1, 2, 3]);
+  assert.deepEqual(
+    retention.map((entry) => entry.checkpointId),
+    ["ckpt-new-fail", "ckpt-mid-warn", "ckpt-old-ready"],
+  );
+  assert.deepEqual(
+    retention.map((entry) => entry.reason),
+    ["latest-1", "outside-retention-window", "publish-ready"],
+  );
+  assert.deepEqual(
+    retention.map((entry) => entry.retain),
+    [true, false, true],
+  );
+  assert.deepEqual(
+    retention.map((entry) => entry.retentionRank),
+    [1, 2, 3],
+  );
 });

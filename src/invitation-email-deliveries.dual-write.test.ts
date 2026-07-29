@@ -38,13 +38,17 @@ interface InvitationEmailDeliveryRow {
 function readDedicatedRows(dbPath: string): InvitationEmailDeliveryRow[] {
   const db = new DatabaseSync(dbPath);
   try {
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       select id, workspace_id, invitation_id, recipient_email, subject,
         status, provider, mode, created_at, sent_at, error,
         provider_status, provider_delivery_id, provider_status_at, provider_error
       from invitation_email_deliveries
       order by created_at, id
-    `).all() as unknown as InvitationEmailDeliveryRow[];
+    `,
+      )
+      .all() as unknown as InvitationEmailDeliveryRow[];
   } finally {
     db.close();
   }
@@ -53,7 +57,9 @@ function readDedicatedRows(dbPath: string): InvitationEmailDeliveryRow[] {
 function readAppRecordRows(dbPath: string): InvitationEmailDeliveryRecord[] {
   const db = new DatabaseSync(dbPath);
   try {
-    const rows = db.prepare("select payload from app_records where collection = 'invitationEmailDeliveries'").all() as Array<{ payload: string }>;
+    const rows = db
+      .prepare("select payload from app_records where collection = 'invitationEmailDeliveries'")
+      .all() as Array<{ payload: string }>;
     return rows.map((row) => JSON.parse(row.payload) as InvitationEmailDeliveryRecord);
   } finally {
     db.close();
@@ -280,7 +286,9 @@ test("invitation-email-delivery mutators do not touch the dedicated table in JSO
         "2026-04-26T12:00:00.000Z",
       ),
     );
-    mutateStore((data) => markInvitationEmailDeliverySent(data, delivery.id, "2026-04-26T12:05:00.000Z"));
+    mutateStore((data) =>
+      markInvitationEmailDeliverySent(data, delivery.id, "2026-04-26T12:05:00.000Z"),
+    );
     mutateStore((data) => markInvitationEmailDeliveryFailed(data, delivery.id, "later failure"));
     mutateStore((data) => markInvitationEmailDeliverySkipped(data, delivery.id, "later skipped"));
     mutateStore((data) =>

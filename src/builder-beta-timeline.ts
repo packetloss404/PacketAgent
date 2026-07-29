@@ -28,7 +28,14 @@ export type BuilderBetaTimelineSeverity = "info" | "warning" | "error";
 export type BuilderBetaTimelineStatus = "ready" | "attention" | "blocked";
 export type BuilderBetaPromptRole = "system" | "user" | "assistant" | "tool";
 export type BuilderBetaGenerationChangeType = "create" | "update" | "delete" | "rename";
-export type BuilderBetaFailureSource = "prompt" | "generation" | "preview" | "build" | "smoke" | "publish" | "integration";
+export type BuilderBetaFailureSource =
+  | "prompt"
+  | "generation"
+  | "preview"
+  | "build"
+  | "smoke"
+  | "publish"
+  | "integration";
 export type BuilderBetaNextActionStatus = "pending" | "completed" | "skipped";
 
 export interface BuilderBetaTimelineInput {
@@ -201,7 +208,8 @@ export interface BuilderBetaTimeline {
 const DEFAULT_TIMESTAMP = "1970-01-01T00:00:00.000Z";
 const MAX_TEXT_LENGTH = 240;
 const MAX_LOG_EXCERPT_LENGTH = 800;
-const SECRET_PATTERN = /\b(api[_-]?key|authorization|bearer|secret|token|password)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/gi;
+const SECRET_PATTERN =
+  /\b(api[_-]?key|authorization|bearer|secret|token|password)\b\s*[:=]\s*["']?(?:Bearer\s+)?[^"',\s)]+/gi;
 const KIND_ORDER = new Map<BuilderBetaTimelineEventKind, number>([
   ["prompt_turn", 10],
   ["generation_change", 20],
@@ -229,13 +237,16 @@ export function buildBuilderBetaTimeline(input: BuilderBetaTimelineInput): Build
     ...(input.integrationChecks ?? []).map((check) => integrationCheckEntry(context, check)),
     ...(input.failures ?? []).map((failure) => failureEntry(context, failure)),
     ...(input.nextActions ?? []).map((action) => nextActionEntry(context, action)),
-  ].sort(compareEntries).map((entry, index) => ({ ...entry, order: index + 1 }));
+  ]
+    .sort(compareEntries)
+    .map((entry, index) => ({ ...entry, order: index + 1 }));
   const summary = summarizeEntries(entries);
-  const status: BuilderBetaTimelineStatus = summary.errors > 0
-    ? "blocked"
-    : summary.warnings > 0 || summary.openNextActions > 0
-      ? "attention"
-      : "ready";
+  const status: BuilderBetaTimelineStatus =
+    summary.errors > 0
+      ? "blocked"
+      : summary.warnings > 0 || summary.openNextActions > 0
+        ? "attention"
+        : "ready";
 
   return removeUndefined({
     kind: "builder-beta-consolidated-timeline" as const,
@@ -287,7 +298,15 @@ function generationChangeEntry(
     ? ` (${nonNegativeInteger(diff.files) ?? 0} files, +${nonNegativeInteger(diff.additions) ?? 0}/-${nonNegativeInteger(diff.deletions) ?? 0})`
     : "";
   return entry(context, {
-    idSeed: [input.id, input.at, changeType, input.summary, input.filePath, input.routePath, input.checkpointId],
+    idSeed: [
+      input.id,
+      input.at,
+      changeType,
+      input.summary,
+      input.filePath,
+      input.routePath,
+      input.checkpointId,
+    ],
     explicitId: input.id,
     kind: "generation_change",
     at: input.at,
@@ -364,14 +383,33 @@ function smokeResultEntry(
   const skipped = nonNegativeInteger(input.skipped) ?? 0;
   const notRun = nonNegativeInteger(input.notRun) ?? 0;
   return entry(context, {
-    idSeed: [input.id, input.at, status, passed, failed, skipped, notRun, input.checkIds?.join("|")],
+    idSeed: [
+      input.id,
+      input.at,
+      status,
+      passed,
+      failed,
+      skipped,
+      notRun,
+      input.checkIds?.join("|"),
+    ],
     explicitId: input.id,
     kind: "smoke_result",
     at: input.at,
     title: `Smoke ${status}`,
-    summary: truncate(redact(input.message ?? `${passed} passed, ${failed} failed, ${skipped} skipped, ${notRun} not run.`)),
+    summary: truncate(
+      redact(
+        input.message ??
+          `${passed} passed, ${failed} failed, ${skipped} skipped, ${notRun} not run.`,
+      ),
+    ),
     status,
-    severity: status === "failed" || status === "blocked" ? "error" : status === "warning" ? "warning" : "info",
+    severity:
+      status === "failed" || status === "blocked"
+        ? "error"
+        : status === "warning"
+          ? "warning"
+          : "info",
     details: removeUndefined({
       passed,
       failed,
@@ -389,12 +427,27 @@ function publishEventEntry(
 ): BuilderBetaTimelineEntry {
   const status = normalizeStatus(input.status);
   return entry(context, {
-    idSeed: [input.id, input.at, input.publishId, input.versionLabel, status, input.publicUrl, input.privateUrl],
+    idSeed: [
+      input.id,
+      input.at,
+      input.publishId,
+      input.versionLabel,
+      status,
+      input.publicUrl,
+      input.privateUrl,
+    ],
     explicitId: input.id,
     kind: "publish_event",
     at: input.at,
     title: status === "published" ? "Published app" : `Publish ${status}`,
-    summary: truncate(redact(input.message ?? (input.versionLabel ? `Publish ${input.versionLabel} is ${status}.` : `Publish is ${status}.`))),
+    summary: truncate(
+      redact(
+        input.message ??
+          (input.versionLabel
+            ? `Publish ${input.versionLabel} is ${status}.`
+            : `Publish is ${status}.`),
+      ),
+    ),
     status,
     severity: severityForStatus(status),
     references: {
@@ -413,14 +466,32 @@ function integrationCheckEntry(
   const status = normalizeStatus(input.status);
   const provider = cleanString(input.provider) || "integration";
   return entry(context, {
-    idSeed: [input.id, input.at, provider, input.capability, status, input.message, input.requiredSetup?.join("|")],
+    idSeed: [
+      input.id,
+      input.at,
+      provider,
+      input.capability,
+      status,
+      input.message,
+      input.requiredSetup?.join("|"),
+    ],
     explicitId: input.id,
     kind: "integration_check",
     at: input.at,
     title: `${provider} integration ${status}`,
-    summary: truncate(redact(input.message ?? `${provider} ${cleanString(input.capability) || "integration"} check is ${status}.`)),
+    summary: truncate(
+      redact(
+        input.message ??
+          `${provider} ${cleanString(input.capability) || "integration"} check is ${status}.`,
+      ),
+    ),
     status,
-    severity: status === "failed" || status === "blocked" ? "error" : input.requiredSetup?.length ? "warning" : severityForStatus(status),
+    severity:
+      status === "failed" || status === "blocked"
+        ? "error"
+        : input.requiredSetup?.length
+          ? "warning"
+          : severityForStatus(status),
     references: { provider },
     details: removeUndefined({
       capability: cleanString(input.capability) || undefined,
@@ -435,7 +506,16 @@ function failureEntry(
 ): BuilderBetaTimelineEntry {
   const severity = input.severity ?? "error";
   return entry(context, {
-    idSeed: [input.id, input.at, input.source, severity, input.message, input.fingerprint, input.routePath, input.filePath],
+    idSeed: [
+      input.id,
+      input.at,
+      input.source,
+      severity,
+      input.message,
+      input.fingerprint,
+      input.routePath,
+      input.filePath,
+    ],
     explicitId: input.id,
     kind: "failure",
     at: input.at,
@@ -458,7 +538,9 @@ function nextActionEntry(
   input: BuilderBetaNextActionInput,
 ): BuilderBetaTimelineEntry {
   const status = normalizeStatus(input.status ?? "pending");
-  const actionId = cleanString(input.id) || `next_action_${stableHash([input.at, input.owner, input.action].join(":")).slice(0, 12)}`;
+  const actionId =
+    cleanString(input.id) ||
+    `next_action_${stableHash([input.at, input.owner, input.action].join(":")).slice(0, 12)}`;
   return entry(context, {
     idSeed: [actionId],
     explicitId: actionId,
@@ -494,7 +576,9 @@ function entry(
   },
 ): BuilderBetaTimelineEntry {
   const at = normalizeTimestamp(input.at);
-  const id = cleanString(input.explicitId) || `${input.kind}_${stableHash(input.idSeed.map((value) => String(value ?? "")).join(":")).slice(0, 16)}`;
+  const id =
+    cleanString(input.explicitId) ||
+    `${input.kind}_${stableHash(input.idSeed.map((value) => String(value ?? "")).join(":")).slice(0, 16)}`;
   return removeUndefined({
     id,
     kind: input.kind,
@@ -526,20 +610,27 @@ function summarizeEntries(entries: BuilderBetaTimelineEntry[]): BuilderBetaTimel
     integrationChecks: countKind(entries, "integration_check"),
     failures: countKind(entries, "failure"),
     nextActions: countKind(entries, "next_action"),
-    openNextActions: entries.filter((entry) => entry.kind === "next_action" && entry.status === "pending").length,
+    openNextActions: entries.filter(
+      (entry) => entry.kind === "next_action" && entry.status === "pending",
+    ).length,
     warnings: entries.filter((entry) => entry.severity === "warning").length,
     errors: entries.filter((entry) => entry.severity === "error").length,
   };
 }
 
 function compareEntries(left: BuilderBetaTimelineEntry, right: BuilderBetaTimelineEntry): number {
-  return timestampMs(left.at) - timestampMs(right.at)
-    || ((KIND_ORDER.get(left.kind) ?? 100) - (KIND_ORDER.get(right.kind) ?? 100))
-    || left.id.localeCompare(right.id)
-    || left.title.localeCompare(right.title);
+  return (
+    timestampMs(left.at) - timestampMs(right.at) ||
+    (KIND_ORDER.get(left.kind) ?? 100) - (KIND_ORDER.get(right.kind) ?? 100) ||
+    left.id.localeCompare(right.id) ||
+    left.title.localeCompare(right.title)
+  );
 }
 
-function countKind(entries: BuilderBetaTimelineEntry[], kind: BuilderBetaTimelineEventKind): number {
+function countKind(
+  entries: BuilderBetaTimelineEntry[],
+  kind: BuilderBetaTimelineEventKind,
+): number {
   return entries.filter((entry) => entry.kind === kind).length;
 }
 
@@ -559,7 +650,15 @@ function previewSummary(status: BuilderBetaTimelineEntryStatus): string {
   return `Preview result is ${status}.`;
 }
 
-function normalizeStatus(status: BuilderBetaTimelineEntryStatus | "ready" | "stale" | "refreshing" | "partial" | "canceled"): BuilderBetaTimelineEntryStatus {
+function normalizeStatus(
+  status:
+    | BuilderBetaTimelineEntryStatus
+    | "ready"
+    | "stale"
+    | "refreshing"
+    | "partial"
+    | "canceled",
+): BuilderBetaTimelineEntryStatus {
   if (status === "ready") return "passed";
   if (status === "stale" || status === "partial") return "warning";
   if (status === "refreshing") return "running";
@@ -577,7 +676,9 @@ function normalizeLogs(logs: string | string[] | undefined): string | undefined 
   const joined = Array.isArray(logs) ? logs.join("\n") : logs;
   const redacted = redact(cleanString(joined));
   if (!redacted) return undefined;
-  return redacted.length > MAX_LOG_EXCERPT_LENGTH ? `${redacted.slice(0, MAX_LOG_EXCERPT_LENGTH).trim()}...` : redacted;
+  return redacted.length > MAX_LOG_EXCERPT_LENGTH
+    ? `${redacted.slice(0, MAX_LOG_EXCERPT_LENGTH).trim()}...`
+    : redacted;
 }
 
 function normalizePath(path: string | undefined): string | undefined {
@@ -605,7 +706,9 @@ function timestampMs(value: string): number {
 
 function truncate(value: string): string {
   const cleaned = cleanString(value);
-  return cleaned.length > MAX_TEXT_LENGTH ? `${cleaned.slice(0, MAX_TEXT_LENGTH).trim()}...` : cleaned;
+  return cleaned.length > MAX_TEXT_LENGTH
+    ? `${cleaned.slice(0, MAX_TEXT_LENGTH).trim()}...`
+    : cleaned;
 }
 
 function redact(value: string): string {
@@ -613,12 +716,15 @@ function redact(value: string): string {
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.map((value) => cleanString(value)).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right));
+  return [...new Set(values.map((value) => cleanString(value)).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right),
+  );
 }
 
 function nonNegativeInteger(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : undefined;
 }
 
 function stableHash(value: string): string {

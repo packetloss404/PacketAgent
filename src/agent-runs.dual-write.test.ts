@@ -35,14 +35,18 @@ function makeStore(records: AgentRunRecord[] = []): PacketAgentData {
 function readDedicated(dbPath: string): AgentRunRow[] {
   const db = new DatabaseSync(dbPath);
   try {
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       select id, workspace_id, agent_id, title, status, trigger_kind,
         started_at, completed_at, inputs, output, error,
         logs, tool_calls, transcript, model_used, cost_usd,
         created_at, updated_at
       from agent_runs
       order by created_at, id
-    `).all() as unknown as AgentRunRow[];
+    `,
+      )
+      .all() as unknown as AgentRunRow[];
   } finally {
     db.close();
   }

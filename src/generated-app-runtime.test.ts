@@ -111,7 +111,8 @@ test("generated runtime emits a self-contained local CRUD app bundle", () => {
   assert.match(schemaFile, /editableFields/);
   assert.match(schemaFile, /server-sqlite/);
 
-  const migrationFile = findGeneratedAppSourceFile(artifact, "src/db/migrations/0001_initial.sql")?.content ?? "";
+  const migrationFile =
+    findGeneratedAppSourceFile(artifact, "src/db/migrations/0001_initial.sql")?.content ?? "";
   assert.match(migrationFile, /CREATE TABLE IF NOT EXISTS account/);
   assert.match(migrationFile, /archived BOOLEAN NOT NULL DEFAULT FALSE/);
 
@@ -120,11 +121,14 @@ test("generated runtime emits a self-contained local CRUD app bundle", () => {
 });
 
 test("generated runtime can wrap an LLM-authored file tree as the artifact", () => {
-  const artifact = buildGeneratedAppRuntimeArtifactFromFiles([
-    { path: "index.html", content: "<div id=\"root\"></div>" },
-    { path: "src/App.tsx", content: "export default function App(){ return null; }" },
-    { path: "tsconfig.json", content: "{}" },
-  ], "2026-05-12T12:00:00.000Z");
+  const artifact = buildGeneratedAppRuntimeArtifactFromFiles(
+    [
+      { path: "index.html", content: '<div id="root"></div>' },
+      { path: "src/App.tsx", content: "export default function App(){ return null; }" },
+      { path: "tsconfig.json", content: "{}" },
+    ],
+    "2026-05-12T12:00:00.000Z",
+  );
 
   assert.equal(artifact.entrypoint, "index.html");
   assert.equal(artifact.renderedAt, "2026-05-12T12:00:00.000Z");

@@ -37,7 +37,7 @@ test("GET /api/health/ready returns 503 with status: not_ready when loadStore th
   });
   const res = await app.request("/api/health/ready");
   assert.equal(res.status, 503);
-  const body = await res.json() as { status: string; error: string };
+  const body = (await res.json()) as { status: string; error: string };
   assert.equal(body.status, "not_ready");
   assert.equal(typeof body.error, "string");
   assert.ok(body.error.length > 0);
@@ -48,7 +48,7 @@ test("GET /api/health/ready returns 503 when loadStore returns a non-object valu
   const app = mountWith(() => null);
   const res = await app.request("/api/health/ready");
   assert.equal(res.status, 503);
-  const body = await res.json() as { status: string; error: string };
+  const body = (await res.json()) as { status: string; error: string };
   assert.equal(body.status, "not_ready");
   assert.ok(body.error.includes("unexpected shape"));
 });
@@ -59,7 +59,7 @@ test("GET /api/health/ready redacts secrets in the error message", async () => {
   });
   const res = await app.request("/api/health/ready");
   assert.equal(res.status, 503);
-  const body = await res.json() as { status: string; error: string };
+  const body = (await res.json()) as { status: string; error: string };
   assert.equal(body.status, "not_ready");
   assert.equal(body.error.includes("super-secret-value"), false);
   assert.ok(body.error.includes("[redacted]"));
