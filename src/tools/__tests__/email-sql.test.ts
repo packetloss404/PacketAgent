@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   createEmailSendTool,
   createSqlQueryTool,
+  parseSmtpCredential,
   resolveAgentSqlitePath,
   type SmtpConfig,
   type SmtpMessage,
@@ -43,7 +44,11 @@ test("email_send delivers through an injected SMTP adapter", async () => {
       return {
         async send(message) {
           sentMessage = message;
-          return { messageId: "msg-1", accepted: message.to };
+          return {
+            messageId: `${"m".repeat(512)}\r\nignored`,
+            accepted: Array.from({ length: 101 }, () => "ada@example.com"),
+            rejected: Array.from({ length: 101 }, () => "rejected@example.com"),
+          };
         },
       };
     },
@@ -63,7 +68,11 @@ test("email_send delivers through an injected SMTP adapter", async () => {
   );
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.output, { messageId: "msg-1", acceptedCount: 1, rejectedCount: 0 });
+  assert.deepEqual(result.output, {
+    messageId: "m".repeat(512),
+    acceptedCount: 100,
+    rejectedCount: 100,
+  });
   assert.deepEqual(seenConfig, {
     host: "smtp.example.test",
     port: 2525,
@@ -71,6 +80,7 @@ test("email_send delivers through an injected SMTP adapter", async () => {
     pass: "smtp-secret",
     from: "noreply@example.com",
     secure: true,
+    requireTls: true,
   });
   assert.deepEqual(sentMessage, {
     from: "noreply@example.com",
@@ -84,8 +94,26 @@ test("email_send delivers through an injected SMTP adapter", async () => {
   });
 });
 
-test("email_send reports a setup error when no SMTP adapter is configured", async () => {
-  const tool = createEmailSendTool({ env: {} });
+test("email_send uses the default TLS SMTP port without an injected adapter factory", async () => {
+  let sends = 0;
+  const tool = createEmailSendTool({
+    env: {
+      SMTP_HOST: "smtp.example.test",
+      SMTP_PORT: "587",
+      SMTP_USER: "bot",
+      SMTP_PASS: "smtp-secret",
+      SMTP_FROM: "noreply@example.com",
+    },
+    smtp: {
+      async send(input) {
+        sends += 1;
+        assert.equal(input.config.host, "smtp.example.test");
+        assert.equal(input.config.requireTls, true);
+        assert.equal(input.config.pass, "smtp-secret");
+        return { messageId: "default-transport", accepted: [...input.message.to] };
+      },
+    },
+  });
 
   const result = await tool.handle(
     {
@@ -96,8 +124,13 @@ test("email_send reports a setup error when no SMTP adapter is configured", asyn
     context(),
   );
 
-  assert.equal(result.ok, false);
-  assert.match(result.error ?? "", /SMTP adapter is not configured/);
+  assert.equal(result.ok, true);
+  assert.equal(sends, 1);
+  assert.deepEqual(result.output, {
+    messageId: "default-transport",
+    acceptedCount: 1,
+    rejectedCount: 0,
+  });
 });
 
 test("email_send redacts SMTP secrets and recipients from adapter errors", async () => {
@@ -134,6 +167,63 @@ test("email_send redacts SMTP secrets and recipients from adapter errors", async
   assert.doesNotMatch(result.error ?? "", /ada@example\.com/);
   assert.doesNotMatch(result.error ?? "", /audit@example\.com/);
   assert.match(result.error ?? "", /\[redacted/);
+});
+
+test("SMTP vault configuration is strict, TLS-required, and header-injection safe", () => {
+  const valid = parseSmtpCredential(
+    JSON.stringify({
+      host: "smtp.example.com",
+      port: 587,
+      secure: false,
+      requireTls: true,
+      from: "PacketAgent <noreply@example.com>",
+      user: "smtp-user",
+      pass: "smtp-secret",
+    }),
+  );
+  assert.equal(valid.ok, true);
+
+  for (const value of [
+    "{not-json",
+    JSON.stringify({
+      host: "smtp.example.com",
+      port: 587,
+      secure: false,
+      requireTls: false,
+      from: "noreply@example.com",
+    }),
+    JSON.stringify({
+      host: "smtp.example.com",
+      port: 587,
+      secure: false,
+      requireTls: true,
+      from: "noreply@example.com\r\nBcc: stolen@example.com",
+    }),
+    JSON.stringify({
+      host: "smtp.example.com",
+      port: 587,
+      secure: false,
+      requireTls: true,
+      from: "noreply@example.com",
+      unexpected: "field",
+    }),
+    JSON.stringify({
+      host: "smtp.example.com",
+      port: 587,
+      secure: "false",
+      requireTls: true,
+      from: "noreply@example.com",
+    }),
+    JSON.stringify({
+      host: "smtp.example.com",
+      port: 587,
+      secure: false,
+      requireTls: "true",
+      from: "noreply@example.com",
+    }),
+  ]) {
+    assert.equal(parseSmtpCredential(value).ok, false);
+  }
 });
 
 test("sql_query requires write=true for mutations and returns rows for reads", async () => {

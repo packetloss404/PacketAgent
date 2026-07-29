@@ -73,7 +73,8 @@
     "verify:sandbox-policy": "node --import tsx src/sandbox/sandbox-policy-verify-cli.ts",
     "verify:sandbox-egress": "node --import tsx src/sandbox/sandbox-egress-verify-cli.ts",
     "verify:preview-isolation": "node --import tsx src/app-preview-isolation-verify-cli.ts",
-    "verify:container-hardening": "node --import tsx src/container-hardening-verify-cli.ts"
+    "verify:container-hardening": "node --import tsx src/container-hardening-verify-cli.ts",
+    "verify:smtp": "node --import tsx src/smtp-verify-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
@@ -83,6 +84,7 @@
     "fflate": "^0.8.3",
     "hono": "^4.12.32",
     "lucide-react": "^0.542.0",
+    "nodemailer": "9.0.3",
     "openai": "^6.34.0",
     "pg": "^8.20.0",
     "react": "^19.1.1",
@@ -93,6 +95,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/nodemailer": "8.0.1",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",

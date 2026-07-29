@@ -265,9 +265,31 @@ and executes that job through the bounded supervisor.
    root, non-root user, PID/CPU/memory limits, dropped capabilities, and
    no-new-privileges. Select or fall back to the native driver and confirm the
    Worker command is refused even if interactive native sandbox opt-in is set.
-5. Attempt Worker browser, SMTP, or SQL execution. Confirm those adapters fail
-   closed until a hardened Worker-specific driver is configured; legacy
-   interactive Agent behavior remains unchanged.
+5. Attempt Worker browser or SQL execution. Confirm those adapters fail closed
+   until hardened Worker-specific drivers are configured. Exercise Worker SMTP
+   through the R6.1 smoke below.
+
+## R6.1 Vault-Backed SMTP Smoke
+
+1. Store a strict JSON credential as kind `smtp_config` under
+   `vault:smtp-primary`. Confirm the durable store and workspace export contain
+   neither password nor username and expose only metadata.
+2. Declare that reference in an immutable Worker version and grant
+   `email_send` `SEND` only to `mailto:ada@example.com`. Send to another
+   recipient and confirm the denial is recorded before credential resolution;
+   no SMTP transport may be created.
+3. Send to the allowed recipient. Confirm the order is policy approval,
+   credential resolution, then SMTP. Supplying `from` in Worker input must
+   fail; the sender comes from the encrypted credential.
+4. Use a hostname with a mixed public/private A or AAAA answer, a private or
+   local literal, plaintext mode, invalid certificate, failed STARTTLS, header
+   newline, oversized body, or malformed credential field. Confirm each fails
+   closed without persisting raw credentials or message content.
+5. Abort an in-flight send and confirm the transport closes exactly once.
+   Confirm successful tool output contains only the bounded message ID plus
+   accepted/rejected counts.
+6. Run `npm run verify:smtp`. All seven assertions must be true. The verifier
+   uses deterministic fake DNS/SMTP and sends no live email.
 
 ## W6.4 Rolling Budget Smoke
 

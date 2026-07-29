@@ -6,6 +6,27 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R6.1 vault-backed SMTP transport
+
+- Added a Nodemailer-backed default `email_send` transport with mandatory
+  implicit TLS or STARTTLS, certificate validation, TLS 1.2 minimum, bounded
+  timeouts/results, disabled message file/URL access, and abort cleanup.
+- Reused the W6 all-address public-target validator and connected-address
+  pinning boundary, retaining the original hostname for TLS verification.
+- Bound autonomous Worker email to strict, encrypted `smtp_config`
+  credentials declared by the immutable version. Recipient policy approval
+  precedes secret resolution and Worker input cannot override the sender.
+- Preserved legacy Agent `SMTP_*` configuration while removing the injected
+  adapter requirement.
+- Added adversarial credential, policy-order, redaction, header, TLS, network,
+  cancellation, runtime binding, and storage/export coverage plus
+  `npm run verify:smtp`, which sends no live email.
+- Typecheck, zero-warning lint, repository formatting, the production web
+  build, 33 web tests, 35 focused adversarial tests, the seven-assertion SMTP
+  verifier, and 1,628 API tests pass (1,625 passed with three intentional live
+  interoperability skips).
+- Resume at R6.2 LLM-authored Worker/agent templates.
+
 ### 2026-07-29 - R5.6 container-hardening closure
 
 - Made the generated-code validator image default to numeric non-root in

@@ -75,8 +75,10 @@ applies nonce CSP and exact-parent framing, and moves click-to-edit onto a
 validated message bridge. R5.6 closes the containment gate: the validator
 image, control-plane Compose service, generated-app package, and live
 untrusted sandbox now share an executable non-root/read-only-root/
-capability-drop/no-new-privileges/process-limit matrix. Resume at R6.1
-vault-backed default SMTP transport in
+capability-drop/no-new-privileges/process-limit matrix. R6.1 now adds a
+TLS-only, public-address-pinned default SMTP transport, with Workers resolving
+strict `smtp_config` values from the encrypted vault only after recipient
+policy approval. Resume at R6.2 LLM-authored Worker/agent templates in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r6---agent-authoring-and-execution-depth).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

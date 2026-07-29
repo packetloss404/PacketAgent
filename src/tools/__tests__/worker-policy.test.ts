@@ -7,6 +7,7 @@ import type { WorkerToolRuntimeServices } from "../../workers/runtime-services.j
 import { WORKER_CREDENTIAL_SCHEMA_VERSION } from "../../workers/credential-types.js";
 import { computeWorkerVersionContentDigest } from "../../workers/validation.js";
 import { executeTool } from "../executor.js";
+import { createEmailSendTool } from "../email-sql.js";
 import { createHttpFetchTool } from "../http-fetch.js";
 import type { ToolContext, ToolDefinition, ToolPolicyDecision } from "../types.js";
 
@@ -105,6 +106,11 @@ test("Worker credentials resolve only after policy approval and immediately befo
         throw new Error("unused");
       },
     },
+    smtp: {
+      async send() {
+        throw new Error("unused");
+      },
+    },
   };
   const tool = createHttpFetchTool();
 
@@ -143,6 +149,103 @@ test("Worker credentials resolve only after policy approval and immediately befo
   assert.equal(allowed.status, "ok");
   assert.deepEqual(order, ["allow", "credential", "network"]);
   assert.doesNotMatch(JSON.stringify(allowed), /resolved-secret/);
+});
+
+test("Worker SMTP resolves an encrypted smtp_config only after recipient policy approval", async () => {
+  const order: string[] = [];
+  const policy = emailPolicy();
+  const smtpSecret = "worker-smtp-secret";
+  const services: WorkerToolRuntimeServices = {
+    credentials: {
+      async use(reference, expectedKinds, consumer) {
+        order.push("credential");
+        assert.equal(reference, "vault:release-api");
+        assert.deepEqual(expectedKinds, ["smtp_config"]);
+        return await consumer(
+          JSON.stringify({
+            host: "smtp.example.com",
+            port: 587,
+            secure: false,
+            requireTls: true,
+            from: "PacketAgent <noreply@example.com>",
+            user: "smtp-user",
+            pass: smtpSecret,
+          }),
+          {
+            schemaVersion: WORKER_CREDENTIAL_SCHEMA_VERSION,
+            id: "credential-smtp",
+            workspaceId: "workspace-1",
+            reference,
+            kind: "smtp_config",
+            label: "Worker SMTP",
+            createdAt: "2026-07-29T12:00:00.000Z",
+            updatedAt: "2026-07-29T12:00:00.000Z",
+            encrypted: true,
+          },
+        );
+      },
+    },
+    network: {
+      async request() {
+        throw new Error("HTTP network must not run");
+      },
+    },
+    sandbox: {
+      async execute() {
+        throw new Error("sandbox must not run");
+      },
+    },
+    smtp: {
+      async send(input) {
+        order.push("smtp");
+        assert.equal(input.config.pass, smtpSecret);
+        assert.equal(input.config.requireTls, true);
+        assert.equal(input.message.from, "PacketAgent <noreply@example.com>");
+        return { messageId: "smtp-message-1", accepted: [...input.message.to] };
+      },
+    },
+  };
+  const tool = createEmailSendTool();
+
+  const denied = await executeTool({
+    tool,
+    input: {
+      to: "admin@example.com",
+      subject: "Denied",
+      text: "No send",
+      credentialRef: "vault:release-api",
+    },
+    context: workerContext(
+      policy,
+      async () => {
+        order.push("deny");
+      },
+      services,
+    ),
+  });
+  assert.equal(denied.status, "error");
+  assert.deepEqual(order, ["deny"]);
+
+  order.length = 0;
+  const allowed = await executeTool({
+    tool,
+    input: {
+      to: "ada@example.com",
+      subject: "Allowed",
+      text: "Send",
+      credentialRef: "vault:release-api",
+    },
+    context: workerContext(
+      policy,
+      async () => {
+        order.push("allow");
+      },
+      services,
+    ),
+  });
+  assert.equal(allowed.status, "ok");
+  assert.deepEqual(order, ["allow", "credential", "smtp"]);
+  assert.doesNotMatch(JSON.stringify(allowed), /worker-smtp-secret|smtp-user|smtp\.example/);
 });
 
 test("executeTool fails closed for a missing descriptor or stale or tampered compiled policy", async () => {
@@ -250,6 +353,36 @@ function policyFor(resource: string): WorkerCompiledPolicy {
         approval: "never",
       },
     ],
+  });
+  const contentDigest = computeWorkerVersionContentDigest(content);
+  return compileWorkerCapabilityPolicy({
+    workerVersionContentDigest: contentDigest,
+    requestedCapabilities: content.tools,
+    allowedCapabilityIds: content.policy.permissions.allowedCapabilityIds,
+    credentialRefs: content.credentialRefs,
+  }).policy;
+}
+
+function emailPolicy(): WorkerCompiledPolicy {
+  const capability = {
+    id: "email-send",
+    tool: "email_send",
+    verbs: ["SEND"],
+    resources: ["mailto:ada@example.com"],
+    effect: "write" as const,
+    approval: "never" as const,
+  };
+  const base = makeWorkerVersionContent();
+  const content = makeWorkerVersionContent({
+    tools: [capability],
+    credentialRefs: ["vault:release-api"],
+    policy: {
+      ...base.policy,
+      permissions: {
+        default: "deny",
+        allowedCapabilityIds: [capability.id],
+      },
+    },
   });
   const contentDigest = computeWorkerVersionContentDigest(content);
   return compileWorkerCapabilityPolicy({

@@ -121,6 +121,50 @@ test("Worker credential resolution is scoped, declared, kind checked, and usage 
   );
 });
 
+test("SMTP configuration stays encrypted and is exposed only inside a typed use callback", async () => {
+  const { data, service } = fixture();
+  const smtpSecret = "smtp-password-never-persist-plaintext";
+  const smtpValue = JSON.stringify({
+    host: "smtp.example.com",
+    port: 587,
+    secure: false,
+    requireTls: true,
+    from: "PacketAgent <noreply@example.com>",
+    user: "smtp-user",
+    pass: smtpSecret,
+  });
+  const metadata = await service.upsert({
+    workspaceId: "alpha",
+    reference: "vault:smtp-primary",
+    kind: "smtp_config",
+    label: "Primary SMTP",
+    value: smtpValue,
+  });
+
+  assert.equal(metadata.kind, "smtp_config");
+  assert.equal(JSON.stringify(data).includes(smtpSecret), false);
+  assert.equal(JSON.stringify(metadata).includes("smtp-user"), false);
+  const exported = exportWorkspaceData({ workspaceId: "alpha" }, { loadStore: () => data });
+  assert.equal(JSON.stringify(exported).includes(smtpSecret), false);
+  assert.equal(JSON.stringify(exported).includes(data.workerCredentials[0].ciphertext), false);
+
+  let consumed = false;
+  await service.use(
+    {
+      workspaceId: "alpha",
+      reference: "vault:smtp-primary",
+      declaredCredentialRefs: ["vault:smtp-primary"],
+      expectedKinds: ["smtp_config"],
+    },
+    (value) => {
+      consumed = true;
+      assert.equal(value, smtpValue);
+    },
+  );
+  assert.equal(consumed, true);
+  assert.ok(data.workerCredentials[0].lastResolvedAt);
+});
+
 test("Worker credential upsert rotates encrypted values without changing opaque identity", async () => {
   const { data, service } = fixture();
   const created = await service.upsert({

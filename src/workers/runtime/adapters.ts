@@ -15,6 +15,7 @@ import { createWorkerEffectCoordinator, type WorkerEffectCoordinator } from "../
 import { createWorkerCredentialService, type WorkerCredentialService } from "../credentials.js";
 import { createWorkerNetworkClient, type WorkerNetworkPort } from "../network.js";
 import { createWorkerSandboxPort, type WorkerSandboxPort } from "../sandbox-execution.js";
+import { createWorkerSmtpClient, type WorkerSmtpPort } from "../smtp.js";
 import {
   createWorkerRollingBudgetService,
   WorkerRollingBudgetExceededError,
@@ -273,6 +274,7 @@ export interface WorkerToolAdapterServices {
   readonly credentials: WorkerCredentialService;
   readonly network: WorkerNetworkPort;
   readonly sandbox: WorkerSandboxPort;
+  readonly smtp: WorkerSmtpPort;
 }
 
 function workerToolBaseContext(
@@ -322,6 +324,7 @@ function workerToolBaseContext(
         },
         network: services.network,
         sandbox: services.sandbox,
+        smtp: services.smtp,
       },
       recordPolicyDecision,
     },
@@ -333,6 +336,7 @@ function createDefaultWorkerToolAdapterServices(): WorkerToolAdapterServices {
     credentials: createWorkerCredentialService(),
     network: createWorkerNetworkClient(),
     sandbox: createWorkerSandboxPort(),
+    smtp: createWorkerSmtpClient(),
   };
 }
 

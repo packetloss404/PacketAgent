@@ -455,9 +455,9 @@ Status: complete as of 2026-07-29. Resume at R6.
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. Resume at R6.1.
+Status: in progress. R6.1 is complete; resume at R6.2.
 
-- [ ] Wire the default SMTP transport through vault-backed credentials.
+- [x] Wire the default SMTP transport through vault-backed credentials.
 - [ ] Add LLM-authored Worker/agent templates beyond the heuristic builder.
 - [ ] Show provider/model/key/capability readiness before first run.
 - [ ] Add editable memory/input examples and first-run evaluation.
@@ -466,6 +466,24 @@ Status: in progress. Resume at R6.1.
       compatibility and migration tests pass.
 - Gate: authored agents can be evaluated, moved between installs, and operated
   canonically without losing compatibility.
+
+- R6.1 result: `email_send` now defaults to a Nodemailer-backed transport for
+  legacy Agent runs and to the canonical runtime SMTP port for Workers.
+  Workers accept only an immutable-version-declared, encrypted
+  `smtp_config` vault reference; recipient policy approval precedes resolution,
+  and the credential-bound sender plus TLS mode cannot be overridden by tool
+  input. SMTP reuses W6 all-address public-target validation and address
+  pinning, requires implicit TLS or mandatory STARTTLS with certificate
+  validation and TLS 1.2+, disables message file/URL access, closes on abort,
+  and returns only bounded secret-free delivery counts and message identity.
+  `npm run verify:smtp` proves the encrypted-store, policy order, pinned
+  transport, TLS, sender, default-path, and redaction contract without a live
+  server. Design and research evidence live in
+  [`dev/r6-smtp-transport.md`](dev/r6-smtp-transport.md). Typecheck,
+  zero-warning lint, repository formatting, the production web build, 33 web
+  tests, 35 focused adversarial tests, the seven-assertion verifier, and 1,628
+  API tests pass (1,625 passed with three intentional live interoperability
+  skips). Resume at R6.2 LLM-authored Worker/agent templates.
 
 ### R7 - Builder and frontend maintainability
 
@@ -577,7 +595,10 @@ planning plus zip/git-ready export.
 ### Existing agent path
 
 - Shipped: six new tools are registered in the default runtime catalog (`http_fetch`, `slack_post_webhook`, `github_api`, `email_send`, `sql_query`, and `shell_for_agent`), manual tool-enabled runs now have the first-call Launch / Edit tools / Cancel approval flow, `/builder` separates app and agent intent, and run detail exposes a trace inspector.
-- Remaining hardening: resource-scoped runtime enforcement per tool call, live SMTP adapter wiring, LLM-authored agent-template generation beyond the current heuristic draft builder, and broader end-to-end agent happy-path tests.
+- Remaining depth: LLM-authored Worker/agent-template generation beyond the
+  current heuristic draft builder, first-run evaluation, portable signed
+  import/export, and broader end-to-end agent happy-path tests. Resource-scoped
+  runtime enforcement and the default hardened SMTP adapter are shipped.
 
 ### Sandbox and execution farm
 
@@ -670,8 +691,8 @@ _Findings from a 2026-07-17 code audit, preserved for later._
   - Resolution: the flag is retired. A lockfile-addressed Docker validator now
     runs by default, and unavailable isolation produces `source: "blocked"`
     with `ok: false`.
-- **[low/M]** email_send has no default SMTP transport: returns 'SMTP adapter is not configured' unless an adapterFactory is injected
-  - Fix: src/tools/email-sql.ts:165 returns config error when options.adapterFactory is absent; SMTP*\* env parsing exists but no default transport. To close, add a default nodemailer-backed adapterFactory built from parsed SMTP*\* config. Deliberate BYO-adapter DI design; email just doesn't work out-of-box.
+- **[resolved R6.1]** `email_send` previously had no default SMTP transport.
+  - Resolution: the default path is now Nodemailer-backed, TLS-only, public-address-pinned, bounded, and abortable. Autonomous Workers resolve strict encrypted `smtp_config` values only after recipient policy approval; legacy Agents retain `SMTP_*` environment compatibility.
 - **[low/L]** Tool approval tokens are whole-tool-scoped; resource/verb-scoped approvals (e.g. http.fetch:GET:api.github.com) not supported
   - Fix: src/tools/approval.ts keys tokens purely by uniqueSortedToolNames (L131,190,283) - no resource/verb dimension. Current coarse approval is safe, just not granular. Closing requires designing resource-scoped token keys + matching call-site enforcement. Disclosed future work.
 - **[med/L]** Generated-app previews are not origin-isolated: preview served same-origin, so CSRF/separate-origin hardening for previews remains open

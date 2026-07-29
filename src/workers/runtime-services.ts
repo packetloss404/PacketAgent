@@ -1,6 +1,7 @@
 import type { WorkerCredentialKind, WorkerCredentialMetadata } from "./credential-types.js";
 import type { WorkerNetworkPort } from "./network.js";
 import type { WorkerSandboxPort } from "./sandbox-execution.js";
+import type { WorkerSmtpPort } from "./smtp.js";
 
 export interface BoundWorkerCredentialPort {
   use<TResult>(
@@ -14,4 +15,5 @@ export interface WorkerToolRuntimeServices {
   readonly credentials: BoundWorkerCredentialPort;
   readonly network: WorkerNetworkPort;
   readonly sandbox: WorkerSandboxPort;
+  readonly smtp: WorkerSmtpPort;
 }

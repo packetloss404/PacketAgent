@@ -1,7 +1,15 @@
 import { mkdirSync } from "node:fs";
+import { isIP } from "node:net";
 import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { redactedErrorMessage } from "../security/redaction.js";
+import {
+  createWorkerSmtpClient,
+  type WorkerSmtpConfig,
+  type WorkerSmtpMessage,
+  type WorkerSmtpPort,
+  type WorkerSmtpSendResult,
+} from "../workers/smtp.js";
 import { inputAuthorization, recipientResources } from "./authorization.js";
 import type { ToolDefinition, ToolResult } from "./types.js";
 
@@ -16,36 +24,15 @@ export interface EmailSendInput extends Record<string, unknown> {
   cc?: string | string[];
   bcc?: string | string[];
   replyTo?: string;
+  credentialRef?: string;
 }
 
-export interface SmtpConfig {
-  host: string;
-  port: number;
-  user?: string;
-  pass?: string;
-  from: string;
-  secure: boolean;
-}
-
-export interface SmtpMessage {
-  from: string;
-  to: string[];
-  subject: string;
-  text: string;
-  html?: string;
-  cc?: string[];
-  bcc?: string[];
-  replyTo?: string;
-}
-
-export interface SmtpSendResult {
-  messageId?: string;
-  accepted?: string[];
-  rejected?: string[];
-}
+export type SmtpConfig = WorkerSmtpConfig;
+export type SmtpMessage = WorkerSmtpMessage;
+export type SmtpSendResult = WorkerSmtpSendResult;
 
 export interface SmtpAdapter {
-  send(message: SmtpMessage): Promise<SmtpSendResult>;
+  send(message: SmtpMessage, signal?: AbortSignal): Promise<SmtpSendResult>;
 }
 
 export type SmtpAdapterFactory = (config: SmtpConfig) => SmtpAdapter | Promise<SmtpAdapter>;
@@ -53,6 +40,7 @@ export type SmtpAdapterFactory = (config: SmtpConfig) => SmtpAdapter | Promise<S
 export interface EmailSendToolOptions {
   env?: Env;
   adapterFactory?: SmtpAdapterFactory;
+  smtp?: WorkerSmtpPort;
 }
 
 export interface SqlQueryInput extends Record<string, unknown> {
@@ -73,6 +61,9 @@ interface AgentSqlitePathInput {
 
 const DEFAULT_SQL_ROOT = path.join("data", "agent-sql");
 const EMAIL_TIMEOUT_MS = 20_000;
+const EMAIL_MAX_BODY_BYTES = 1024 * 1024;
+const EMAIL_MAX_RECIPIENTS = 100;
+const SMTP_CREDENTIAL_MAX_BYTES = 16 * 1024;
 const SQLITE_TIMEOUT_MS = 30_000;
 
 const recipientSchema = {
@@ -144,7 +135,8 @@ export function createEmailSendTool(
 ): ToolDefinition<EmailSendInput> {
   return {
     name: "email_send",
-    description: "Send an email through the configured SMTP adapter.",
+    description:
+      "Send an email through TLS-enforced SMTP. Autonomous Workers must use a declared vault smtp_config credentialRef.",
     inputSchema: {
       type: "object",
       properties: {
@@ -156,6 +148,13 @@ export function createEmailSendTool(
         cc: recipientSchema,
         bcc: recipientSchema,
         replyTo: { type: "string", minLength: 1 },
+        credentialRef: {
+          type: "string",
+          minLength: 7,
+          maxLength: 200,
+          description:
+            "Opaque vault: reference containing the Worker SMTP host, port, sender, and optional authentication.",
+        },
       },
       required: ["to", "subject", "text"],
       additionalProperties: false,
@@ -178,38 +177,62 @@ export function createEmailSendTool(
     })),
     timeoutMs: EMAIL_TIMEOUT_MS,
     async handle(input, ctx) {
+      const parsedMessage = parseEmailMessageInput(input);
+      if (!parsedMessage.ok) return parsedMessage;
+      const messageInput = parsedMessage.output as Omit<SmtpMessage, "from">;
+
       if (ctx.worker) {
-        return {
-          ok: false,
-          error:
-            "Autonomous Worker email is disabled until the SMTP adapter enforces credential references and pinned network destinations.",
-        };
+        if (input.from !== undefined) {
+          return {
+            ok: false,
+            error: "Autonomous Worker email sender is bound by its SMTP credential.",
+          };
+        }
+        const credentialRef = input.credentialRef?.trim();
+        if (!credentialRef) {
+          return {
+            ok: false,
+            error: "Autonomous Worker email requires an opaque credentialRef.",
+          };
+        }
+        const services = ctx.worker.services;
+        if (!services) {
+          return { ok: false, error: "Worker SMTP runtime services are unavailable." };
+        }
+        try {
+          return await services.credentials.use(credentialRef, ["smtp_config"], async (value) => {
+            const parsedConfig = parseSmtpCredential(value);
+            if (!parsedConfig.ok) return parsedConfig;
+            const config = parsedConfig.output as SmtpConfig;
+            const message: SmtpMessage = { ...messageInput, from: config.from };
+            return await sendSmtp(services.smtp, config, message, ctx.signal);
+          });
+        } catch (error) {
+          return {
+            ok: false,
+            error: `email send failed: ${redactedErrorMessage(error)}`,
+          };
+        }
       }
-      const env = options.env ?? process.env;
-      const adapterFactory = options.adapterFactory;
-      if (!adapterFactory) {
+      if (input.credentialRef !== undefined) {
         return {
           ok: false,
-          error:
-            "SMTP adapter is not configured for email_send; provide an adapter factory before sending mail.",
+          error: "credentialRef is available only to the hardened Worker runtime.",
         };
       }
 
-      const parsed = parseEmailInput(input, env);
+      const env = options.env ?? process.env;
+      const parsed = parseEmailInput(input, env, messageInput);
       if (!parsed.ok) return parsed;
       const { config, message } = parsed.output as { config: SmtpConfig; message: SmtpMessage };
+      const adapterFactory =
+        options.adapterFactory ??
+        defaultSmtpAdapterFactory(options.smtp ?? createWorkerSmtpClient());
 
       try {
         const adapter = await adapterFactory(config);
-        const sent = await adapter.send(message);
-        return {
-          ok: true,
-          output: {
-            messageId: sent.messageId,
-            acceptedCount: sent.accepted?.length ?? message.to.length,
-            rejectedCount: sent.rejected?.length ?? 0,
-          },
-        };
+        const sent = await adapter.send(message, ctx.signal);
+        return smtpSuccess(sent, message);
       } catch (error) {
         return {
           ok: false,
@@ -331,25 +354,66 @@ export function resolveAgentSqlitePath(input: AgentSqlitePathInput): string {
   return dbPath;
 }
 
-function parseEmailInput(input: EmailSendInput, env: Env): ToolResult {
+function parseEmailMessageInput(input: EmailSendInput): ToolResult {
+  if (!validRecipientInput(input.to)) {
+    return { ok: false, error: "email_send to must contain only bounded recipient strings" };
+  }
   const to = normalizeRecipients(input.to);
   if (to.length === 0)
     return { ok: false, error: "email_send requires at least one recipient in to" };
+  if (!validOptionalRecipientInput(input.cc) || !validOptionalRecipientInput(input.bcc)) {
+    return { ok: false, error: "email_send cc and bcc must contain bounded recipient strings" };
+  }
+  const cc = normalizeOptionalRecipients(input.cc);
+  const bcc = normalizeOptionalRecipients(input.bcc);
+  if (to.length + cc.length + bcc.length > EMAIL_MAX_RECIPIENTS) {
+    return { ok: false, error: `email_send supports at most ${EMAIL_MAX_RECIPIENTS} recipients` };
+  }
   if (!isNonEmptyString(input.subject))
     return { ok: false, error: "email_send requires a non-empty subject" };
+  if (!safeHeaderValue(input.subject, 998))
+    return { ok: false, error: "email_send subject contains invalid header characters" };
   if (typeof input.text !== "string")
     return { ok: false, error: "email_send requires text content" };
   if (input.html !== undefined && typeof input.html !== "string")
     return { ok: false, error: "email_send html must be a string" };
-
-  const cc = normalizeOptionalRecipients(input.cc);
-  const bcc = normalizeOptionalRecipients(input.bcc);
-  const from = input.from?.trim() || env.SMTP_FROM?.trim();
-  if (!from) return { ok: false, error: "email_send requires a from address or SMTP_FROM" };
+  if (
+    Buffer.byteLength(input.text, "utf8") + Buffer.byteLength(input.html ?? "", "utf8") >
+    EMAIL_MAX_BODY_BYTES
+  ) {
+    return { ok: false, error: "email_send body exceeds the 1 MiB limit" };
+  }
   if (input.replyTo !== undefined && !isNonEmptyString(input.replyTo)) {
     return { ok: false, error: "email_send replyTo must be a non-empty string" };
   }
+  if (input.replyTo !== undefined && !safeHeaderValue(input.replyTo, 320)) {
+    return { ok: false, error: "email_send replyTo contains invalid header characters" };
+  }
 
+  return {
+    ok: true,
+    output: {
+      to,
+      subject: input.subject.trim(),
+      text: input.text,
+      ...(input.html !== undefined ? { html: input.html } : {}),
+      ...(cc.length > 0 ? { cc } : {}),
+      ...(bcc.length > 0 ? { bcc } : {}),
+      ...(input.replyTo ? { replyTo: input.replyTo.trim() } : {}),
+    },
+  };
+}
+
+function parseEmailInput(
+  input: EmailSendInput,
+  env: Env,
+  messageInput: Omit<SmtpMessage, "from">,
+): ToolResult {
+  const from = input.from?.trim() || env.SMTP_FROM?.trim();
+  if (!from) return { ok: false, error: "email_send requires a from address or SMTP_FROM" };
+  if (!safeHeaderValue(from, 320)) {
+    return { ok: false, error: "email_send from contains invalid header characters" };
+  }
   const host = env.SMTP_HOST?.trim();
   const rawPort = env.SMTP_PORT?.trim();
   if (!host) return { ok: false, error: "email_send requires SMTP_HOST" };
@@ -359,16 +423,7 @@ function parseEmailInput(input: EmailSendInput, env: Env): ToolResult {
     return { ok: false, error: "email_send requires SMTP_PORT to be an integer from 1 to 65535" };
   }
 
-  const message: SmtpMessage = {
-    from,
-    to,
-    subject: input.subject.trim(),
-    text: input.text,
-    ...(input.html !== undefined ? { html: input.html } : {}),
-    ...(cc.length > 0 ? { cc } : {}),
-    ...(bcc.length > 0 ? { bcc } : {}),
-    ...(input.replyTo ? { replyTo: input.replyTo.trim() } : {}),
-  };
+  const message: SmtpMessage = { ...messageInput, from };
   return {
     ok: true,
     output: {
@@ -379,9 +434,64 @@ function parseEmailInput(input: EmailSendInput, env: Env): ToolResult {
         ...(env.SMTP_PASS ? { pass: env.SMTP_PASS } : {}),
         from,
         secure: parseSmtpSecure(env.SMTP_SECURE),
+        requireTls: parseSmtpRequireTls(env.SMTP_REQUIRE_TLS),
       },
       message,
     },
+  };
+}
+
+export function parseSmtpCredential(value: string): ToolResult {
+  if (typeof value !== "string" || Buffer.byteLength(value, "utf8") > SMTP_CREDENTIAL_MAX_BYTES) {
+    return { ok: false, error: "SMTP credential is invalid." };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { ok: false, error: "SMTP credential must be valid JSON." };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, error: "SMTP credential must be a JSON object." };
+  }
+  const candidate = parsed as Record<string, unknown>;
+  const allowed = new Set(["host", "port", "secure", "requireTls", "from", "user", "pass"]);
+  if (Object.keys(candidate).some((key) => !allowed.has(key))) {
+    return { ok: false, error: "SMTP credential contains unsupported fields." };
+  }
+  const host = typeof candidate.host === "string" ? candidate.host.trim() : "";
+  const from = typeof candidate.from === "string" ? candidate.from.trim() : "";
+  const secure = candidate.secure === true;
+  const requireTls = candidate.requireTls !== false;
+  const port = candidate.port;
+  const user = typeof candidate.user === "string" ? candidate.user : undefined;
+  const pass = typeof candidate.pass === "string" ? candidate.pass : undefined;
+  if (
+    (candidate.secure !== undefined && typeof candidate.secure !== "boolean") ||
+    (candidate.requireTls !== undefined && typeof candidate.requireTls !== "boolean") ||
+    !safeSmtpHostname(host) ||
+    !Number.isSafeInteger(port) ||
+    (port as number) < 1 ||
+    (port as number) > 65_535 ||
+    !safeHeaderValue(from, 320) ||
+    Boolean(user) !== Boolean(pass) ||
+    (user !== undefined && !safeCredentialPart(user)) ||
+    (pass !== undefined && !safeCredentialPart(pass)) ||
+    (!secure && !requireTls)
+  ) {
+    return { ok: false, error: "SMTP credential configuration is invalid." };
+  }
+  return {
+    ok: true,
+    output: {
+      host,
+      port: port as number,
+      secure,
+      requireTls,
+      from,
+      ...(user ? { user } : {}),
+      ...(pass ? { pass } : {}),
+    } satisfies SmtpConfig,
   };
 }
 
@@ -406,8 +516,94 @@ function parseSmtpSecure(value: string | undefined): boolean {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
+function parseSmtpRequireTls(value: string | undefined): boolean {
+  if (!value) return true;
+  return !["0", "false", "no", "off"].includes(value.trim().toLowerCase());
+}
+
+function defaultSmtpAdapterFactory(smtp: WorkerSmtpPort): SmtpAdapterFactory {
+  return (config) => ({
+    send(message, signal = new AbortController().signal) {
+      return smtp.send({ config, message, signal });
+    },
+  });
+}
+
+async function sendSmtp(
+  smtp: WorkerSmtpPort,
+  config: SmtpConfig,
+  message: SmtpMessage,
+  signal: AbortSignal,
+): Promise<ToolResult> {
+  try {
+    return smtpSuccess(await smtp.send({ config, message, signal }), message);
+  } catch (error) {
+    return {
+      ok: false,
+      error: `email send failed: ${redactEmailError(
+        error,
+        { SMTP_USER: config.user, SMTP_PASS: config.pass },
+        message,
+      )}`,
+    };
+  }
+}
+
+function smtpSuccess(sent: SmtpSendResult, message: SmtpMessage): ToolResult {
+  const messageId =
+    typeof sent.messageId === "string"
+      ? sent.messageId.replace(/[\r\n\0]/g, "").slice(0, 512)
+      : undefined;
+  const recipientCount = message.to.length + (message.cc?.length ?? 0) + (message.bcc?.length ?? 0);
+  return {
+    ok: true,
+    output: {
+      ...(messageId ? { messageId } : {}),
+      acceptedCount: Math.min(sent.accepted?.length ?? recipientCount, EMAIL_MAX_RECIPIENTS),
+      rejectedCount: Math.min(sent.rejected?.length ?? 0, EMAIL_MAX_RECIPIENTS),
+    },
+  };
+}
+
+function validRecipientInput(value: unknown): value is string | string[] {
+  const values = Array.isArray(value) ? value : [value];
+  return (
+    values.length > 0 &&
+    values.every((entry) => typeof entry === "string" && safeHeaderValue(entry.trim(), 320))
+  );
+}
+
+function validOptionalRecipientInput(value: unknown): value is string | string[] | undefined {
+  return value === undefined || validRecipientInput(value);
+}
+
+function safeHeaderValue(value: string, maxLength: number): boolean {
+  return value.length > 0 && value.length <= maxLength && !/[\r\n\0]/.test(value);
+}
+
+function safeCredentialPart(value: string): boolean {
+  return value.length > 0 && value.length <= 4096 && !/[\r\n\0]/.test(value);
+}
+
+function safeSmtpHostname(value: string): boolean {
+  if (!value || value.length > 253 || /[\s/?#@\0]/.test(value) || value.includes("://")) {
+    return false;
+  }
+  const normalized = value.replace(/^\[|\]$/g, "");
+  if (isIP(normalized)) return true;
+  return normalized
+    .split(".")
+    .every(
+      (label) =>
+        label.length >= 1 &&
+        label.length <= 63 &&
+        /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label),
+    );
+}
+
 function redactEmailError(error: unknown, env: Env, message: SmtpMessage): string {
   const recipients = [
+    message.from,
     ...message.to,
     ...(message.cc ?? []),
     ...(message.bcc ?? []),

@@ -50,6 +50,14 @@ export interface WorkerNetworkPort {
   request(input: WorkerNetworkRequest): Promise<WorkerNetworkResponse>;
 }
 
+export interface WorkerPublicNetworkTarget {
+  readonly hostname: string;
+  readonly addresses: readonly LookupAddress[];
+  readonly pinnedAddress: LookupAddress;
+}
+
+export type WorkerNetworkLookup = (hostname: string) => Promise<readonly LookupAddress[]>;
+
 export type WorkerNetworkErrorCode =
   | "invalid_url"
   | "blocked_host"
@@ -84,7 +92,7 @@ interface WorkerNetworkConnectInput {
 type WorkerNetworkConnectResponse = WorkerNetworkResponse;
 
 export interface WorkerNetworkClientDeps {
-  readonly lookup: (hostname: string) => Promise<readonly LookupAddress[]>;
+  readonly lookup: WorkerNetworkLookup;
   readonly connect: (input: WorkerNetworkConnectInput) => Promise<WorkerNetworkConnectResponse>;
 }
 
@@ -99,32 +107,8 @@ export function createWorkerNetworkClient(
   return {
     async request(input) {
       const url = validateWorkerNetworkUrl(input.url);
-      const hostname = normalizeHostname(url.hostname);
-      let addresses: readonly LookupAddress[];
-      if (isIP(hostname)) {
-        addresses = [{ address: hostname, family: isIP(hostname) }];
-      } else {
-        try {
-          addresses = await deps.lookup(hostname);
-        } catch (error) {
-          throw new WorkerNetworkError(
-            "resolution_failed",
-            "Worker network host resolution failed.",
-            { cause: error },
-          );
-        }
-      }
-      if (addresses.length === 0) {
-        throw new WorkerNetworkError(
-          "resolution_failed",
-          "Worker network host did not resolve to an address.",
-        );
-      }
-      for (const address of addresses) {
-        assertPublicAddress(address.address);
-      }
-
-      const pinnedAddress = addresses[0];
+      const target = await resolveWorkerPublicHost(url.hostname, deps.lookup);
+      const { pinnedAddress } = target;
       let response: WorkerNetworkConnectResponse;
       try {
         response = await deps.connect({
@@ -164,6 +148,41 @@ export function createWorkerNetworkClient(
       return response;
     },
   };
+}
+
+export async function resolveWorkerPublicHost(
+  hostnameInput: string,
+  lookup: WorkerNetworkLookup = defaultDeps.lookup,
+): Promise<WorkerPublicNetworkTarget> {
+  const hostname = normalizeHostname(hostnameInput);
+  if (
+    !hostname ||
+    BLOCKED_HOSTS.has(hostname) ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local")
+  ) {
+    throw new WorkerNetworkError("blocked_host", "Worker network host is blocked.");
+  }
+  let addresses: readonly LookupAddress[];
+  if (isIP(hostname)) {
+    addresses = [{ address: hostname, family: isIP(hostname) }];
+  } else {
+    try {
+      addresses = await lookup(hostname);
+    } catch (error) {
+      throw new WorkerNetworkError("resolution_failed", "Worker network host resolution failed.", {
+        cause: error,
+      });
+    }
+  }
+  if (addresses.length === 0) {
+    throw new WorkerNetworkError(
+      "resolution_failed",
+      "Worker network host did not resolve to an address.",
+    );
+  }
+  for (const address of addresses) assertPublicAddress(address.address);
+  return { hostname, addresses, pinnedAddress: addresses[0] };
 }
 
 export function validateWorkerNetworkUrl(value: string): URL {

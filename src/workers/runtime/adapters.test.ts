@@ -322,6 +322,11 @@ test("Worker policy denial precedes credential, budget, effect, and network boun
           throw new Error("sandbox must not run");
         },
       },
+      smtp: {
+        async send() {
+          throw new Error("SMTP must not run");
+        },
+      },
     },
     {
       ...permissive,

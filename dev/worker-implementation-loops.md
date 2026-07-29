@@ -1179,9 +1179,14 @@ R5 research, implementation decisions, and cumulative gate evidence live in
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. Resume at R6.1.
+Status: in progress. R6.1 is complete; resume at R6.2.
 
-1. Wire the default SMTP transport through the vault-backed credential path.
+1. [Complete 2026-07-29] Wire the default SMTP transport through the
+   vault-backed credential path. The Worker sender and TLS policy are
+   credential-bound; public-address pinning, strict parsing, abort cleanup,
+   secret-free output, and policy-before-resolution ordering are certified by
+   `npm run verify:smtp`. See
+   [`r6-smtp-transport.md`](r6-smtp-transport.md).
 2. Add LLM-authored Worker/agent templates beyond the heuristic draft builder.
 3. Show provider/model/key/capability readiness before first run.
 4. Add editable memory and input-schema examples plus first-run evaluation.

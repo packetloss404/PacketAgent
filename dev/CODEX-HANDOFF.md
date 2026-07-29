@@ -180,6 +180,12 @@ Prompt-to-app generation remains a supported secondary capability.
   fallback, one non-executing malformed-tool correction, Gemini/OpenRouter
   vault parity, expanded provider-kind persistence, and secret-free
   workspace-aware readiness.
+- Completed R6.1's default SMTP transport. Legacy Agent runs retain `SMTP_*`
+  compatibility; autonomous Workers accept only a declared encrypted
+  `smtp_config` reference after recipient policy approval. The sender is
+  credential-bound, SMTP reuses W6 public-address validation and pinning, and
+  implicit TLS or mandatory STARTTLS with certificate validation is required.
+  The deterministic `npm run verify:smtp` gate sends no live email.
 
 ## Current implementation truth
 
@@ -284,7 +290,8 @@ Implemented substrate:
   keys for every hosted provider, structured-response mapping, one bounded
   malformed-tool correction, and secret-free readiness reporting;
 - tool approvals, encrypted secrets, RBAC, audit, sandbox, and Playwright;
-- outbound HTTP, Slack, GitHub, email, SQL, and scoped shell tool adapters;
+- outbound HTTP, Slack, GitHub, TLS SMTP email, SQL, and scoped shell tool
+  adapters;
 - bounded app-code validation repair, per-app SQLite runtime, and supervised
   runtime workers;
 - JSON, SQLite, and managed Postgres storage paths; and
@@ -292,8 +299,8 @@ Implemented substrate:
 
 Not shipped:
 
-- hardened Worker-specific browser, SMTP, and SQL drivers (those paths fail
-  closed for Worker runs);
+- hardened Worker-specific browser and SQL drivers (those paths fail closed
+  for Worker runs);
 - live PacketChat/PacketPhone interoperability certification when endpoint
   credentials are available.
 
@@ -301,9 +308,9 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R4 - generated-app runtime and self-host publish** in
-[`../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish).
-`BACKLOG.md` is the single ledger for every remaining R4-R8 task.
+Continue **R6.2 - LLM-authored Worker/agent templates** in
+[`../BACKLOG.md#r6---agent-authoring-and-execution-depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth).
+`BACKLOG.md` is the single ledger for every remaining R6-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
 active work absent from the backlog.
 
@@ -748,14 +755,24 @@ container/publish tests, all five cumulative R5 executable verifiers, and
 1,620 API tests (1,617 passed with three intentional live interoperability
 skips).
 
-The exact next slice is R6.1 under
+R6.1 is complete. `email_send` now has a default Nodemailer-backed Agent path
+and a canonical Worker SMTP runtime port. Worker sends use only declared
+encrypted `smtp_config` references, authorize recipient resources before
+resolution, bind the sender to the credential, reuse W6 public-address
+validation/pinning, require certificate-validated implicit TLS or STARTTLS,
+and expose only bounded delivery metadata. `npm run verify:smtp` proves seven
+encrypted-store, policy-order, address, TLS, sender, default-path, and
+redaction assertions without contacting a live SMTP server. Research and
+decisions are recorded in
+[`r6-smtp-transport.md`](r6-smtp-transport.md).
+
+The exact next slice is R6.2 under
 [`R6 - agent authoring and execution depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth):
-wire the default SMTP transport through vault-backed credentials and prove no
-plaintext secret is persisted or logged. After each gate passes, continue
-through R6-R8 using that backlog's unchecked
-checklists; use the loop document only for execution
-mechanics. Historical D/phase/track documents have been reconciled there and
-must not be resumed independently.
+add LLM-authored Worker/agent templates beyond the heuristic draft builder.
+After each gate passes, continue through R6-R8 using that backlog's unchecked
+checklists; use the loop document only for execution mechanics. Historical
+D/phase/track documents have been reconciled there and must not be resumed
+independently.
 
 ## Canonical documents
 
@@ -783,9 +800,14 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,617 passed, 3 intentionally skipped live probes, 0
-  failed (1,620 total)
+- `npm run test:api` - 1,625 passed, 3 intentionally skipped live probes, 0
+  failed (1,628 total)
 - `npm run test:web` - 33 passed, 0 failed
+- focused R6.1 SMTP, credential, network, runtime-binding, policy-order, and
+  registry-bypass gate - 35 passed, 0 failed
+- `npm run verify:smtp` - all 7 encrypted-storage, address-pinning, TLS,
+  sender-binding, denial-order, allowed-order, and default-Agent-path
+  assertions passed without sending live email
 - focused R2 canonical catalog, provider request mappings, vLLM constrained
   decoding and one fallback, malformed tool-input correction bound,
   local single-file authoring, Gemini/OpenRouter vault storage and request-time

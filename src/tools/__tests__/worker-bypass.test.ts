@@ -284,5 +284,10 @@ function runtimeServices(onSandboxExecute: () => Promise<void>): WorkerToolRunti
         throw new Error("sandbox must not run");
       },
     },
+    smtp: {
+      async send() {
+        throw new Error("SMTP must not run");
+      },
+    },
   };
 }
