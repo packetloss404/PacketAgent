@@ -303,11 +303,19 @@ Status: active.
       limits.
 - [x] Add health endpoints, static-asset manifest validation, and
       signed/checksummed artifact manifests.
-- [ ] Turn publish handoff into a verified local Docker Compose run path.
+- [x] Turn publish handoff into a verified local Docker Compose run path.
 - [ ] Add reverse-proxy/VPN examples and public-URL reachability verification.
 - [ ] Preserve accurate schema/data migration claims.
 - Gate: an exported app can be integrity-checked, started, health-checked, and
   reached through the documented self-host path.
+- R4.3 result: generated publishes now contain a single-service standalone
+  Node/Vite/SQLite package with sealed build/runtime inputs, runtime validation
+  of Vite's emitted asset manifest, a non-root read-only bounded Compose
+  service, and a CLI that proves health, static delivery, CRUD, restart
+  persistence, and cleanup against Docker. Resume at reverse-proxy/VPN
+  examples and public reachability verification. Typecheck, zero-warning lint,
+  formatting, production web build, 32 web tests, and 1,577 API tests pass
+  (1,573 passed with four intentional live interoperability skips).
 
 ### R5 - Sandbox, egress, and preview isolation
 
@@ -487,9 +495,11 @@ planning plus zip/git-ready export.
 - Shipped: generated-app process health endpoints, bounded static-asset
   validation, checksum-sealed artifact manifest v2, optional HMAC authenticity,
   and authenticated package re-verification.
-- Remaining: turn publish handoff into a verified local Docker Compose run,
-  document reverse-proxy examples for local network / VPN deployment, and
-  verify that a configured public URL reaches the intended published app.
+- Shipped: generated-app publish directories now include the standalone image,
+  Compose service, runtime/model/runbook, and bounded Docker verification CLI.
+- Remaining: document reverse-proxy examples for local network / VPN
+  deployment and verify that a configured public URL reaches the intended
+  published app.
 
 ### Quality bar
 

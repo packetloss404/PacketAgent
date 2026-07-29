@@ -220,7 +220,7 @@ test("builder publish dashboard falls back to pending private production handoff
 
   assert.equal(dashboard.status, "pending");
   assert.equal(dashboard.urls.preview.url, "/builder/preview/workspace/generated-app");
-  assert.equal(dashboard.urls.production.url, "http://localhost:8484/app/workspace/generated-app");
+  assert.equal(dashboard.urls.production.url, "http://localhost:8787");
   assert.equal(dashboard.urls.production.visibility, "private");
   assert.equal(dashboard.urls.production.status, "pending");
   assert.equal(dashboard.rollback.available, false);

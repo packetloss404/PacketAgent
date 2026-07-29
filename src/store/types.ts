@@ -403,7 +403,7 @@ export interface GeneratedAppPublishLogEntry {
 export interface GeneratedAppDockerComposeExportPayload {
   fileName: "docker-compose.publish.yml";
   format: "docker-compose";
-  version: "3.9";
+  version: "compose-spec";
   services: string[];
   environment: Record<string, string>;
   volumes: string[];

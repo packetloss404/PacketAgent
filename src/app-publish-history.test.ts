@@ -31,13 +31,12 @@ test("generated app publish records include local hosting metadata and compose p
   assert.equal(publish.localPublishPath, "exports/packetagent/alpha-workspace/booking-app");
   assert.equal(publish.workspacePath, "exports/packetagent/alpha-workspace/booking-app");
   assert.equal(publish.publicUrl, "https://apps.example.test/alpha-workspace/booking-app");
-  assert.equal(
-    publish.privateUrl,
-    "http://localhost:8484/api/app/generated-apps/gapp_booking/preview?checkpointId=ckpt_1",
-  );
+  assert.equal(publish.privateUrl, "http://localhost:8484");
   assert.equal(publish.dockerComposeExport.fileName, "docker-compose.publish.yml");
-  assert.equal(publish.dockerComposeExport.services.includes("packetagent-app"), true);
-  assert.match(publish.dockerComposeExport.yaml, /packetagent-app:/);
+  assert.equal(publish.dockerComposeExport.version, "compose-spec");
+  assert.deepEqual(publish.dockerComposeExport.services, ["generated-app"]);
+  assert.match(publish.dockerComposeExport.yaml, /generated-app:/);
+  assert.equal(publish.dockerComposeExport.yaml.includes("packetagent-db"), false);
   assert.equal(
     publish.dockerComposeExport.bundlePath,
     "exports/packetagent/alpha-workspace/booking-app/bundle",
@@ -46,9 +45,12 @@ test("generated app publish records include local hosting metadata and compose p
     publish.dockerComposeExport.manifestPath,
     "exports/packetagent/alpha-workspace/booking-app/publish-artifacts.json",
   );
-  assert.match(publish.dockerComposeExport.yaml, /PACKETAGENT_APP_BUNDLE_PATH/);
+  assert.match(publish.dockerComposeExport.yaml, /generated-app-data:\/app\/data/);
+  assert.match(publish.dockerComposeExport.yaml, /read_only: true/);
   assert.ok(
-    publish.dockerComposeExport.instructions.some((step) => step.includes("generated app bundle")),
+    publish.dockerComposeExport.instructions.some((step) =>
+      step.includes("standalone generated app"),
+    ),
   );
   assert.equal(publish.artifactManifest.fileName, "publish-artifacts.json");
   assert.equal(publish.manifest.fileName, "publish-artifacts.json");

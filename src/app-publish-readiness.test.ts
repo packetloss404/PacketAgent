@@ -38,10 +38,7 @@ test("app publish readiness package contract is deterministic for the same draft
     first.urlHandoff.publicUrl,
     "https://publish.example.test/apps/alpha-workspace/release-audit-console",
   );
-  assert.equal(
-    first.urlHandoff.privateUrl,
-    "http://localhost:8484/app/alpha-workspace/release-audit-console",
-  );
+  assert.equal(first.urlHandoff.privateUrl, "http://localhost:8484");
   assert.equal(first.envChecklist.find((item) => item.name === "NODE_ENV")?.configured, true);
   assert.equal(
     first.envChecklist.find((item) => item.name === "OPENAI_API_KEY")?.configured,
@@ -60,27 +57,29 @@ test("app publish readiness captures runtime config and generated checks", () =>
     workspaceSlug: "Beta",
   });
 
-  assert.equal(readiness.packaging.runtime, "hono-vite");
-  assert.equal(readiness.runtimeConfig.nodeVersion, ">=22.5.0");
-  assert.equal(readiness.runtimeConfig.appRouteBase, "/app/beta/ops-board");
+  assert.equal(readiness.packaging.runtime, "packetagent-generated-app-standalone");
+  assert.equal(readiness.runtimeConfig.nodeVersion, "22");
+  assert.equal(readiness.runtimeConfig.appRouteBase, "/");
   assert.equal(readiness.runtimeConfig.agentRouteBase, null);
-  assert.equal(readiness.runtimeConfig.generatedBundlePath, "data/published-apps/beta/ops-board");
+  assert.equal(
+    readiness.runtimeConfig.generatedBundlePath,
+    "data/published-apps/beta/ops-board/bundle",
+  );
   assert.ok(
     readiness.runtimeAssumptions.some((assumption) => assumption.id === "local-self-hosted-urls"),
   );
-  assert.ok(readiness.packaging.notes.some((note) => note.includes("Hono server")));
-  assert.ok(readiness.packaging.notes.some((note) => note.includes("Vite client")));
-  assert.deepEqual(readiness.packaging.buildCommands.slice(0, 3), [
-    "npm ci",
-    "npm run build:web",
-    "npm run typecheck",
+  assert.ok(readiness.packaging.notes.some((note) => note.includes("multi-stage image")));
+  assert.ok(readiness.packaging.notes.some((note) => note.includes("Vite")));
+  assert.deepEqual(readiness.packaging.buildCommands.slice(0, 2), [
+    "docker compose -f data/published-apps/beta/ops-board/docker-compose.publish.yml config --quiet",
+    "npm run verify:generated-app-publish -- data/published-apps/beta/ops-board",
   ]);
   assert.ok(
-    readiness.packageContract.buildCommands.some((step) => step.id === "write-publish-manifest"),
+    readiness.packageContract.buildCommands.some((step) => step.id === "verify-standalone-package"),
   );
-  assert.equal(readiness.healthCheck.livePath, "/api/health/live");
-  assert.equal(readiness.healthCheck.readyPath, "/api/health/ready");
-  assert.match(readiness.healthCheck.command, /\/api\/health\/ready$/);
+  assert.equal(readiness.healthCheck.livePath, "/health/live");
+  assert.equal(readiness.healthCheck.readyPath, "/health/ready");
+  assert.match(readiness.healthCheck.command, /\/health\/ready$/);
   assert.ok(
     readiness.packageContract.healthChecks.every((check) => check.failureAction.length > 0),
   );
@@ -105,23 +104,10 @@ test("app publish readiness sorts and deduplicates environment checklist entries
     .filter((item) => !item.required)
     .map((item) => item.name);
 
-  assert.deepEqual(requiredNames, [
-    "DATABASE_URL",
-    "NODE_ENV",
-    "PACKETAGENT_PUBLISH_ROOT",
-    "PACKETAGENT_STORE",
-    "PORT",
-    "Z_REQUIRED",
-  ]);
+  assert.deepEqual(requiredNames, ["DATABASE_URL", "NODE_ENV", "PORT", "Z_REQUIRED"]);
   assert.equal(optionalNames.includes("PORT"), false);
   assert.equal(optionalNames.includes("Z_REQUIRED"), false);
-  assert.deepEqual(optionalNames, [
-    "A_OPTIONAL",
-    "PACKETAGENT_ACCESS_LOG_MODE",
-    "PACKETAGENT_PRIVATE_APP_BASE_URL",
-    "PACKETAGENT_PUBLIC_APP_BASE_URL",
-    "PACKETAGENT_SCHEDULER_LEADER_MODE",
-  ]);
+  assert.deepEqual(optionalNames, ["A_OPTIONAL", "PACKETAGENT_GENERATED_APP_PORT"]);
 });
 
 test("app publish readiness includes publish artifact manifest and docker compose metadata", () => {
@@ -132,7 +118,11 @@ test("app publish readiness includes publish artifact manifest and docker compos
 
   assert.equal(readiness.publishArtifactManifest.fileName, "publish-artifacts.json");
   assert.equal(readiness.publishArtifactManifest.packageId, "beta/ops-board/app");
-  assert.ok(readiness.publishArtifactManifest.entries.some((entry) => entry.path === "web/dist"));
+  assert.ok(
+    readiness.publishArtifactManifest.entries.some((entry) =>
+      entry.path.endsWith("/runtime/server.mjs"),
+    ),
+  );
   assert.ok(
     readiness.publishArtifactManifest.entries.some(
       (entry) =>
@@ -147,23 +137,21 @@ test("app publish readiness includes publish artifact manifest and docker compos
   );
   assert.equal(readiness.dockerComposeExport.fileName, "docker-compose.publish.yml");
   assert.equal(readiness.dockerComposeExport.projectName, "packetagent-beta-ops-board");
-  assert.deepEqual(readiness.dockerComposeExport.networks, ["packetagent-publish"]);
+  assert.deepEqual(readiness.dockerComposeExport.networks, ["default"]);
   assert.ok(
     readiness.dockerComposeExport.services.some(
-      (service) => service.name === "packetagent-app" && service.healthcheck,
+      (service) => service.name === "generated-app" && service.healthcheck,
     ),
   );
   assert.equal(
-    readiness.dockerComposeExport.services.find((service) => service.name === "packetagent-app")
-      ?.environment?.PACKETAGENT_APP_BUNDLE_PATH,
-    "/app/data/published-apps/beta/ops-board/bundle",
+    readiness.dockerComposeExport.services.find((service) => service.name === "generated-app")
+      ?.environment?.PORT,
+    "8080",
   );
-  assert.ok(
-    readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-db"),
-  );
+  assert.deepEqual(readiness.dockerComposeExport.volumes, ["generated-app-data"]);
   assert.ok(
     readiness.dockerComposeExport.outline.some((step) =>
-      step.includes("data/published-apps/beta/ops-board/bundle"),
+      step.includes("data/published-apps/beta/ops-board"),
     ),
   );
 });
@@ -324,7 +312,9 @@ test("app publish readiness expands app agent bundle contract", () => {
   );
   assert.ok(readiness.packageContract.smokeChecks.some((check) => check.id === "agent-manifest"));
   assert.ok(
-    readiness.dockerComposeExport.services.some((service) => service.name === "packetagent-agent"),
+    readiness.dockerComposeExport.outline.some((step) =>
+      step.includes("permissioned PacketAgent Worker runtime"),
+    ),
   );
 });
 
@@ -337,9 +327,6 @@ test("app publish readiness defaults to private URL handoff", () => {
     readiness.urlHandoff.publicUrl,
     "https://apps.packetagent.example/workspace/generated-app",
   );
-  assert.equal(
-    readiness.urlHandoff.privateUrl,
-    "http://localhost:8484/app/workspace/generated-app",
-  );
+  assert.equal(readiness.urlHandoff.privateUrl, "http://localhost:8787");
   assert.ok(readiness.urlHandoff.notes.some((note) => note.includes("Hold the public URL")));
 });

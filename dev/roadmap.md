@@ -51,7 +51,10 @@ bounded crash visibility and operational counters, a Builder surface, and a
 documented 1-64-process supervised warm-pool limit. R4.2 adds checkpoint-bound
 artifact manifest v2 sealing, per-file and canonical checksums, optional HMAC
 signing, bounded HTML/CSS static-asset validation, tamper/substitution checks,
-and authenticated re-verification. Resume at R4.3 in
+and authenticated re-verification. R4.3 adds the actual standalone
+Node/Vite/SQLite publish image, hardened single-service Compose contract, and
+bounded Docker build/health/CRUD/restart-persistence verifier. Resume at R4.4
+proxy/VPN examples and public reachability verification in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r4---generated-app-runtime-and-self-host-publish).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

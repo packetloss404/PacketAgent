@@ -1188,20 +1188,20 @@ export interface AppPublishRuntimeAssumption {
 }
 
 export interface AppPublishRuntimeConfig {
-  runtime: "hono-vite";
+  runtime: "packetagent-generated-app-standalone" | string;
   nodeVersion: string;
   workingDirectory: string;
   startCommand: string;
   portEnv: string;
-  storeEnv: string;
-  publishRootEnv: string;
-  publicBaseUrlEnv: string;
-  privateBaseUrlEnv: string;
+  storeEnv: string | null;
+  publishRootEnv: string | null;
+  publicBaseUrlEnv: string | null;
+  privateBaseUrlEnv: string | null;
   healthBasePath: string;
   appRouteBase: string;
   agentRouteBase: string | null;
   generatedBundlePath: string;
-  envFileName: string;
+  envFileName: string | null;
 }
 
 export interface AppPublishChecklistItem {

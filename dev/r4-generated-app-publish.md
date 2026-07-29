@@ -20,9 +20,18 @@ remains the implementation ledger.
 - [Vite backend integration](https://vite.dev/guide/backend-integration.html)
   defines the production build manifest's entry, import, dynamic-import, CSS,
   and asset relationships. R4.2 validates the materialized source handoff's
-  concrete HTML and CSS references. R4.3 must enable and validate Vite's
-  emitted `.vite/manifest.json` when it turns that source handoff into a
-  verified production build.
+  concrete HTML and CSS references. R4.3 enables Vite's emitted
+  `.vite/manifest.json` and validates its files before the standalone runtime
+  becomes ready.
+- [Dockerfile reference](https://docs.docker.com/reference/dockerfile/) defines
+  build-stage network modes, non-root runtime users, and image health checks.
+  The Vite compile step uses `RUN --network=none`.
+- [Compose services](https://docs.docker.com/reference/compose-file/services/)
+  defines the read-only filesystem, capability drop, process/CPU/memory limits,
+  health check, restart, and named-volume controls used by the generated
+  service.
+- [Compose build](https://docs.docker.com/reference/compose-file/build/)
+  defines the package-local build context and explicit Dockerfile selection.
 
 ## Implemented manifest v2
 
@@ -69,16 +78,55 @@ signature status. Legacy list-only manifests remain readable in stored
 history, but the v2 verifier labels them unsupported rather than treating
 presence as integrity.
 
-## R4.3 handoff
+## R4.3 verified standalone package
 
-The current compose export is still inherited guidance and is not yet a
-certified generated-app run path. R4.3 must:
+R4.3 is complete. Every new generated-app publish directory contains:
 
-1. build the materialized generated app into production assets;
-2. enable and validate Vite's `.vite/manifest.json` graph;
-3. generate a compose file that starts the intended generated-app runtime,
-   rather than merely carrying unused environment hints;
-4. run `docker compose config`, start the stack, wait for bounded liveness and
-   readiness checks, exercise the generated app, capture a secret-free
-   transcript, and stop it; and
-5. reseal the final compose/build output bytes in manifest v2.
+- the generated React/Vite source under `bundle/`;
+- `Dockerfile.publish`, `docker-compose.publish.yml`, and `.dockerignore`;
+- a dependency-free Node static/health/SQLite server plus the generated
+  schema/seed model under `runtime/`;
+- checkpoint-bound `runtime-config.json`;
+- `RUNBOOK.md`; and
+- the v2 manifest sealed over all of those exact source and runtime input
+  bytes.
+
+The multi-stage image installs dependencies without lifecycle scripts, copies
+the generated source, and runs Vite with build networking disabled. The final
+image contains only `dist`, the standalone server, runtime identity, and the
+schema model. It runs as the unprivileged `node` user. Compose adds a read-only
+root, bounded `/tmp`, a named SQLite volume, all-capability drop,
+`no-new-privileges`, PID/CPU/memory limits, and a readiness health check. It
+starts one `generated-app` service; PacketAgent and Postgres are not hidden
+dependencies.
+
+The emitted Vite `.vite/manifest.json` lives in the image rather than the
+source handoff. Runtime startup reads it with a 1 MiB/4,096-reference bound,
+requires an entry chunk, and verifies every declared chunk/CSS/asset plus
+`index.html` before readiness can pass. The source manifest therefore seals
+the declared build inputs while runtime readiness verifies the concrete
+build outputs. It does not claim an image digest is part of manifest v2.
+
+`npm run verify:generated-app-publish -- <publish-directory>` uses a unique
+Compose project and free loopback port. It runs Compose config, builds and
+waits up to a bounded deadline, verifies port mapping, liveness, readiness,
+static HTML, list/create/update CRUD, stops and restarts the container, proves
+the created record survived in SQLite, archives it, and removes the container,
+network, volume, and local verification image. Command output is bounded and
+common credential patterns are redacted.
+
+The 2026-07-29 closure run used Docker Engine 29.5.3 and Compose 5.1.4 on
+Windows. Both clean and cached builds passed; the cached run completed all 14
+steps, including cleanup, in about 21 seconds. The repository closure gate also
+passes typecheck, zero-warning lint, formatting, production web build, 32 web
+tests, and 1,577 API tests (1,573 passed with four intentional live
+interoperability skips).
+
+## R4.4 handoff
+
+The standalone service deliberately exposes a host port on Compose's default
+bridge network. R4.4 must add tested reverse-proxy and private-VPN examples,
+define trusted-forwarded-header/TLS behavior without weakening direct local
+use, and add a bounded reachability command that distinguishes DNS, TCP/TLS,
+HTTP health, identity mismatch, and unexpected redirects. Do not claim that
+public DNS or TLS is provisioned by PacketAgent.

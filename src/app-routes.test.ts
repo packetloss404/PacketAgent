@@ -1915,12 +1915,10 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
         entry.manifest?.fileName === "publish-artifacts.json",
     ),
   );
-  assert.match(
-    firstPublish.publish?.privateUrl ?? "",
-    new RegExp(`/api/app/generated-apps/${applied.app.id}/preview`),
-  );
-  assert.match(firstPublish.dockerComposeExport?.yaml ?? "", /packetagent-app:/);
-  assert.ok(firstPublish.dockerComposeExport?.services?.includes("packetagent-app"));
+  assert.match(firstPublish.publish?.privateUrl ?? "", /localhost:8484/);
+  assert.match(firstPublish.dockerComposeExport?.yaml ?? "", /generated-app:/);
+  assert.ok(firstPublish.dockerComposeExport?.services?.includes("generated-app"));
+  assert.equal(firstPublish.dockerComposeExport?.services?.includes("packetagent-db"), false);
   assert.ok((firstPublish.publish?.logs.length ?? 0) >= 3);
 
   const integrityResponse = await app.request(
@@ -1977,9 +1975,7 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   );
   writeFileSync(publishedEntrypoint, originalEntrypoint, "utf8");
 
-  const privatePreviewUrl =
-    new URL(firstPublish.publish?.privateUrl ?? "http://localhost/").pathname +
-    new URL(firstPublish.publish?.privateUrl ?? "http://localhost/").search;
+  const privatePreviewUrl = `/api/app/generated-apps/${applied.app.id}/preview?checkpointId=${applied.checkpoint.id}`;
   const privatePreviewResponse = await app.request(privatePreviewUrl, {
     headers: authHeaders(alpha.cookieValue),
   });
@@ -2062,7 +2058,8 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
 
   assert.equal(composeResponse.status, 200);
   assert.equal(compose.fileName, "docker-compose.publish.yml");
-  assert.match(compose.contents ?? "", /packetagent-app:/);
+  assert.match(compose.contents ?? "", /generated-app:/);
+  assert.match(compose.contents ?? "", /read_only: true/);
 
   const secondPublishResponse = await app.request("/api/app/builder/publish", {
     method: "POST",
@@ -2090,10 +2087,8 @@ test("builder publish creates self-hosted history, compose export, logs, and rol
   assert.equal(secondPublish.publish?.previousPublishId, firstPublish.publish?.id);
   assert.equal(secondPublish.publish?.rollbackCommand?.toPublishId, firstPublish.publish?.id);
   assert.match(secondPublish.rollbackToPrevious?.command ?? "", /packetagent publish rollback/);
-  assert.match(
-    secondPublish.state?.publishedUrl ?? "",
-    new RegExp(`/api/app/generated-apps/${applied.app.id}/preview`),
-  );
+  assert.equal(secondPublish.state?.publishedUrl, secondPublish.publish?.privateUrl);
+  assert.match(secondPublish.state?.publishedUrl ?? "", /localhost:8787/);
 
   const rollbackResponse = await app.request(
     `/api/app/builder/publish/${secondPublish.publish?.id}/rollback`,

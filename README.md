@@ -263,6 +263,30 @@ current publish at
 `GET /api/app/generated-apps/:appId/publish/integrity`; the Builder Publish tab
 shows the same file/byte totals and signature state.
 
+Each materialized publish is also a standalone container package under
+`data/published-apps/<workspace>/<app>/` (or the selected publish root). It
+contains `Dockerfile.publish`, `docker-compose.publish.yml`, the generated
+source bundle, a small dependency-free Node static/health/SQLite runtime, the
+checkpoint's runtime model, and a runbook. The single generated-app service
+does not start PacketAgent or Postgres. Its final image is non-root with a
+read-only root filesystem, bounded resources, dropped capabilities,
+`no-new-privileges`, and a named SQLite data volume. Vite compiles with build
+networking disabled, and runtime readiness validates Vite's emitted asset
+manifest and referenced files.
+
+Run the bounded local certification path from the repository root:
+
+```bash
+npm run verify:generated-app-publish -- data/published-apps/<workspace>/<app>
+```
+
+The verifier validates Compose, builds and starts on a free loopback port,
+checks health/static/CRUD, restarts the container to prove SQLite persistence,
+then removes its uniquely named containers, network, volume, and local image.
+For ordinary use, follow the generated `RUNBOOK.md`; the default app URL is
+`http://localhost:8787`, configurable with
+`PACKETAGENT_GENERATED_APP_PORT`.
+
 ## Configuration
 
 Common environment variables:
@@ -347,10 +371,10 @@ Generated `web/dist/` is gitignored; rebuild locally rather than committing it.
 
 - **The canonical runtime and Packet-side handoff/control adapters pass their local gates; live product interoperability is not certified.** W1-W5 provide versioned Worker records, lifecycle routes, durable trigger intake, bounded execution, immutable full-state checkpoints, scheduler recovery, and mutation effect receipts across JSON, SQLite, and managed Postgres. W6 compiles version-bound verb/resource grants, rejects deployment broadening, normalizes and authorizes each operation, resolves only declared opaque credentials, pins public network destinations, denies redirects, requires isolated no-network Docker command execution, atomically reserves provider cost and externally billable actions across rolling workspace/deployment windows, and prevents direct registered-handler bypass. W7 persists and executes exact attention/control state, exposes concise independently authorized operator routes, and closes restart/callback/control/activation races without later work. W8 persists versioned evidence and artifact provenance, rebuilds deterministic cumulative rollups, applies bounded redaction/retention with deletion evidence, and exposes the consolidated server-side operations read model, cursor APIs, resumable SSE, and accessible canonical Worker workbench. W9 defines strict digest-bound WorkerPackage v1 bytes, optional DSSE verification, authenticated workspace-bound PacketADE actors, durable local-policy receipts, the receipt-bound deployment/control API, reconnectable PacketADE events with explicit acknowledgements, and a passing disconnect/restart contract gate. W10 adds the durable notification outbox, encrypted pinned-network PacketChat delivery with exact-binding read-only callbacks, encrypted HTTPS-only PacketPhone delivery with role-bounded durable single-use W7 controls, and a local certification matrix covering race orderings, restart, replay, credential rotation, and audited dead-letter redrive. The registered live PacketChat and PacketPhone probes have not run because no external configuration is present.
 - **File-tree codegen is an inherited secondary capability.** With a BYOK key, the LLM authors files through `write_file`, validates with `tsc` and Vite when real sandbox validation is enabled, and can make up to two bounded repair passes. Legacy template-shaped drafts still use their older iteration path.
-- **Per-app SQLite is current, with a compatibility caveat.** Current generated apps use the PacketAgent-served per-app SQLite API and supervised runtime processes. The legacy template/source-artifact path and older saved drafts can still contain sql.js/jsdelivr browser persistence.
+- **Per-app SQLite is current, with compatibility and migration caveats.** PacketAgent previews use the supervised per-app SQLite runtime. Standalone publish packages use the same CRUD/storage semantics inside their own container and named volume. A schema-signature change currently clears and reseeds that app's records; automatic data-preserving schema migration is not yet claimed. Legacy template/source artifacts and older saved drafts can still contain sql.js/jsdelivr browser persistence.
 - **Outbound Worker tools fail closed when a hardened dependency is unavailable.** `http_fetch`, `slack_post_webhook`, and `github_api` use Worker-scoped credential and pinned-network ports; `run_command` and `shell_for_agent` use the Docker-only execution port. Worker browser, email, and SQL calls are refused until equivalent hardened drivers are implemented. Approval tokens remain on the inherited Agent path, and legacy interactive Agent adapters retain their existing configuration behavior.
 - **Preview is local.** Builder preview routes serve generated source files from disk through PacketAgent. They are not public deployments unless you configure and validate a public URL.
-- **Publish is a handoff.** The publish surface records package metadata, artifact manifests, validation state, compose guidance, history, and rollback targets. Operators still run the self-hosted runtime and networking.
+- **Publish is a verified local handoff, not managed hosting.** PacketAgent emits and integrity-checks the standalone package and provides a Docker certification command. Operators still run the long-lived service and configure DNS, TLS, reverse proxy, VPN, backups, and public networking.
 - **Sandbox smoke is opt-in.** Docker-backed smoke checks require Docker and `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`; otherwise statuses should remain explicit about pending, blocked, or fallback checks.
 - **Self-host is the category, not a step toward hosted.** PacketAgent is not pursuing parity with Replit, v0, Bolt, Lovable, or anything.com. Hosted-only capabilities (free public subdomain, pre-wired OAuth, managed App Store submission) are inventoried in [CLOUD.md](CLOUD.md) and intentionally out of scope.
 

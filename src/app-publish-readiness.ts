@@ -118,20 +118,20 @@ export interface AppPublishRuntimeAssumption {
 }
 
 export interface AppPublishRuntimeConfig {
-  runtime: "hono-vite";
-  nodeVersion: ">=22.5.0";
-  workingDirectory: ".";
-  startCommand: "npm run start";
-  portEnv: "PORT";
-  storeEnv: "PACKETAGENT_STORE";
-  publishRootEnv: "PACKETAGENT_PUBLISH_ROOT";
-  publicBaseUrlEnv: "PACKETAGENT_PUBLIC_APP_BASE_URL";
-  privateBaseUrlEnv: "PACKETAGENT_PRIVATE_APP_BASE_URL";
-  healthBasePath: "/api/health";
+  runtime: "packetagent-generated-app-standalone";
+  nodeVersion: "22";
+  workingDirectory: string;
+  startCommand: "docker compose -f docker-compose.publish.yml up --build --wait";
+  portEnv: "PACKETAGENT_GENERATED_APP_PORT";
+  storeEnv: null;
+  publishRootEnv: null;
+  publicBaseUrlEnv: null;
+  privateBaseUrlEnv: null;
+  healthBasePath: "/health";
   appRouteBase: string;
   agentRouteBase: string | null;
   generatedBundlePath: string;
-  envFileName: ".env.publish";
+  envFileName: null;
 }
 
 export interface AppPublishDockerComposeService {
@@ -207,7 +207,7 @@ export interface AppPublishReadiness {
   publishChecklist: AppPublishChecklistItem[];
   packageContract: AppPublishPackageContract;
   packaging: {
-    runtime: "hono-vite";
+    runtime: "packetagent-generated-app-standalone";
     notes: string[];
     buildCommands: string[];
     artifactPaths: string[];
@@ -218,8 +218,8 @@ export interface AppPublishReadiness {
   publishArtifactManifest: AppPublishArtifactManifest;
   dockerComposeExport: AppPublishDockerComposeExport;
   healthCheck: {
-    livePath: "/api/health/live";
-    readyPath: "/api/health/ready";
+    livePath: "/health/live";
+    readyPath: "/health/ready";
     command: string;
   };
   smokeCheck: {
@@ -242,17 +242,12 @@ const DEFAULT_WORKSPACE_SLUG = "workspace";
 const DEFAULT_DRAFT_SLUG = "generated-app";
 const DEFAULT_AGENT_SLUG = "generated-agent";
 const DEFAULT_PUBLIC_BASE_URL = "https://apps.packetagent.example";
-const DEFAULT_PRIVATE_BASE_URL = "http://localhost:8484";
+const DEFAULT_PRIVATE_BASE_URL = "http://localhost:8787";
 const DEFAULT_PACKAGE_VERSION = "0.1.0";
 
-const BASE_REQUIRED_ENV = ["NODE_ENV", "PORT", "PACKETAGENT_PUBLISH_ROOT", "PACKETAGENT_STORE"];
+const BASE_REQUIRED_ENV = ["NODE_ENV", "PORT"];
 
-const BASE_OPTIONAL_ENV = [
-  "PACKETAGENT_ACCESS_LOG_MODE",
-  "PACKETAGENT_PRIVATE_APP_BASE_URL",
-  "PACKETAGENT_PUBLIC_APP_BASE_URL",
-  "PACKETAGENT_SCHEDULER_LEADER_MODE",
-];
+const BASE_OPTIONAL_ENV = ["PACKETAGENT_GENERATED_APP_PORT"];
 
 const AGENT_REQUIRED_ENV = ["PACKETAGENT_AGENT_BUNDLE_PATH"];
 
@@ -260,17 +255,11 @@ const AGENT_OPTIONAL_ENV = ["PACKETAGENT_AGENT_RUN_TIMEOUT_MS", "PACKETAGENT_AGE
 
 const ENV_PURPOSES: Record<string, string> = {
   NODE_ENV: "Set to production for hosted app and agent bundles.",
-  PORT: "Port exposed by the Hono server.",
-  PACKETAGENT_PUBLISH_ROOT: "Root directory containing generated publish bundles.",
-  PACKETAGENT_STORE: "Selects the runtime store posture for the API.",
-  PACKETAGENT_ACCESS_LOG_MODE: "Controls hosted request logging.",
+  PORT: "Container port used by the standalone generated-app runtime.",
+  PACKETAGENT_GENERATED_APP_PORT: "Optional host port mapped to container port 8080.",
   PACKETAGENT_AGENT_BUNDLE_PATH: "Filesystem path for generated agent bundle metadata and prompts.",
   PACKETAGENT_AGENT_RUN_TIMEOUT_MS: "Caps generated agent execution time during smoke checks.",
   PACKETAGENT_AGENT_TOOL_ALLOWLIST: "Restricts tools exposed to generated agent bundles.",
-  PACKETAGENT_PRIVATE_APP_BASE_URL: "Internal operator URL used for admin smoke checks.",
-  PACKETAGENT_PUBLIC_APP_BASE_URL: "External URL handed to public users after publish.",
-  PACKETAGENT_SCHEDULER_LEADER_MODE:
-    "Coordinates background work when more than one app instance runs.",
 };
 
 export function buildAppPublishReadiness(
@@ -295,12 +284,7 @@ export function buildAppPublishReadiness(
     workspaceSlug,
     draftSlug,
   );
-  const privateUrl = joinUrl(
-    input.privateBaseUrl || DEFAULT_PRIVATE_BASE_URL,
-    "app",
-    workspaceSlug,
-    draftSlug,
-  );
+  const privateUrl = joinUrl(input.privateBaseUrl || DEFAULT_PRIVATE_BASE_URL);
   const visibility = input.visibility ?? "private";
   const runtimeConfig = buildRuntimeConfig(localPublishPath, workspaceSlug, draftSlug, agentSlug);
   const envChecklist = buildEnvChecklist(
@@ -367,7 +351,7 @@ export function buildAppPublishReadiness(
       rollback,
     },
     packaging: {
-      runtime: "hono-vite",
+      runtime: "packetagent-generated-app-standalone",
       notes: packagingNotes,
       buildCommands: buildCommands.map((step) => step.command),
       artifactPaths,
@@ -378,11 +362,11 @@ export function buildAppPublishReadiness(
     publishArtifactManifest: artifactManifest,
     dockerComposeExport,
     healthCheck: {
-      livePath: "/api/health/live",
-      readyPath: "/api/health/ready",
+      livePath: "/health/live",
+      readyPath: "/health/ready",
       command:
         healthChecks.find((check) => check.id === "ready")?.command ??
-        `curl -fsS ${privateUrl}/api/health/ready`,
+        `curl -fsS ${privateUrl}/health/ready`,
     },
     smokeCheck: {
       command: smokeChecks.map((check) => check.command).join(" && "),
@@ -416,20 +400,20 @@ function buildRuntimeConfig(
   agentSlug: string | null,
 ): AppPublishRuntimeConfig {
   return {
-    runtime: "hono-vite",
-    nodeVersion: ">=22.5.0",
-    workingDirectory: ".",
-    startCommand: "npm run start",
-    portEnv: "PORT",
-    storeEnv: "PACKETAGENT_STORE",
-    publishRootEnv: "PACKETAGENT_PUBLISH_ROOT",
-    publicBaseUrlEnv: "PACKETAGENT_PUBLIC_APP_BASE_URL",
-    privateBaseUrlEnv: "PACKETAGENT_PRIVATE_APP_BASE_URL",
-    healthBasePath: "/api/health",
-    appRouteBase: `/app/${workspaceSlug}/${draftSlug}`,
+    runtime: "packetagent-generated-app-standalone",
+    nodeVersion: "22",
+    workingDirectory: localPublishPath,
+    startCommand: "docker compose -f docker-compose.publish.yml up --build --wait",
+    portEnv: "PACKETAGENT_GENERATED_APP_PORT",
+    storeEnv: null,
+    publishRootEnv: null,
+    publicBaseUrlEnv: null,
+    privateBaseUrlEnv: null,
+    healthBasePath: "/health",
+    appRouteBase: "/",
     agentRouteBase: agentSlug ? `/agent/${workspaceSlug}/${agentSlug}` : null,
-    generatedBundlePath: localPublishPath,
-    envFileName: ".env.publish",
+    generatedBundlePath: `${localPublishPath}/bundle`,
+    envFileName: null,
   };
 }
 
@@ -439,32 +423,19 @@ function buildPublishCommands(
 ): AppPublishBuildCommand[] {
   return [
     {
-      id: "install",
-      command: "npm ci",
-      required: true,
-      produces: ["node_modules"],
-      description: "Install locked dependencies before building the publish bundle.",
-    },
-    {
-      id: "build-web",
-      command: "npm run build:web",
-      required: true,
-      produces: ["web/dist"],
-      description: "Compile the Vite generated app shell served by Hono.",
-    },
-    {
-      id: "typecheck",
-      command: "npm run typecheck",
+      id: "compose-config",
+      command: `docker compose -f ${localPublishPath}/docker-compose.publish.yml config --quiet`,
       required: true,
       produces: [],
-      description: "Verify TypeScript contracts for the app and generated package metadata.",
+      description: "Validate the exported Compose model before starting containers.",
     },
     {
-      id: "write-publish-manifest",
-      command: `packetagent internal write-publish-manifest --output ${localPublishPath}/publish-artifacts.json`,
+      id: "verify-standalone-package",
+      command: `npm run verify:generated-app-publish -- ${localPublishPath}`,
       required: true,
-      produces: [`${localPublishPath}/publish-artifacts.json`],
-      description: "Record the deterministic publish artifact manifest used by one-click hosting.",
+      produces: [`${localPublishPath}/bundle/dist`, "generated-app-data"],
+      description:
+        "Build, start, probe, restart, verify SQLite persistence, and clean up the standalone package.",
     },
     ...(includesAgent(bundleKind)
       ? [
@@ -509,22 +480,22 @@ function buildArtifactManifest(
     packageId,
     entries: [
       {
-        path: "src/server.ts",
-        kind: "source",
-        required: true,
-        description: "Hono server entrypoint for health checks, app routes, and static hosting.",
-      },
-      {
-        path: "web/dist",
-        kind: "build_output",
-        required: true,
-        description: "Built Vite assets for generated app pages.",
-      },
-      {
         path: `${localPublishPath}/bundle`,
         kind: "generated_bundle",
         required: true,
-        description: "Concrete generated app bundle directory mounted by self-hosted publish.",
+        description: "Generated app source bundle compiled inside the image build stage.",
+      },
+      {
+        path: `${localPublishPath}/runtime/server.mjs`,
+        kind: "source",
+        required: true,
+        description: "Standalone static, health, and SQLite CRUD runtime.",
+      },
+      {
+        path: `${localPublishPath}/runtime/runtime-model.json`,
+        kind: "config",
+        required: true,
+        description: "Generated schema and seed model for the standalone runtime.",
       },
       {
         path: `${localPublishPath}/app-manifest.json`,
@@ -546,10 +517,22 @@ function buildArtifactManifest(
         description: "Deterministic publish artifact manifest.",
       },
       {
-        path: "docker-compose.publish.yml",
+        path: `${localPublishPath}/Dockerfile.publish`,
         kind: "config",
         required: true,
-        description: "Self-hosted Docker Compose export generated from the package contract.",
+        description: "Multi-stage generated-app image definition.",
+      },
+      {
+        path: `${localPublishPath}/docker-compose.publish.yml`,
+        kind: "config",
+        required: true,
+        description: "Self-hosted single-service Docker Compose export.",
+      },
+      {
+        path: `${localPublishPath}/RUNBOOK.md`,
+        kind: "config",
+        required: true,
+        description: "Local start, health, persistence, stop, and migration instructions.",
       },
     ],
   };
@@ -561,10 +544,10 @@ function buildHealthChecks(privateUrl: string): AppPublishGeneratedCheck[] {
       id: "live",
       kind: "health",
       label: "Liveness",
-      path: "/api/health/live",
-      command: `curl -fsS ${privateUrl}/api/health/live`,
+      path: "/health/live",
+      command: `curl -fsS ${privateUrl}/health/live`,
       expectedStatus: 200,
-      expected: ["GET /api/health/live returns 200 with status live."],
+      expected: ["GET /health/live returns 200 with status live."],
       failureAction:
         "Keep the previous publish pointer active and inspect the app container start logs.",
     },
@@ -572,12 +555,12 @@ function buildHealthChecks(privateUrl: string): AppPublishGeneratedCheck[] {
       id: "ready",
       kind: "health",
       label: "Readiness",
-      path: "/api/health/ready",
-      command: `curl -fsS ${privateUrl}/api/health/ready`,
+      path: "/health/ready",
+      command: `curl -fsS ${privateUrl}/health/ready`,
       expectedStatus: 200,
-      expected: ["GET /api/health/ready returns 200 with status ready."],
+      expected: ["GET /health/ready returns 200 with status ready."],
       failureAction:
-        "Do not shift public traffic; verify env, store connectivity, and publish artifact mounts.",
+        "Do not shift public traffic; verify the static manifest, runtime config, and SQLite volume.",
     },
   ];
 }
@@ -641,55 +624,36 @@ function buildDockerComposeExport(
     projectName: `packetagent-${workspaceSlug}-${draftSlug}`,
     services: [
       {
-        name: "packetagent-app",
-        imageHint: "node:22-alpine",
+        name: "generated-app",
+        imageHint: "packetagent-generated-app:local",
         buildContext: ".",
-        ports: ["${PORT:-8484}:8484"],
-        envFile: ".env.publish",
+        ports: ["${PACKETAGENT_GENERATED_APP_PORT:-8787}:8080"],
         environment: {
-          PACKETAGENT_APP_BUNDLE_PATH: `/app/${localPublishPath}/bundle`,
-          PACKETAGENT_PUBLISH_MANIFEST_PATH: `/app/${localPublishPath}/publish-artifacts.json`,
-          PACKETAGENT_PUBLISH_ROOT: `/app/${localPublishPath}`,
+          NODE_ENV: "production",
+          PORT: "8080",
         },
-        volumes: [`${localPublishPath}:/app/${localPublishPath}:ro`],
-        dependsOn: ["packetagent-db"],
+        volumes: ["generated-app-data:/app/data"],
         healthcheck: {
-          test: "CMD-SHELL curl -fsS http://localhost:${PORT:-8484}/api/health/ready || exit 1",
+          test: "CMD node -e fetch('http://127.0.0.1:8080/health/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
           interval: "10s",
           timeout: "5s",
           retries: 6,
         },
       },
-      {
-        name: "packetagent-db",
-        imageHint: "postgres:16-alpine",
-        volumes: ["packetagent-db-data:/var/lib/postgresql/data"],
-      },
+    ],
+    networks: ["default"],
+    volumes: ["generated-app-data"],
+    outline: [
+      `Run Compose from the standalone package directory ${localPublishPath}.`,
+      "Build the generated Vite source in a multi-stage Node 22 image; the compile step has no network.",
+      "Run only the generated-app service as the unprivileged node user with a read-only root filesystem.",
+      "Persist per-app SQLite state in generated-app-data and expose container port 8080.",
       ...(withAgent
         ? [
-            {
-              name: "packetagent-agent",
-              imageHint: "node:22-alpine",
-              buildContext: ".",
-              envFile: ".env.publish",
-              volumes: [`${localPublishPath}/agent:/app/${localPublishPath}/agent:ro`],
-              dependsOn: ["packetagent-app"],
-            },
+            "Agent execution remains in the permissioned PacketAgent Worker runtime; this package only hosts the generated app surface.",
           ]
         : []),
-    ],
-    networks: ["packetagent-publish"],
-    volumes: ["packetagent-db-data"],
-    outline: [
-      "Build packetagent-app from the repository root with Node 22 or newer.",
-      `Mount ${localPublishPath} read-only; the generated app bundle is expected at ${localPublishPath}/bundle.`,
-      `Set PACKETAGENT_PUBLISH_MANIFEST_PATH to ${localPublishPath}/publish-artifacts.json inside the app container.`,
-      "Expose PORT from the app service and route it through the hosting load balancer.",
-      "Attach packetagent-db only when the selected PACKETAGENT_STORE posture needs managed Postgres.",
-      ...(withAgent
-        ? ["Start packetagent-agent with the same read-only generated agent bundle metadata."]
-        : []),
-      "Run the ready health check before shifting public traffic.",
+      "Run bounded liveness, readiness, static, CRUD, and restart-persistence checks before handoff.",
     ],
   };
 }
@@ -711,10 +675,10 @@ function buildRuntimeAssumptions(
 ): AppPublishRuntimeAssumption[] {
   return [
     {
-      id: "hono-vite-runtime",
-      summary: "Existing PacketAgent runtime hosts generated publishes.",
+      id: "standalone-generated-app-runtime",
+      summary: "The publish package hosts the generated app independently.",
       detail:
-        "The publish package uses the existing Hono API/static server and Vite web build instead of introducing a separate generated-app runtime.",
+        "The final image contains built Vite assets and a dependency-free Node SQLite runtime; it does not start the PacketAgent control plane.",
     },
     {
       id: "local-self-hosted-urls",
@@ -882,9 +846,10 @@ function buildRollbackSemantics(
 
 function buildPackagingNotes(bundleKind: AppPublishBundleKind): string[] {
   return [
-    "Use the existing Hono server as the API host; do not create a second HTTP runtime for drafts.",
-    "Build the Vite client with npm run build:web and serve web/dist through the existing Hono static fallback.",
-    "Keep generated app draft assets under the local publish path so package exports are deterministic.",
+    "Build generated Vite source in a multi-stage image and copy only dist plus the standalone Node runtime into the final image.",
+    "Keep the final container root read-only and persist only per-app SQLite data in the named volume.",
+    "Validate Vite's output manifest and every referenced static file before reporting readiness.",
+    "Treat a schema-signature change as destructive until the data-preserving migration backlog gate passes.",
     ...(includesAgent(bundleKind)
       ? [
           "Package generated agent prompts, tool policy, and manifest beside the app bundle for one-click self-hosted export.",

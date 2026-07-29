@@ -457,7 +457,24 @@ the v2 verifier. Research and implementation decisions are in
 [`r4-generated-app-publish.md`](r4-generated-app-publish.md). The closure gate
 passes typecheck, zero-warning lint, formatting, production web build, 32 web
 tests, and 68 focused backend tests (67 passed with one intentional Windows
-sandbox skip). Resume at R4.3 verified local Docker Compose execution.
+sandbox skip).
+
+R4.3 is complete. New materialized publishes contain a standalone multi-stage
+Node 22/Vite image, one generated-app Compose service, a dependency-free
+static/health/SQLite CRUD server, the checkpoint's schema model, and a
+migration-truth runbook. The final container is non-root with a read-only root,
+bounded tmpfs/CPU/memory/PIDs, dropped capabilities, no-new-privileges, and a
+named SQLite volume. Vite compiles with build networking disabled; startup
+verifies the emitted `.vite/manifest.json` and all referenced assets before
+readiness. `npm run verify:generated-app-publish -- <publish-directory>`
+performs bounded config/build/start/health/static/CRUD/stop/restart/persistence/
+delete/cleanup verification. Clean and cached Docker runs passed locally using
+Engine 29.5.3 and Compose 5.1.4. Exact decisions and caveats are in
+[`r4-generated-app-publish.md`](r4-generated-app-publish.md). Typecheck,
+zero-warning lint, formatting, production web build, 32 web tests, and 1,577
+API tests pass (1,573 passed with four intentional live interoperability
+skips). Resume at R4.4 reverse-proxy/VPN examples and public-URL reachability
+verification.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -608,10 +625,10 @@ without duplicate jobs, and compacted source evidence fails closed. Opt-in live
 PacketChat and PacketPhone delivery probes are registered but skipped because
 no endpoint configuration is present.
 
-The exact next slice is R4.3 under
+The exact next slice is R4.4 under
 [`R4 - generated-app runtime and self-host publish`](../BACKLOG.md#r4---generated-app-runtime-and-self-host-publish):
-turn the current compose guidance into an actually generated, started, probed,
-and stopped local Docker Compose path.
+add reverse-proxy/VPN examples and a bounded public-URL reachability check
+without claiming that PacketAgent provisions DNS or TLS.
 After each gate passes, continue through R4-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and

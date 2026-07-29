@@ -1097,7 +1097,10 @@ Status: active.
    and documented process-pool limits.
 2. [Complete 2026-07-29] Add health endpoints, static-asset manifest validation,
    and signed/checksum artifact manifests.
-3. Turn publish handoff into a verified local Docker Compose run path.
+3. [Complete 2026-07-29] Turn publish handoff into a verified local Docker
+   Compose run path with one standalone generated-app service, emitted Vite
+   manifest validation, bounded health/CRUD/restart-persistence probes, and
+   complete verification cleanup.
 4. Add reverse-proxy/VPN examples and a public-URL reachability check.
 5. Preserve schema/data migration truth; do not imply automatic migration when
    a schema reset is still the behavior.

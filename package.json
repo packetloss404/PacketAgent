@@ -66,7 +66,8 @@
     "format:check": "prettier --check .",
     "test": "npm run test:api && npm run test:web",
     "test:api": "node --import tsx --test-concurrency=1 --test \"src/**/*.test.ts\"",
-    "test:web": "tsx --tsconfig web/tsconfig.json --test \"web/src/**/*.test.ts\" \"web/src/**/*.test.tsx\""
+    "test:web": "tsx --tsconfig web/tsconfig.json --test \"web/src/**/*.test.ts\" \"web/src/**/*.test.tsx\"",
+    "verify:generated-app-publish": "node --import tsx src/generated-app-publish-verify-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

@@ -249,19 +249,44 @@ curl -s --cookie-jar /tmp/jar --cookie /tmp/jar \
 When you click **Publish handoff** in the builder, PacketAgent produces a local package - not a hosted deployment. The package lands under:
 
 ```
-data/generated-apps/<workspace>/<app>/workspace/
+data/published-apps/<workspace>/<app>/
 ```
 
-It contains the generated React/Vite source files, a `package.json`, a seed schema, an API helper, a migration starter, and a Docker-Compose-ready bundle. The publish handoff panel surfaces the path, the artifact manifest, the smoke-check results, and rollback metadata.
+It contains the generated React/Vite source under `bundle/`,
+`Dockerfile.publish`, `docker-compose.publish.yml`, a small standalone Node
+static/health/SQLite runtime under `runtime/`, checkpoint-bound runtime config,
+the sealed artifact manifest, and `RUNBOOK.md`. It does not start or require the
+PacketAgent control plane or a separate Postgres container.
 
-**To run a published app locally:**
+**To certify a published app locally from the PacketAgent repository:**
 
 ```bash
-cd data/generated-apps/<workspace>/<app>/workspace
-docker compose up
+npm run verify:generated-app-publish -- data/published-apps/<workspace>/<app>
 ```
 
-The generated app exposes its own health endpoint and serves on its own port (defined in the generated `docker-compose.yml`). Open the port shown in the publish handoff panel - by default it's a free port allocated at generation time, not a hard-coded one.
+The bounded verifier validates Compose, builds and starts the package on a free
+loopback port, checks `/health/live`, `/health/ready`, static HTML, and
+generated CRUD, restarts the container to prove SQLite volume persistence, and
+then removes its uniquely named test container, network, volume, and local
+image.
+
+**To keep a published app running:**
+
+```bash
+cd data/published-apps/<workspace>/<app>
+docker compose -f docker-compose.publish.yml up --build --wait
+```
+
+Open `http://localhost:8787`. Set `PACKETAGENT_GENERATED_APP_PORT` before
+starting Compose to select another host port. Stop without deleting app data
+with:
+
+```bash
+docker compose -f docker-compose.publish.yml down --remove-orphans
+```
+
+The `generated-app-data` named volume holds `runtime.sqlite`. Adding
+`--volumes` deletes that local app data and should be an intentional reset.
 
 ### Verify the publish package
 
@@ -298,19 +323,46 @@ silently downgrading it to checksum-only.
 
 **To deploy to your own infrastructure:**
 
-The generated bundle is a normal Node app. You can:
+The generated bundle is a standalone containerized Node/Vite/SQLite app. You
+can:
 
-- `scp` or `rsync` it to a VPS and run `docker compose up -d` there.
+- `scp` or `rsync` the whole publish directory to a VPS and run
+  `docker compose -f docker-compose.publish.yml up --build -d --wait` there.
 - Push it to a registry and deploy via Kubernetes / Fly Machines / Cloud Run / your own orchestrator.
-- Wrap it in your existing CI / CD pipeline - there is nothing PacketAgent-specific in the generated artifacts.
+- Wrap it in your existing CI/CD pipeline. Keep `runtime-config.json` and
+  `runtime/runtime-model.json` with the image because they bind it to the
+  published app/checkpoint.
 
-DNS, TLS, reverse-proxy, and public URL configuration are your responsibility. The README's **Self-Host Publish** notes link to a reverse-proxy example for local-network / VPN deployment. The tradeoff: you own the URL and the certificate, end-to-end, with no vendor in the path.
+DNS, TLS, reverse-proxy, VPN, and public URL configuration are your
+responsibility. PacketAgent does not provision a domain or certificate. R4.4
+tracks tested proxy/VPN examples and public reachability verification; until
+that gate passes, treat custom public routing as operator-managed.
+
+### Standalone runtime and migration truth
+
+The image build may use the package registry only during dependency
+installation; dependency lifecycle scripts are disabled and the Vite compile
+step runs with Docker build networking disabled. The final container runs as
+the unprivileged `node` user with a read-only root, bounded `/tmp`, CPU, memory,
+and process limits, all capabilities dropped, and
+`no-new-privileges`. Only the named SQLite volume is persistent and writable.
+
+The standalone runtime validates Vite's emitted `.vite/manifest.json` and all
+referenced chunks, CSS, and assets before readiness passes. The source
+`publish-artifacts.json` seals the exact declared build/runtime inputs; it
+does not claim to contain the final image digest.
+
+A generated schema-signature change currently clears and reseeds that app's
+standalone SQLite records. Back up or export the named volume before replacing
+a running package with a schema-changing checkpoint. PacketAgent does not yet
+claim automatic data-preserving schema migration.
 
 For hosted-only conveniences PacketAgent does not ship (free public subdomain, auto TLS, managed App Store submission, hosted OAuth proxy), see [CLOUD.md](../CLOUD.md) for the full deferred-features inventory.
 
-### Monitor the generated-app runtime
+### Monitor PacketAgent preview runtimes
 
-Preview/API requests for generated apps run in supervised per-app Node child
+These endpoints describe generated-app previews served by PacketAgent, not a
+standalone Compose package. Preview/API requests run in supervised per-app Node child
 processes. The pool defaults to four warm processes per PacketAgent server.
 Set `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` to a value from `1` to
 `64` before startup to change the limit; out-of-range values are clamped. When
@@ -340,6 +392,17 @@ metadata. PacketAgent retries a failed request once. Request totals, failures,
 retries, starts, crashes, schema restarts, and LRU evictions are process-local
 operational counters and reset when the PacketAgent server restarts. The
 Builder's **Sandbox** tab presents the same per-app status and recent failure.
+
+For a standalone package, probe its own endpoints on the mapped app port:
+
+```bash
+curl -fsS http://localhost:8787/health/live
+curl -fsS http://localhost:8787/health/ready
+curl -fsS http://localhost:8787/meta
+```
+
+`/meta` contains only package identity and schema entity names; it does not
+expose secrets.
 
 ---
 

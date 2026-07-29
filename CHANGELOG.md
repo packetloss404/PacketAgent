@@ -6,6 +6,31 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R4.3 verified generated-app Compose runtime
+
+- Replaced inherited compose guidance that started the full PacketAgent server
+  and an unused Postgres service with a package-local, single-service
+  generated-app runtime.
+- Added a multi-stage Node 22/Vite build. Dependency installation disables
+  lifecycle scripts, Vite compilation runs with build networking disabled,
+  and the final image contains only built static assets plus the standalone
+  runtime/config/model.
+- Added dependency-free health, static hosting, Vite output-manifest
+  validation, and per-app SQLite CRUD with bounded request and manifest reads.
+- Hardened the generated Compose service with a non-root user, read-only root,
+  bounded tmpfs/CPU/memory/PIDs, dropped capabilities,
+  `no-new-privileges`, readiness checks, and a named data volume.
+- Added `npm run verify:generated-app-publish -- <directory>` to validate
+  Compose, build/start/wait, health, static delivery, CRUD, restart
+  persistence, and complete project/volume/image cleanup with bounded redacted
+  output.
+- Corrected publish readiness, artifact observations, URL handoff, package
+  runbooks, and self-host documentation to describe the runtime that actually
+  ships.
+- Closed the loop with clean/cached Docker verification, typecheck,
+  zero-warning lint, formatting, production web build, 32 web tests, and 1,577
+  API tests (1,573 passed with four intentional live interoperability skips).
+
 ### 2026-07-29 - R4.2 generated-app artifact integrity
 
 - Added generated-app artifact manifest v2 with workspace/app/checkpoint

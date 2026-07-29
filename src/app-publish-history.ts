@@ -3,6 +3,10 @@ import {
   buildAppPublishReadiness,
   type AppPublishReadinessInput,
 } from "./app-publish-readiness.js";
+import {
+  generatedAppDockerComposeYaml,
+  generatedAppPublishServiceNames,
+} from "./generated-app-publish-package.js";
 import type {
   GeneratedAppDockerComposeExportPayload,
   GeneratedAppPublishArtifactManifest,
@@ -77,8 +81,8 @@ export function buildGeneratedAppPublishRecord(
     appSlug: readiness.draftSlug,
     workspaceSlug: readiness.workspaceSlug,
     localPublishPath: readiness.localPublishPath,
-    publicUrl: generatedAppPublishUrlForBase(readiness.urlHandoff.publicUrl, input),
-    privateUrl: generatedAppPublishUrlForBase(readiness.urlHandoff.privateUrl, input),
+    publicUrl: readiness.urlHandoff.publicUrl,
+    privateUrl: readiness.urlHandoff.privateUrl,
     manifestPath: `${readiness.localPublishPath}/${readiness.publishArtifactManifest.fileName}`,
     bundlePath: `${readiness.localPublishPath}/bundle`,
   });
@@ -173,66 +177,32 @@ export function buildDockerComposeExport(input: {
     input.manifestPath || `${input.localPublishPath}/publish-artifacts.json`,
   );
   const bundlePath = normalizePath(input.bundlePath || `${input.localPublishPath}/bundle`);
-  const containerPublishPath = `/app/data/published-apps/${input.workspaceSlug}/${input.appSlug}`;
   const environment = {
     NODE_ENV: "production",
-    PORT: "8484",
-    PACKETAGENT_STORE: "sqlite",
-    PACKETAGENT_PUBLISH_ROOT: containerPublishPath,
-    PACKETAGENT_APP_BUNDLE_PATH: `${containerPublishPath}/bundle`,
-    PACKETAGENT_PUBLISH_MANIFEST_PATH: `${containerPublishPath}/publish-artifacts.json`,
+    PORT: "8080",
     PACKETAGENT_PUBLIC_APP_BASE_URL: input.publicUrl,
     PACKETAGENT_PRIVATE_APP_BASE_URL: input.privateUrl,
   };
-  const volume = `${input.localPublishPath}:/app/data/published-apps/${input.workspaceSlug}/${input.appSlug}:ro`;
   const instructions = [
-    `Export the generated app bundle at ${bundlePath}.`,
-    `Export the publish artifact manifest at ${manifestPath}.`,
-    `Mount ${input.localPublishPath} read-only so PACKETAGENT_APP_BUNDLE_PATH resolves inside the packetagent-app container.`,
-    "Run docker compose with this file from the repository root after npm dependencies are installed or the image is built.",
+    `Open the standalone generated app package at ${input.localPublishPath}.`,
+    `Verify the sealed source and runtime package with ${manifestPath}.`,
+    "Run docker compose -f docker-compose.publish.yml config --quiet.",
+    "Run docker compose -f docker-compose.publish.yml up --build --wait --wait-timeout 180.",
+    "Probe /health/live, /health/ready, the app root, and generated CRUD before handoff.",
+    "Run docker compose -f docker-compose.publish.yml down --remove-orphans when finished.",
   ];
-  const yaml = [
-    'version: "3.9"',
-    "services:",
-    "  packetagent-app:",
-    "    build: .",
-    "    command: npm start",
-    "    ports:",
-    '      - "8484:8484"',
-    "    environment:",
-    ...Object.entries(environment).map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`),
-    "    volumes:",
-    `      - ${JSON.stringify(volume)}`,
-    "    depends_on:",
-    "      - packetagent-db",
-    "    healthcheck:",
-    `      test: ["CMD", "node", "-e", "fetch('${input.privateUrl}/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]`,
-    "      interval: 30s",
-    "      timeout: 5s",
-    "      retries: 3",
-    "  packetagent-db:",
-    "    image: postgres:16-alpine",
-    "    environment:",
-    "      POSTGRES_DB: packetagent",
-    "      POSTGRES_USER: packetagent",
-    "      POSTGRES_PASSWORD: packetagent",
-    "    volumes:",
-    "      - packetagent-db-data:/var/lib/postgresql/data",
-    "volumes:",
-    "  packetagent-db-data:",
-  ].join("\n");
 
   return {
     fileName: "docker-compose.publish.yml",
     format: "docker-compose",
-    version: "3.9",
-    services: ["packetagent-app", "packetagent-db"],
+    version: "compose-spec",
+    services: generatedAppPublishServiceNames(),
     environment,
-    volumes: [volume, "packetagent-db-data:/var/lib/postgresql/data"],
+    volumes: ["generated-app-data:/app/data"],
     bundlePath,
     manifestPath,
     instructions,
-    yaml,
+    yaml: generatedAppDockerComposeYaml(),
   };
 }
 

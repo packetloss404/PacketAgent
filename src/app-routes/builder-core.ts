@@ -50,7 +50,6 @@ import {
   buildGeneratedAppPublishRecord,
   buildGeneratedAppPublishRollbackResult,
   createGeneratedAppPublishRollbackCommand,
-  generatedAppPublishUrlForBase,
   orderGeneratedAppPublishHistory,
 } from "../app-publish-history.js";
 import type { ModelRoutingPresetId } from "../model-routing-presets.js";
@@ -63,6 +62,7 @@ import {
 import {
   buildGeneratedAppRuntimeArtifact,
   buildGeneratedAppRuntimeArtifactFromFiles,
+  buildGeneratedAppRuntimeModel,
   findGeneratedAppSourceFile,
   summarizeGeneratedAppSourceFiles,
   writeGeneratedAppRuntimeWorkspace,
@@ -77,6 +77,7 @@ import {
   type GeneratedAppPublishArtifactFile,
   type GeneratedAppPublishArtifactVerification,
 } from "../generated-app-publish-integrity.js";
+import { buildGeneratedAppPublishPackageFiles } from "../generated-app-publish-package.js";
 import {
   approveAgentBuilderDraftAsync,
   generateAgentBuilderDraftAsync,
@@ -2150,7 +2151,7 @@ async function buildAgentPublishPayload(
     bundleKind: "agent",
     visibility: body.visibility ?? "private",
     publicBaseUrl: body.publicBaseUrl,
-    privateBaseUrl: body.privateBaseUrl,
+    privateBaseUrl: body.privateBaseUrl ?? "http://localhost:8484",
     runtimeEnv: publishRuntimeEnv(),
   });
   const expectedArtifacts = readiness.publishArtifactManifest.entries
@@ -2467,14 +2468,8 @@ async function buildPublishPreflight(
       artifactIntegrity = materialized.verification;
     }
   }
-  const privateUrl = generatedAppPublishUrlForBase(readiness.urlHandoff.privateUrl, {
-    appId: record.id,
-    checkpointId: checkpoint.id,
-  });
-  const publicUrl = generatedAppPublishUrlForBase(readiness.urlHandoff.publicUrl, {
-    appId: record.id,
-    checkpointId: checkpoint.id,
-  });
+  const privateUrl = readiness.urlHandoff.privateUrl;
+  const publicUrl = readiness.urlHandoff.publicUrl;
   const expectedArtifacts = readiness.publishArtifactManifest.entries
     .filter((entry) => entry.required)
     .map((entry) => entry.path);
@@ -2573,14 +2568,22 @@ function materializeGeneratedAppPublishWorkspace(
     })),
   };
   const runtimeConfig = {
-    runtime: "packetagent-generated-app-preview",
+    runtime: "packetagent-generated-app-standalone",
     workspaceId: record.workspaceId,
     appId: record.id,
     checkpointId: checkpoint.id,
-    route: `/api/app/generated-apps/${encodeURIComponent(record.id)}/preview?checkpointId=${encodeURIComponent(checkpoint.id)}`,
-    bundlePath: `${localPublishPath}/bundle`,
-    entrypoint: artifact.entrypoint,
+    port: 8080,
+    health: {
+      live: "/health/live",
+      ready: "/health/ready",
+    },
+    apiBasePath: `/api/app/generated-apps/${encodeURIComponent(record.id)}/api`,
+    staticRoot: "/app/static",
+    dataRoot: "/app/data",
   };
+  const runtimeModel = buildGeneratedAppRuntimeModel(
+    checkpoint.draft as unknown as AppBuilderDraftContract,
+  );
   const files: GeneratedAppPublishArtifactFile[] = [
     ...artifact.files.map((file) => ({
       path: `bundle/${normalizeSourceFilePath(file.path)}`,
@@ -2603,6 +2606,13 @@ function materializeGeneratedAppPublishWorkspace(
       description: "PacketAgent generated-app runtime configuration.",
       mediaType: "application/json; charset=utf-8",
     },
+    ...buildGeneratedAppPublishPackageFiles({
+      workspaceId: record.workspaceId,
+      appId: record.id,
+      checkpointId: checkpoint.id,
+      appName: record.name,
+      model: runtimeModel,
+    }),
   ];
   for (const file of files) {
     writeTextArtifact(
@@ -2694,14 +2704,13 @@ function publishArtifactObservations(
   record: GeneratedAppRecordWithRuntime,
   checkpoint: GeneratedAppCheckpointWithRuntime,
   localPublishPath: string,
-  buildStatus: string | undefined,
+  _buildStatus: string | undefined,
 ): PublishArtifactObservation[] {
   const artifact = checkpoint.runtimeArtifact ?? record.runtimeArtifact;
   const snapshot = latestPreviewSnapshot(record);
   const snapshotPaths =
     snapshot?.checkpoint.id === checkpoint.id ? snapshot.build.artifactPaths : [];
   const generatedBundlePresent = Boolean(artifact?.files.length);
-  const buildPassed = buildStatus === "passed";
   const bundleObservation = diskArtifactObservation(
     `${localPublishPath}/bundle`,
     "generated_bundle",
@@ -2728,20 +2737,6 @@ function publishArtifactObservations(
   );
 
   return [
-    {
-      path: "src/server.ts",
-      kind: "source",
-      present: true,
-      source: "operator",
-      description: "PacketAgent Hono server source that serves generated apps.",
-    },
-    {
-      path: "web/dist",
-      kind: "build_output",
-      present: buildPassed,
-      source: "build",
-      description: "Built Vite app shell for the generated app runtime.",
-    },
     { ...bundleObservation, present: bundleObservation.present && generatedBundlePresent },
     {
       ...appManifestObservation,
@@ -2756,11 +2751,44 @@ function publishArtifactObservations(
       present: publishManifestObservation.present && generatedBundlePresent,
     },
     {
-      path: "docker-compose.publish.yml",
-      kind: "config",
-      present: generatedBundlePresent,
-      source: "publish_manifest",
-      description: "Self-hostable compose export for the generated bundle.",
+      ...diskArtifactObservation(
+        `${localPublishPath}/Dockerfile.publish`,
+        "config",
+        "publish_manifest",
+        "Standalone generated-app image definition.",
+      ),
+    },
+    {
+      ...diskArtifactObservation(
+        `${localPublishPath}/docker-compose.publish.yml`,
+        "config",
+        "publish_manifest",
+        "Single-service self-hosted compose export.",
+      ),
+    },
+    {
+      ...diskArtifactObservation(
+        `${localPublishPath}/runtime/server.mjs`,
+        "source",
+        "publish_manifest",
+        "Standalone Node static and SQLite runtime.",
+      ),
+    },
+    {
+      ...diskArtifactObservation(
+        `${localPublishPath}/runtime/runtime-model.json`,
+        "config",
+        "publish_manifest",
+        "Generated standalone runtime schema and seed model.",
+      ),
+    },
+    {
+      ...diskArtifactObservation(
+        `${localPublishPath}/RUNBOOK.md`,
+        "config",
+        "publish_manifest",
+        "Standalone generated-app operator runbook.",
+      ),
     },
     ...snapshotPaths.map((path) => ({
       path,
