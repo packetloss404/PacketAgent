@@ -1,7 +1,5 @@
 import { Hono, type Context } from "hono";
-import {
-  parseInvitationEmailReconciliationBody,
-} from "./invitation-email-reconciliation.js";
+import { parseInvitationEmailReconciliationBody } from "./invitation-email-reconciliation.js";
 import { resolveInvitationEmailReconciliationConfig } from "./invitation-email.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 import { mutateStoreAsync, recordInvitationEmailProviderStatus } from "./packetagent-store.js";
@@ -46,7 +44,7 @@ invitationEmailWebhookRoutes.post("/", async (c) => {
     let body: unknown;
     try {
       body = await readJsonBody(c);
-    } catch (error) {
+    } catch {
       return c.json({ error: "request body must be valid JSON" }, 400);
     }
 

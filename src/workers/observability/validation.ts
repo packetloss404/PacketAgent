@@ -12,11 +12,7 @@ import {
   type WorkerEvidenceEntry,
   type WorkerEvidencePayloadReference,
 } from "./types.js";
-import {
-  computeWorkerEventDigest,
-  computeWorkerEvidenceDigest,
-  isWorkerEventV2,
-} from "./journal.js";
+import { computeWorkerEventDigest, computeWorkerEvidenceDigest } from "./journal.js";
 import { createHash } from "node:crypto";
 import { canonicalWorkerJson } from "../validation.js";
 

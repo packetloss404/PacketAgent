@@ -1,7 +1,6 @@
 import type { AlertEvent, AlertSeverity } from "./alert-engine.js";
 import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 import {
-  loadStore as defaultLoadStore,
   loadStoreAsync as defaultLoadStoreAsync,
   mutateStore as defaultMutateStore,
   mutateStoreAsync as defaultMutateStoreAsync,
@@ -9,7 +8,10 @@ import {
 // Phase 33B: read path delegated to repository wrapper.
 import { listAlertsViaRepository } from "./alert-store-read.js";
 // Phase 33C: dedicated alert_events table dual-write.
-import { createAlertEventsRepository, createAsyncAlertEventsRepository } from "../repositories/alert-events-repo.js";
+import {
+  createAlertEventsRepository,
+  createAsyncAlertEventsRepository,
+} from "../repositories/alert-events-repo.js";
 import type { AlertEventsRepository } from "../repositories/alert-events-repo.js";
 import { redactedErrorMessage } from "../security/redaction.js";
 
@@ -21,7 +23,9 @@ const DAY_MS = 86_400_000;
 // already succeeded) nor diverge silently — log it (redacted) so the dedicated
 // table can be reconciled out-of-band. See repair/reconcile jobs in src/jobs.ts.
 function logAlertDualWriteFailure(operation: string, error: unknown): void {
-  console.warn(`[alert-store] dedicated alert_events dual-write failed during ${operation}: ${redactedErrorMessage(error)}`);
+  console.warn(
+    `[alert-store] dedicated alert_events dual-write failed during ${operation}: ${redactedErrorMessage(error)}`,
+  );
 }
 const DEFAULT_RETENTION_DAYS = 30;
 
@@ -234,7 +238,8 @@ export function updateAlertDeliveryStatus(
     const target = collection.find((entry) => entry.id === input.alertId);
     if (!target) return null;
 
-    const previousAttempts = typeof target.deliveryAttempts === "number" ? target.deliveryAttempts : 0;
+    const previousAttempts =
+      typeof target.deliveryAttempts === "number" ? target.deliveryAttempts : 0;
     target.deliveryAttempts = previousAttempts + 1;
     target.lastDeliveryAttemptAt = input.attemptedAt;
     target.delivered = input.delivered;
@@ -289,7 +294,8 @@ export async function updateAlertDeliveryStatusAsync(
     const target = collection.find((entry) => entry.id === input.alertId);
     if (!target) return null;
 
-    const previousAttempts = typeof target.deliveryAttempts === "number" ? target.deliveryAttempts : 0;
+    const previousAttempts =
+      typeof target.deliveryAttempts === "number" ? target.deliveryAttempts : 0;
     target.deliveryAttempts = previousAttempts + 1;
     target.lastDeliveryAttemptAt = input.attemptedAt;
     target.delivered = input.delivered;

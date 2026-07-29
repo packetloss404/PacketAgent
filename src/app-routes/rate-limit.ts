@@ -2,7 +2,11 @@ import type { Context } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { createHash } from "node:crypto";
 import { mutateStoreAsync, upsertRateLimit } from "../packetagent-store.js";
-import { configuredNonNegativeInteger, configuredPositiveInteger, httpRouteError } from "./shared.js";
+import {
+  configuredNonNegativeInteger,
+  configuredPositiveInteger,
+  httpRouteError,
+} from "./shared.js";
 
 export const AUTH_RATE_LIMIT = {
   maxAttempts: 20,
@@ -31,14 +35,27 @@ export async function enforceRateLimit(
     maxAttempts: configuredPositiveInteger(options.maxAttemptsEnv, options.maxAttempts),
     windowMs: configuredPositiveInteger(options.windowMsEnv, options.windowMs),
     timestamp,
-    maxBuckets: configuredPositiveInteger("PACKETAGENT_RATE_LIMIT_MAX_BUCKETS", RATE_LIMIT_MAX_BUCKETS),
+    maxBuckets: configuredPositiveInteger(
+      "PACKETAGENT_RATE_LIMIT_MAX_BUCKETS",
+      RATE_LIMIT_MAX_BUCKETS,
+    ),
   };
 
   applyRateLimitDecision(c, timestamp, await distributedRateLimitUpsert(input));
-  applyRateLimitDecision(c, timestamp, await mutateStoreAsync((data) => upsertRateLimit(data, input)));
+  applyRateLimitDecision(
+    c,
+    timestamp,
+    await mutateStoreAsync((data) => upsertRateLimit(data, input)),
+  );
 }
 
-async function distributedRateLimitUpsert(input: { bucketId: string; scope: string; maxAttempts: number; windowMs: number; timestamp: number }) {
+async function distributedRateLimitUpsert(input: {
+  bucketId: string;
+  scope: string;
+  maxAttempts: number;
+  windowMs: number;
+  timestamp: number;
+}) {
   const url = (process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL ?? "").trim();
   if (!url) return null;
 
@@ -60,14 +77,18 @@ async function distributedRateLimitUpsert(input: { bucketId: string; scope: stri
         windowMs: input.windowMs,
         timestamp: new Date(input.timestamp).toISOString(),
       }),
-      signal: AbortSignal.timeout(configuredPositiveInteger("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_TIMEOUT_MS", 750)),
+      signal: AbortSignal.timeout(
+        configuredPositiveInteger("PACKETAGENT_DISTRIBUTED_RATE_LIMIT_TIMEOUT_MS", 750),
+      ),
     });
     const payload = await readJsonObject(response);
-    if (response.status === 429) return limitedUntilFromDistributedResponse(input, response, payload);
+    if (response.status === 429)
+      return limitedUntilFromDistributedResponse(input, response, payload);
     if (!response.ok) throw new Error(`distributed rate limiter returned ${response.status}`);
-    if (payload?.limited === true || payload?.allowed === false) return limitedUntilFromDistributedResponse(input, response, payload);
+    if (payload?.limited === true || payload?.allowed === false)
+      return limitedUntilFromDistributedResponse(input, response, payload);
     return null;
-  } catch (error) {
+  } catch {
     if (distributedRateLimitFailOpen()) return null;
     throw httpRouteError(503, "rate limit service unavailable");
   }
@@ -86,17 +107,26 @@ async function readJsonObject(response: Response): Promise<Record<string, unknow
   if (!text.trim()) return null;
   try {
     const parsed = JSON.parse(text) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
 }
 
-function limitedUntilFromDistributedResponse(input: { windowMs: number; timestamp: number }, response: Response, payload: Record<string, unknown> | null) {
+function limitedUntilFromDistributedResponse(
+  input: { windowMs: number; timestamp: number },
+  response: Response,
+  payload: Record<string, unknown> | null,
+) {
   const retryAfter = retryAfterLimitedUntil(response.headers.get("retry-after"), input.timestamp);
   if (retryAfter !== null) return retryAfter;
 
-  if (typeof payload?.retryAfterSeconds === "number" && Number.isFinite(payload.retryAfterSeconds)) {
+  if (
+    typeof payload?.retryAfterSeconds === "number" &&
+    Number.isFinite(payload.retryAfterSeconds)
+  ) {
     return input.timestamp + Math.max(0, payload.retryAfterSeconds) * 1000;
   }
 
@@ -121,7 +151,9 @@ function retryAfterLimitedUntil(headerValue: string | null, timestamp: number) {
 }
 
 function distributedRateLimitFailOpen() {
-  return ["1", "true", "yes"].includes((process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN ?? "").trim().toLowerCase());
+  return ["1", "true", "yes"].includes(
+    (process.env.PACKETAGENT_DISTRIBUTED_RATE_LIMIT_FAIL_OPEN ?? "").trim().toLowerCase(),
+  );
 }
 
 // Derive the rate-limit client identity.
@@ -143,7 +175,10 @@ function clientNetworkIdentity(c: Context): string {
   if (trustedProxyEnabled()) {
     const forwarded = c.req.header("x-forwarded-for");
     if (forwarded) {
-      const entries = forwarded.split(",").map((entry) => entry.trim()).filter(Boolean);
+      const entries = forwarded
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
       if (entries.length > 0) {
         const hops = configuredNonNegativeInteger("PACKETAGENT_TRUSTED_PROXY_HOPS", -1);
         if (hops >= 0) {
@@ -189,5 +224,7 @@ function hashedClientKey(clientIdentity: string) {
 }
 
 function trustedProxyEnabled() {
-  return ["1", "true", "yes"].includes((process.env.PACKETAGENT_TRUST_PROXY ?? "").trim().toLowerCase());
+  return ["1", "true", "yes"].includes(
+    (process.env.PACKETAGENT_TRUST_PROXY ?? "").trim().toLowerCase(),
+  );
 }

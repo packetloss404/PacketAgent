@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { createAsyncJobMetricSnapshotsRepository, createJobMetricSnapshotsRepository } from "../repositories/job-metric-snapshots-repo.js";
+import {
+  createAsyncJobMetricSnapshotsRepository,
+  createJobMetricSnapshotsRepository,
+} from "../repositories/job-metric-snapshots-repo.js";
 import type { JobMetricSnapshotRecord, PacketAgentData } from "../packetagent-store.js";
-import { loadStore as defaultLoadStore, loadStoreAsync as defaultLoadStoreAsync, mutateStore as defaultMutateStore, mutateStoreAsync as defaultMutateStoreAsync } from "../packetagent-store.js";
+import {
+  loadStoreAsync as defaultLoadStoreAsync,
+  mutateStore as defaultMutateStore,
+  mutateStoreAsync as defaultMutateStoreAsync,
+} from "../packetagent-store.js";
 import { getJobTypeMetrics, type JobTypeMetrics } from "./scheduler-metrics.js";
 // Phase 32 read-redirect (Slice B):
 import { listJobMetricSnapshotsViaRepository } from "./job-metrics-snapshot-read.js";
@@ -76,7 +83,11 @@ function ensureSnapshotCollection(data: PacketAgentData): JobMetricSnapshotRecor
   return data.jobMetricSnapshots;
 }
 
-function buildSnapshot(metric: JobTypeMetrics, capturedAt: string, id: string): JobMetricSnapshotRecord {
+function buildSnapshot(
+  metric: JobTypeMetrics,
+  capturedAt: string,
+  id: string,
+): JobMetricSnapshotRecord {
   return {
     id,
     capturedAt,
@@ -109,7 +120,9 @@ export function snapshotJobMetrics(
 
   const result = mutate((data) => {
     const collection = ensureSnapshotCollection(data);
-    const snapshots: JobMetricSnapshotRecord[] = metrics.map((metric) => buildSnapshot(metric, capturedAt, generateId()));
+    const snapshots: JobMetricSnapshotRecord[] = metrics.map((metric) =>
+      buildSnapshot(metric, capturedAt, generateId()),
+    );
     for (const snapshot of snapshots) {
       collection.push(snapshot);
     }
@@ -169,7 +182,9 @@ export async function snapshotJobMetricsAsync(
 
   const result = await mutate((data) => {
     const collection = ensureSnapshotCollection(data);
-    const snapshots: JobMetricSnapshotRecord[] = metrics.map((metric) => buildSnapshot(metric, capturedAt, generateId()));
+    const snapshots: JobMetricSnapshotRecord[] = metrics.map((metric) =>
+      buildSnapshot(metric, capturedAt, generateId()),
+    );
     for (const snapshot of snapshots) {
       collection.push(snapshot);
     }

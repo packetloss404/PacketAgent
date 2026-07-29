@@ -1,9 +1,20 @@
 import { createHash } from "node:crypto";
 
-export type AppPreviewSnapshotBuildStatus = "not_run" | "queued" | "running" | "passed" | "failed" | "canceled";
+export type AppPreviewSnapshotBuildStatus =
+  | "not_run"
+  | "queued"
+  | "running"
+  | "passed"
+  | "failed"
+  | "canceled";
 export type AppPreviewSnapshotSmokeStatus = "not_run" | "pending" | "pass" | "warn" | "fail";
 export type AppPreviewSnapshotSource = "builder" | "checkpoint" | "preview" | "smoke" | "publish";
-export type AppPreviewSnapshotComparisonRelation = "new" | "unchanged" | "advanced" | "regressed" | "diverged";
+export type AppPreviewSnapshotComparisonRelation =
+  | "new"
+  | "unchanged"
+  | "advanced"
+  | "regressed"
+  | "diverged";
 export type AppPreviewSnapshotPublishHandoffStatus = "ready" | "blocked";
 export type AppPreviewSnapshotRollbackStatus = "pending" | "succeeded" | "failed" | "noop";
 
@@ -142,7 +153,6 @@ export interface AppPreviewSnapshotRetentionEntry {
 
 const DEFAULT_WORKSPACE_ID = "workspace";
 const DEFAULT_APP_ID = "generated-app";
-const DEFAULT_CHECKPOINT_ID = "checkpoint";
 const DEFAULT_TIMESTAMP = "1970-01-01T00:00:00.000Z";
 const DEFAULT_KEEP_LATEST = 3;
 
@@ -181,36 +191,44 @@ const SMOKE_STATUS_ALIASES: Record<string, AppPreviewSnapshotSmokeStatus> = {
   error: "fail",
 };
 
-export function buildAppPreviewSnapshotMetadata(input: AppPreviewSnapshotInput = {}): AppPreviewSnapshotMetadata {
+export function buildAppPreviewSnapshotMetadata(
+  input: AppPreviewSnapshotInput = {},
+): AppPreviewSnapshotMetadata {
   const workspaceId = stableToken(input.workspaceId) || DEFAULT_WORKSPACE_ID;
   const appSlug = slugify(input.appSlug || input.appName || input.appId) || DEFAULT_APP_ID;
-  const appId = stableToken(input.appId) || `gapp_${stableHash(`${workspaceId}:${appSlug}`).slice(0, 12)}`;
-  const checkpointId = stableToken(input.checkpointId) || `gapp_ckpt_${stableHash(`${workspaceId}:${appId}:${appSlug}`).slice(0, 12)}`;
+  const appId =
+    stableToken(input.appId) || `gapp_${stableHash(`${workspaceId}:${appSlug}`).slice(0, 12)}`;
+  const checkpointId =
+    stableToken(input.checkpointId) ||
+    `gapp_ckpt_${stableHash(`${workspaceId}:${appId}:${appSlug}`).slice(0, 12)}`;
   const capturedAt = normalizeTimestamp(input.capturedAt ?? input.checkpointSavedAt);
   const checkpointSavedAt = normalizeTimestamp(input.checkpointSavedAt ?? capturedAt);
   const buildStatus = normalizeBuildStatus(input.buildStatus);
   const smokeStatus = normalizeSmokeStatus(input.smokeStatus);
   const generatedFiles = uniqueSorted(input.generatedFiles ?? []);
-  const artifactPaths = uniqueSorted(input.artifactPaths ?? defaultArtifactPaths(workspaceId, appSlug, checkpointId));
-  const contentHash = normalizeHash(input.contentHash) || stableHash([
-    workspaceId,
-    appId,
-    appSlug,
-    checkpointId,
-    generatedFiles.join("|"),
-    artifactPaths.join("|"),
-  ].join(":"));
-  const buildId = stableToken(input.buildId) || `preview_build_${stableHash(`${checkpointId}:${contentHash}`).slice(0, 12)}`;
+  const artifactPaths = uniqueSorted(
+    input.artifactPaths ?? defaultArtifactPaths(workspaceId, appSlug, checkpointId),
+  );
+  const contentHash =
+    normalizeHash(input.contentHash) ||
+    stableHash(
+      [
+        workspaceId,
+        appId,
+        appSlug,
+        checkpointId,
+        generatedFiles.join("|"),
+        artifactPaths.join("|"),
+      ].join(":"),
+    );
+  const buildId =
+    stableToken(input.buildId) ||
+    `preview_build_${stableHash(`${checkpointId}:${contentHash}`).slice(0, 12)}`;
   const previewUrl = cleanString(input.previewUrl) || undefined;
   const source = input.source ?? "checkpoint";
-  const id = `preview_snapshot_${stableHash([
-    workspaceId,
-    appId,
-    checkpointId,
-    buildId,
-    contentHash,
-    capturedAt,
-  ].join(":")).slice(0, 16)}`;
+  const id = `preview_snapshot_${stableHash(
+    [workspaceId, appId, checkpointId, buildId, contentHash, capturedAt].join(":"),
+  ).slice(0, 16)}`;
 
   const snapshot: Omit<AppPreviewSnapshotMetadata, "publishHandoff"> = removeUndefined({
     version: "phase-69-lane-5",
@@ -265,7 +283,12 @@ export function compareAppPreviewSnapshots(
   const smokeStatusChanged = current.build.smokeStatus !== previous.build.smokeStatus;
   const contentHashChanged = current.build.contentHash !== previous.build.contentHash;
   const publishReadinessChanged = current.publishHandoff.ready !== previous.publishHandoff.ready;
-  const changed = checkpointChanged || buildStatusChanged || smokeStatusChanged || contentHashChanged || publishReadinessChanged;
+  const changed =
+    checkpointChanged ||
+    buildStatusChanged ||
+    smokeStatusChanged ||
+    contentHashChanged ||
+    publishReadinessChanged;
 
   if (!changed && current.id === previous.id) {
     return comparison(current, previous, "unchanged", false, "Preview snapshot is unchanged.");
@@ -296,12 +319,11 @@ export function compareAppPreviewSnapshots(
 export function createAppPreviewRollbackCommand(
   input: AppPreviewSnapshotRollbackCommandInput,
 ): AppPreviewSnapshotRollbackCommand {
-  const commandId = `preview_rollback_${stableHash([
-    input.current.id,
-    input.target.id,
-    input.reason ?? "",
-    input.requestedByUserId ?? "",
-  ].join(":")).slice(0, 16)}`;
+  const commandId = `preview_rollback_${stableHash(
+    [input.current.id, input.target.id, input.reason ?? "", input.requestedByUserId ?? ""].join(
+      ":",
+    ),
+  ).slice(0, 16)}`;
   const command = [
     "packetagent preview rollback",
     `--workspace=${input.current.workspaceId}`,
@@ -359,11 +381,25 @@ export function buildAppPreviewPublishHandoffReadiness(
   snapshot: Pick<AppPreviewSnapshotMetadata, "id" | "checkpoint" | "build">,
 ): AppPreviewSnapshotPublishHandoffReadiness {
   const blockers = [
-    ...(!stableToken(snapshot.checkpoint.id) ? ["A generated app checkpoint is required before publish handoff."] : []),
-    ...(snapshot.build.status !== "passed" ? [`Preview build must pass before publish handoff; current status is ${snapshot.build.status}.`] : []),
-    ...(snapshot.build.smokeStatus !== "pass" ? [`Smoke checks must pass before publish handoff; current status is ${snapshot.build.smokeStatus}.`] : []),
-    ...(!snapshot.build.previewUrl ? ["A preview URL is required for reviewer and publish handoff."] : []),
-    ...(snapshot.build.artifactPaths.length === 0 ? ["At least one preview snapshot artifact path is required."] : []),
+    ...(!stableToken(snapshot.checkpoint.id)
+      ? ["A generated app checkpoint is required before publish handoff."]
+      : []),
+    ...(snapshot.build.status !== "passed"
+      ? [
+          `Preview build must pass before publish handoff; current status is ${snapshot.build.status}.`,
+        ]
+      : []),
+    ...(snapshot.build.smokeStatus !== "pass"
+      ? [
+          `Smoke checks must pass before publish handoff; current status is ${snapshot.build.smokeStatus}.`,
+        ]
+      : []),
+    ...(!snapshot.build.previewUrl
+      ? ["A preview URL is required for reviewer and publish handoff."]
+      : []),
+    ...(snapshot.build.artifactPaths.length === 0
+      ? ["At least one preview snapshot artifact path is required."]
+      : []),
   ];
   const ready = blockers.length === 0;
 
@@ -377,13 +413,13 @@ export function buildAppPreviewPublishHandoffReadiness(
     blockers,
     notes: ready
       ? [
-        "Snapshot is tied to a generated app checkpoint.",
-        "Preview build and smoke checks passed; publish handoff can use this checkpoint.",
-      ]
+          "Snapshot is tied to a generated app checkpoint.",
+          "Preview build and smoke checks passed; publish handoff can use this checkpoint.",
+        ]
       : [
-        "Keep publish disabled until blockers are resolved.",
-        "Use rollback metadata to return to the last publish-ready checkpoint if a newer preview regresses.",
-      ],
+          "Keep publish disabled until blockers are resolved.",
+          "Use rollback metadata to return to the last publish-ready checkpoint if a newer preview regresses.",
+        ],
   } satisfies AppPreviewSnapshotPublishHandoffReadiness);
 }
 
@@ -447,17 +483,27 @@ function comparison(
   };
 }
 
-function currentRegressed(current: AppPreviewSnapshotMetadata, previous: AppPreviewSnapshotMetadata): boolean {
-  return (previous.publishHandoff.ready && !current.publishHandoff.ready)
-    || buildRank(current.build.status) < buildRank(previous.build.status)
-    || smokeRank(current.build.smokeStatus) < smokeRank(previous.build.smokeStatus);
+function currentRegressed(
+  current: AppPreviewSnapshotMetadata,
+  previous: AppPreviewSnapshotMetadata,
+): boolean {
+  return (
+    (previous.publishHandoff.ready && !current.publishHandoff.ready) ||
+    buildRank(current.build.status) < buildRank(previous.build.status) ||
+    smokeRank(current.build.smokeStatus) < smokeRank(previous.build.smokeStatus)
+  );
 }
 
-function currentAdvanced(current: AppPreviewSnapshotMetadata, previous: AppPreviewSnapshotMetadata): boolean {
-  return (!previous.publishHandoff.ready && current.publishHandoff.ready)
-    || buildRank(current.build.status) > buildRank(previous.build.status)
-    || smokeRank(current.build.smokeStatus) > smokeRank(previous.build.smokeStatus)
-    || current.checkpoint.id !== previous.checkpoint.id;
+function currentAdvanced(
+  current: AppPreviewSnapshotMetadata,
+  previous: AppPreviewSnapshotMetadata,
+): boolean {
+  return (
+    (!previous.publishHandoff.ready && current.publishHandoff.ready) ||
+    buildRank(current.build.status) > buildRank(previous.build.status) ||
+    smokeRank(current.build.smokeStatus) > smokeRank(previous.build.smokeStatus) ||
+    current.checkpoint.id !== previous.checkpoint.id
+  );
 }
 
 function comparisonSummary(
@@ -477,17 +523,28 @@ function comparisonSummary(
   return "Preview snapshot is unchanged.";
 }
 
-function compareSnapshotsForRetention(left: AppPreviewSnapshotMetadata, right: AppPreviewSnapshotMetadata): number {
-  return timestampMs(right.capturedAt) - timestampMs(left.capturedAt)
-    || Number(right.publishHandoff.ready) - Number(left.publishHandoff.ready)
-    || left.workspaceId.localeCompare(right.workspaceId)
-    || left.appId.localeCompare(right.appId)
-    || left.checkpoint.id.localeCompare(right.checkpoint.id)
-    || left.id.localeCompare(right.id);
+function compareSnapshotsForRetention(
+  left: AppPreviewSnapshotMetadata,
+  right: AppPreviewSnapshotMetadata,
+): number {
+  return (
+    timestampMs(right.capturedAt) - timestampMs(left.capturedAt) ||
+    Number(right.publishHandoff.ready) - Number(left.publishHandoff.ready) ||
+    left.workspaceId.localeCompare(right.workspaceId) ||
+    left.appId.localeCompare(right.appId) ||
+    left.checkpoint.id.localeCompare(right.checkpoint.id) ||
+    left.id.localeCompare(right.id)
+  );
 }
 
-function defaultArtifactPaths(workspaceId: string, appSlug: string, checkpointId: string): string[] {
-  return [`data/generated-apps/${workspaceId}/${appSlug}/checkpoints/${checkpointId}/preview-snapshot.json`];
+function defaultArtifactPaths(
+  workspaceId: string,
+  appSlug: string,
+  checkpointId: string,
+): string[] {
+  return [
+    `data/generated-apps/${workspaceId}/${appSlug}/checkpoints/${checkpointId}/preview-snapshot.json`,
+  ];
 }
 
 function normalizeBuildStatus(value: string | undefined): AppPreviewSnapshotBuildStatus {
@@ -521,10 +578,15 @@ function smokeRank(status: AppPreviewSnapshotSmokeStatus): number {
   return ranks[status];
 }
 
-function rollbackMessage(status: AppPreviewSnapshotRollbackStatus, checkpointId: string, error: string | undefined): string {
+function rollbackMessage(
+  status: AppPreviewSnapshotRollbackStatus,
+  checkpointId: string,
+  error: string | undefined,
+): string {
   if (status === "succeeded") return `Rolled preview back to checkpoint ${checkpointId}.`;
   if (status === "noop") return `Preview already points at checkpoint ${checkpointId}.`;
-  if (status === "failed") return `Preview rollback to checkpoint ${checkpointId} failed${error ? `: ${error}` : "."}`;
+  if (status === "failed")
+    return `Preview rollback to checkpoint ${checkpointId} failed${error ? `: ${error}` : "."}`;
   return `Preview rollback to checkpoint ${checkpointId} is pending confirmation.`;
 }
 
@@ -545,11 +607,16 @@ function stableStatus(value: string | undefined): string {
 }
 
 function normalizeHash(value: string | undefined): string {
-  return cleanString(value).toLowerCase().replace(/[^a-f0-9]/g, "");
+  return cleanString(value)
+    .toLowerCase()
+    .replace(/[^a-f0-9]/g, "");
 }
 
 function stableToken(value: string | undefined): string {
-  return cleanString(value).toLowerCase().replace(/[^a-z0-9:_./-]+/g, "-").replace(/^-+|-+$/g, "");
+  return cleanString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9:_./-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function slugify(value?: string): string {
@@ -561,12 +628,15 @@ function slugify(value?: string): string {
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.map((value) => cleanString(value)).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right));
+  return [...new Set(values.map((value) => cleanString(value)).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right),
+  );
 }
 
 function nonNegativeInteger(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : undefined;
 }
 
 function stableHash(value: string): string {

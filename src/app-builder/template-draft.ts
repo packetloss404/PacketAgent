@@ -58,7 +58,11 @@ export function generateAppDraftFromPrompt(prompt: string): AppDraft {
     integrationMetadata,
     pageMap,
     components: applyIntegrationComponents(components, pageMap, integrationMetadata.requested),
-    apiRouteStubs: applyIntegrationApiRoutes(apiRouteStubs, appSlug(appName), integrationMetadata.requested),
+    apiRouteStubs: applyIntegrationApiRoutes(
+      apiRouteStubs,
+      appSlug(appName),
+      integrationMetadata.requested,
+    ),
     dataSchema: {
       database: "postgres",
       entities,
@@ -75,7 +79,10 @@ export function generateAppDraftFromPrompt(prompt: string): AppDraft {
     acceptanceChecks: [
       `${appName} uses the ${template.summaryNoun} heuristic selected from the prompt.`,
       ...template.acceptanceChecks,
-      ...integrationMetadata.requested.map((integration) => `${integration.label} setup guidance references ${integration.envVars.join(", ")} without blocking unrelated app features.`),
+      ...integrationMetadata.requested.map(
+        (integration) =>
+          `${integration.label} setup guidance references ${integration.envVars.join(", ")} without blocking unrelated app features.`,
+      ),
       "Generated API routes return validation errors for missing required fields.",
       "Generated seed data can render every primary page without empty states.",
     ],
@@ -88,14 +95,14 @@ export function listAppDraftTemplateIds(): AppDraftTemplateId[] {
 
 export function detectPhase71Integrations(prompt: string): Phase71IntegrationDraft[] {
   const source = String(prompt ?? "");
-  return PHASE_71_INTEGRATIONS
-    .filter((integration) => integration.signals.some((signal) => signal.test(source)))
-    .map(({ signals, ...integration }) => ({
-      ...integration,
-      envVars: [...integration.envVars],
-      flows: [...integration.flows],
-      setupGuidance: [...integration.setupGuidance],
-    }));
+  return PHASE_71_INTEGRATIONS.filter((integration) =>
+    integration.signals.some((signal) => signal.test(source)),
+  ).map(({ signals: _signals, ...integration }) => ({
+    ...integration,
+    envVars: [...integration.envVars],
+    flows: [...integration.flows],
+    setupGuidance: [...integration.setupGuidance],
+  }));
 }
 
 function buildPhase71IntegrationMetadata(prompt: string): Phase71IntegrationMetadata {
@@ -112,14 +119,18 @@ function applyIntegrationComponents(
   integrations: Phase71IntegrationDraft[],
 ): ComponentDraft[] {
   if (integrations.length === 0) return components;
-  const targetPage = pages.find((entry) => entry.access !== "public")?.path ?? pages[0]?.path ?? "/";
+  const targetPage =
+    pages.find((entry) => entry.access !== "public")?.path ?? pages[0]?.path ?? "/";
   return [
     ...components,
     component(
       "IntegrationSetupPanel",
       "detail",
       [targetPage],
-      integrations.map((integration) => `show ${integration.label} setup state for ${integration.envVars.join(", ")}`),
+      integrations.map(
+        (integration) =>
+          `show ${integration.label} setup state for ${integration.envVars.join(", ")}`,
+      ),
     ),
   ];
 }
@@ -152,7 +163,8 @@ function applyIntegrationApiRoutes(
 
 function chooseTemplate(prompt: string): TemplateDefinition {
   const lower = prompt.toLowerCase();
-  let best = TEMPLATE_DEFINITIONS.find((entry) => entry.id === "task_tracker") ?? TEMPLATE_DEFINITIONS[0];
+  let best =
+    TEMPLATE_DEFINITIONS.find((entry) => entry.id === "task_tracker") ?? TEMPLATE_DEFINITIONS[0];
   let bestScore = 0;
 
   for (const template of TEMPLATE_DEFINITIONS) {
@@ -182,9 +194,7 @@ function buildAppName(prompt: string, template: TemplateDefinition): string {
     .filter((word) => !suffixTokens.has(word))
     .slice(0, 2);
 
-  const prefix = domainWords.length > 0
-    ? titleCase(domainWords.join(" "))
-    : "Workspace";
+  const prefix = domainWords.length > 0 ? titleCase(domainWords.join(" ")) : "Workspace";
   return `${prefix} ${template.nameSuffix}`;
 }
 
@@ -194,8 +204,16 @@ function buildSummary(appName: string, prompt: string, template: TemplateDefinit
   return `${appName} is a deterministic ${template.summaryNoun} draft for: ${clipped}`;
 }
 
-function buildApiRoutes(entities: EntitySchemaDraft[], pages: PageDraft[], slug: string): ApiRouteStub[] {
-  const adminEntities = new Set(pages.filter((entry) => entry.access === "admin" && entry.primaryEntity).map((entry) => entry.primaryEntity));
+function buildApiRoutes(
+  entities: EntitySchemaDraft[],
+  pages: PageDraft[],
+  slug: string,
+): ApiRouteStub[] {
+  const adminEntities = new Set(
+    pages
+      .filter((entry) => entry.access === "admin" && entry.primaryEntity)
+      .map((entry) => entry.primaryEntity),
+  );
   const routes: ApiRouteStub[] = [];
 
   for (const entityDraft of entities) {
