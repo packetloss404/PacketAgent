@@ -29,6 +29,9 @@ export interface SandboxStartSpec {
   timeoutMs: number;
   memoryLimitMb?: number;
   cpus?: number;
+  pidsLimit?: number;
+  tmpfsSizeMb?: number;
+  networkPolicy?: "none" | "host";
   /** Trusted internal image override. Public sandbox routes do not expose it. */
   image?: string;
   /** Trusted internal bind mounts. Public sandbox routes do not expose them. */

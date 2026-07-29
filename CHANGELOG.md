@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R5.3 sandbox boundary policy and resource enforcement
+
+- Centralized command/stdin, working-directory, explicit-environment, timeout,
+  CPU, memory, PID, writable-tmpfs, filesystem, and network policy resolution
+  before a sandbox driver can start.
+- Hardened Docker execution with private IPC, equal memory/swap bounds,
+  process and file-descriptor ulimits, readonly trusted mounts, a bounded kill
+  path, and continued non-root/read-only/no-capability/no-network defaults.
+- Persisted the effective execution policy across JSON and SQLite while
+  storing accepted environment values only as `[redacted]`; surfaced the
+  policy in the sandbox workbench and fixed output truncation to apply byte
+  limits safely to multibyte text.
+- Added policy, driver, service, route, hostile-input, and persistence-parity
+  coverage plus `npm run verify:sandbox-policy`, which proves real Docker root
+  writes and outbound IP access fail, bounded `/tmp` works, env records are
+  redacted, and the wall-clock deadline terminates execution.
+- Typecheck, zero-warning lint, formatting, production web build, 32 web
+  tests, 51 focused tests, both uninjected Docker verifiers, and 1,598 API
+  tests pass (1,595 passed with three intentional live interoperability skips).
+- Resume at R5.4 reuse of W6 hardened networking for any future declared
+  sandbox egress.
+
 ### 2026-07-29 - R5.2 fail-closed non-Docker execution truth
 
 - Defined Docker as PacketAgent's only supported untrusted-code driver. There

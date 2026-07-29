@@ -1126,7 +1126,7 @@ live interoperability skips).
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1-R5.2 completed on 2026-07-29. Resume at R5.3.
+Status: in progress. R5.1-R5.3 completed on 2026-07-29. Resume at R5.4.
 
 1. [Complete 2026-07-29] Make real sandboxed `tsc` and Vite validation the
    default; remove synthetic success. The required validator uses a
@@ -1142,8 +1142,13 @@ Status: in progress. R5.1-R5.2 completed on 2026-07-29. Resume at R5.3.
    trusted diagnostic path. Status exposes the distinction, ordinary service
    calls refuse native, and lint plus source-inventory coverage prohibit
    `node:vm`.
-3. Enforce CPU, memory, process, timeout, filesystem, environment, and egress
-   limits at the sandbox boundary.
+3. [Complete 2026-07-29] Enforce CPU, memory, process, timeout, filesystem,
+   environment, and egress limits at the sandbox boundary. One resolver
+   validates every request before driver start, and Docker applies and records
+   the exact wall-clock, CPU, memory, PID, tmpfs, no-network, read-only-root,
+   and explicit-environment policy. Stored environment values are redacted.
+   JSON/SQLite parity and `npm run verify:sandbox-policy` cover the durable and
+   real-container boundary.
 4. Reuse W6 network protections for redirects, SSRF, IPv4/IPv6, and DNS
    rebinding.
 5. Serve generated previews on an isolated origin with appropriately scoped

@@ -204,7 +204,14 @@ interface SandboxExecRow {
   stderr_preview: string | null;
   error_message: string | null;
   cpu_limit_ms: number | null;
+  wall_clock_timeout_ms: number | null;
+  cpu_limit: number | null;
   memory_limit_mb: number | null;
+  process_limit: number | null;
+  tmpfs_size_mb: number | null;
+  network_policy: SandboxExecRecord["networkPolicy"] | null;
+  filesystem_policy: SandboxExecRecord["filesystemPolicy"] | null;
+  environment_policy: SandboxExecRecord["environmentPolicy"] | null;
   created_at: string;
   updated_at: string;
 }
@@ -216,8 +223,10 @@ function upsertRow(db: DatabaseSync, record: SandboxExecRecord): void {
       id, workspace_id, app_id, checkpoint_id, sandbox_id, driver, runtime,
       command, working_dir, env, status, exit_code, started_at, completed_at,
       duration_ms, stdout_preview, stderr_preview, error_message,
-      cpu_limit_ms, memory_limit_mb, created_at, updated_at
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      cpu_limit_ms, wall_clock_timeout_ms, cpu_limit, memory_limit_mb,
+      process_limit, tmpfs_size_mb, network_policy, filesystem_policy,
+      environment_policy, created_at, updated_at
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
   ).run(
     record.id,
@@ -239,7 +248,14 @@ function upsertRow(db: DatabaseSync, record: SandboxExecRecord): void {
     record.stderrPreview ?? null,
     record.errorMessage ?? null,
     record.cpuLimitMs ?? null,
+    record.wallClockTimeoutMs ?? null,
+    record.cpuLimit ?? null,
     record.memoryLimitMb ?? null,
+    record.processLimit ?? null,
+    record.tmpfsSizeMb ?? null,
+    record.networkPolicy ?? null,
+    record.filesystemPolicy ?? null,
+    record.environmentPolicy ?? null,
     record.createdAt,
     record.updatedAt,
   );
@@ -278,7 +294,14 @@ function rowToRecord(row: SandboxExecRow): SandboxExecRecord {
   if (row.stderr_preview !== null) record.stderrPreview = row.stderr_preview;
   if (row.error_message !== null) record.errorMessage = row.error_message;
   if (row.cpu_limit_ms !== null) record.cpuLimitMs = row.cpu_limit_ms;
+  if (row.wall_clock_timeout_ms !== null) record.wallClockTimeoutMs = row.wall_clock_timeout_ms;
+  if (row.cpu_limit !== null) record.cpuLimit = row.cpu_limit;
   if (row.memory_limit_mb !== null) record.memoryLimitMb = row.memory_limit_mb;
+  if (row.process_limit !== null) record.processLimit = row.process_limit;
+  if (row.tmpfs_size_mb !== null) record.tmpfsSizeMb = row.tmpfs_size_mb;
+  if (row.network_policy !== null) record.networkPolicy = row.network_policy;
+  if (row.filesystem_policy !== null) record.filesystemPolicy = row.filesystem_policy;
+  if (row.environment_policy !== null) record.environmentPolicy = row.environment_policy;
   return record;
 }
 

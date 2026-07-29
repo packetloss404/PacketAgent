@@ -37,8 +37,16 @@ export interface SandboxExecRecord {
   stdoutPreview?: string;
   stderrPreview?: string;
   errorMessage?: string;
+  /** Legacy name retained for persisted compatibility; equals wallClockTimeoutMs. */
   cpuLimitMs?: number;
+  wallClockTimeoutMs?: number;
+  cpuLimit?: number;
   memoryLimitMb?: number;
+  processLimit?: number;
+  tmpfsSizeMb?: number;
+  networkPolicy?: "none" | "host";
+  filesystemPolicy?: "read-only-root+bounded-tmpfs" | "host";
+  environmentPolicy?: "validated-explicit" | "scrubbed-host+validated-explicit";
   createdAt: string;
   updatedAt: string;
 }

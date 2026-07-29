@@ -725,6 +725,37 @@ export function SelectedExecPanel({
         </div>
       )}
 
+      {(liveExec.networkPolicy ||
+        liveExec.filesystemPolicy ||
+        liveExec.wallClockTimeoutMs ||
+        liveExec.memoryLimitMb ||
+        liveExec.cpuLimit ||
+        liveExec.processLimit ||
+        liveExec.tmpfsSizeMb) && (
+        <div
+          className="mono muted"
+          style={{
+            padding: "7px 16px",
+            borderTop: "1px solid var(--line)",
+            fontSize: 10.5,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+          aria-label="Execution policy"
+        >
+          {liveExec.networkPolicy && <span>network={liveExec.networkPolicy}</span>}
+          {liveExec.filesystemPolicy && <span>fs={liveExec.filesystemPolicy}</span>}
+          {liveExec.wallClockTimeoutMs && (
+            <span>timeout={formatDuration(liveExec.wallClockTimeoutMs)}</span>
+          )}
+          {liveExec.memoryLimitMb && <span>memory={liveExec.memoryLimitMb}MB</span>}
+          {liveExec.cpuLimit && <span>cpus={liveExec.cpuLimit}</span>}
+          {liveExec.processLimit && <span>pids={liveExec.processLimit}</span>}
+          {liveExec.tmpfsSizeMb && <span>tmpfs={liveExec.tmpfsSizeMb}MB</span>}
+        </div>
+      )}
+
       <div className="tabbar">
         <button
           type="button"

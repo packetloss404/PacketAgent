@@ -517,6 +517,28 @@ The sandbox runtime defaults to `docker`. If Docker is not installed or not runn
   will report a blocked failure until Docker is available.
 - For production, install Docker Desktop (macOS/Windows) or `docker-ce` (Linux), confirm `docker ps` works for your user, and restart PacketAgent.
 
+### Sandbox limits
+
+Docker sandbox executions default to a 120-second wall-clock deadline, 512 MiB
+memory, one CPU, 64 processes, and 256 MiB writable `/tmp`. Configure them
+before startup with:
+
+```dotenv
+PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS=120000
+PACKETAGENT_SANDBOX_MAX_TIMEOUT_MS=120000
+PACKETAGENT_SANDBOX_MEMORY_MB=512
+PACKETAGENT_SANDBOX_CPUS=1
+PACKETAGENT_SANDBOX_PIDS_LIMIT=64
+PACKETAGENT_SANDBOX_TMPFS_MB=256
+```
+
+Client-requested timeouts cannot exceed the configured maximum. Untrusted
+containers always use a read-only root, deny all network access, and receive
+only explicitly requested validated environment entries. Secret-like and
+runtime-control environment names are rejected, and accepted values are
+redacted from persisted execution records. Run
+`npm run verify:sandbox-policy` after changing Docker or these limits.
+
 ### Reset everything
 
 ```bash

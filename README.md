@@ -199,7 +199,7 @@ PacketAgent keeps one logical `PacketAgentData` mutation contract with a differe
 - **SQLite** uses Node's built-in `node:sqlite` with WAL, foreign keys, `busy_timeout`, and one `BEGIN IMMEDIATE` whole-store transaction. Promoted hot and Worker collections live in dedicated relational tables; remaining records live in `app_records`.
 - **Managed Postgres** stores one normalized document in `packetagent_document_store`. A row lock plus transaction-scoped advisory lock serializes writers across processes. It does not currently use the SQLite per-entity migration tables.
 - **Staged backfill and verification** move old `app_records` collections into dedicated SQLite tables or copy a stopped JSON/SQLite source into the managed document adapter. There is no live SQLite-to-Postgres dual-write cutover.
-- **25 ordered SQLite migrations** live in `src/db/migrations`.
+- **26 ordered SQLite migrations** live in `src/db/migrations`.
 
 Managed startup requires a database URL plus
 `PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres`. Multiple app processes can
@@ -228,7 +228,19 @@ A first-class sandbox runtime ships under `/api/app/sandbox/*` with a `/sandbox`
 view in the workbench. It powers ad-hoc command execution and the required
 app-builder TypeScript/Vite validation pipeline before publish handoff.
 
-- **Drivers.** `docker` (default) runs `docker run --rm -i --network=none --cpus --memory --read-only --tmpfs /tmp` against runtimes `node-20`, `python-3.11`, `ubuntu-22`, and the internal `codegen-node-22` validator. Docker is the only untrusted-code boundary. An explicitly opted-in `native` host process is available only to owners/admins for trusted-host diagnostics; ordinary sandbox calls, generated-code validation, and Workers reject it.
+- **Drivers.** `docker` (default) runs each untrusted command with no network or
+  IPC namespace sharing, a read-only root, bounded writable `/tmp`, non-root
+  identity, dropped capabilities, `no-new-privileges`, CPU/memory/PID/file
+  descriptor limits, and an exact wall-clock deadline. Docker is the only
+  untrusted-code boundary. An explicitly opted-in `native` host process is
+  available only to owners/admins for trusted-host diagnostics; ordinary
+  sandbox calls, generated-code validation, and Workers reject it.
+- **Boundary policy.** One resolver validates command/stdin size, container
+  working directories, requested timeout, and a small explicit environment
+  before the driver starts. Host environment values are never inherited by
+  containers; secret-bearing and runtime-control variable names are rejected,
+  and accepted values are redacted in stored records. The selected exec view
+  reports the effective resource, network, filesystem, and environment policy.
 - **Endpoints.** `GET /status`, `GET /runtimes`, `POST /exec`, `GET /exec`, `GET /exec/:id`, `POST /exec/:id/cancel`, `GET /exec/:id/stream` (SSE).
 - **Workbench UI.** Status panel, runtime readiness, command composer, exec history, and a live log viewer with stdout / stderr tabs and follow-tail. The Builder also gains a per-app Sandbox tab.
 - **Generated-code validation.** Draft apply, change apply, preview refresh, and
@@ -329,9 +341,12 @@ Common environment variables:
 | `PACKETAGENT_SANDBOX_DRIVER`                      | `auto`                    | `docker`, `native`, or `auto`. `native` is never an untrusted-code fallback.                                                                                                                          |
 | `PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX`       | `false`                   | Allow owner/admin trusted-host diagnostics when the selected driver is `native`. This provides no isolation and is rejected by generated-code and Worker paths.                                       |
 | `PACKETAGENT_SANDBOX_DEFAULT_RUNTIME`             | `node-20`                 | Default container image.                                                                                                                                                                              |
-| `PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS`          | `30000`                   | Per-exec timeout.                                                                                                                                                                                     |
+| `PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS`          | `120000`                  | Default wall-clock timeout for an execution.                                                                                                                                                          |
+| `PACKETAGENT_SANDBOX_MAX_TIMEOUT_MS`              | `120000`                  | Maximum client-requested wall-clock timeout; clamped to `1000-900000`.                                                                                                                                |
 | `PACKETAGENT_SANDBOX_MEMORY_MB`                   | `512`                     | Container memory limit.                                                                                                                                                                               |
 | `PACKETAGENT_SANDBOX_CPUS`                        | `1`                       | Container CPU limit.                                                                                                                                                                                  |
+| `PACKETAGENT_SANDBOX_PIDS_LIMIT`                  | `64`                      | Container PID and process-count limit.                                                                                                                                                                |
+| `PACKETAGENT_SANDBOX_TMPFS_MB`                    | `256`                     | Size limit for the container's writable `/tmp`.                                                                                                                                                       |
 | `PACKETAGENT_GENERATED_APP_RUNTIME_MAX_PROCESSES` | `4`                       | Maximum warm generated-app child processes per PacketAgent server. Values are clamped to `1-64`; an idle least-recently-used process is evicted at the limit.                                         |
 | `PACKETAGENT_GENERATED_APP_BIND_ADDRESS`          | `127.0.0.1`               | Host address used by a generated publish package's Compose port mapping. Set `0.0.0.0` only for deliberate, protected direct LAN exposure.                                                            |
 | `PACKETAGENT_GENERATED_APP_PORT`                  | `8787`                    | Host port used by a generated publish package. The container always listens on `8080`.                                                                                                                |
@@ -361,7 +376,7 @@ returned by these routes.
 - **Backend.** Hono on `@hono/node-server`. `src/server.ts` mounts ~20 route groups (`app-routes`, `workflow-routes`, `webhook-routes`, `share-routes`, `sandbox-routes`, four `operations-*-routes`, and more) with access-log middleware, redacted error envelopes, baseline security headers/CSP, `enforcePrivateAppMutationSecurity` on `/api/app/*`, cross-origin/CSRF enforcement, public webhooks, and static serving of the built web plus explicitly enabled, authenticated, workspace-scoped run artifacts.
 - **LLM layer.** `ProviderRouter` route-key dispatch over six BYOK clients, a canonical capability/model/generation catalog, vault-aware preset resolution and readiness, native/conditional structured response mapping, one bounded malformed-tool correction, and a cost `ledger`. A `stub` provider keeps the loop runnable with zero keys.
 - **Codegen + agents.** `src/codegen/` (plan/write/chunk orchestrator, path validator, derived-draft, app-builder/iteration services, generated-app runtime/workspace, preview/snapshot/publish-readiness) and `src/tools/` (agent loop, registry/executor, read/write/browser builtins, Playwright runtime) plus `src/sandbox/`.
-- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, `busy_timeout`) for single-node; and an advisory-lock-serialized managed-Postgres document adapter for shared app processes. SQLite has 25 ordered SQL migrations.
+- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, `busy_timeout`) for single-node; and an advisory-lock-serialized managed-Postgres document adapter for shared app processes. SQLite has 26 ordered SQL migrations.
 - **Jobs / ops.** Persisted queue with five-field cron, exponential retry, dead-letter, three-way scheduler leader election, an alert engine, and metrics snapshots.
 
 ## Engineering & testing
@@ -436,10 +451,13 @@ persistence plus stopped-service backup/restore. R5.1 also requires real
 network-disabled Docker validation for generated TypeScript/Vite and removes
 the old synthetic-success path. R5.2 makes Docker the sole untrusted-code
 driver, restricts native host execution to explicit owner/admin diagnostics,
-and permanently guards against `node:vm`. Active remaining work resumes at
-R5.3 boundary-limit enforcement in `BACKLOG.md`.
+and permanently guards against `node:vm`. R5.3 centralizes the sandbox boundary
+policy, enforces and records the effective wall-clock, CPU, memory, PID,
+filesystem, environment, and deny-all-network limits, and proves the boundary
+against real Docker. Active remaining work resumes at R5.4 hardened handling
+for any future declared egress in `BACKLOG.md`.
 
-The exact resume point is R5.3 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+The exact resume point is R5.4 in [BACKLOG.md](BACKLOG.md), the sole ledger for
 the conditional live W10 check and all remaining R5-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.

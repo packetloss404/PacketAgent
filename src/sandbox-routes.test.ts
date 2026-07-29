@@ -27,10 +27,11 @@ interface MockHandleInternal extends SandboxHandle {
 
 function createMockDriver(
   behavior: (handle: MockHandleInternal, spec: SandboxStartSpec) => void,
+  id: SandboxDriver["id"] = "native",
 ): SandboxDriver {
   let counter = 0;
   return {
-    id: "native",
+    id,
     async available() {
       return true;
     },
@@ -358,4 +359,37 @@ test("sandbox routes: POST /exec rejects empty command", async () => {
   assert.equal(response.status, 400);
   const body = (await response.json()) as { error: string };
   assert.match(body.error, /command is required/);
+});
+
+test("sandbox routes: Docker policy rejects env, filesystem, and timeout escapes", async () => {
+  resetStoreForTests();
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
+  let started = 0;
+  const store = createInMemoryStore();
+  const driver = createMockDriver(() => {
+    started += 1;
+  }, "docker");
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "docker",
+    env: { PACKETAGENT_SANDBOX_MAX_TIMEOUT_MS: "30000" },
+  });
+  const app = createTestApp(service);
+  const headers = { ...authHeaders(auth.cookieValue), "content-type": "application/json" };
+
+  for (const body of [
+    { command: "true", env: { OPENAI_API_KEY: "must-not-enter" } },
+    { command: "true", workingDir: "/etc" },
+    { command: "true", timeoutMs: 30_001 },
+  ]) {
+    const response = await app.request("/api/app/sandbox/exec", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 400);
+  }
+  assert.equal(started, 0);
 });

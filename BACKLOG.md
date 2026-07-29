@@ -341,14 +341,14 @@ Status: complete as of 2026-07-29. Resume at R5.
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: in progress. R5.1-R5.2 are complete as of 2026-07-29. Resume at
-R5.3.
+Status: in progress. R5.1-R5.3 are complete as of 2026-07-29. Resume at
+R5.4.
 
 - [x] Make real sandboxed TypeScript and Vite validation the default and remove
       synthetic success.
 - [x] Define fail-closed non-Docker behavior (no supported untrusted fallback)
       and remove `node:vm` as a security boundary.
-- [ ] Enforce CPU, memory, process, timeout, filesystem, environment, and
+- [x] Enforce CPU, memory, process, timeout, filesystem, environment, and
       egress limits at the sandbox boundary.
 - [ ] Reuse W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections.
 - [ ] Isolate generated previews by origin with scoped cookies, CSP, and proxy
@@ -385,6 +385,23 @@ R5.3.
   real Docker validator, and 1,586 API tests pass (1,583 passed with three
   intentional live interoperability skips). Resume at R5.3 consolidated
   resource, filesystem, environment, timeout, and egress enforcement.
+- R5.3 result: one fail-closed policy resolver now validates command/stdin
+  size, Docker working directories, explicit environment names and values, and
+  requested wall-clock deadlines before driver start. Docker execution applies
+  and persists the effective wall-clock, CPU, memory, PID, writable-tmpfs,
+  deny-all-network, read-only-filesystem, and validated-environment policy;
+  accepted environment values persist only as `[redacted]`. The driver adds
+  private IPC, equal memory/swap bounds, process and file-descriptor ulimits,
+  readonly trusted mounts, and a bounded kill path. JSON/SQLite parity,
+  multibyte output truncation, hostile request, and route coverage pass.
+  `npm run verify:sandbox-policy` proves a real container cannot write its
+  root, can use only bounded `/tmp`, cannot reach an external IP, does not
+  persist an explicit env value, and is killed at the requested one-second
+  deadline. Typecheck, zero-warning lint, formatting, production web build, 32
+  web tests, 51 focused tests, both uninjected Docker verifiers, and 1,598 API
+  tests pass (1,595 passed with three intentional live interoperability
+  skips). Resume at R5.4 reuse of W6 hardened network protections for any
+  future declared sandbox egress.
 
 ### R6 - Agent authoring and execution depth
 

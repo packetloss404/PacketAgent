@@ -684,10 +684,25 @@ three intentional live interoperability skips).
 Implementation and research evidence are recorded in
 [`r5-sandbox-isolation.md`](r5-sandbox-isolation.md).
 
-The exact next slice is R5.3 under
+R5.3 is complete. A single fail-closed resolver validates command/stdin size,
+container working directories, explicit environment names/values, and
+wall-clock requests before a driver can start. Docker receives and persisted
+records expose the effective timeout, CPU, memory, PID, tmpfs, network,
+filesystem, and environment policies; accepted environment values persist only
+as `[redacted]`. The driver also applies private IPC, equal memory/swap bounds,
+process/file-descriptor ulimits, readonly trusted mounts, and a bounded kill
+path. JSON/SQLite parity and multibyte output truncation are covered. The real
+`npm run verify:sandbox-policy` proof confirms root writes and outbound IP
+access fail, bounded `/tmp` works, stored env is redacted, and a one-second
+deadline terminates the container. Typecheck, zero-warning lint, formatting,
+production web build, 32 web tests, 51 focused tests, both uninjected Docker
+verifiers, and 1,598 API tests pass (1,595 passed with three intentional live
+interoperability skips).
+
+The exact next slice is R5.4 under
 [`R5 - sandbox, egress, and preview isolation`](../BACKLOG.md#r5---sandbox-egress-and-preview-isolation):
-consolidate and adversarially prove CPU, memory, process, timeout, filesystem,
-environment, and egress limits at the sandbox boundary.
+reuse the W6 redirect, SSRF, IPv4/IPv6, and DNS-rebinding protections for any
+declared sandbox egress while preserving deny-all as the default.
 After each gate passes, continue through R5-R8 using that backlog's unchecked
 checklists; use the loop document only for execution
 mechanics. Historical D/phase/track documents have been reconciled there and

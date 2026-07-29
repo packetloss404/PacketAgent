@@ -123,16 +123,68 @@ production web build, 32/32 web tests, 25/25 focused sandbox/route/Worker
 tests, the uninjected real Docker validator, and the complete 1,586-test API
 suite (1,583 passed with three intentional live interoperability skips).
 
+## R5.3 decision: one effective boundary policy
+
+Every sandbox entry point now resolves the same policy before driver start:
+
+- commands are limited to 32 KiB and stdin to 64 KiB;
+- client timeouts cannot exceed the operator maximum;
+- Docker working directories must remain under `/workspace` or `/tmp`;
+- explicit environments are limited by entry/name/value/total byte counts,
+  reject secret-like and runtime-control names, and never inherit the host
+  environment;
+- Docker always selects `network=none`, a read-only root, and bounded writable
+  `/tmp`; and
+- CPU, memory, PID, tmpfs, and wall-clock limits are clamped to safe operator
+  ranges and passed as concrete driver inputs.
+
+The resulting record distinguishes the legacy `cpuLimitMs` compatibility
+field from the actual wall-clock limit and records CPU, memory, PID, tmpfs,
+network, filesystem, and environment policy explicitly. Accepted environment
+names remain useful for audit, but all stored values are `[redacted]`.
+SQLite migration `0027_sandbox_execution_policy.sql` keeps the persisted
+record equivalent to the JSON adapter.
+
+The Docker driver independently rejects missing or out-of-range policy input.
+It applies `--network=none`, `--ipc=none`, equal memory and swap bounds,
+CPU/PID limits, `nproc` and `nofile` ulimits, a read-only root, bounded
+`nosuid,nodev` tmpfs, non-root identity, all-capability removal, and
+`no-new-privileges`. Trusted internal mounts must be read-only and target the
+`/input` subtree. Timeout/cancel cleanup has its own five-second Docker CLI
+deadline.
+
+## R5.3 proof
+
+Unit, route, and storage coverage exercises policy clamping, forbidden
+environment variables, path escape, over-limit timeouts, driver-side policy
+rejection, JSON/SQLite record parity, and byte-accurate multibyte output
+truncation.
+
+The uninjected command is:
+
+```bash
+npm run verify:sandbox-policy
+```
+
+It runs real Docker jobs through `SandboxService`. The first proves the
+read-only root rejects a write, bounded `/tmp` accepts a write, an explicit
+environment value reaches the process but persists only as `[redacted]`, and a
+direct external-IP connection fails. The second proves a one-second
+wall-clock deadline produces terminal `timeout` state. Both records must expose
+the expected effective policy for the verifier to pass.
+
+The R5.3 closeout passed typecheck, zero-warning lint, formatting, the
+production web build, 32/32 web tests, 51/51 focused sandbox/route/Worker
+tests, both uninjected real Docker verifiers, and the complete 1,598-test API
+suite (1,595 passed with three intentional live interoperability skips).
+
 ## Remaining R5 order
 
 Resume only from the unchecked R5 items in `BACKLOG.md`:
 
-1. R5.3: consolidate and adversarially verify CPU, memory, PID, timeout,
-   filesystem, environment, and egress bounds across each supported sandbox
-   entry point.
-2. R5.4: reuse the W6 hardened network port for any declared sandbox egress,
+1. R5.4: reuse the W6 hardened network port for any declared sandbox egress,
    including redirects, all A/AAAA answers, alternate IP forms, and DNS
    rebinding.
-3. R5.5: move generated previews to an isolated origin and narrow cookies, CSP,
+2. R5.5: move generated previews to an isolated origin and narrow cookies, CSP,
    messaging, and proxy rules.
-4. R5.6: close the container-hardening matrix and the complete R5 gate.
+3. R5.6: close the container-hardening matrix and the complete R5 gate.

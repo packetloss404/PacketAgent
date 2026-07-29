@@ -63,8 +63,10 @@ TypeScript/Vite validation mandatory through a lockfile-addressed,
 network-disabled Docker image and fails closed when isolation is unavailable.
 R5.2 defines the non-Docker contract: there is no supported untrusted fallback;
 native host execution is explicit owner/admin trusted diagnostics only, and
-production `node:vm` imports are prohibited. Resume at R5.3 consolidated
-sandbox resource/filesystem/environment/egress bounds in
+production `node:vm` imports are prohibited. R5.3 centralizes the sandbox
+policy, enforces exact wall-clock/CPU/memory/PID/tmpfs bounds, read-only
+filesystem and explicit redacted environment rules, and proves deny-all egress
+with real Docker. Resume at R5.4 reuse of W6 hardened network protections in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r5---sandbox-egress-and-preview-isolation).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

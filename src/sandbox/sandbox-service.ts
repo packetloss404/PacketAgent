@@ -8,8 +8,11 @@
  *   PACKETAGENT_SANDBOX_DRIVER          docker | native | auto (default: auto)
  *   PACKETAGENT_SANDBOX_DEFAULT_RUNTIME default runtime id (default: node-20)
  *   PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS default exec timeout (default: 120000)
+ *   PACKETAGENT_SANDBOX_MAX_TIMEOUT_MS   maximum requested timeout (default: 120000)
  *   PACKETAGENT_SANDBOX_MEMORY_MB       per-exec memory limit (default: 512)
  *   PACKETAGENT_SANDBOX_CPUS            per-exec cpu count (default: 1)
+ *   PACKETAGENT_SANDBOX_PIDS_LIMIT      per-exec process limit (default: 64)
+ *   PACKETAGENT_SANDBOX_TMPFS_MB        writable /tmp limit (default: 256)
  *
  * Future hook for the app builder integration:
  *   `runBuildInSandbox(appId, checkpointId)` — the eventual entry point that
@@ -32,6 +35,7 @@ import {
   type SandboxSubscription,
 } from "./sandbox-driver.js";
 import { createSandboxStore, type SandboxStore } from "./sandbox-store.js";
+import { redactedSandboxEnvironment, resolveSandboxExecutionPolicy } from "./sandbox-policy.js";
 import type {
   SandboxDriver as SandboxDriverId,
   SandboxExecRecord,
@@ -41,7 +45,6 @@ import type {
 } from "./types.js";
 
 const PREVIEW_BYTE_BUDGET = 16 * 1024;
-const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_RUNTIME = "node-20";
 const NATIVE_INSECURE_NOTE =
   "Native driver is active for owner/admin trusted-host diagnostics only. It has no isolation, is not a sandbox, and never runs generated or autonomous code.";
@@ -140,31 +143,32 @@ interface ActiveExec {
 }
 
 class BufferedStream {
-  private chunks: string[] = [];
-  private size = 0;
+  private buffer = Buffer.alloc(0);
   truncated = false;
 
   constructor(private readonly limit: number) {}
 
   push(data: string): void {
     if (data.length === 0) return;
-    this.chunks.push(data);
-    this.size += data.length;
-    while (this.size > this.limit && this.chunks.length > 1) {
-      const dropped = this.chunks.shift()!;
-      this.size -= dropped.length;
+    let incoming = Buffer.from(data, "utf8");
+    if (incoming.length >= this.limit) {
+      incoming = incoming.subarray(incoming.length - this.limit);
+      this.buffer = incoming;
       this.truncated = true;
+      return;
     }
-    if (this.size > this.limit && this.chunks.length === 1) {
-      const overflow = this.size - this.limit;
-      this.chunks[0] = this.chunks[0]!.slice(overflow);
-      this.size -= overflow;
+    const combined = Buffer.concat([this.buffer, incoming], this.buffer.length + incoming.length);
+    if (combined.length > this.limit) {
+      this.buffer = combined.subarray(combined.length - this.limit);
       this.truncated = true;
+    } else {
+      this.buffer = combined;
     }
   }
 
   read(): string {
-    return this.chunks.join("");
+    const value = this.buffer.toString("utf8");
+    return this.truncated && value.startsWith("\uFFFD") ? value.slice(1) : value;
   }
 }
 
@@ -285,19 +289,15 @@ export class SandboxService {
     const now = this.nowFn().toISOString();
     const id = randomUUID();
     const runtime = request.runtime ?? this.defaultRuntime();
-    const timeoutMs = clampPositive(
-      request.timeoutMs,
-      this.defaultTimeoutMs(),
-      1,
-      24 * 60 * 60 * 1000,
-    );
-    const memoryMb = clampPositive(
-      this.numberFromEnv("PACKETAGENT_SANDBOX_MEMORY_MB"),
-      512,
-      64,
-      8192,
-    );
-    const cpus = clampPositive(this.numberFromEnv("PACKETAGENT_SANDBOX_CPUS"), 1, 1, 32);
+    const policy = resolveSandboxExecutionPolicy({
+      driver: driver.id,
+      command: request.command,
+      workingDir: request.workingDir ?? defaultWorkingDirForDriver(driver.id),
+      ...(request.env ? { requestedEnv: request.env } : {}),
+      ...(request.stdin !== undefined ? { stdin: request.stdin } : {}),
+      ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+      configEnv: this.env,
+    });
 
     const baseRecord: SandboxExecRecord = {
       id,
@@ -306,16 +306,27 @@ export class SandboxService {
       driver: driver.id,
       runtime,
       command: request.command,
-      workingDir: request.workingDir ?? defaultWorkingDirForDriver(driver.id),
+      workingDir: policy.workingDir,
       status: "queued",
-      cpuLimitMs: timeoutMs,
-      memoryLimitMb: memoryMb,
+      cpuLimitMs: policy.timeoutMs,
+      wallClockTimeoutMs: policy.timeoutMs,
+      networkPolicy: policy.networkPolicy,
+      filesystemPolicy: policy.filesystemPolicy,
+      environmentPolicy: policy.environmentPolicy,
       createdAt: now,
       updatedAt: now,
     };
+    if (driver.id === "docker") {
+      baseRecord.cpuLimit = policy.cpus;
+      baseRecord.memoryLimitMb = policy.memoryLimitMb;
+      baseRecord.processLimit = policy.pidsLimit;
+      baseRecord.tmpfsSizeMb = policy.tmpfsSizeMb;
+    }
     if (request.appId !== undefined) baseRecord.appId = request.appId;
     if (request.checkpointId !== undefined) baseRecord.checkpointId = request.checkpointId;
-    if (request.env !== undefined) baseRecord.env = request.env;
+    if (Object.keys(policy.env).length > 0) {
+      baseRecord.env = redactedSandboxEnvironment(policy.env);
+    }
 
     await this.store.insertExec(baseRecord);
 
@@ -326,11 +337,14 @@ export class SandboxService {
         runtime,
         command: request.command,
         workingDir: baseRecord.workingDir,
-        ...(request.env ? { env: request.env } : {}),
+        ...(Object.keys(policy.env).length > 0 ? { env: policy.env } : {}),
         ...(request.stdin !== undefined ? { stdin: request.stdin } : {}),
-        timeoutMs,
-        memoryLimitMb: memoryMb,
-        cpus,
+        timeoutMs: policy.timeoutMs,
+        memoryLimitMb: policy.memoryLimitMb,
+        cpus: policy.cpus,
+        pidsLimit: policy.pidsLimit,
+        tmpfsSizeMb: policy.tmpfsSizeMb,
+        networkPolicy: policy.networkPolicy,
         ...(request.image ? { image: request.image } : {}),
         ...(request.mounts ? { mounts: request.mounts } : {}),
       });
@@ -663,22 +677,6 @@ export class SandboxService {
     return value && value.length > 0 ? value : DEFAULT_RUNTIME;
   }
 
-  private defaultTimeoutMs(): number {
-    return clampPositive(
-      this.numberFromEnv("PACKETAGENT_SANDBOX_DEFAULT_TIMEOUT_MS"),
-      DEFAULT_TIMEOUT_MS,
-      1,
-      24 * 60 * 60 * 1000,
-    );
-  }
-
-  private numberFromEnv(key: string): number | undefined {
-    const raw = this.env[key];
-    if (raw === undefined || raw === "") return undefined;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-
   private nativeOptIn(): boolean {
     return isTruthy(this.env.PACKETAGENT_ALLOW_INSECURE_NATIVE_SANDBOX);
   }
@@ -693,17 +691,6 @@ export class SandboxService {
     if (this.nativeOptIn()) return;
     throw new Error(NATIVE_PRODUCTION_BLOCK_MESSAGE);
   }
-}
-
-function clampPositive(
-  value: number | undefined,
-  fallback: number,
-  min: number,
-  max: number,
-): number {
-  const candidate = value ?? fallback;
-  if (!Number.isFinite(candidate) || candidate < min) return Math.max(min, fallback);
-  return Math.min(candidate, max);
 }
 
 function isTruthy(value: string | undefined): boolean {

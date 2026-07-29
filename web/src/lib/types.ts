@@ -1960,7 +1960,14 @@ export interface SandboxExecRecord {
   stderrPreview?: string;
   errorMessage?: string;
   cpuLimitMs?: number;
+  wallClockTimeoutMs?: number;
+  cpuLimit?: number;
   memoryLimitMb?: number;
+  processLimit?: number;
+  tmpfsSizeMb?: number;
+  networkPolicy?: "none" | "host";
+  filesystemPolicy?: "read-only-root+bounded-tmpfs" | "host";
+  environmentPolicy?: "validated-explicit" | "scrubbed-host+validated-explicit";
   createdAt: string;
   updatedAt: string;
 }

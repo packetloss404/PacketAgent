@@ -894,7 +894,23 @@ Required generated-code validation:
    `typecheck` and `build` set to `passed`.
 4. Sign in and apply an app draft from `/builder` with smoke checks enabled.
    Verify the smoke section includes the real TypeScript and Vite phases.
-5. Stop Docker and repeat. Confirm Builder reports blocked failure; it must not
+
+Required sandbox boundary verification:
+
+1. Run `npm run verify:sandbox-policy` with Docker available.
+2. Confirm the result reports `ok: true`, `networkPolicy: "none"`,
+   `filesystemPolicy: "read-only-root+bounded-tmpfs"`, and
+   `environmentPolicy: "validated-explicit"`.
+3. Confirm the boundary job could write under `/tmp` but not the container
+   root, could not connect directly to `1.1.1.1`, and persisted its explicit
+   environment value only as `[redacted]`.
+4. Confirm the deadline job finishes with `status: "timeout"` and records the
+   requested one-second wall-clock limit.
+5. Through `POST /api/app/sandbox/exec`, try a secret-like environment name, a
+   Docker working directory outside `/workspace` and `/tmp`, and a timeout over
+   `PACKETAGENT_SANDBOX_MAX_TIMEOUT_MS`. Each must return a policy error before
+   the driver starts.
+6. Stop Docker and repeat. Confirm Builder reports blocked failure; it must not
    return pass or use the insecure native driver.
 
 ## Operations Sanity

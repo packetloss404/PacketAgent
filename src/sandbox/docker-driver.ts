@@ -10,17 +10,18 @@
  *     --network=none \
  *     --cpus=<cpus> \
  *     --memory=<memory>m \
- *     --pids-limit=64 \
+ *     --memory-swap=<memory>m \
+ *     --pids-limit=<pids> \
  *     --cap-drop=ALL \
  *     --security-opt=no-new-privileges:true \
  *     --user=65534:65534 \
  *     --read-only \
- *     --tmpfs /tmp \
+ *     --tmpfs /tmp:rw,nosuid,nodev,exec,size=<tmpfs>m,mode=1777 \
  *     -w <workingDir> \
  *     <image> sh -c <command>
  */
 
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { isAbsolute, resolve } from "node:path";
@@ -100,8 +101,15 @@ export function createDockerDriver(deps: DockerDriverDeps = {}): SandboxDriver {
       }
 
       const containerName = `packetagent-sandbox-${randomUUID()}`;
-      const memoryMb = Math.max(64, Math.floor(spec.memoryLimitMb ?? 512));
-      const cpus = Math.max(1, Number(spec.cpus ?? 1));
+      if (spec.networkPolicy !== "none") {
+        throw new Error("sandbox: Docker execution requires networkPolicy=none");
+      }
+      const memoryMb = validatedResourceNumber("memoryLimitMb", spec.memoryLimitMb, 64, 8_192);
+      const cpus = validatedResourceNumber("cpus", spec.cpus, 0.1, 8);
+      const pidsLimit = Math.floor(validatedResourceNumber("pidsLimit", spec.pidsLimit, 16, 512));
+      const tmpfsSizeMb = Math.floor(
+        validatedResourceNumber("tmpfsSizeMb", spec.tmpfsSizeMb, 64, 1_024),
+      );
       const image = validatedImage(spec.image ?? runtimeEntry.image);
 
       const args: string[] = [
@@ -111,15 +119,21 @@ export function createDockerDriver(deps: DockerDriverDeps = {}): SandboxDriver {
         "--name",
         containerName,
         "--network=none",
+        "--ipc=none",
         `--cpus=${cpus}`,
         `--memory=${memoryMb}m`,
-        "--pids-limit=64",
+        `--memory-swap=${memoryMb}m`,
+        `--pids-limit=${pidsLimit}`,
+        "--ulimit",
+        `nproc=${pidsLimit}:${pidsLimit}`,
+        "--ulimit",
+        "nofile=256:256",
         "--cap-drop=ALL",
         "--security-opt=no-new-privileges:true",
         "--user=65534:65534",
         "--read-only",
         "--tmpfs",
-        "/tmp",
+        `/tmp:rw,nosuid,nodev,exec,size=${tmpfsSizeMb}m,mode=1777`,
       ];
 
       for (const mount of spec.mounts ?? []) {
@@ -267,6 +281,18 @@ function validatedImage(value: string): string {
   return value;
 }
 
+function validatedResourceNumber(
+  field: string,
+  value: number | undefined,
+  min: number,
+  max: number,
+): number {
+  if (value === undefined || !Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`sandbox: invalid ${field}`);
+  }
+  return value;
+}
+
 function validatedBindMount(mount: { source: string; target: string; readOnly?: boolean }): string {
   if (
     !isAbsolute(mount.source) ||
@@ -276,7 +302,8 @@ function validatedBindMount(mount: { source: string; target: string; readOnly?: 
     mount.target.includes("\0") ||
     mount.target.includes(",") ||
     mount.target.split("/").includes("..") ||
-    mount.target === "/var/run/docker.sock"
+    (mount.target !== "/input" && !mount.target.startsWith("/input/")) ||
+    mount.readOnly !== true
   ) {
     throw new Error("sandbox: invalid trusted bind mount");
   }
@@ -315,21 +342,32 @@ async function probeDocker(spawnFn: DockerSpawn): Promise<boolean> {
 async function dockerKillContainer(spawnFn: DockerSpawn, containerName: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
+    let child: ChildProcess | undefined;
+    const timeout = setTimeout(() => {
+      try {
+        child?.kill("SIGKILL");
+      } catch {
+        /* ignore */
+      }
+      finish(new Error(`docker kill ${containerName} exceeded 5000ms`));
+    }, 5_000);
     const finish = (err: Error | null) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timeout);
       if (err) reject(err);
       else resolve();
     };
     try {
-      const child = spawnFn("docker", ["kill", containerName], {
+      child = spawnFn("docker", ["kill", containerName], {
         stdio: ["ignore", "ignore", "ignore"],
         env: dockerCliEnvironment(),
         shell: false,
         windowsHide: true,
       });
-      child.on("error", (err) => finish(err));
-      child.on("close", (code) => {
+      const killProcess = child;
+      killProcess.on("error", (err) => finish(err));
+      killProcess.on("close", (code) => {
         if (code === 0) finish(null);
         else finish(new Error(`docker kill ${containerName} exited ${code}`));
       });

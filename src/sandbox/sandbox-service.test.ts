@@ -261,6 +261,98 @@ test("sandbox service: native driver always fails closed for untrusted execution
   assert.equal(driver.startedSpecs.length, 0);
 });
 
+test("sandbox service: resolves, persists, and passes one bounded Docker policy", async () => {
+  const store = createInMemoryStore();
+  const driver = createMockDriver({
+    id: "docker",
+    behavior: (handle) => {
+      handle.emitter.emit("exit", { exitCode: 0, signal: null });
+    },
+  });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "docker",
+    env: {
+      PACKETAGENT_SANDBOX_MAX_TIMEOUT_MS: "30000",
+      PACKETAGENT_SANDBOX_MEMORY_MB: "256",
+      PACKETAGENT_SANDBOX_CPUS: "0.5",
+      PACKETAGENT_SANDBOX_PIDS_LIMIT: "32",
+      PACKETAGENT_SANDBOX_TMPFS_MB: "128",
+    },
+  });
+
+  const started = await service.startExec({
+    workspaceId: "alpha",
+    command: "node --version",
+    workingDir: "/tmp/job",
+    timeoutMs: 25_000,
+    env: { CI: "1" },
+  });
+  const final = await service.waitForExec(started.id);
+
+  assert.equal(final?.wallClockTimeoutMs, 25_000);
+  assert.equal(final?.cpuLimit, 0.5);
+  assert.equal(final?.memoryLimitMb, 256);
+  assert.equal(final?.processLimit, 32);
+  assert.equal(final?.tmpfsSizeMb, 128);
+  assert.equal(final?.networkPolicy, "none");
+  assert.equal(final?.filesystemPolicy, "read-only-root+bounded-tmpfs");
+  assert.equal(final?.environmentPolicy, "validated-explicit");
+  assert.deepEqual(final?.env, { CI: "[redacted]" });
+
+  const spec = driver.startedSpecs[0];
+  assert.equal(spec?.timeoutMs, 25_000);
+  assert.equal(spec?.cpus, 0.5);
+  assert.equal(spec?.memoryLimitMb, 256);
+  assert.equal(spec?.pidsLimit, 32);
+  assert.equal(spec?.tmpfsSizeMb, 128);
+  assert.equal(spec?.networkPolicy, "none");
+  assert.deepEqual(spec?.env, { CI: "1" });
+});
+
+test("sandbox service: rejects policy escapes before Docker starts", async () => {
+  const store = createInMemoryStore();
+  const driver = createMockDriver({ id: "docker", behavior: () => {} });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "docker",
+    env: { PACKETAGENT_SANDBOX_MAX_TIMEOUT_MS: "30000" },
+  });
+
+  await assert.rejects(
+    () =>
+      service.startExec({
+        workspaceId: "alpha",
+        command: "true",
+        env: { OPENAI_API_KEY: "must-not-enter-sandbox" },
+      }),
+    /env name is not allowed/,
+  );
+  await assert.rejects(
+    () =>
+      service.startExec({
+        workspaceId: "alpha",
+        command: "true",
+        workingDir: "/etc",
+      }),
+    /workingDir/,
+  );
+  await assert.rejects(
+    () =>
+      service.startExec({
+        workspaceId: "alpha",
+        command: "true",
+        timeoutMs: 30_001,
+      }),
+    /timeoutMs/,
+  );
+  assert.equal(driver.startedSpecs.length, 0);
+});
+
 test("sandbox service: blocks native driver in production by default", async () => {
   const store = createInMemoryStore();
   const driver = createMockDriver({ behavior: () => {} });
@@ -384,4 +476,25 @@ test("sandbox service: stdout/stderr previews are bounded to ~16KB", async () =>
   assert.ok(final?.stdoutPreview);
   assert.ok((final?.stdoutPreview?.length ?? 0) <= 16 * 1024);
   assert.ok(final?.stdoutPreview?.endsWith("TAIL"), "preview should retain the tail of the stream");
+});
+
+test("sandbox service: preview limits are byte-based for multibyte output", async () => {
+  const store = createInMemoryStore();
+  const driver = createMockDriver({
+    id: "docker",
+    behavior: (handle) => {
+      handle.emitter.emit("chunk", { stream: "stdout", data: "🧪".repeat(10_000) });
+      handle.emitter.emit("exit", { exitCode: 0, signal: null });
+    },
+  });
+  const service = new SandboxService({
+    store,
+    dockerDriver: driver,
+    nativeDriver: driver,
+    forcedDriver: "docker",
+  });
+  const exec = await service.startExec({ workspaceId: "alpha", command: "spew" });
+  const final = await service.waitForExec(exec.id);
+
+  assert.ok(Buffer.byteLength(final?.stdoutPreview ?? "", "utf8") <= 16 * 1024);
 });
