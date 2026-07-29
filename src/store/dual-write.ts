@@ -13,26 +13,26 @@ import type {
   InvitationEmailDeliveryRecord,
 } from "./types.js";
 
-// LEAF module: best-effort dual-write of canonical store mutations into the
-// dedicated sqlite tables. Imports cache (depth counter), sqlite-db,
-// dedicated-tables, the repositories, and redaction — never a backend or the
-// barrel. Behavior (deferred flush at depth 0, swallow-on-failure) moved
-// verbatim from packetagent-store.ts.
+// LEAF module: inherited best-effort compatibility upserts into dedicated
+// SQLite tables. Imports cache (depth counter), sqlite-db, dedicated-tables,
+// the repositories, and redaction — never a backend or the barrel. The
+// canonical SQLite transaction already persists these promoted collections;
+// do not extend this compatibility path to new collections.
 
 const pendingActivityDualWrites: ActivityRecord[] = [];
 const pendingActivationSignalDualWrites: ActivationSignalRecord[] = [];
 const pendingAgentRunDualWrites: AgentRunRecord[] = [];
 const pendingInvitationEmailDeliveryDualWrites: InvitationEmailDeliveryRecord[] = [];
 
-// Dedicated tables are secondary/derived copies of the canonical store, which
-// commits FIRST (see mutateSqliteStore*). These flushes run post-commit and are
-// best-effort: if a dedicated-table upsert throws, the primary write already
-// succeeded, so the error must NOT propagate to the caller (which would falsely
-// report the whole op as failed) — log it (redacted) and continue so the other
-// dedicated tables still flush. Dedicated tables can be reconciled out-of-band
-// (e.g. repair-activation-read-models / reconcile-invitation-emails in jobs.ts).
+// These redundant compatibility upserts run after mutateSqliteStore* has
+// committed the same collection in its dedicated table. If an upsert throws,
+// the canonical write already succeeded, so the error must NOT propagate to
+// the caller (which would falsely report the whole operation as failed). Log
+// it (redacted) and continue so the other compatibility writes still flush.
 function logDualWriteFlushFailure(table: string, error: unknown): void {
-  console.warn(`[packetagent-store] dedicated ${table} dual-write flush failed (primary write already committed): ${redactedErrorMessage(error)}`);
+  console.warn(
+    `[packetagent-store] dedicated ${table} dual-write flush failed (primary write already committed): ${redactedErrorMessage(error)}`,
+  );
 }
 
 // Called when a sqlite mutation transaction rolls back: discard everything that
@@ -68,7 +68,10 @@ function flushPendingActivityDualWrites(): void {
 
 function flushPendingActivationSignalDualWrites(): void {
   if (pendingActivationSignalDualWrites.length === 0) return;
-  const drained = pendingActivationSignalDualWrites.splice(0, pendingActivationSignalDualWrites.length);
+  const drained = pendingActivationSignalDualWrites.splice(
+    0,
+    pendingActivationSignalDualWrites.length,
+  );
   if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   try {
     const db = openStoreDatabase(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE));
@@ -107,7 +110,10 @@ function flushPendingAgentRunDualWrites(): void {
 
 function flushPendingInvitationEmailDeliveryDualWrites(): void {
   if (pendingInvitationEmailDeliveryDualWrites.length === 0) return;
-  const drained = pendingInvitationEmailDeliveryDualWrites.splice(0, pendingInvitationEmailDeliveryDualWrites.length);
+  const drained = pendingInvitationEmailDeliveryDualWrites.splice(
+    0,
+    pendingInvitationEmailDeliveryDualWrites.length,
+  );
   if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   try {
     const repo = createInvitationEmailDeliveriesRepository({});
@@ -145,7 +151,9 @@ export function enqueueActivationSignalDualWrite(record: ActivationSignalRecord)
   }
 }
 
-export function enqueueInvitationEmailDeliveryDualWrite(record: InvitationEmailDeliveryRecord): void {
+export function enqueueInvitationEmailDeliveryDualWrite(
+  record: InvitationEmailDeliveryRecord,
+): void {
   if (process.env.PACKETAGENT_STORE !== "sqlite") return;
   if (getMutateSqliteDepth() > 0) {
     pendingInvitationEmailDeliveryDualWrites.push({ ...record });

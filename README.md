@@ -4,7 +4,7 @@
 
 PacketAgent is the always-available worker runtime in the Packet suite. A worker can be launched manually or activated by a schedule, webhook, queue, or alert; plan and act through approved tools; stop when its objective is satisfied; and pause safely when it needs a person. "Always on" describes the control plane, not an endless token loop: each run must have an exit condition plus time, cost, iteration, and permission boundaries.
 
-The inherited TaskLoom implementation supplied substantial parts of that runtime: a Hono REST+SSE API (`src/server.ts`), provider-agnostic LLM routing, a bounded tool-using agent loop with a cost ledger, a Playwright browser runtime, a Docker/native command sandbox, an AES-256-GCM secrets vault, RBAC, inbound/outbound webhooks, a persistent scheduler with distributed leader election, and a SQLite-to-Postgres dual-write migration path. PacketAgent now unifies those pieces through a durable Worker definition, activation envelope, bounded supervisor, immutable checkpoints, restart recovery, external-effect receipts, fine-grained tool policy, opaque credential references, hardened network/process boundaries, rolling budgets, operator controls, and an independently authorized operations read model. WorkerPackage v1 now defines the PacketADE handoff bytes, and PacketAgent authenticates workspace-bound PacketADE actors before persisting integrity, provenance, local-policy, and idempotency decisions. The Packet-product API validates, deploys, updates, activates, inspects, lists runs, pauses, resumes, rolls back, and revokes receipt-bound deployments, then exposes reconnectable deployment/run events with durable cursor acknowledgements. The PacketADE disconnect/restart handoff gate passes; PacketChat can receive bounded threaded Worker cards with authenticated read-only callbacks; and PacketPhone can receive role-bounded approve, reject, pause, stop, and revoke controls whose single-use callbacks execute through W7. W10.4 now certifies those adapters locally under races, restart, replay, credential rotation, and dead-letter recovery; live product interoperability remains unverified until external endpoints are supplied.
+The inherited TaskLoom implementation supplied substantial parts of that runtime: a Hono REST+SSE API (`src/server.ts`), provider-agnostic LLM routing, a bounded tool-using agent loop with a cost ledger, a Playwright browser runtime, a Docker/native command sandbox, an AES-256-GCM secrets vault, RBAC, inbound/outbound webhooks, a persistent scheduler with distributed leader election, and JSON/SQLite/managed-Postgres persistence with staged backfill and parity checks. PacketAgent now unifies those pieces through a durable Worker definition, activation envelope, bounded supervisor, immutable checkpoints, restart recovery, external-effect receipts, fine-grained tool policy, opaque credential references, hardened network/process boundaries, rolling budgets, operator controls, and an independently authorized operations read model. WorkerPackage v1 now defines the PacketADE handoff bytes, and PacketAgent authenticates workspace-bound PacketADE actors before persisting integrity, provenance, local-policy, and idempotency decisions. The Packet-product API validates, deploys, updates, activates, inspects, lists runs, pauses, resumes, rolls back, and revokes receipt-bound deployments, then exposes reconnectable deployment/run events with durable cursor acknowledgements. The PacketADE disconnect/restart handoff gate passes; PacketChat can receive bounded threaded Worker cards with authenticated read-only callbacks; and PacketPhone can receive role-bounded approve, reject, pause, stop, and revoke controls whose single-use callbacks execute through W7. W10.4 now certifies those adapters locally under races, restart, replay, credential rotation, and dead-letter recovery; live product interoperability remains unverified until external endpoints are supplied.
 
 The existing full-bleed builder at `/builder` remains useful, but its role changes: it becomes the worker creation studio. Existing prompt-to-app functionality remains supported as an inherited capability rather than the product's organizing principle.
 
@@ -33,7 +33,7 @@ The following implemented subsystems are exercised by tests. Most are inherited 
 - **Real Playwright browser runtime** (`src/tools/browser-runtime.ts`). Headless chromium, per-run page sessions, screenshot artifacts to `data/artifacts/<runId>`, graceful shutdown on SIGINT/SIGTERM.
 - **Command sandbox** (`src/sandbox/`). A driver abstraction with a Docker driver (`--network=none`, CPU/memory/PID caps, dropped capabilities, no-new-privileges, non-root user, read-only rootfs) and a native child-process fallback for explicitly opted-in interactive development. Autonomous Workers refuse the native fallback.
 - **AES-256-GCM secrets vault** (`src/security/vault.ts`). PBKDF2 100k iterations, auth-tag validation, masking, and a production `MASTER_KEY` enforcement guard. Backs the Integrations secret store.
-- **SQLite-to-Postgres dual-write migration path** (`src/repositories/*`, `src/db/`). Per-entity repositories (jobs, agent-runs, activities, alert-events, provider-calls, invitation-email-deliveries) have `*-read.ts` read models, dual-write handlers, and parity suites. `src/db/postgres-client.ts` pools connections; `db:backfill-*` / `db:verify-*` scripts cover multiple entity types. Migrations live in `src/db/migrations`.
+- **Three explicit persistence authorities** (`src/store/`, `src/repositories/`, `src/db/`). JSON is a contributor-only whole document; SQLite stores promoted collections in dedicated tables and the remainder in `app_records` inside one transaction; managed Postgres stores one advisory-lock-protected normalized document. Staged `db:backfill-*` / `db:verify-*` commands cover SQLite promotion and managed cutover; this is not live SQLite/Postgres dual-write replication.
 - **Distributed job scheduler** (`src/jobs/`). Persisted queue with five-field cron, exponential retry, and dead-letter - plus three leader-election strategies for multi-node coordination: a file TTL lock (`scheduler-lock.ts`), an HTTP coordinator (`scheduler-http-coordinator.ts`), and a noop, selected via `scheduler-leader-selection.ts`. Registers cron, metrics-snapshot, alert evaluate/deliver, workspace-scoped Worker retention, and canonical `worker.run` job types; shutdown releases claimed work instead of reporting false success.
 - **Integration connector verifier** (`src/integration-sandbox.ts`). Deterministically pre-flights model / db / email / webhook / payment / github / browser connector readiness before preview/runtime.
 - **RBAC, webhooks, share links, activation analytics.** `rbac.ts` (viewer/member/admin/owner, server-enforced), API-key auth, inbound webhooks that trigger agent runs, outbound webhooks (alerts + invitation-email delivery) with retry/dead-letter/signing, public share links, and an onboarding/activation analytics subsystem (`src/activation/*`).
@@ -69,6 +69,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [dev/taskloom-to-packetagent.md](dev/taskloom-to-packetagent.md) records rename compatibility and repository migration details.
 - [dev/worker-contract-plan.md](dev/worker-contract-plan.md) records W1 research, contract decisions, implementation loops, and verification.
 - [dev/TESTING.md](dev/TESTING.md) covers local verification and release checks.
+- [dev/persistence-authority.md](dev/persistence-authority.md) records the physical authority, migration stages, and compatibility-facade decision for every control-plane store mode.
 - [dev/roadmap.md](dev/roadmap.md) captures the broader roadmap after the MVP path is reliable.
 - [Canonical Worker implementation report](output/pdf/packetagent-worker-implementation-report.pdf) is the committed pre-W10.3 pause snapshot summarizing W1-W10.2 and its verification.
 - [Packet suite integration reality check](output/pdf/packet-suite-integration-reality-check.pdf) is the matching pre-W10.3 snapshot separating PacketAgent-side work from changes required in the other Packet repositories.
@@ -174,7 +175,7 @@ You can also register a new account from the sign-up page. To reset local data b
 - **Alert engine.** `evaluateAlerts` + a delivery pipeline with metrics snapshots, scheduled as job types.
 - **SSE run streaming** for live transcripts and tool-call output.
 - **RBAC** with viewer / member / admin / owner roles, enforced server-side, plus API-key auth.
-- **Consolidated Admin.** Sixteen operator surfaces (Roles, SSO, Secrets, Rate limits, Webhooks, Releases, Storage, Backups, Notifications, Operations, Integrations, Activation, Sandbox, Workflows, Billing, Alerts) live under a single tabbed `/admin/:tab` page. The sidebar collapses to four items: Build, Projects, Runs, Admin. Back-compat redirects keep the old per-page URLs working.
+- **Consolidated Admin.** Twelve live operator surfaces (Roles, SSO, Secrets, Rate limits, Webhooks, Notifications, Operations, Integrations, Activation, Sandbox, Workflows, Billing) live under a single tabbed `/admin/:tab` page. The sidebar collapses to four items: Build, Projects, Runs, Admin. Back-compat redirects keep supported old per-page URLs working.
 - **Command palette** (Cmd/Ctrl-K) for fast navigation and run shortcuts.
 
 ### Self-host
@@ -182,18 +183,23 @@ You can also register a new account from the sign-up page. To reset local data b
 - **MIT licensed**, self-hosted, and runs anywhere the supported Node 22 runtime and required services are available.
 - **No telemetry.** Nothing phones home.
 - **BYO keys.** No vendored model relationships; no proxy in the middle.
-- **JSON, SQLite, or managed Postgres.** Default is file-backed JSON for contributor flow; flip to SQLite for single-node deployments or managed Postgres for horizontal app writers - backed by a dual-write migration engine with read-parity test suites (see below).
+- **JSON, SQLite, or managed Postgres.** Default is file-backed JSON for contributor flow; use SQLite for a single process on one host or managed Postgres when multiple app processes must share state. The managed adapter serializes whole-document writes for correctness; it is not a per-entity relational scale-out layer.
 
-## Data layer: SQLite -> managed Postgres
+## Data layer and migration
 
-PacketAgent runs on Node's built-in `node:sqlite` (`DatabaseSync`, WAL, foreign keys on, busy_timeout) and includes a dual-write/backfill path to managed Postgres:
+PacketAgent keeps one logical `PacketAgentData` mutation contract with a different physical authority in each mode:
 
-- **Per-entity repositories** (`src/repositories/*`) for jobs, agent-runs, activities, alert-events, provider-calls, and invitation-email-deliveries, each with a `*-read.ts` read model.
-- **Dual-write handlers** that write to both SQLite and Postgres during migration, with `*.dual-write.test.ts` and `*.read-parity.test.ts` suites proving the two stores stay in parity.
-- **Pooled Postgres client** (`src/db/postgres-client.ts`) plus a managed-database startup boot guard that enforces explicit opt-in before any Postgres writer is engaged.
-- **Backfill / verify CLIs** (`db:backfill-*`, `db:verify-*`) covering 8+ entity types, and 17 ordered SQL migrations in `src/db/migrations`.
+- **JSON** stores the complete normalized document in one atomically replaced file and is limited to contributor/evaluation use.
+- **SQLite** uses Node's built-in `node:sqlite` with WAL, foreign keys, `busy_timeout`, and one `BEGIN IMMEDIATE` whole-store transaction. Promoted hot and Worker collections live in dedicated relational tables; remaining records live in `app_records`.
+- **Managed Postgres** stores one normalized document in `packetagent_document_store`. A row lock plus transaction-scoped advisory lock serializes writers across processes. It does not currently use the SQLite per-entity migration tables.
+- **Staged backfill and verification** move old `app_records` collections into dedicated SQLite tables or copy a stopped JSON/SQLite source into the managed document adapter. There is no live SQLite-to-Postgres dual-write cutover.
+- **24 ordered SQLite migrations** live in `src/db/migrations`.
 
-Managed Postgres is gated behind explicit startup flags; the distributed scheduler and these repositories are what make multi-node operation real rather than aspirational.
+Managed startup requires a database URL plus
+`PACKETAGENT_MANAGED_DATABASE_ADAPTER=postgres`. Multiple app processes can
+share the document safely, but write throughput remains globally serialized.
+See [the persistence-authority decision](dev/persistence-authority.md) and
+[deployment guidance](dev/deployment/persistence.md).
 
 ## Agent templates
 
@@ -227,8 +233,10 @@ Common environment variables:
 | ---------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `NODE_ENV`                               | `development`             | Set to `production` to mark cookies `Secure` and disable dev shortcuts.                                                                                                                               |
 | `PORT`                                   | `8484`                    | API server port.                                                                                                                                                                                      |
-| `PACKETAGENT_STORE`                      | `json`                    | `json` (file-backed) or `sqlite`.                                                                                                                                                                     |
+| `PACKETAGENT_STORE`                      | `json`                    | `json`, `sqlite`, or `postgres`. A configured managed URL also selects managed mode unless SQLite is explicit.                                                                                        |
 | `PACKETAGENT_DB_PATH`                    | `data/packetagent.sqlite` | SQLite database path when store is `sqlite`.                                                                                                                                                          |
+| `PACKETAGENT_DATABASE_URL`               | _unset_                   | Managed Postgres URL. `PACKETAGENT_MANAGED_DATABASE_URL` and `DATABASE_URL` are accepted aliases.                                                                                                     |
+| `PACKETAGENT_MANAGED_DATABASE_ADAPTER`   | _unset_                   | Set to `postgres` when enabling the managed adapter.                                                                                                                                                  |
 | `PACKETAGENT_TRUST_PROXY`                | `false`                   | Trust `X-Forwarded-Host` / `X-Forwarded-For` from a known proxy.                                                                                                                                      |
 | `PACKETAGENT_RATE_LIMIT_KEY_SALT`        | _unset_                   | Salt for hashed rate-limit bucket IDs. Set in production.                                                                                                                                             |
 | `PACKETAGENT_SANDBOX_DRIVER`             | `auto`                    | `docker`, `native`, or `auto`.                                                                                                                                                                        |
@@ -256,16 +264,16 @@ returned by these routes.
 
 ## Architecture
 
-- **Frontend.** React 19 + react-router 7 + Vite 7, mounted at `/`. Tailwind CSS, Geist fonts, a silver / grey / green-light theme. `/builder` is a full-bleed route outside the workbench Shell (chat thread, streamed prose, split preview). The rest of the workbench lives behind a four-item sidebar (Build, Projects, Runs, Admin); sixteen operator surfaces are tabbed under `/admin/:tab`.
+- **Frontend.** React 19 + react-router 7 + Vite 7, mounted at `/`. Tailwind CSS, Geist fonts, a silver / grey / green-light theme. `/builder` is a full-bleed route outside the workbench Shell (chat thread, streamed prose, split preview). The rest of the workbench lives behind a four-item sidebar (Build, Projects, Runs, Admin); twelve live operator surfaces are tabbed under `/admin/:tab`.
 - **Backend.** Hono on `@hono/node-server`. `src/server.ts` mounts ~20 route groups (`app-routes`, `workflow-routes`, `webhook-routes`, `share-routes`, `sandbox-routes`, four `operations-*-routes`, and more) with access-log middleware, redacted error envelopes, baseline security headers/CSP, `enforcePrivateAppMutationSecurity` on `/api/app/*`, cross-origin/CSRF enforcement, public webhooks, and static serving of the built web plus explicitly enabled, authenticated, workspace-scoped run artifacts.
 - **LLM layer.** `ProviderRouter` route-key dispatch over six BYOK clients, `preset-resolver` priority walking, and a cost `ledger`. A `stub` provider keeps the loop runnable with zero keys.
 - **Codegen + agents.** `src/codegen/` (plan/write/chunk orchestrator, path validator, derived-draft, app-builder/iteration services, generated-app runtime/workspace, preview/snapshot/publish-readiness) and `src/tools/` (agent loop, registry/executor, read/write/browser builtins, Playwright runtime) plus `src/sandbox/`.
-- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, busy_timeout) for single-node; managed Postgres via repositories and document transactions with parity coverage. 22 SQL migrations.
+- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, `busy_timeout`) for single-node; and an advisory-lock-serialized managed-Postgres document adapter for shared app processes. SQLite has 24 ordered SQL migrations.
 - **Jobs / ops.** Persisted queue with five-field cron, exponential retry, dead-letter, three-way scheduler leader election, an alert engine, and metrics snapshots.
 
 ## Engineering & testing
 
-PacketAgent is TypeScript ESM on Node >=22.5 with a React/Vite frontend. The code uses strict typechecking, dependency injection in many runtime boundaries, and feature directories for providers, tools, jobs, sandboxing, repositories, activation, codegen, and security. The inherited lint baseline still contains 145 warnings and is tracked as cleanup debt.
+PacketAgent is TypeScript ESM on Node >=22.5 with a React/Vite frontend. The code uses strict typechecking, dependency injection in many runtime boundaries, and feature directories for providers, tools, jobs, sandboxing, repositories, activation, codegen, and security. The inherited lint baseline currently contains 143 warnings and is tracked as cleanup debt.
 
 The W8.3 validation ran **1,452 API tests** (1,451 passed, 1 skipped) plus **25 web tests** with no failures, covering separate retention windows, pre-persistence and read-boundary redaction, read-only dry runs, bounded tenant cleanup, terminal-only compaction, artifact deletion ports, idempotent tombstones, retention-explained gaps, and stable JSON/SQLite/managed-Postgres parity in addition to the W8.2 and prior Worker gates.
 

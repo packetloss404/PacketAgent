@@ -54,8 +54,10 @@ until explicit startup, applies baseline headers/CSP, and authorizes opt-in
 artifact reads against the owning workspace and exact run. Frontend safety,
 render recovery, multi-secret redaction, the preview iframe contract, audited
 dead controls, primary keyboard semantics, and stale web branding are also
-closed. Persistence end-state, dependency disposition, and formatting/lint are
-next;
+closed. The storage-authority/cutover decision and deliberate dependency
+disposition are now closed, including the documented unreachable React Router
+RSC exception. Repository-wide formatting, button-type, and ESLint cleanup is
+the only remaining R1 work;
 [`r1-repository-health-audit.md`](r1-repository-health-audit.md) records
 supporting evidence while `BACKLOG.md` remains the ledger.
 

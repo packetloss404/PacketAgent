@@ -331,9 +331,24 @@ choices, output tabs, and project cards use native button semantics; and all
 visible stale TaskLoom wordmarks now consume the PacketAgent web brand config.
 The focused backend safety set passes 23 tests, the web gate passes 30 tests,
 the production web build and typecheck pass, and a local signed-out/signed-in
-browser pass is clean. Resume with the persistence end-state and dependency
-advisory disposition, then close the remaining repo-wide Prettier/button-type
-and ESLint batches.
+browser pass is clean.
+
+The persistence-authority and dependency-advisory slice is also complete.
+[`persistence-authority.md`](persistence-authority.md) records JSON,
+promoted/record-row SQLite, and advisory-lock-serialized managed-document
+authority, staged cutovers, generated-app isolation, compatibility writers,
+and the decision to retain the logical store facade. The README and deployment
+guide no longer claim a live SQLite/Postgres dual-write or per-entity managed
+runtime. Targeted non-major dependency upgrades removed every critical,
+moderate, and low advisory. The remaining two high package entries represent
+one React Router RSC advisory whose server-action path PacketAgent does not
+use; [`r1-dependency-advisory-audit.md`](r1-dependency-advisory-audit.md)
+records the reachability and exact-pin decision. Typecheck, production build,
+30 web tests, and the full 1,525-test API gate pass.
+
+Resume with the remaining repo-wide Prettier/button-type and ESLint batches.
+Keep each batch mechanically scoped and reviewable; update the counts here and
+in `BACKLOG.md` after every checkpoint.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -617,11 +632,10 @@ handoff, the roadmap, or the backlog.
 
 Known inherited quality debt:
 
-- repo-wide `npm run format:check` flags 311 inherited files;
-- full dependency audit reports 11 advisories, including 2 critical
-  development-tree advisories; and
-- production-only audit reports 5 advisories: 1 low, 1 moderate, 3 high,
-  0 critical.
+- repo-wide `npm run format:check` flags 307 inherited files;
+- full and production dependency audits each report two high package entries
+  for the same accepted, unreachable React Router RSC advisory; and
+- ESLint reports zero errors and 143 inherited warnings.
 
 Do not use `npm audit fix --force` or format the entire repository as an
 incidental part of the Worker loops. Track those cleanups separately in the

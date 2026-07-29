@@ -6,6 +6,26 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R1 persistence authority and dependency security
+
+- Defined the current control-plane authority for JSON, promoted/record-row
+  SQLite, and advisory-lock-serialized managed-Postgres document storage,
+  including staged cutovers, generated-app separation, compatibility writers,
+  and the gates required before replacing the logical store facade.
+- Corrected the README and deployment guide: the managed runtime does not use
+  per-entity Postgres tables or continuous SQLite/Postgres dual-write, and its
+  whole-document write throughput is globally serialized.
+- Upgraded Hono, its Node adapter, React Router, Vite, PostCSS, concurrently,
+  Babel, and brace-expansion without a forced or unrelated major change.
+- Made PacketAgent's direct preview-runtime `esbuild` dependency explicit and
+  pinned all consumers to the compatible advisory-free `0.27.2` release.
+- Reduced both full and production dependency audits from 11/5 findings to two
+  high package entries for one React Router RSC advisory. PacketAgent does not
+  expose the affected RSC/server-action path; the deliberate exact-pin and
+  re-audit trigger are documented.
+- Passed typecheck, the production web build, 30 web tests, and the 1,525-test
+  API gate (1,521 passed, 4 intentionally skipped live probes).
+
 ### 2026-07-28 - R1 persistence and queue correctness
 
 - Reused one managed Postgres pool per connection target instead of opening and

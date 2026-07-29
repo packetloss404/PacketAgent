@@ -52,8 +52,8 @@ import type {
 
 // LEAF module: dedicated relational table load/persist for the sqlite backend.
 // Imports only types, normalize (also a leaf), and node:sqlite — never a backend
-// or the barrel. These tables are derived/secondary copies of canonical store
-// collections; behavior moved verbatim.
+// or the barrel. These tables are the physical authority for promoted SQLite
+// collections and are written inside the canonical store transaction.
 
 export type DedicatedRelationalCollectionKey =
   | "jobMetricSnapshots"

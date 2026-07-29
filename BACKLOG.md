@@ -26,9 +26,9 @@ Status: foundation complete on `codex/packetagent-foundation`; inherited quality
 - [x] Carry the only uncommitted TaskLoom worktree fix into the new branch.
 - [x] Refresh every Markdown document, label historical plans, and add an authoritative Codex project handoff.
 - [x] Pass typecheck, lint with zero errors, production web build, API tests, web tests, migration tests, diff check, and compatibility-only brand scan.
-- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 311 files; files authored in the R1 review slices are formatted.
+- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 307 files; files authored in the R1 review slices are formatted.
 - [ ] Reduce the inherited ESLint baseline of 143 warnings to zero while preserving the current zero-error gate.
-- [ ] Review and remediate dependency advisories deliberately. The full install reports 11 advisories (including 2 critical development-tree advisories); `npm audit --omit=dev` reports 5 production advisories (1 low, 1 moderate, 3 high, 0 critical). Do not apply a blind force-fix that causes unrelated dependency churn.
+- [x] Review and remediate dependency advisories deliberately. Targeted non-major upgrades reduced the full and production audits from 11/5 findings to two package entries for one unreachable React Router RSC advisory; [`dev/r1-dependency-advisory-audit.md`](dev/r1-dependency-advisory-audit.md) records ownership, reachability, and the exact-pin decision. No forced fix was used.
 - Gate: a clean PacketAgent checkout starts with new defaults and can read an existing default TaskLoom deployment without destructive migration.
 
 ### W1 - Canonical Worker contract
@@ -226,7 +226,8 @@ is recorded in these checklists.
 
 ### R1 - Repository health and historical finding re-audit
 
-Status: active.
+Status: active; only the repository-wide formatting, button-type, and ESLint
+cleanup remains.
 
 Supporting finding-by-finding evidence is maintained in
 [`dev/r1-repository-health-audit.md`](dev/r1-repository-health-audit.md).
@@ -239,16 +240,19 @@ workspace-authorized opt-in artifact serving. The broader R1 gate remains
 open. The frontend slice additionally closes render recovery, multi-secret
 redaction, corrupt-row re-audit, the historical preview iframe contract,
 audited dead controls, primary keyboard semantics, and stale web branding.
+The persistence authority/cutover contract is now explicit, and deliberate
+dependency remediation removed every critical, moderate, and low advisory
+while recording the single unreachable React Router RSC exception.
 
-- [ ] Re-audit every still-relevant historical P0/P1 finding and close stale
+- [x] Re-audit every still-relevant historical P0/P1 finding and close stale
       findings with evidence.
 - [ ] Finish the Prettier baseline in reviewable batches and reduce inherited
       ESLint warnings to zero.
-- [ ] Triage dependency advisories without blind or forced upgrades.
-- [ ] Close verified persistence, migration, queue, managed-pool, startup,
+- [x] Triage dependency advisories without blind or forced upgrades.
+- [x] Close verified persistence, migration, queue, managed-pool, startup,
       redaction, rate-limit, CSP/header, artifact-scope, and dead-control
       findings.
-- [ ] Decide and document the persistence end-state before removing any
+- [x] Decide and document the persistence end-state before removing any
       compatibility facade.
 - Gate: every historical P0/P1 finding is fixed, proven stale, or assigned to a
   named later loop; CI and migration recovery are green.
@@ -347,7 +351,7 @@ audited dead controls, primary keyboard semantics, and stale web branding.
 These capabilities were implemented before or during the TaskLoom foundation and are present in the PacketAgent working tree. They are recorded here so new Worker work reuses them instead of rebuilding them. This is implementation inventory, not the current priority list.
 
 - **Full-bleed Builder.** `/builder` is now its own route outside the workbench Shell, with a chat thread, streamed prose, and a split preview. The Topbar no longer leaks into the builder.
-- **Admin consolidation.** Sixteen operator surfaces (Roles, SSO, Secrets, Rate limits, Webhooks, Releases, Storage, Backups, Notifications, Operations, Integrations, Activation, Sandbox, Workflows, Billing, Alerts) live under a single tabbed `/admin/:tab` page. Back-compat redirects keep the old per-page URLs working.
+- **Admin consolidation.** Twelve live operator surfaces (Roles, SSO, Secrets, Rate limits, Webhooks, Notifications, Operations, Integrations, Activation, Sandbox, Workflows, Billing) live under a single tabbed `/admin/:tab` page. Back-compat redirects keep supported old per-page URLs working.
 - **Sidebar collapsed to four items.** Build, Projects, Runs, Admin. Removes the long secondary nav that competed with the Builder.
 - **LLM wire-up via `ProviderRouter`.** Both `generateAppDraftViaLLM` and `applyAppIterationViaLLM` now route through `ProviderRouter`; iteration emits a real SSE prose stream. Template-only generation is the documented fallback when no provider is configured.
 - **Six-provider BYOK at the builder.** Anthropic, OpenAI, Gemini, OpenRouter, MiniMax, and a generic local-LLM provider (Ollama / vLLM / LM Studio / llama.cpp) are first-class. Anthropic remains the default; `PACKETAGENT_PROVIDER_PRIORITY` re-orders the priority walk for every preset; the `local` preset is strict.

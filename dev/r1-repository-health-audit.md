@@ -1,6 +1,6 @@
 # R1 repository health audit
 
-Last updated: 2026-07-28.
+Last updated: 2026-07-29.
 
 This is supporting evidence for
 [`R1`](../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit).
@@ -24,7 +24,7 @@ are inputs to this re-audit, not active task lists.
 | Destructive migrations lack recovery and foreign-key validation | Fixed in current R1 slice; full R1 gate pending | Destructive SQL already creates a timestamped, WAL-checkpointed pre-migration backup. Migration and restore now run `integrity_check` and `foreign_key_check`; a corrupt restore candidate is rejected without replacing the current database. Migrations `0012`, `0013`, `0015`, and `0016` copy data forward before table swaps.                                                                                              |
 | Managed backfill deletes target-only records                    | Fixed in current R1 slice; full R1 gate pending | Managed backfill now makes source records authoritative only for matching identities, preserves target-only records, and does not rewrite a target whose only difference is additional records.                                                                                                                                                                                                                                 |
 | Jobs have multiple writers and incomplete workspace scoping     | Fixed in current R1 slice; full R1 gate pending | SQLite store mutations already load and persist the dedicated `jobs` table inside one `begin immediate` transaction. R1 removed the redundant post-commit repository upsert, so a claim cannot be reverted by a stale second writer. Repository and scheduler find/update/cancel APIs now require `(workspaceId, jobId)`; cross-workspace reads/updates return null, and an upsert cannot replace another workspace's identity. |
-| Persistence has no documented end-state                         | Open                                            | R1 must document which of JSON, SQLite, managed document Postgres, and entity repositories is authoritative for each deployment/migration stage. No compatibility facade may be removed first.                                                                                                                                                                                                                                  |
+| Persistence has no documented end-state                         | Fixed                                           | [`persistence-authority.md`](persistence-authority.md) now distinguishes the logical facade from JSON, SQLite, and managed-Postgres physical authority; inventories promoted SQLite collections and compatibility writers; defines staged cutovers; separates generated-app SQLite; and retains the facade until a future explicit backlog decision satisfies named removal gates.                                              |
 
 ## Other historical findings
 
@@ -33,7 +33,7 @@ are inputs to this re-audit, not active task lists.
 | Quoted Node test globs                                      | Stale                                                                    | `package.json` quotes the API and web test globs, and the current suites discover the expected files on Windows.                                                                                                                                                                                                                                                                                                                              |
 | Sandbox fail-open and host-environment leakage              | Fixed by W6/current runtime                                              | `src/sandbox/sandbox-service.ts` requires an explicit insecure-native opt-in when Docker is unavailable; `src/sandbox/native-driver.ts` allowlists inherited environment entries. Worker command execution is Docker-only and no-network.                                                                                                                                                                                                     |
 | CI has no type/test/build/lint coverage                     | Stale with formatting debt open                                          | `.github/workflows/ci.yml` runs install, typecheck, API/web tests, web build, lint, and Docker build. Formatting remains non-blocking until R1 completes the inherited baseline.                                                                                                                                                                                                                                                              |
-| Dependency advisories                                       | Open                                                                     | R1 will record direct/transitive ownership and reachable production risk before any upgrade. Forced upgrades are not authorized.                                                                                                                                                                                                                                                                                                              |
+| Dependency advisories                                       | Fixed with one unreachable accepted exception                            | [`r1-dependency-advisory-audit.md`](r1-dependency-advisory-audit.md) records direct/transitive ownership, targeted non-major upgrades, the explicit safe esbuild dependency, and reachability. Full/production audits fell from 11/5 findings to two package entries for one React Router RSC advisory; PacketAgent has no RSC/server-action path, and the registry's suggested downgrade reintroduces a broader set of reachable advisories. |
 | Scheduler rejection can crash or fail silently              | Fixed                                                                    | `JobScheduler.tick` catches detached `runJob` failures with redacted logging, distinguishes coordinator authentication failure, guards terminal-write failures, and logs recurring enqueue failure. Current focused scheduler coverage includes all three historical failure paths.                                                                                                                                                           |
 | Production startup truth                                    | Fixed in current R1 slice; full R1 gate pending                          | `npm start` now launches the single-process Hono server without Vite, `concurrently`, or watch mode. Provider/tool registration and legacy-file migration run through the explicit, idempotent `bootstrapServerRuntime()` only after the startup runtime guard passes. `server-startup.test.ts` prevents watch-mode regression.                                                                                                               |
 | Rate-limit client identity and distributed failure handling | Fixed                                                                    | Untrusted forwarded headers are ignored in favor of the socket peer; trusted proxy chains are parsed from the right with a configured hop count. Auth buckets combine the network identity with normalized email before hashing. The distributed limiter fails closed by default. Current auth route coverage proves untrusted/trusted forwarding, hashed buckets, persistence, cleanup, distributed denial, and explicit fail-open behavior. |
@@ -51,7 +51,8 @@ are inputs to this re-audit, not active task lists.
 
 ## Current R1 persistence verification
 
-- `npm run typecheck`: passed.
+- `npm run typecheck`: passed after the dependency and persistence-authority
+  slice.
 - Focused managed-pool reuse test: 1 passed.
 - Focused migration corruption, restore preservation, and managed-backfill
   tests: 4 passed.
@@ -63,12 +64,16 @@ are inputs to this re-audit, not active task lists.
   the corrected focused gate then passed.
 - Focused frontend/backend-safety tests: 23 passed, 0 failed.
 - `npm run test:web`: 30 passed, 0 failed.
-- `npm run build:web`: passed. A local browser pass covered signed-out login,
+- `npm run build:web`: passed with Vite 7.3.6, esbuild 0.27.2, and React Router
+  7.18.2. A prior local browser pass covered signed-out login,
   seeded authentication, PacketAgent branding, sidebar/button semantics,
   project tabs, and project-card layout.
 - `npm run lint`: zero errors and 143 inherited warnings, down from 145.
-- `npm run format:check`: 311 files remain, down from 326.
-- `npm run test:api`: 1,513 passed, 4 intentionally skipped live probes, 0
-  failed (1,517 total).
-- Full web/build/lint/format gates and the remaining R1 slices remain required
-  before R1 can close.
+- `npm run format:check`: 307 files remain, down from 326.
+- `npm run test:api`: 1,521 passed, 4 intentionally skipped live probes, 0
+  failed (1,525 total).
+- `npm audit` and `npm audit --omit=dev`: two high package entries for the
+  single accepted unreachable React Router RSC advisory; no critical,
+  moderate, or low findings.
+- Full formatting and ESLint-warning cleanup remain required before R1 can
+  close.
