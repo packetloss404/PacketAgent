@@ -11,7 +11,10 @@ export function sampleInputsForDraft(draft: AgentBuilderDraft): AgentBuilderSamp
   return { ...draft.sampleInputs };
 }
 
-export function coerceSampleValue(field: AgentInputField | undefined, value: string | boolean): string | number | boolean {
+export function coerceSampleValue(
+  field: AgentInputField | undefined,
+  value: string | boolean,
+): string | number | boolean {
   if (!field) return value;
   if (field.type === "boolean") return Boolean(value);
   if (field.type === "number") {
@@ -23,7 +26,10 @@ export function coerceSampleValue(field: AgentInputField | undefined, value: str
   return String(value);
 }
 
-export function sampleInputIssuesForDraft(draft: AgentBuilderDraft, sampleInputs: AgentBuilderSampleInputs): AgentBuilderSampleInputIssue[] {
+export function sampleInputIssuesForDraft(
+  draft: AgentBuilderDraft,
+  sampleInputs: AgentBuilderSampleInputs,
+): AgentBuilderSampleInputIssue[] {
   const issues: AgentBuilderSampleInputIssue[] = [];
   for (const field of draft.agent.inputSchema ?? []) {
     const value = sampleInputs[field.key];

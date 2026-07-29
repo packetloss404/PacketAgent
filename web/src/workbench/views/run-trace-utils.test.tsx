@@ -26,23 +26,38 @@ test("flattenTraceSpans preserves backend order and derives parent depth", () =>
   };
 
   const rows = flattenTraceSpans(trace, Date.parse("2026-05-27T12:00:00Z"));
-  assert.deepEqual(rows.map((row) => row.span.id), ["root", "model", "tool", "orphan"]);
-  assert.deepEqual(rows.map((row) => row.depth), [0, 1, 2, 0]);
+  assert.deepEqual(
+    rows.map((row) => row.span.id),
+    ["root", "model", "tool", "orphan"],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.depth),
+    [0, 1, 2, 0],
+  );
 });
 
 test("resolveSpanDurationMs prefers explicit duration and falls back to timestamps", () => {
   assert.equal(resolveSpanDurationMs({ id: "a", name: "A", durationMs: 42 }), 42);
-  assert.equal(resolveSpanDurationMs({
-    id: "b",
-    name: "B",
-    startedAt: "2026-05-27T12:00:00Z",
-    endedAt: "2026-05-27T12:00:01.500Z",
-  }), 1500);
-  assert.equal(resolveSpanDurationMs({
-    id: "c",
-    name: "C",
-    startedAt: "2026-05-27T12:00:00Z",
-  }, Date.parse("2026-05-27T12:00:02Z")), 2000);
+  assert.equal(
+    resolveSpanDurationMs({
+      id: "b",
+      name: "B",
+      startedAt: "2026-05-27T12:00:00Z",
+      endedAt: "2026-05-27T12:00:01.500Z",
+    }),
+    1500,
+  );
+  assert.equal(
+    resolveSpanDurationMs(
+      {
+        id: "c",
+        name: "C",
+        startedAt: "2026-05-27T12:00:00Z",
+      },
+      Date.parse("2026-05-27T12:00:02Z"),
+    ),
+    2000,
+  );
 });
 
 test("summarizeTrace uses summary fields when present and otherwise derives counts", () => {

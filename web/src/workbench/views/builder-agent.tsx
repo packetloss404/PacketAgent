@@ -171,6 +171,7 @@ export function AgentBuilderPanel({
             </div>
             {savedAgent && (
               <button
+                type="button"
                 className="btn btn-primary"
                 style={{ marginLeft: "auto" }}
                 onClick={() => navigate(agentEditorPath(savedAgent.id))}
@@ -221,6 +222,7 @@ export function AgentBuilderPanel({
               {prompt.length} chars
             </span>
             <button
+              type="button"
               className="btn btn-primary"
               style={{ marginLeft: "auto" }}
               disabled={!prompt.trim() || working}
@@ -771,6 +773,7 @@ function ApproveCard({
         </div>
         {savedAgent ? (
           <button
+            type="button"
             className="btn btn-primary"
             style={{ marginLeft: "auto", flexShrink: 0 }}
             onClick={onOpenAgent}
@@ -779,6 +782,7 @@ function ApproveCard({
           </button>
         ) : (
           <button
+            type="button"
             className="btn btn-primary"
             style={{ marginLeft: "auto", flexShrink: 0 }}
             disabled={working}

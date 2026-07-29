@@ -75,6 +75,7 @@ export function RunsView() {
             </h1>
           </div>
           <button
+            type="button"
             className="btn btn-sm"
             style={{ marginLeft: "auto" }}
             onClick={() => navigate("/runs")}
@@ -157,6 +158,7 @@ export function RunsView() {
           <span className="kicker">FILTER</span>
           {STATUS_FILTERS.map((f) => (
             <button
+              type="button"
               key={f}
               className="btn btn-sm"
               onClick={() => setFilter(f)}
@@ -175,6 +177,7 @@ export function RunsView() {
             style={{ width: 280, marginLeft: "auto" }}
           />
           <button
+            type="button"
             className="btn btn-sm"
             onClick={() => {
               void runs.refresh();
@@ -232,6 +235,7 @@ export function RunsView() {
                   </td>
                   <td style={{ display: "flex", gap: 4 }}>
                     <button
+                      type="button"
                       className="btn btn-sm"
                       style={{ padding: "3px 8px" }}
                       onClick={() => navigate(`/runs/${r.id}`)}
@@ -240,6 +244,7 @@ export function RunsView() {
                     </button>
                     {r.canCancel && (
                       <button
+                        type="button"
                         className="btn btn-sm"
                         style={{ padding: "3px 8px" }}
                         onClick={() => api.cancelAgentRun(r.id).then(() => runs.refresh())}
@@ -249,6 +254,7 @@ export function RunsView() {
                     )}
                     {r.canRetry && (
                       <button
+                        type="button"
                         className="btn btn-sm"
                         style={{ padding: "3px 8px" }}
                         onClick={() => api.retryAgentRun(r.id).then(() => runs.refresh())}

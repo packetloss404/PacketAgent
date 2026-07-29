@@ -9,13 +9,16 @@ export function buildFixErrorsPrompt(errors: string[]): string {
 export function getPreviewNavigationTarget(previewUrl: string | null, appId: string | null) {
   const cleanPreviewUrl = previewUrl?.trim();
   if (cleanPreviewUrl) {
-    if (/^https?:\/\//i.test(cleanPreviewUrl) || cleanPreviewUrl.startsWith("/")) return cleanPreviewUrl;
+    if (/^https?:\/\//i.test(cleanPreviewUrl) || cleanPreviewUrl.startsWith("/"))
+      return cleanPreviewUrl;
     return `/${cleanPreviewUrl}`;
   }
   return appId ? `/builder/preview/workspace/${encodeURIComponent(appId)}` : null;
 }
 
-export function publishReadinessHeading(state: Pick<AppBuilderPublishState, "canPublish" | "publishedUrl"> | null): string {
+export function publishReadinessHeading(
+  state: Pick<AppBuilderPublishState, "canPublish" | "publishedUrl"> | null,
+): string {
   if (!state) return "Loading publish handoff";
   return state.canPublish ? "Ready for local publish handoff" : "Publish handoff blocked";
 }
@@ -72,13 +75,21 @@ export function stableTargetKey(value: string): string {
   return encodeURIComponent(value.trim().toLowerCase()).replace(/%/g, "_");
 }
 
-export function buildIterationTargetOptions(draft: AppBuilderDraft | null): IterationTargetOption[] {
+export function buildIterationTargetOptions(
+  draft: AppBuilderDraft | null,
+): IterationTargetOption[] {
   if (!draft) {
     return [{ id: "app:draft", kind: "app", label: "Whole app", group: "App" }];
   }
   const appKey = stableTargetKey(draft.app.slug || draft.app.name || "app");
   return [
-    { id: `app:${appKey}`, kind: "app", label: draft.app.name || "Whole app", path: draft.app.slug, group: "App" },
+    {
+      id: `app:${appKey}`,
+      kind: "app",
+      label: draft.app.name || "Whole app",
+      path: draft.app.slug,
+      group: "App",
+    },
     ...draft.app.pages.map((page) => ({
       id: `page:${stableTargetKey(page.route || page.name)}`,
       kind: "page" as const,
@@ -101,13 +112,15 @@ export function buildIterationTargetOptions(draft: AppBuilderDraft | null): Iter
       group: "API",
     })),
     ...(draft.app.authDecisions.length > 0
-      ? [{
-          id: `auth:${appKey}`,
-          kind: "auth" as const,
-          label: `Auth (${draft.app.authDecisions.map((decision) => decision.area).join(", ")})`,
-          path: "auth",
-          group: "Auth",
-        }]
+      ? [
+          {
+            id: `auth:${appKey}`,
+            kind: "auth" as const,
+            label: `Auth (${draft.app.authDecisions.map((decision) => decision.area).join(", ")})`,
+            path: "auth",
+            group: "Auth",
+          },
+        ]
       : []),
     {
       id: `smoke:${appKey}`,
@@ -141,11 +154,18 @@ export function cssPathFor(el: Element): string {
       segments.unshift(segment);
       break;
     }
-    const classes = (node.getAttribute("class") ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 2);
-    if (classes.length > 0) segment += classes.map((className) => `.${escapeCssIdent(className)}`).join("");
+    const classes = (node.getAttribute("class") ?? "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2);
+    if (classes.length > 0)
+      segment += classes.map((className) => `.${escapeCssIdent(className)}`).join("");
     const parent: Element | null = node.parentElement;
     if (parent) {
-      const sameTagSiblings: Element[] = Array.from(parent.children).filter((sibling) => sibling.tagName === node.tagName);
+      const sameTagSiblings: Element[] = Array.from(parent.children).filter(
+        (sibling) => sibling.tagName === node.tagName,
+      );
       if (sameTagSiblings.length > 1) {
         const index = sameTagSiblings.indexOf(node) + 1;
         segment += `:nth-of-type(${index})`;

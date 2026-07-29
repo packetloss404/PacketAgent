@@ -46,6 +46,7 @@ export function DashboardView() {
         actions={
           <>
             <button
+              type="button"
               className="top-btn"
               onClick={() => {
                 void bootstrap.refresh();
@@ -57,7 +58,7 @@ export function DashboardView() {
             >
               <I.refresh size={13} /> Refresh
             </button>
-            <button className="top-btn" onClick={() => setActive("builder")}>
+            <button type="button" className="top-btn" onClick={() => setActive("builder")}>
               <I.plus size={13} /> New build
             </button>
           </>
@@ -111,7 +112,11 @@ export function DashboardView() {
               title="Recent agents"
               sub="Pick up where you left off"
               action={
-                <button className="btn-ghost btn btn-sm" onClick={() => setActive("agents")}>
+                <button
+                  type="button"
+                  className="btn-ghost btn btn-sm"
+                  onClick={() => setActive("agents")}
+                >
                   View all
                 </button>
               }
@@ -209,6 +214,7 @@ export function DashboardView() {
                 Next: <span style={{ color: "var(--green)" }}>{nextAction}</span>
               </div>
               <button
+                type="button"
                 onClick={() => setActive("activation")}
                 className="btn btn-sm"
                 style={{ marginTop: 10 }}

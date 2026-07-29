@@ -31,6 +31,7 @@ export function SandboxBuilderTab({ appId, appName }: { appId: string | null; ap
       <div style={{ display: "flex", alignItems: "center", marginBottom: 12, gap: 8 }}>
         <div className="kicker">Sandbox runs · {appName}</div>
         <button
+          type="button"
           className="btn btn-sm"
           style={{ marginLeft: "auto" }}
           onClick={() => void execs.refresh()}

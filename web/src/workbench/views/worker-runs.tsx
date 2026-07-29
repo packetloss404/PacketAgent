@@ -150,6 +150,7 @@ export function WorkerRunsView() {
           <span className="kicker">STATE</span>
           {WORKER_STATUS_FILTERS.map((filter) => (
             <button
+              type="button"
               key={filter}
               className="btn btn-sm"
               aria-pressed={status === filter}
@@ -173,7 +174,7 @@ export function WorkerRunsView() {
               style={{ width: 290 }}
             />
           </label>
-          <button className="btn btn-sm" onClick={refresh}>
+          <button type="button" className="btn btn-sm" onClick={refresh}>
             Refresh
           </button>
         </div>
@@ -262,6 +263,7 @@ export function WorkerRunsView() {
                   <td className="mono">{formatRelative(run.updatedAt)}</td>
                   <td>
                     <button
+                      type="button"
                       className="btn btn-sm"
                       aria-label={`View Worker run ${run.id}`}
                       onClick={() => navigate(`/runs/worker/${encodeURIComponent(run.id)}`)}
@@ -290,7 +292,12 @@ export function WorkerRunsView() {
         )}
         {nextCursor && (
           <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
-            <button className="btn" disabled={loadingMore} onClick={() => void loadMore()}>
+            <button
+              type="button"
+              className="btn"
+              disabled={loadingMore}
+              onClick={() => void loadMore()}
+            >
               {loadingMore ? "Loading…" : "Load more Workers"}
             </button>
           </div>
@@ -310,6 +317,7 @@ function RunModeSwitch({
   return (
     <div role="group" aria-label="Run type" style={{ display: "flex", gap: 5 }}>
       <button
+        type="button"
         className="btn btn-sm"
         aria-pressed={mode === "workers"}
         onClick={() => onChange("workers")}
@@ -321,6 +329,7 @@ function RunModeSwitch({
         Workers
       </button>
       <button
+        type="button"
         className="btn btn-sm"
         aria-pressed={mode === "agents"}
         onClick={() => onChange("agents")}

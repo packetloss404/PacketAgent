@@ -709,6 +709,7 @@ export function BuilderView() {
                 ⚙
               </button>
               <button
+                type="button"
                 className="btn-primary btn"
                 disabled={!prompt.trim() || working}
                 onClick={submitInitialPrompt}
@@ -977,6 +978,7 @@ export function BuilderView() {
                       creates a checkpoint.
                     </p>
                     <button
+                      type="button"
                       className="btn btn-primary"
                       disabled={working}
                       onClick={() => {
@@ -1022,6 +1024,7 @@ export function BuilderView() {
                       </div>
                     </div>
                     <button
+                      type="button"
                       className="btn btn-primary"
                       disabled={working}
                       onClick={() => {
@@ -1044,6 +1047,7 @@ export function BuilderView() {
                     const active = selectedIterationTarget.id === t.id && !selectedElement;
                     return (
                       <button
+                        type="button"
                         key={t.id}
                         className="btn btn-sm"
                         title={t.group}
@@ -1097,6 +1101,7 @@ export function BuilderView() {
                       )}
                     </span>
                     <button
+                      type="button"
                       onClick={() => setSelectedElement(null)}
                       style={{
                         background: "transparent",
@@ -1139,6 +1144,7 @@ export function BuilderView() {
                     style={{ position: "absolute", right: 8, bottom: 8, display: "flex", gap: 4 }}
                   >
                     <button
+                      type="button"
                       className="btn-primary btn btn-sm"
                       disabled={!iterPrompt.trim() || working}
                       onClick={() => {
@@ -1174,6 +1180,7 @@ export function BuilderView() {
                         : `${p.friendly} — no provider configured (template fallback)`;
                     return (
                       <button
+                        type="button"
                         key={p.id}
                         onClick={() => setComposerPreset(p.id)}
                         title={tooltip}

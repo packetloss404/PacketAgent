@@ -401,6 +401,7 @@ function AgentTemplates({ onCreated }: { onCreated: (a: AgentRecord) => void }) 
                 {t.summary || t.description}
               </p>
               <button
+                type="button"
                 className="btn btn-sm"
                 style={{ marginTop: 8 }}
                 disabled={Boolean(creatingTemplateId)}

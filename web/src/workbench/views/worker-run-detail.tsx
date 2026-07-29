@@ -140,7 +140,7 @@ export function WorkerRunDetailView() {
       <>
         <Topbar crumbs={["__WS__", "Runs", "Workers", id]} />
         <div style={{ padding: "26px 28px" }}>
-          <button className="btn btn-sm" onClick={() => navigate("/runs")}>
+          <button type="button" className="btn btn-sm" onClick={() => navigate("/runs")}>
             Back to Workers
           </button>
           <div
@@ -162,7 +162,7 @@ export function WorkerRunDetailView() {
         crumbs={["__WS__", "Runs", "Workers", run.definition.name]}
         actions={
           <>
-            <button className="top-btn" onClick={() => navigate("/runs")}>
+            <button type="button" className="top-btn" onClick={() => navigate("/runs")}>
               All Workers
             </button>
             {run.controls.canPause && (
@@ -354,7 +354,7 @@ function ControlButton({
   onClick: () => void;
 }) {
   return (
-    <button className="top-btn" disabled={disabled} onClick={onClick}>
+    <button type="button" className="top-btn" disabled={disabled} onClick={onClick}>
       {busy ? "Working…" : label}
     </button>
   );
@@ -499,6 +499,7 @@ function AttentionPanel({
           {item.status === "open" && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 9 }}>
               <button
+                type="button"
                 className="btn btn-sm"
                 disabled={busy !== null}
                 onClick={() => void onResolve(item, "approve-once")}
@@ -506,6 +507,7 @@ function AttentionPanel({
                 {busy === `${item.id}:approve-once` ? "Approving…" : "Approve once"}
               </button>
               <button
+                type="button"
                 className="btn btn-sm"
                 disabled={busy !== null}
                 onClick={() => void onResolve(item, "approve-for-run")}
@@ -513,6 +515,7 @@ function AttentionPanel({
                 {busy === `${item.id}:approve-for-run` ? "Approving…" : "Approve for run"}
               </button>
               <button
+                type="button"
                 className="btn btn-sm"
                 disabled={busy !== null}
                 onClick={() => void onResolve(item, "reject")}

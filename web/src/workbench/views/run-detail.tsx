@@ -56,7 +56,7 @@ function RunDetailContent({ id }: { id: string }) {
       <>
         <Topbar crumbs={["__WS__", "Activity"]} />
         <div style={{ padding: "26px 28px" }}>
-          <button className="btn btn-sm" onClick={() => navigate(-1)}>
+          <button type="button" className="btn btn-sm" onClick={() => navigate(-1)}>
             <I.arrow size={11} style={{ transform: "scaleX(-1)" }} /> Back
           </button>
           <div className="card muted" style={{ padding: 22, marginTop: 18 }}>
@@ -88,7 +88,7 @@ function RunDetailContent({ id }: { id: string }) {
       <Topbar
         crumbs={["__WS__", "Activity", activityTitle(activity)]}
         actions={
-          <button className="top-btn" onClick={() => navigate("/runs")}>
+          <button type="button" className="top-btn" onClick={() => navigate("/runs")}>
             <I.activity size={13} /> All activity
           </button>
         }

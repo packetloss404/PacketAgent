@@ -13,9 +13,14 @@ export function SharePopover({ appId }: { appId: string | null }) {
     if (!open) return;
     let cancelled = false;
     if (!hostInfo && !hostInfoError) {
-      api.getHostInfo()
-        .then((info) => { if (!cancelled) setHostInfo(info); })
-        .catch((err: Error) => { if (!cancelled) setHostInfoError(err.message || "couldn't load network info"); });
+      api
+        .getHostInfo()
+        .then((info) => {
+          if (!cancelled) setHostInfo(info);
+        })
+        .catch((err: Error) => {
+          if (!cancelled) setHostInfoError(err.message || "couldn't load network info");
+        });
     }
     const onDown = (event: MouseEvent) => {
       if (!wrapperRef.current) return;
@@ -50,9 +55,8 @@ export function SharePopover({ appId }: { appId: string | null }) {
       const previewPath = `/api/app/generated-apps/${encodeURIComponent(appId)}/preview/?token=${encodeURIComponent(token)}`;
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const local = `${origin}${previewPath}`;
-      const lan = firstLanIp && hostInfo
-        ? `http://${firstLanIp}:${hostInfo.port}${previewPath}`
-        : null;
+      const lan =
+        firstLanIp && hostInfo ? `http://${firstLanIp}:${hostInfo.port}${previewPath}` : null;
       return { localUrl: local, lanUrl: lan };
     } catch {
       return null;
@@ -108,7 +112,9 @@ export function SharePopover({ appId }: { appId: string | null }) {
         onClick={() => setOpen((value) => !value)}
         className="btn-ghost"
         style={{
-          display: "flex", alignItems: "center", gap: 6,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
           padding: "5px 10px",
           background: "var(--panel)",
           border: "1px solid var(--line-2)",
@@ -118,7 +124,7 @@ export function SharePopover({ appId }: { appId: string | null }) {
           cursor: "pointer",
         }}
       >
-        <ShareIcon size={12}/>
+        <ShareIcon size={12} />
         <span>Share</span>
       </button>
       {open && (
@@ -147,17 +153,23 @@ export function SharePopover({ appId }: { appId: string | null }) {
             label="Copy link to this device"
             hint="Link expires in 1 hour · works in incognito on this device"
             copied={copiedKey === "local"}
-            onClick={() => { void copyLocal(); }}
+            onClick={() => {
+              void copyLocal();
+            }}
           />
           {hostInfo === null && hostInfoError === null && (
-            <div className="muted" style={{ fontSize: 11 }}>Loading network info…</div>
+            <div className="muted" style={{ fontSize: 11 }}>
+              Loading network info…
+            </div>
           )}
           {lanShareable ? (
             <ShareOptionButton
               label="Copy link for your network"
               hint={`Link expires in 1 hour · valid on any device on your network (http://${firstLanIp})`}
               copied={copiedKey === "lan"}
-              onClick={() => { void copyLan(); }}
+              onClick={() => {
+                void copyLan();
+              }}
             />
           ) : hostInfo && (hostInfo.lanIps.length === 0 || !appId) ? (
             <div className="muted" style={{ fontSize: 11, fontStyle: "italic" }}>
@@ -166,13 +178,15 @@ export function SharePopover({ appId }: { appId: string | null }) {
                 : "(save the draft first to share over your network)"}
             </div>
           ) : null}
-          <div style={{
-            borderTop: "1px solid var(--line)",
-            paddingTop: 8,
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-          }}>
+          <div
+            style={{
+              borderTop: "1px solid var(--line)",
+              paddingTop: 8,
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
             <div style={{ fontWeight: 500, fontSize: 12 }}>Download as Docker bundle</div>
             <div className="muted" style={{ fontSize: 11 }}>
               Switch to the Publish tab to generate a Docker Compose bundle.
@@ -212,13 +226,30 @@ function ShareOptionButton({
         gap: 2,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <div
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
+      >
         <span style={{ fontSize: 12, fontWeight: 500 }}>{label}</span>
         {copied && (
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--green)", background: "rgba(184,242,92,0.18)", padding: "2px 8px", borderRadius: 12 }}>✓ Copied</span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--green)",
+              background: "rgba(184,242,92,0.18)",
+              padding: "2px 8px",
+              borderRadius: 12,
+            }}
+          >
+            ✓ Copied
+          </span>
         )}
       </div>
-      {hint && <span className="muted" style={{ fontSize: 10.5 }}>{hint}</span>}
+      {hint && (
+        <span className="muted" style={{ fontSize: 10.5 }}>
+          {hint}
+        </span>
+      )}
     </button>
   );
 }

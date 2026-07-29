@@ -127,7 +127,7 @@ function RunDeepContent({ id }: { id: string }) {
       <>
         <Topbar crumbs={["__WS__", "Runs", id]} />
         <div style={{ padding: "26px 28px" }}>
-          <button className="btn btn-sm" onClick={() => navigate("/runs")}>
+          <button type="button" className="btn btn-sm" onClick={() => navigate("/runs")}>
             <I.arrow size={11} style={{ transform: "scaleX(-1)" }} /> All runs
           </button>
           <div className="card" style={{ padding: 22, marginTop: 18, color: "var(--danger)" }}>
@@ -147,11 +147,12 @@ function RunDeepContent({ id }: { id: string }) {
         crumbs={["__WS__", "Runs", agentName || run.title]}
         actions={
           <>
-            <button className="top-btn" onClick={() => navigate("/runs")}>
+            <button type="button" className="top-btn" onClick={() => navigate("/runs")}>
               <I.activity size={13} /> All runs
             </button>
             {run.canCancel && (
               <button
+                type="button"
                 className="top-btn"
                 disabled={Boolean(actionBusy)}
                 onClick={() => {
@@ -170,6 +171,7 @@ function RunDeepContent({ id }: { id: string }) {
             )}
             {run.canRetry && (
               <button
+                type="button"
                 className="top-btn"
                 disabled={Boolean(actionBusy)}
                 onClick={() => {
@@ -187,6 +189,7 @@ function RunDeepContent({ id }: { id: string }) {
               </button>
             )}
             <button
+              type="button"
               className="top-btn"
               disabled={Boolean(actionBusy)}
               onClick={() => {

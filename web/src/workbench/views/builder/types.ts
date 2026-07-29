@@ -37,7 +37,14 @@ export interface ChatMessage {
   checkpointId?: string;
 }
 
-export type Mode = "empty" | "agent" | "drafting" | "drafted" | "applying" | "applied" | "iterating";
+export type Mode =
+  | "empty"
+  | "agent"
+  | "drafting"
+  | "drafted"
+  | "applying"
+  | "applied"
+  | "iterating";
 export type BuilderKind = "app" | "agent";
 
 export interface BuilderState {
@@ -55,4 +62,6 @@ export interface BuilderState {
 
 export type IterationTargetOption = AppBuilderIterationTarget & { group: string };
 export type PublishRollbackAction = AppBuilderPublishState["rollbackActions"][number];
-export type PublishRollbackBody = NonNullable<Parameters<typeof api.rollbackBuilderPublish>[1]> & { targetPublishId?: string };
+export type PublishRollbackBody = NonNullable<Parameters<typeof api.rollbackBuilderPublish>[1]> & {
+  targetPublishId?: string;
+};

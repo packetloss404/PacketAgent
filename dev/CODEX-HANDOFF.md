@@ -346,9 +346,10 @@ use; [`r1-dependency-advisory-audit.md`](r1-dependency-advisory-audit.md)
 records the reachability and exact-pin decision. Typecheck, production build,
 30 web tests, and the full 1,525-test API gate pass.
 
-Resume with the remaining repo-wide Prettier/button-type and ESLint batches.
-Keep each batch mechanically scoped and reviewable; update the counts here and
-in `BACKLOG.md` after every checkpoint.
+Resume with the remaining repo-wide Prettier batches. ESLint is clean, and all
+123 native React buttons declare an explicit type. Keep each formatting batch
+mechanically scoped and reviewable; update the counts here and in `BACKLOG.md`
+after every checkpoint.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private
@@ -633,7 +634,7 @@ handoff, the roadmap, or the backlog.
 
 Known inherited quality debt:
 
-- repo-wide `npm run format:check` flags 268 inherited files;
+- repo-wide `npm run format:check` flags 247 inherited files;
 - full and production dependency audits each report two high package entries
   for the same accepted, unreachable React Router RSC advisory; and
 - ESLint is clean with zero errors and zero warnings.

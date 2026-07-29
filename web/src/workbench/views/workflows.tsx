@@ -441,6 +441,7 @@ function ReleaseView() {
             </div>
             {!r.confirmed && (
               <button
+                type="button"
                 className="btn btn-primary"
                 onClick={async () => {
                   try {

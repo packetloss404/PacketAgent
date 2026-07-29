@@ -181,6 +181,7 @@ export function SandboxView() {
         <span className="kicker">FILTER</span>
         {STATUS_FILTERS.map((f) => (
           <button
+            type="button"
             key={f}
             className="btn btn-sm"
             onClick={() => setFilter(f)}
@@ -194,6 +195,7 @@ export function SandboxView() {
           </button>
         ))}
         <button
+          type="button"
           className="btn btn-sm"
           style={{ marginLeft: "auto" }}
           onClick={() => void execs.refresh()}
@@ -453,6 +455,7 @@ function Composer({
             </span>
           )}
           <button
+            type="button"
             className="btn btn-primary"
             disabled={!command.trim() || working}
             onClick={onStart}
@@ -532,6 +535,7 @@ export function ExecTable({
                 </td>
                 <td style={{ display: "flex", gap: 4 }}>
                   <button
+                    type="button"
                     className="btn btn-sm"
                     style={{ padding: "3px 8px" }}
                     onClick={() => onSelect(e.id)}
@@ -540,6 +544,7 @@ export function ExecTable({
                   </button>
                   {cancellable && (
                     <button
+                      type="button"
                       className="btn btn-sm"
                       style={{ padding: "3px 8px" }}
                       onClick={() => onCancel(e.id)}

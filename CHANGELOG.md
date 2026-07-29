@@ -53,6 +53,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   suppresses stale responses, and Builder tours, agent generation, run detail,
   iteration targets, and workspace forms reset by explicit identity or
   scheduled effects instead of synchronous effect-driven state writes.
+- Audited all 123 native React buttons through the TypeScript syntax tree and
+  added explicit non-submit types to the 64 that relied on browser defaults;
+  formatted the workbench-view tree and reduced the Prettier backlog from 268
+  files to 247.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

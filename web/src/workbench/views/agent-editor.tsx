@@ -454,6 +454,7 @@ export function AgentEditorView() {
           !isNew && agent ? (
             <>
               <button
+                type="button"
                 className="top-btn"
                 onClick={() => {
                   void runNow();
@@ -471,6 +472,7 @@ export function AgentEditorView() {
               </button>
               {canManageAgent && (
                 <button
+                  type="button"
                   className="top-btn"
                   onClick={() => {
                     void archive();

@@ -268,6 +268,7 @@ function MembersTab({
                 <td>
                   {canManageWorkspace ? (
                     <button
+                      type="button"
                       className="btn btn-sm"
                       style={{ padding: "3px 8px" }}
                       onClick={async () => {
@@ -369,6 +370,7 @@ function InvitesTab({
                   {canManageWorkspace ? (
                     <>
                       <button
+                        type="button"
                         className="btn btn-sm"
                         style={{ padding: "3px 8px" }}
                         onClick={async () => {
@@ -383,6 +385,7 @@ function InvitesTab({
                         Resend
                       </button>
                       <button
+                        type="button"
                         className="btn btn-sm"
                         style={{ padding: "3px 8px", marginLeft: 4, color: "var(--danger)" }}
                         onClick={async () => {
@@ -473,6 +476,7 @@ function SharesTab({
           </span>
           {canManageWorkspace ? (
             <button
+              type="button"
               className="btn btn-sm"
               style={{ color: "var(--danger)" }}
               onClick={async () => {
@@ -565,6 +569,7 @@ function KeysTab({
                 <td>
                   {canManageWorkspace ? (
                     <button
+                      type="button"
                       className="btn btn-sm"
                       style={{ padding: "3px 8px", color: "var(--danger)" }}
                       onClick={async () => {
@@ -714,6 +719,7 @@ function WorkspaceTab() {
           }}
         >
           <button
+            type="button"
             className="btn btn-primary"
             onClick={() => {
               void save();

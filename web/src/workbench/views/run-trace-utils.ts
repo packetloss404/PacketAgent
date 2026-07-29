@@ -17,7 +17,10 @@ export function normalizeTraceSpans(trace: AgentRunTrace | null | undefined): Ag
   return Array.isArray(trace?.spans) ? trace.spans.filter((span) => Boolean(span?.id)) : [];
 }
 
-export function flattenTraceSpans(trace: AgentRunTrace | null | undefined, nowMs = Date.now()): TraceSpanRow[] {
+export function flattenTraceSpans(
+  trace: AgentRunTrace | null | undefined,
+  nowMs = Date.now(),
+): TraceSpanRow[] {
   const spans = normalizeTraceSpans(trace);
   const byId = new Map(spans.map((span) => [span.id, span]));
   return spans.map((span) => ({
@@ -39,7 +42,9 @@ export function resolveSpanDurationMs(span: AgentRunTraceSpan, nowMs = Date.now(
   return end - start;
 }
 
-export function traceStatusTone(status: string | null | undefined): "good" | "warn" | "danger" | "info" | "muted" {
+export function traceStatusTone(
+  status: string | null | undefined,
+): "good" | "warn" | "danger" | "info" | "muted" {
   switch ((status ?? "").toLowerCase()) {
     case "success":
     case "ok":
@@ -68,8 +73,13 @@ export function summarizeTrace(trace: AgentRunTrace | null | undefined) {
   const summary = trace?.summary;
   return {
     spans: summary?.spans ?? summary?.spanCount ?? spans.length,
-    modelCalls: summary?.modelCalls ?? spans.filter((span) => span.kind === "model" || span.model).length,
-    toolCalls: summary?.toolCalls ?? summary?.toolCallCount ?? spans.filter((span) => span.kind === "tool" || span.kind === "tool_call" || span.toolName).length,
+    modelCalls:
+      summary?.modelCalls ?? spans.filter((span) => span.kind === "model" || span.model).length,
+    toolCalls:
+      summary?.toolCalls ??
+      summary?.toolCallCount ??
+      spans.filter((span) => span.kind === "tool" || span.kind === "tool_call" || span.toolName)
+        .length,
     costUsd: summary?.costUsd ?? sumKnownNumbers(spans.map((span) => span.costUsd)),
     durationMs: summary?.durationMs ?? trace?.durationMs ?? null,
   };
