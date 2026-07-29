@@ -21,6 +21,7 @@ import type {
   AppBuilderDraftSource,
   AppBuilderDraftResult,
   AppBuilderFixPromptResult,
+  AppBuilderFileProgress,
   AppBuilderGeneratedFile,
   AppBuilderIterationApplyRequest,
   AppBuilderIterationApplyResult,
@@ -173,6 +174,7 @@ function csrfTokenForRequest(init?: RequestInit) {
 export type BuilderStreamEvent =
   | { type: "step"; text: string }
   | { type: "prose"; text: string }
+  | { type: "file-progress"; progress: AppBuilderFileProgress }
   | {
       type: "draft";
       draft: AppBuilderDraft;

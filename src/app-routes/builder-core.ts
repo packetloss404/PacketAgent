@@ -26,6 +26,7 @@ import {
   canonicalizeIterationFileTree,
   type AppIterationChangeRequest,
   type AppIterationDiffHunk,
+  type AppIterationFileTreeOptions,
   type AppIterationLLMResult,
   type AppIterationPlan,
   type AppIterationPresetId,
@@ -437,6 +438,7 @@ async function runAppIterationCore(
   body: AppIterationRouteRequest,
   onStep?: (text: string) => Promise<void> | void,
   onProse?: (chunk: string) => Promise<void> | void,
+  onFileProgress?: NonNullable<AppIterationFileTreeOptions["onFileProgress"]>,
 ): Promise<AppIterationRouteResult> {
   await onStep?.("Loading current draft");
   const prompt = promptFromBody(body.prompt);
@@ -523,6 +525,7 @@ async function runAppIterationCore(
         {
           workspaceId: context.workspace.id,
           preset: body.preset as AppIterationPresetId | undefined,
+          ...(onFileProgress ? { onFileProgress } : {}),
         },
         onProse
           ? async (chunk) => {
@@ -3885,13 +3888,23 @@ export function registerBuilderRoutes(app: Hono): void {
         await emitStep(sse, "Reading the prompt");
         await chatStreamDelay();
         const prompt = promptFromBody(body.prompt);
-        // Fork B: generateAppDraftWithLLM uses the Claude API when ANTHROPIC_API_KEY
-        // is configured, otherwise falls back to the deterministic template path.
+        // The file-tree path resolves the selected preset through the provider
+        // router, then falls back to the structured draft or deterministic
+        // template path when no compatible provider is ready.
         // The emit callback forwards model prose token-by-token to the UI as SSE
         // "prose" events so the chat bubble streams as the model thinks.
         const { draft, source, files, validationErrors } = await generateAppDraftWithLLM(
           prompt,
-          { preset: body.preset },
+          {
+            preset: body.preset,
+            workspaceId: context.workspace.id,
+            onFileProgress: async (progress) => {
+              await sse.writeSSE({
+                event: "file-progress",
+                data: JSON.stringify({ type: "file-progress", progress }),
+              });
+            },
+          },
           async (text) => {
             await sse.writeSSE({ event: "prose", data: JSON.stringify({ type: "prose", text }) });
           },
@@ -3979,6 +3992,12 @@ export function registerBuilderRoutes(app: Hono): void {
                 await emitProse(sse, chunk);
               }
             : undefined,
+          async (progress) => {
+            await sse.writeSSE({
+              event: "file-progress",
+              data: JSON.stringify({ type: "file-progress", progress }),
+            });
+          },
         );
         await sse.writeSSE({
           event: "diff",

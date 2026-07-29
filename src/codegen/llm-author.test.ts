@@ -14,6 +14,7 @@ import {
   isSafePath,
   MAX_FILES_PER_WRITE_CHUNK,
   parsePlan,
+  type CodegenProgressEvent,
   type ResolvedPrompts,
 } from "./llm-author.js";
 import type { ValidateOptions, ValidationResult } from "./validate.js";
@@ -712,6 +713,7 @@ test("authorAndValidateAppViaLLM: repairs once after validation failure", async 
     ) => validations.shift() ?? validations[validations.length - 1]!;
 
     const emitted: string[] = [];
+    const progress: CodegenProgressEvent[] = [];
     const result = await authorAndValidateAppViaLLM(
       "Build a tiny app.",
       {
@@ -719,6 +721,9 @@ test("authorAndValidateAppViaLLM: repairs once after validation failure", async 
         router: makeRouterWithProvider(provider),
         resolvePrompts: fixedPrompts,
         validateFn,
+        onProgress: (event) => {
+          progress.push(event);
+        },
       },
       (chunk) => {
         emitted.push(chunk);
@@ -730,7 +735,89 @@ test("authorAndValidateAppViaLLM: repairs once after validation failure", async 
     assert.equal(result!.validation.ok, true);
     assert.match(result!.files[0]!.content, /return null/);
     assert.ok(emitted.some((chunk) => chunk.includes("Trying repair pass 1 of 2")));
+    assert.ok(
+      progress.some(
+        (event) =>
+          event.attempt === 0 &&
+          event.phase === "plan" &&
+          event.path === "src/App.tsx" &&
+          event.status === "completed",
+      ),
+    );
+    assert.ok(
+      progress.some(
+        (event) =>
+          event.attempt === 0 &&
+          event.phase === "validate" &&
+          event.path === "src/App.tsx" &&
+          event.status === "failed" &&
+          event.errorCount === 1,
+      ),
+    );
+    assert.ok(
+      progress.some(
+        (event) =>
+          event.attempt === 1 &&
+          event.phase === "write" &&
+          event.path === "src/App.tsx" &&
+          event.status === "completed",
+      ),
+    );
+    assert.ok(
+      progress.some(
+        (event) =>
+          event.attempt === 1 &&
+          event.phase === "validate" &&
+          event.path === "src/App.tsx" &&
+          event.status === "completed",
+      ),
+    );
   });
+});
+
+test("authorAndValidateAppViaLLM: reports skipped validation without claiming success", async () => {
+  const progress: CodegenProgressEvent[] = [];
+  const result = await authorAndValidateAppViaLLM(
+    "Build a tiny app.",
+    {
+      workspaceId: "ws",
+      authorFn: async () => ({
+        files: [
+          { path: "src/App.tsx", content: "export default function App() { return null; }\n" },
+        ],
+        summary: "tiny app",
+        source: "llm",
+      }),
+      validateFn: async () => ({
+        ok: true,
+        source: "skipped",
+        errors: [],
+        warnings: ["Sandbox unavailable."],
+        durationMs: 0,
+        phases: { typecheck: "skipped", build: "skipped" },
+      }),
+      onProgress: (event) => {
+        progress.push(event);
+      },
+    },
+    () => {},
+  );
+
+  assert.ok(result);
+  assert.equal(result.validation.source, "skipped");
+  assert.ok(
+    progress.some(
+      (event) =>
+        event.phase === "validate" && event.path === "src/App.tsx" && event.status === "skipped",
+    ),
+  );
+  assert.equal(
+    progress.some(
+      (event) =>
+        event.phase === "validate" && event.path === "src/App.tsx" && event.status === "completed",
+    ),
+    false,
+  );
 });
 
 test("authorAndValidateAppViaLLM: stops on repeated validation signature", async () => {

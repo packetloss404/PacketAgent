@@ -31,6 +31,7 @@ export async function tryFileTreeCodegen(
     const authorOptions: AuthorAndValidateAppOptions = { workspaceId };
     if (options.preset) authorOptions.preset = options.preset;
     if (options.signal) authorOptions.signal = options.signal;
+    if (options.onFileProgress) authorOptions.onProgress = options.onFileProgress;
     const noopEmit = (_: string) => {};
     const author = options.fileTreeAuthorFn ?? authorAndValidateAppViaLLM;
     const result = await author(prompt, authorOptions, emit ?? noopEmit);

@@ -1065,7 +1065,9 @@ Status: active.
 2. [Complete 2026-07-29] Normalize persisted legacy source bundles through a
    path-safe, collision-safe one-time conversion; applied iteration checkpoints
    become canonical `llm-filetree` even when model authoring falls back.
-3. Stream per-file plan/write/validate progress to the Files view.
+3. [Complete 2026-07-29] Stream typed, attempt-aware per-file
+   plan/write/validate progress through the authoring loop, SSE routes, and
+   Files view; sandbox-skipped validation remains explicitly `skipped`.
 4. Add file-level changed/unchanged/new/deleted review and targeted
    route/entity/component regeneration.
 5. Add sandboxed package-install planning and workspace export as zip or

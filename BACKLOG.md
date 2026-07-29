@@ -282,7 +282,7 @@ Status: active.
 - [x] Add targeted bounded repair prompts from real failure clusters.
 - [x] Move legacy-template iteration to the file-tree path or a deterministic
       one-time conversion.
-- [ ] Stream per-file plan/write/validate progress.
+- [x] Stream per-file plan/write/validate progress.
 - [ ] Add file-level change review and targeted route/entity/component
       regeneration.
 - [ ] Add sandboxed package planning and workspace export as zip or git-ready
@@ -411,11 +411,12 @@ The router, preset resolver, and six adapters are present. What remains:
 
 ### File-tree codegen
 
-The orchestrator, default-on flip, path validator, derived-draft projection, iteration parity, chunked planning, Vite-build validation, bounded repair, and inline error UX are present. What remains:
-
-- Broaden the multi-round auto-fix loop with more targeted repair prompts once real-world generated apps expose common failure clusters. A bounded repair loop now runs automatically before surfacing errors.
-- Iteration on legacy-template drafts (drafts where `source === "template"` or `source === "llm"`) still uses the regex pipeline. Only file-tree drafts get the new iteration path.
-- Streaming per-file progress in the Files tab as the tree lands. Today the Files tab updates after the write phase finishes rather than file-by-file.
+The orchestrator, default-on flip, path validator, derived-draft projection,
+canonical legacy conversion, targeted bounded repair, per-file
+plan/write/validate streaming, iteration parity, chunked planning, Vite-build
+validation, and inline error UX are present. The remaining R3 work is the
+file-level change review/targeted-regeneration slice and sandboxed package
+planning plus export.
 
 ### Generated-app persistence and runtime
 

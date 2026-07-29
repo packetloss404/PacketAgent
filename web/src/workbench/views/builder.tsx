@@ -13,6 +13,7 @@ import {
 } from "./builder-start";
 import type {
   AppBuilderApproveResult,
+  AppBuilderFileProgress,
   AppBuilderIterationTarget,
   AppBuilderCheckpointSummary,
   AppBuilderPublishState,
@@ -27,6 +28,7 @@ import {
   newId,
   nextSmarterPreset,
   stableTargetKey,
+  upsertFileProgress,
 } from "./builder/helpers";
 import type {
   BuilderKind,
@@ -39,7 +41,7 @@ import type {
 } from "./builder/types";
 import { ThreadMessage } from "./builder/thread";
 import { PreviewTab } from "./builder/tabs/preview";
-import { FilesTab } from "./builder/tabs/files";
+import { FileGenerationProgress, FilesTab } from "./builder/tabs/files";
 import { LogsTab, SmokeTab } from "./builder/tabs/smoke-logs";
 import { CheckpointsTab } from "./builder/tabs/checkpoints";
 import { PublishTab } from "./builder/tabs/publish";
@@ -59,6 +61,7 @@ export function BuilderView() {
   >("preview");
   const [checkpoints, setCheckpoints] = useState<AppBuilderCheckpointSummary[]>([]);
   const [publishState, setPublishState] = useState<AppBuilderPublishState | null>(null);
+  const [fileProgress, setFileProgress] = useState<AppBuilderFileProgress[]>([]);
 
   const [state, setState] = useState<BuilderState>({
     draft: null,
@@ -139,6 +142,7 @@ export function BuilderView() {
     setMessages([]);
     setCheckpoints([]);
     setPublishState(null);
+    setFileProgress([]);
     setSelectedElement(null);
     setState({
       draft: null,
@@ -212,6 +216,7 @@ export function BuilderView() {
     setWorking(true);
     setError(null);
     setMode("drafting");
+    setFileProgress([]);
     appendMessage({ id: newId(), role: "user", body: { kind: "text", text: nextPrompt } });
     const assistantId = newId();
     appendMessage({
@@ -232,7 +237,10 @@ export function BuilderView() {
             const next = m.body.kind === "prose" ? m.body.text + event.text : event.text;
             return { ...m, body: { kind: "prose", text: next } };
           });
+        } else if (event.type === "file-progress") {
+          setFileProgress((current) => upsertFileProgress(current, event.progress));
         } else if (event.type === "draft") {
+          setFileProgress([]);
           setPrompt(event.draft.prompt || nextPrompt);
           setState({
             draft: event.draft,
@@ -368,6 +376,8 @@ export function BuilderView() {
     setWorking(true);
     setError(null);
     setMode("iterating");
+    setFileProgress([]);
+    setTab("files");
     appendMessage({ id: newId(), role: "user", body: { kind: "text", text: composedPrompt } });
     const assistantId = newId();
     appendMessage({
@@ -401,7 +411,10 @@ export function BuilderView() {
               const next = m.body.kind === "prose" ? m.body.text + event.text : event.text;
               return { ...m, body: { kind: "prose", text: next } };
             });
+          } else if (event.type === "file-progress") {
+            setFileProgress((current) => upsertFileProgress(current, event.progress));
           } else if (event.type === "diff") {
+            setFileProgress([]);
             setState((prev) => ({ ...prev, iteration: event.iteration }));
             updateMessage(assistantId, (m) => ({
               ...m,
@@ -481,6 +494,7 @@ export function BuilderView() {
         workspace: result.workspace ?? prev.workspace,
       }));
       const newCheckpointId = result.checkpoint?.id;
+      setFileProgress([]);
       if (newCheckpointId) attachCheckpointToLatestPlanOrDiff(newCheckpointId);
       setIterPrompt("");
       pushSystemStatus("Diff applied. Preview refreshed.", "ok");
@@ -513,6 +527,7 @@ export function BuilderView() {
         workspace: prev.workspace,
       }));
       setSelectedElement(null);
+      setFileProgress([]);
       setMode("applied");
       setTab("preview");
       const nextAppId = result.app?.id ?? state.appId;
@@ -559,6 +574,7 @@ export function BuilderView() {
       });
       setMessages([]);
       setSelectedElement(null);
+      setFileProgress([]);
       setTab("preview");
       setMode("applied");
       pushSystemStatus(`Branched from ${sourceCheckpointShort} in '${sourceAppName}'.`, "info");
@@ -792,6 +808,27 @@ export function BuilderView() {
 
       {builderKind === "agent" && mode !== "empty" && (
         <AgentBuilderPanel initialPrompt={prompt} embedded autoGenerate={agentAutoGenerate} />
+      )}
+
+      {builderKind === "app" && mode === "drafting" && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            height: "calc(100vh - 40px)",
+            minHeight: 0,
+          }}
+        >
+          <div className="tabbar">
+            <div className="tab active">
+              <I.code size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+              Source
+            </div>
+          </div>
+          <div style={{ flex: 1, overflow: "auto" }}>
+            <FileGenerationProgress progress={fileProgress} />
+          </div>
+        </div>
       )}
 
       {(mode === "drafted" || mode === "applying" || mode === "applied" || mode === "iterating") &&
@@ -1344,6 +1381,7 @@ export function BuilderView() {
                     iteration={state.iteration}
                     sourceFiles={state.sourceFiles}
                     workspace={state.workspace}
+                    progress={fileProgress}
                   />
                 )}
                 {tab === "smoke" && <SmokeTab smoke={state.smoke ?? draft.smokeBuildStatus} />}

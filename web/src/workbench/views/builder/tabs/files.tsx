@@ -1,25 +1,115 @@
 import { useMemo, useState } from "react";
 import type {
   AppBuilderDraft,
+  AppBuilderFileProgress,
   AppBuilderIterationDiffFile,
   AppBuilderIterationResult,
   AppBuilderSourceFileSummary,
   AppBuilderWorkspaceSummary,
 } from "@/lib/types";
 
+export function FileGenerationProgress({ progress }: { progress: AppBuilderFileProgress[] }) {
+  const filePaths = [...new Set(progress.flatMap((entry) => (entry.path ? [entry.path] : [])))];
+  const latestAttempt = progress.reduce((latest, entry) => Math.max(latest, entry.attempt), 0);
+  const current = progress.filter((entry) => entry.attempt === latestAttempt);
+  const phaseState = (path: string, phase: AppBuilderFileProgress["phase"]) =>
+    current.find((entry) => entry.path === path && entry.phase === phase);
+  const completed = current.filter(
+    (entry) => entry.phase === "validate" && entry.status === "completed",
+  ).length;
+  const failed = current.filter(
+    (entry) => entry.phase === "validate" && entry.status === "failed",
+  ).length;
+  const skipped = current.filter(
+    (entry) => entry.phase === "validate" && entry.status === "skipped",
+  ).length;
+
+  return (
+    <div style={{ padding: 22, height: "100%", overflow: "auto" }}>
+      <div className="card" style={{ padding: 18 }}>
+        <div className="kicker" style={{ marginBottom: 8 }}>
+          Source progress
+        </div>
+        <h2 className="h2" style={{ marginBottom: 6 }}>
+          {latestAttempt > 0 ? `Repair pass ${latestAttempt}` : "Building the file tree"}
+        </h2>
+        <p className="muted" style={{ fontSize: 12.5, marginBottom: 14 }}>
+          Plan, write, and batch-validation state streams from the active generation.
+          {completed > 0 || failed > 0 || skipped > 0
+            ? ` ${completed} validated${failed ? `, ${failed} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`
+            : ""}
+        </p>
+        {filePaths.length === 0 ? (
+          <div className="muted" role="status" aria-live="polite">
+            Planning the source tree…
+          </div>
+        ) : (
+          <div className="card" style={{ overflow: "hidden" }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Path</th>
+                  <th>Plan</th>
+                  <th>Write</th>
+                  <th>Validate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filePaths.map((path) => (
+                  <tr key={path}>
+                    <td className="mono" style={{ fontSize: 11.5 }}>
+                      {path}
+                    </td>
+                    {(["plan", "write", "validate"] as const).map((phase) => {
+                      const state = phaseState(path, phase);
+                      return (
+                        <td key={phase}>
+                          <span
+                            className={`pill ${
+                              state?.status === "completed"
+                                ? "good"
+                                : state?.status === "failed"
+                                  ? "danger"
+                                  : state?.status === "skipped"
+                                    ? "warn"
+                                    : "muted"
+                            }`}
+                          >
+                            {state?.status ?? "queued"}
+                            {state?.errorCount ? ` · ${state.errorCount}` : ""}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function FilesTab({
   draft,
   iteration,
   sourceFiles,
   workspace,
+  progress = [],
 }: {
   draft: AppBuilderDraft;
   iteration: AppBuilderIterationResult | null;
   sourceFiles: AppBuilderSourceFileSummary[];
   workspace: AppBuilderWorkspaceSummary | null;
+  progress?: AppBuilderFileProgress[];
 }) {
   const files = useMemo<AppBuilderIterationDiffFile[]>(() => iteration?.files ?? [], [iteration]);
   const [selected, setSelected] = useState<number>(0);
+  if (progress.length > 0) {
+    return <FileGenerationProgress progress={progress} />;
+  }
   if (files.length === 0) {
     return (
       <div style={{ padding: 22 }}>

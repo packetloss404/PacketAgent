@@ -17,6 +17,7 @@ import type { ModelRoutingPresetId } from "../model-routing-presets.js";
 import type {
   AuthorAndValidateAppOptions,
   AuthorAndValidateAppResult,
+  CodegenProgressEmit,
   GeneratedFile,
 } from "../codegen/llm-author.js";
 import type {
@@ -46,6 +47,7 @@ export interface AppDraftLLMOptions {
   model?: string;
   workspaceId?: string;
   signal?: AbortSignal;
+  onFileProgress?: CodegenProgressEmit;
   /**
    * Inject a pre-built provider (used by tests to mock the SDK). When set, the
    * router resolver is bypassed and this provider is used directly.

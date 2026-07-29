@@ -65,6 +65,22 @@ export interface PlannedFile {
   purpose: string;
 }
 
+export type CodegenProgressPhase = "plan" | "write" | "validate";
+export type CodegenProgressStatus = "started" | "completed" | "failed" | "skipped";
+
+export interface CodegenProgressEvent {
+  phase: CodegenProgressPhase;
+  status: CodegenProgressStatus;
+  path?: string;
+  purpose?: string;
+  completed: number;
+  total: number;
+  attempt: number;
+  errorCount?: number;
+}
+
+export type CodegenProgressEmit = (event: CodegenProgressEvent) => void | Promise<void>;
+
 export interface ResolvedPrompts {
   systemPrompt: string;
   planUserPrompt: (userGoal: string) => string;
@@ -79,6 +95,10 @@ export interface AuthorAppOptions {
   router?: ProviderRouter;
   /** Optional override of the prompt resolver (for tests). */
   resolvePrompts?: () => ResolvedPrompts;
+  /** Typed plan/write/validate progress for SSE and other operator surfaces. */
+  onProgress?: CodegenProgressEmit;
+  /** Internal repair-attempt identity; zero is the initial authoring pass. */
+  progressAttempt?: number;
 }
 
 export type AuthorAppFn = typeof authorAppViaLLM;
@@ -164,6 +184,21 @@ function defaultPrompts(): ResolvedPrompts {
         plan,
       ].join("\n"),
   };
+}
+
+async function emitProgress(
+  options: AuthorAppOptions,
+  event: Omit<CodegenProgressEvent, "attempt">,
+): Promise<void> {
+  if (!options.onProgress) return;
+  try {
+    await options.onProgress({
+      ...event,
+      attempt: Math.max(0, options.progressAttempt ?? 0),
+    });
+  } catch {
+    // Operator progress must never break generation.
+  }
 }
 
 // =============================================================================
@@ -381,8 +416,21 @@ async function runSingleWriteRound(
   resolved: ResolvedProvider,
   options: AuthorAppOptions,
   userContent: string,
+  plannedFiles: PlannedFile[],
+  progressOffset: number,
+  progressTotal: number,
   emit: (chunk: string) => void | Promise<void>,
 ): Promise<WritePhaseResult | null> {
+  for (const planned of plannedFiles) {
+    await emitProgress(options, {
+      phase: "write",
+      status: "started",
+      path: planned.path,
+      purpose: planned.purpose,
+      completed: progressOffset,
+      total: progressTotal,
+    });
+  }
   let stream: AsyncIterable<ProviderStreamChunk>;
   try {
     stream = resolved.provider.stream({
@@ -404,6 +452,8 @@ async function runSingleWriteRound(
   }
 
   const files: GeneratedFile[] = [];
+  const completedPaths = new Set<string>();
+  const plannedByPath = new Map(plannedFiles.map((file) => [file.path, file]));
   try {
     for await (const chunk of stream) {
       if (chunk.error) {
@@ -433,6 +483,16 @@ async function runSingleWriteRound(
           continue;
         }
         files.push({ path, content });
+        completedPaths.add(path);
+        const planned = plannedByPath.get(path);
+        await emitProgress(options, {
+          phase: "write",
+          status: "completed",
+          path,
+          ...(planned ? { purpose: planned.purpose } : {}),
+          completed: Math.min(progressTotal, progressOffset + completedPaths.size),
+          total: progressTotal,
+        });
       }
     }
   } catch (error) {
@@ -440,6 +500,17 @@ async function runSingleWriteRound(
     return null;
   }
 
+  for (const planned of plannedFiles) {
+    if (completedPaths.has(planned.path)) continue;
+    await emitProgress(options, {
+      phase: "write",
+      status: "failed",
+      path: planned.path,
+      purpose: planned.purpose,
+      completed: Math.min(progressTotal, progressOffset + completedPaths.size),
+      total: progressTotal,
+    });
+  }
   return { files };
 }
 
@@ -474,6 +545,9 @@ async function runWritePhase(
     resolved,
     options,
     prompts.writeUserPrompt(planSummary),
+    plan,
+    0,
+    plan.length,
     emit,
   );
 }
@@ -504,7 +578,17 @@ async function runWritePhaseChunked(
     const chunk = chunks[i];
     if (!chunk) continue;
     const userContent = buildChunkUserPrompt(chunk);
-    const roundResult = await runSingleWriteRound(prompts, resolved, options, userContent, emit);
+    const progressOffset = chunks.slice(0, i).reduce((count, entry) => count + entry.length, 0);
+    const roundResult = await runSingleWriteRound(
+      prompts,
+      resolved,
+      options,
+      userContent,
+      chunk,
+      progressOffset,
+      plan.length,
+      emit,
+    );
     if (!roundResult) {
       // Hard error from the provider stream. Surface as null only if we
       // haven't accumulated anything yet; otherwise return the partial
@@ -552,11 +636,42 @@ export async function authorAppViaLLM(
   const prompts = (options.resolvePrompts ?? defaultPrompts)();
 
   // Phase 1: plan.
+  await emitProgress(options, {
+    phase: "plan",
+    status: "started",
+    completed: 0,
+    total: 0,
+  });
   const planResult = await runPlanPhase(trimmed, prompts, resolved, options, emit);
-  if (!planResult) return null;
+  if (!planResult) {
+    await emitProgress(options, {
+      phase: "plan",
+      status: "failed",
+      completed: 0,
+      total: 0,
+    });
+    return null;
+  }
   if (!planResult.plan) {
+    await emitProgress(options, {
+      phase: "plan",
+      status: "failed",
+      completed: 0,
+      total: 0,
+    });
     console.warn(`[llm-author] plan unparseable after 1 retry; aborting`);
     return null;
+  }
+  for (let index = 0; index < planResult.plan.length; index++) {
+    const planned = planResult.plan[index]!;
+    await emitProgress(options, {
+      phase: "plan",
+      status: "completed",
+      path: planned.path,
+      purpose: planned.purpose,
+      completed: index + 1,
+      total: planResult.plan.length,
+    });
   }
 
   // Phase 2: write. For plans up to CHUNK_WRITE_THRESHOLD files we run a
@@ -603,7 +718,21 @@ export async function authorAndValidateAppViaLLM(
   if (!result) return null;
 
   for (let repairAttempts = 0; ; repairAttempts++) {
+    const validationProgressOptions: AuthorAppOptions = {
+      ...authorOptions,
+      progressAttempt: repairAttempts,
+    };
+    for (const file of result.files) {
+      await emitProgress(validationProgressOptions, {
+        phase: "validate",
+        status: "started",
+        path: file.path,
+        completed: 0,
+        total: result.files.length,
+      });
+    }
     const validation = await runValidation(validate, result.files, validateOptions);
+    await emitValidationResults(validationProgressOptions, result.files, validation);
     if (validation.ok || validation.source !== "real" || validation.errors.length === 0) {
       return { ...result, validation, repairAttempts };
     }
@@ -633,7 +762,11 @@ export async function authorAndValidateAppViaLLM(
       validation,
       repairAttempts + 1,
     );
-    const repaired = await author(repairGoal, authorOptions, emit);
+    const repaired = await author(
+      repairGoal,
+      { ...authorOptions, progressAttempt: repairAttempts + 1 },
+      emit,
+    );
     if (!repaired) {
       return { ...result, validation, repairAttempts, stoppedReason: "repair-author-failed" };
     }
@@ -655,6 +788,8 @@ function authorOptionsOnly(options: AuthorAndValidateAppOptions): AuthorAppOptio
   if (options.signal) out.signal = options.signal;
   if (options.router) out.router = options.router;
   if (options.resolvePrompts) out.resolvePrompts = options.resolvePrompts;
+  if (options.onProgress) out.onProgress = options.onProgress;
+  if (options.progressAttempt !== undefined) out.progressAttempt = options.progressAttempt;
   return out;
 }
 
@@ -687,6 +822,44 @@ async function runValidation(
       durationMs: 0,
       phases: { typecheck: "failed", build: "skipped" },
     };
+  }
+}
+
+async function emitValidationResults(
+  options: AuthorAppOptions,
+  files: GeneratedFile[],
+  validation: ValidationResult,
+): Promise<void> {
+  const errorCounts = new Map<string, number>();
+  for (const error of validation.errors) {
+    const normalized = error.file.replaceAll("\\", "/").replace(/^\.\/+/, "");
+    errorCounts.set(normalized, (errorCounts.get(normalized) ?? 0) + 1);
+  }
+  let completed = 0;
+  for (const file of files) {
+    completed++;
+    const errorCount = errorCounts.get(file.path) ?? 0;
+    await emitProgress(options, {
+      phase: "validate",
+      status: validation.source === "skipped" ? "skipped" : errorCount > 0 ? "failed" : "completed",
+      path: file.path,
+      completed,
+      total: files.length,
+      ...(errorCount > 0 ? { errorCount } : {}),
+    });
+  }
+  const unmatched = validation.errors.filter((error) => {
+    const normalized = error.file.replaceAll("\\", "/").replace(/^\.\/+/, "");
+    return !files.some((file) => file.path === normalized);
+  }).length;
+  if (unmatched > 0) {
+    await emitProgress(options, {
+      phase: "validate",
+      status: "failed",
+      completed,
+      total: files.length,
+      errorCount: unmatched,
+    });
   }
 }
 

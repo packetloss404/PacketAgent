@@ -389,7 +389,17 @@ through an explicit path-normalizing, case-collision-rejecting conversion seam.
 Model-backed iteration consumes that tree when ready; deterministic fallback
 still returns a reviewed full tree, and applying it persists the next
 checkpoint as `llm-filetree`. The legacy generation kill switch remains an
-explicit opt-out. Resume at R3's per-file plan/write/validate stream.
+explicit opt-out.
+
+R3.3 is complete. New-draft and iteration authoring emit typed, attempt-aware
+per-file plan, write, and validation events through their SSE routes. The
+Builder Source view renders the live tree during initial generation and
+iteration, preserves repair-pass identity, and distinguishes failed,
+completed, queued, and sandbox-skipped validation without overstating the
+quality gate. Progress callbacks are observational and cannot break
+generation. Focused backend/UI coverage passes 69 backend tests (68 passed,
+one intentional Windows sandbox skip) and two UI tests. Resume at R3's
+file-level review and targeted route/entity/component regeneration slice.
 
 W1-W10's local gates are complete under `src/workers/`, the store, migrations,
 jobs, alerts, webhooks, and private

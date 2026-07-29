@@ -11,6 +11,7 @@ import {
   authorAppViaLLM,
   type AuthorAppOptions,
   type AuthorAppResult,
+  type CodegenProgressEmit,
   type GeneratedFile,
 } from "./codegen/llm-author.js";
 import { validateWorkspacePath } from "./codegen/path-validator.js";
@@ -26,6 +27,7 @@ export interface AppIterationLLMOptions {
   workspaceId: string;
   preset?: AppIterationPresetId;
   signal?: AbortSignal;
+  onFileProgress?: CodegenProgressEmit;
   /**
    * Inject a pre-built provider (used by tests to mock the SDK). When set, the
    * router resolver is bypassed and this provider is used directly. Accepts
@@ -1265,6 +1267,8 @@ export interface AppIterationFileTreeOptions {
   workspaceId: string;
   preset?: AppIterationPresetId;
   signal?: AbortSignal;
+  /** Per-file plan/write/validate progress for streaming operator surfaces. */
+  onFileProgress?: CodegenProgressEmit;
   /** Optional override of the registered router (for tests). */
   router?: ProviderRouter;
   /**
@@ -1508,6 +1512,7 @@ export async function applyAppIterationViaFileTree(
   if (options.preset) authorOptions.preset = options.preset;
   if (options.signal) authorOptions.signal = options.signal;
   if (options.router) authorOptions.router = options.router;
+  if (options.onFileProgress) authorOptions.onProgress = options.onFileProgress;
 
   let result: (AuthorAppResult & { validation: ValidationResult; repairAttempts: number }) | null;
   try {

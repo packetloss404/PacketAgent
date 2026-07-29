@@ -729,6 +729,20 @@ export interface AppBuilderGeneratedFile {
   content: string;
 }
 
+export type AppBuilderFileProgressPhase = "plan" | "write" | "validate";
+export type AppBuilderFileProgressStatus = "started" | "completed" | "failed" | "skipped";
+
+export interface AppBuilderFileProgress {
+  phase: AppBuilderFileProgressPhase;
+  status: AppBuilderFileProgressStatus;
+  path?: string;
+  purpose?: string;
+  completed: number;
+  total: number;
+  attempt: number;
+  errorCount?: number;
+}
+
 export interface AppBuilderArtifactSummary {
   entrypoint?: string;
   renderedAt?: string;

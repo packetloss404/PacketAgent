@@ -1,9 +1,28 @@
-import type { AppBuilderDraft, AppBuilderPublishState, BuilderModelPresetId } from "@/lib/types";
+import type {
+  AppBuilderDraft,
+  AppBuilderFileProgress,
+  AppBuilderPublishState,
+  BuilderModelPresetId,
+} from "@/lib/types";
 import { SMARTER_TIER_LADDER } from "./constants";
 import type { ChatMessage, IterationTargetOption } from "./types";
 
 export function buildFixErrorsPrompt(errors: string[]): string {
   return `Fix these TypeScript errors:\n${errors.join("\n")}`;
+}
+
+export function upsertFileProgress(
+  current: AppBuilderFileProgress[],
+  next: AppBuilderFileProgress,
+): AppBuilderFileProgress[] {
+  const key = `${next.attempt}:${next.phase}:${next.path ?? "<workspace>"}`;
+  const index = current.findIndex(
+    (entry) => `${entry.attempt}:${entry.phase}:${entry.path ?? "<workspace>"}` === key,
+  );
+  if (index < 0) return [...current, next];
+  const updated = current.slice();
+  updated[index] = next;
+  return updated;
 }
 
 export function getPreviewNavigationTarget(previewUrl: string | null, appId: string | null) {

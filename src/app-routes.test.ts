@@ -2242,6 +2242,7 @@ test("builder app-draft/stream emits step events, a draft event, and done", asyn
     const events = await readSseEvents(response.body!);
     const types = events.map((e) => e.type);
     assert.ok(types.includes("step"), "expected at least one step event");
+    assert.ok(types.includes("file-progress"), "expected typed file progress events");
     assert.ok(types.includes("draft"), "expected a draft event");
     assert.equal(types[types.length - 1], "done");
     const draftEvent = events.find((e) => e.type === "draft") as {
@@ -2456,6 +2457,7 @@ test("builder app-iteration/stream emits step events, a diff event, and done", a
     const events = await readSseEvents(response.body!);
     const types = events.map((e) => e.type);
     assert.ok(types.includes("step"), "expected at least one step event");
+    assert.ok(types.includes("file-progress"), "expected typed file progress events");
     assert.ok(types.includes("diff"), "expected a diff event");
     assert.equal(types[types.length - 1], "done");
     const diffEvent = events.find((e) => e.type === "diff") as {
