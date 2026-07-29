@@ -1,3 +1,4 @@
+import OpenAI from "openai";
 import type {
   ApiKeyResolver,
   LLMProvider,
@@ -48,20 +49,32 @@ interface OpenAIChatResponse {
 interface OpenAIChatStreamDelta {
   role?: string;
   content?: string;
-  tool_calls?: { index: number; id?: string; type?: "function"; function?: { name?: string; arguments?: string } }[];
+  tool_calls?: {
+    index: number;
+    id?: string;
+    type?: "function";
+    function?: { name?: string; arguments?: string };
+  }[];
 }
 
 interface OpenAIChatStreamChunk {
   id: string;
   model: string;
-  choices: { index: number; delta: OpenAIChatStreamDelta; finish_reason: OpenAIChatChoice["finish_reason"] }[];
+  choices: {
+    index: number;
+    delta: OpenAIChatStreamDelta;
+    finish_reason: OpenAIChatChoice["finish_reason"];
+  }[];
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }
 
 export interface OpenAIClient {
   chat: {
     completions: {
-      create(params: OpenAIChatParams, opts?: { signal?: AbortSignal }): Promise<OpenAIChatResponse>;
+      create(
+        params: OpenAIChatParams,
+        opts?: { signal?: AbortSignal },
+      ): Promise<OpenAIChatResponse>;
       create(
         params: OpenAIChatParams & { stream: true },
         opts?: { signal?: AbortSignal },
@@ -94,17 +107,25 @@ function mapMessages(messages: ProviderMessage[]): OpenAIChatMessage[] {
 
 function mapTools(tools: ProviderToolDef[] | undefined): OpenAIToolDef[] | undefined {
   if (!tools || tools.length === 0) return undefined;
-  return tools.map((t) => ({ type: "function" as const, function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
+  return tools.map((t) => ({
+    type: "function" as const,
+    function: { name: t.name, description: t.description, parameters: t.inputSchema },
+  }));
 }
 
-function mapFinishReason(reason: OpenAIChatChoice["finish_reason"]): ProviderCallResult["finishReason"] {
+function mapFinishReason(
+  reason: OpenAIChatChoice["finish_reason"],
+): ProviderCallResult["finishReason"] {
   switch (reason) {
-    case "stop": return "stop";
-    case "length": return "length";
+    case "stop":
+      return "stop";
+    case "length":
+      return "length";
     case "tool_calls":
     case "function_call":
       return "tool_use";
-    default: return "error";
+    default:
+      return "error";
   }
 }
 
@@ -115,7 +136,6 @@ function priceUsage(model: string, prompt: number, completion: number): Provider
 }
 
 function defaultClientFactory(apiKey: string, baseURL?: string): OpenAIClient {
-  const OpenAI = require("openai").default ?? require("openai");
   return new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) }) as OpenAIClient;
 }
 
@@ -144,7 +164,9 @@ export class OpenAIProvider implements LLMProvider {
     }
     const env = process.env.OPENAI_API_KEY;
     if (env) return env;
-    throw new Error("openai: no API key available (vault returned null and OPENAI_API_KEY not set)");
+    throw new Error(
+      "openai: no API key available (vault returned null and OPENAI_API_KEY not set)",
+    );
   }
 
   async call(opts: ProviderCallOptions): Promise<ProviderCallResult> {
@@ -163,7 +185,11 @@ export class OpenAIProvider implements LLMProvider {
     if (choice?.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
         let parsed: Record<string, unknown> = {};
-        try { parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {}; } catch { parsed = {}; }
+        try {
+          parsed = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
+        } catch {
+          parsed = {};
+        }
         toolCalls.push({ id: tc.id, name: tc.function.name, input: parsed });
       }
     }
@@ -180,8 +206,12 @@ export class OpenAIProvider implements LLMProvider {
 
   async *stream(opts: ProviderCallOptions): AsyncIterable<ProviderStreamChunk> {
     let apiKey: string;
-    try { apiKey = await this.resolveApiKey(opts.workspaceId); }
-    catch (error) { yield { error: (error as Error).message }; return; }
+    try {
+      apiKey = await this.resolveApiKey(opts.workspaceId);
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
     const client = this.clientFactory(apiKey, this.baseURL);
     const params: OpenAIChatParams & { stream: true } = {
       model: opts.model,
@@ -194,19 +224,29 @@ export class OpenAIProvider implements LLMProvider {
 
     let stream: AsyncIterable<OpenAIChatStreamChunk>;
     try {
-      const result = await (client.chat.completions.create as unknown as (
-        p: OpenAIChatParams & { stream: true },
-        o?: { signal?: AbortSignal },
-      ) => Promise<AsyncIterable<OpenAIChatStreamChunk>>)(params, { signal: opts.signal });
+      const result = await (
+        client.chat.completions.create as unknown as (
+          p: OpenAIChatParams & { stream: true },
+          o?: { signal?: AbortSignal },
+        ) => Promise<AsyncIterable<OpenAIChatStreamChunk>>
+      )(params, { signal: opts.signal });
       stream = result;
-    } catch (error) { yield { error: (error as Error).message }; return; }
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     const partials = new Map<number, { id?: string; name?: string; argsAccum: string }>();
-    let prompt = 0, completion = 0, model = opts.model;
+    let prompt = 0,
+      completion = 0,
+      model = opts.model;
 
     try {
       for await (const chunk of stream) {
-        if (opts.signal?.aborted) { yield { error: "aborted" }; return; }
+        if (opts.signal?.aborted) {
+          yield { error: "aborted" };
+          return;
+        }
         if (chunk.model) model = chunk.model;
         const choice = chunk.choices[0];
         if (!choice) continue;
@@ -224,7 +264,11 @@ export class OpenAIProvider implements LLMProvider {
           for (const slot of partials.values()) {
             if (!slot.id || !slot.name) continue;
             let parsed: Record<string, unknown> = {};
-            try { parsed = slot.argsAccum ? JSON.parse(slot.argsAccum) : {}; } catch { parsed = {}; }
+            try {
+              parsed = slot.argsAccum ? JSON.parse(slot.argsAccum) : {};
+            } catch {
+              parsed = {};
+            }
             yield { toolCall: { id: slot.id, name: slot.name, input: parsed } };
           }
           partials.clear();
@@ -234,7 +278,10 @@ export class OpenAIProvider implements LLMProvider {
           completion = chunk.usage.completion_tokens;
         }
       }
-    } catch (error) { yield { error: (error as Error).message }; return; }
+    } catch (error) {
+      yield { error: (error as Error).message };
+      return;
+    }
 
     yield { done: true, usage: priceUsage(model, prompt, completion) };
   }

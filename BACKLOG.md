@@ -26,8 +26,8 @@ Status: foundation complete on `codex/packetagent-foundation`; inherited quality
 - [x] Carry the only uncommitted TaskLoom worktree fix into the new branch.
 - [x] Refresh every Markdown document, label historical plans, and add an authoritative Codex project handoff.
 - [x] Pass typecheck, lint with zero errors, production web build, API tests, web tests, migration tests, diff check, and compatibility-only brand scan.
-- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 294 files; files authored in the R1 review slices are formatted.
-- [ ] Reduce the inherited ESLint baseline of 60 warnings to zero while preserving the current zero-error gate.
+- [ ] Close the inherited repo-wide Prettier baseline. `npm run format:check` currently flags 292 files; files authored in the R1 review slices are formatted.
+- [ ] Reduce the inherited ESLint baseline of 56 warnings to zero while preserving the current zero-error gate.
 - [x] Review and remediate dependency advisories deliberately. Targeted non-major upgrades reduced the full and production audits from 11/5 findings to two package entries for one unreachable React Router RSC advisory; [`dev/r1-dependency-advisory-audit.md`](dev/r1-dependency-advisory-audit.md) records ownership, reachability, and the exact-pin decision. No forced fix was used.
 - Gate: a clean PacketAgent checkout starts with new defaults and can read an existing default TaskLoom deployment without destructive migration.
 

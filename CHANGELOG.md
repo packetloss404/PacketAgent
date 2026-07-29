@@ -34,6 +34,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   dynamic workflow response boundary, and concrete activation/onboarding
   contracts; 113 focused route/service tests passed with one intentional
   Windows sandbox skip.
+- Replaced the Anthropic and OpenAI factories' CommonJS `require` calls with
+  native ESM imports and aligned the Anthropic stream interface with the SDK's
+  synchronous async-iterable return.
 - Passed typecheck, the production web build, 30 web tests, and the 1,525-test
   API gate (1,521 passed, 4 intentionally skipped live probes).
 

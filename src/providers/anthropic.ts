@@ -1,3 +1,4 @@
+import Anthropic from "@anthropic-ai/sdk";
 import type {
   ApiKeyResolver,
   LLMProvider,
@@ -66,8 +67,14 @@ interface AnthropicStreamEvent {
 
 export interface AnthropicClient {
   messages: {
-    create(params: AnthropicCreateParams, opts?: { signal?: AbortSignal }): Promise<AnthropicCreateResponse>;
-    stream?(params: AnthropicCreateParams, opts?: { signal?: AbortSignal }): Promise<AsyncIterable<AnthropicStreamEvent>>;
+    create(
+      params: AnthropicCreateParams,
+      opts?: { signal?: AbortSignal },
+    ): Promise<AnthropicCreateResponse>;
+    stream?(
+      params: AnthropicCreateParams,
+      opts?: { signal?: AbortSignal },
+    ): AsyncIterable<AnthropicStreamEvent> | Promise<AsyncIterable<AnthropicStreamEvent>>;
   };
 }
 
@@ -132,7 +139,11 @@ function buildSystemAndMessages(messages: ProviderMessage[]): {
 
 function mapTools(tools: ProviderToolDef[] | undefined) {
   if (!tools || tools.length === 0) return undefined;
-  return tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
+  return tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.inputSchema,
+  }));
 }
 
 function priceUsage(model: string, input: number, output: number): ProviderUsage {
@@ -141,7 +152,9 @@ function priceUsage(model: string, input: number, output: number): ProviderUsage
   return { promptTokens: input, completionTokens: output, costUsd };
 }
 
-function mapStopReason(reason: AnthropicCreateResponse["stop_reason"]): ProviderCallResult["finishReason"] {
+function mapStopReason(
+  reason: AnthropicCreateResponse["stop_reason"],
+): ProviderCallResult["finishReason"] {
   switch (reason) {
     case "end_turn":
     case "stop_sequence":
@@ -156,8 +169,6 @@ function mapStopReason(reason: AnthropicCreateResponse["stop_reason"]): Provider
 }
 
 function defaultClientFactory(apiKey: string): AnthropicClient {
-  // Lazy-load the SDK so tests that inject a fake factory don't pull it in.
-  const Anthropic = require("@anthropic-ai/sdk").default ?? require("@anthropic-ai/sdk");
   return new Anthropic({ apiKey }) as AnthropicClient;
 }
 
@@ -183,7 +194,9 @@ export class AnthropicProvider implements LLMProvider {
     }
     const env = process.env.ANTHROPIC_API_KEY;
     if (env) return env;
-    throw new Error("anthropic: no API key available (vault returned null and ANTHROPIC_API_KEY not set)");
+    throw new Error(
+      "anthropic: no API key available (vault returned null and ANTHROPIC_API_KEY not set)",
+    );
   }
 
   async call(opts: ProviderCallOptions): Promise<ProviderCallResult> {
@@ -204,7 +217,11 @@ export class AnthropicProvider implements LLMProvider {
     for (const block of response.content) {
       if (block.type === "text" && block.text) text.push(block.text);
       else if (block.type === "tool_use" && block.id && block.name) {
-        toolCalls.push({ id: block.id, name: block.name, input: (block.input ?? {}) as Record<string, unknown> });
+        toolCalls.push({
+          id: block.id,
+          name: block.name,
+          input: (block.input ?? {}) as Record<string, unknown>,
+        });
       }
     }
     return {
@@ -242,7 +259,12 @@ export class AnthropicProvider implements LLMProvider {
       if (client.messages.stream) {
         stream = await client.messages.stream(params, { signal: opts.signal });
       } else {
-        stream = (await (client.messages.create as unknown as (p: AnthropicCreateParams, o?: { signal?: AbortSignal }) => Promise<AsyncIterable<AnthropicStreamEvent>>)(params, { signal: opts.signal }));
+        stream = await (
+          client.messages.create as unknown as (
+            p: AnthropicCreateParams,
+            o?: { signal?: AbortSignal },
+          ) => Promise<AsyncIterable<AnthropicStreamEvent>>
+        )(params, { signal: opts.signal });
       }
     } catch (error) {
       yield { error: (error as Error).message };
@@ -265,7 +287,12 @@ export class AnthropicProvider implements LLMProvider {
           continue;
         }
         if (event.type === "content_block_start") {
-          if (event.content_block?.type === "tool_use" && event.content_block.id && event.content_block.name && typeof event.index === "number") {
+          if (
+            event.content_block?.type === "tool_use" &&
+            event.content_block.id &&
+            event.content_block.name &&
+            typeof event.index === "number"
+          ) {
             partialTools.set(event.index, {
               id: event.content_block.id,
               name: event.content_block.name,
@@ -275,8 +302,13 @@ export class AnthropicProvider implements LLMProvider {
           continue;
         }
         if (event.type === "content_block_delta" && event.delta) {
-          if (event.delta.type === "text_delta" && event.delta.text) yield { delta: event.delta.text };
-          else if (event.delta.type === "input_json_delta" && event.delta.partial_json && typeof event.index === "number") {
+          if (event.delta.type === "text_delta" && event.delta.text)
+            yield { delta: event.delta.text };
+          else if (
+            event.delta.type === "input_json_delta" &&
+            event.delta.partial_json &&
+            typeof event.index === "number"
+          ) {
             const tool = partialTools.get(event.index);
             if (tool) tool.jsonAccum += event.delta.partial_json;
           }
@@ -286,7 +318,11 @@ export class AnthropicProvider implements LLMProvider {
           const tool = partialTools.get(event.index);
           if (tool) {
             let parsed: Record<string, unknown> = {};
-            try { parsed = tool.jsonAccum ? JSON.parse(tool.jsonAccum) : {}; } catch { parsed = {}; }
+            try {
+              parsed = tool.jsonAccum ? JSON.parse(tool.jsonAccum) : {};
+            } catch {
+              parsed = {};
+            }
             yield { toolCall: { id: tool.id, name: tool.name, input: parsed } };
             partialTools.delete(event.index);
           }
