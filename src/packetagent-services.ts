@@ -110,6 +110,7 @@ export type {
   AgentDraftResult,
   AgentBuilderPromptInput,
   AgentBuilderDraft,
+  AgentBuilderDraftDependencies,
   AgentBuilderApproveInput,
   AgentBuilderApproveResult,
   IntegrationReadinessSummary,

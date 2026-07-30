@@ -78,7 +78,11 @@ untrusted sandbox now share an executable non-root/read-only-root/
 capability-drop/no-new-privileges/process-limit matrix. R6.1 now adds a
 TLS-only, public-address-pinned default SMTP transport, with Workers resolving
 strict `smtp_config` values from the encrypted vault only after recipient
-policy approval. Resume at R6.2 LLM-authored Worker/agent templates in
+policy approval. R6.2 replaces heuristic-only agent drafting with one bounded,
+schema-constrained provider authoring call plus deterministic semantic
+validation, registered-tool/trigger bounds, visible fallback provenance,
+review-before-save, and a certified canonical Worker draft projection. Resume
+at R6.3 provider/model/key/capability readiness in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r6---agent-authoring-and-execution-depth).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

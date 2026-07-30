@@ -291,6 +291,34 @@ and executes that job through the bounded supervisor.
 6. Run `npm run verify:smtp`. All seven assertions must be true. The verifier
    uses deterministic fake DNS/SMTP and sends no live email.
 
+## R6.2 LLM-Authored AgentTemplate Smoke
+
+1. Configure a supported provider, open `/builder`, select **Build an agent**,
+   and request a bounded manual or scheduled job. Confirm the draft identifies
+   itself as `LLM-authored` and names the provider/model without exposing any
+   key or credential value.
+2. Review the draft before saving. Confirm the model-authored name, summary,
+   description, instructions, typed inputs, playbook, acceptance checks, and
+   open questions are visible, while the trigger and cron expression match the
+   deterministic interpretation of the operator prompt.
+3. Ask for an unregistered tool, a different trigger in the requested
+   template, a secret-valued input, or secret-like assignment text. Confirm
+   unregistered tools are removed, trigger substitution invalidates the model
+   output, sensitive input keys are rejected, and assignment values are
+   redacted.
+4. Stop or misconfigure the provider, or return malformed/truncated output.
+   Confirm the route still returns the deterministic draft with a visible
+   fallback reason and does not fabricate provider authoring provenance.
+5. Approve a valid draft. Confirm the existing Agent API persists and runs it
+   without regression. Its compatibility projection must be a valid
+   `legacy_agent` Worker version in `draft` status with the explicit
+   `projection.requires_validation` warning; do not describe it as deployed
+   through the canonical lifecycle.
+6. Run `npm run verify:agent-template`. All assertions must be true. The
+   verifier uses a deterministic fake provider, performs no live external
+   calls, and certifies structured schema use, tool/trigger constraints,
+   redaction, invalid-output fallback, and canonical Worker draft projection.
+
 ## W6.4 Rolling Budget Smoke
 
 1. Configure positive per-run limits plus explicit workspace and deployment

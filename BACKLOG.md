@@ -455,10 +455,10 @@ Status: complete as of 2026-07-29. Resume at R6.
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1 is complete; resume at R6.2.
+Status: in progress. R6.1-R6.2 are complete; resume at R6.3.
 
 - [x] Wire the default SMTP transport through vault-backed credentials.
-- [ ] Add LLM-authored Worker/agent templates beyond the heuristic builder.
+- [x] Add LLM-authored Worker/agent templates beyond the heuristic builder.
 - [ ] Show provider/model/key/capability readiness before first run.
 - [ ] Add editable memory/input examples and first-run evaluation.
 - [ ] Add signed, versioned agent/Worker import and export.
@@ -483,7 +483,24 @@ Status: in progress. R6.1 is complete; resume at R6.2.
   zero-warning lint, repository formatting, the production web build, 33 web
   tests, 35 focused adversarial tests, the seven-assertion verifier, and 1,628
   API tests pass (1,625 passed with three intentional live interoperability
-  skips). Resume at R6.2 LLM-authored Worker/agent templates.
+  skips).
+- R6.2 result: one bounded provider-routed call now authors reusable Agent
+  template content through JSON Schema where supported and the same bounded
+  best-effort contract elsewhere. Local semantic validation constrains
+  registered tools, deterministic triggers/schedules, typed non-sensitive
+  inputs, playbooks, checks, and secret-like text. Invalid, incomplete,
+  unavailable, or failed provider output falls back visibly to the
+  deterministic builder. Approved agents retain existing APIs and project as
+  valid draft Worker versions; R6.6 remains the canonical-only execution gate.
+  `npm run verify:agent-template` performs no live calls and certifies the
+  authoring and Worker-projection boundary. Research and design evidence live
+  in
+  [`dev/r6-agent-template-authoring.md`](dev/r6-agent-template-authoring.md).
+  Typecheck, zero-warning lint, repository formatting, production web build,
+  34 web tests, 79 focused backend tests, the seven-assertion verifier, and
+  1,632 API tests pass (1,629 passed with three intentional live
+  interoperability skips).
+  Resume at R6.3 provider/model/key/capability readiness.
 
 ### R7 - Builder and frontend maintainability
 

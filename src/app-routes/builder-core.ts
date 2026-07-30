@@ -4152,6 +4152,7 @@ export function registerBuilderRoutes(app: Hono): void {
         draft: await generateAgentBuilderDraftAsync(context, {
           prompt: body.prompt,
           preset: body.preset,
+          signal: c.req.raw.signal,
         }),
       });
     } catch (error) {

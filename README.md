@@ -447,7 +447,7 @@ Generated `web/dist/` is gitignored; rebuild locally rather than committing it.
   validation cannot run, authoring stops with a blocked result. Legacy
   template-shaped drafts still use their older iteration path.
 - **Per-app SQLite has an explicit reset/reseed schema policy.** PacketAgent previews use the supervised per-app SQLite runtime. Standalone publish packages use the same CRUD/storage semantics inside their own container and named volume. Same-schema restarts preserve records; a schema-signature change clears and reseeds that app's records. Runtime health/readiness declares `schemaChangePolicy: "reset-and-reseed"`, generated SQL is labeled reference DDL rather than an executed migration, and the runbook includes a verified stopped-service backup/restore path. Automatic data-preserving schema migration is not implemented or claimed. Legacy template/source artifacts and older saved drafts can still contain sql.js/jsdelivr browser persistence.
-- **Outbound Worker tools fail closed when a hardened dependency is unavailable.** `http_fetch`, `slack_post_webhook`, and `github_api` use Worker-scoped credential and pinned-network ports; `run_command` and `shell_for_agent` use the Docker-only execution port. Worker browser, email, and SQL calls are refused until equivalent hardened drivers are implemented. Approval tokens remain on the inherited Agent path, and legacy interactive Agent adapters retain their existing configuration behavior.
+- **Outbound Worker tools fail closed when a hardened dependency is unavailable.** `http_fetch`, `slack_post_webhook`, and `github_api` use Worker-scoped credential and pinned-network ports; `email_send` uses the vault-backed, public-address-pinned TLS SMTP port; and `run_command` and `shell_for_agent` use the Docker-only execution port. Worker browser and SQL calls are refused until equivalent hardened drivers are implemented. Approval tokens remain on the inherited Agent path, and legacy interactive Agent adapters retain their existing configuration behavior.
 - **Preview is local.** Builder preview routes serve generated source files from disk through PacketAgent. They are not public deployments unless you configure and validate a public URL.
 - **Publish is a verified local handoff, not managed hosting.** PacketAgent emits and integrity-checks the standalone package and provides a Docker certification command. Operators still run the long-lived service and configure DNS, TLS, reverse proxy, VPN, backups, and public networking.
 - **Secure generated-code validation requires Docker.** Interactive sandbox
@@ -496,8 +496,15 @@ R6.1 adds the default TLS-only SMTP transport: legacy Agents may use `SMTP_*`
 environment settings, while Workers require a declared encrypted
 `smtp_config` reference, credential-bound sender identity, recipient policy
 approval before secret resolution, and the W6 public-address pinning boundary.
+R6.2 adds LLM-authored agent templates through one bounded provider call. It
+uses strict JSON Schema when the selected provider supports structured output,
+always performs local semantic validation and redaction, preserves
+deterministic triggers and registered-tool bounds, and visibly falls back to
+the heuristic builder on unavailable, failed, incomplete, or invalid output.
+Users still review before save. Saved agents project to valid canonical Worker
+drafts; they are not deployed through the unified Worker lifecycle until R6.6.
 
-The exact resume point is R6.2 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+The exact resume point is R6.3 in [BACKLOG.md](BACKLOG.md), the sole ledger for
 the conditional live W10 check and all remaining R6-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.

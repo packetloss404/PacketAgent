@@ -1179,7 +1179,7 @@ R5 research, implementation decisions, and cumulative gate evidence live in
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1 is complete; resume at R6.2.
+Status: in progress. R6.1-R6.2 are complete; resume at R6.3.
 
 1. [Complete 2026-07-29] Wire the default SMTP transport through the
    vault-backed credential path. The Worker sender and TLS policy are
@@ -1187,7 +1187,16 @@ Status: in progress. R6.1 is complete; resume at R6.2.
    secret-free output, and policy-before-resolution ordering are certified by
    `npm run verify:smtp`. See
    [`r6-smtp-transport.md`](r6-smtp-transport.md).
-2. Add LLM-authored Worker/agent templates beyond the heuristic draft builder.
+2. [Complete 2026-07-29] Add LLM-authored Worker/agent templates beyond the
+   heuristic draft builder. The model authors bounded reusable content through
+   the canonical provider router and provider-appropriate structured output;
+   deterministic code owns trigger/schedule choice, registered-tool bounds,
+   semantic validation, redaction, fallback, review, and save. Visible
+   provenance distinguishes LLM output from each fallback class.
+   `npm run verify:agent-template` proves the saved shape remains a valid
+   canonical Worker draft projection without claiming R6.6 lifecycle
+   consolidation. See
+   [`r6-agent-template-authoring.md`](r6-agent-template-authoring.md).
 3. Show provider/model/key/capability readiness before first run.
 4. Add editable memory and input-schema examples plus first-run evaluation.
 5. Add signed, versioned agent/Worker import and export.

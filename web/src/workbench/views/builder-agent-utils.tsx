@@ -7,6 +7,12 @@ export type AgentBuilderSampleInputIssue = {
 };
 export type ReadinessTone = "good" | "warn" | "danger" | "muted";
 
+export function agentAuthoringLabel(draft: AgentBuilderDraft): string {
+  return draft.authoring.source === "llm"
+    ? `LLM-authored with ${draft.authoring.provider} / ${draft.authoring.model}`
+    : "Deterministic fallback";
+}
+
 export function sampleInputsForDraft(draft: AgentBuilderDraft): AgentBuilderSampleInputs {
   return { ...draft.sampleInputs };
 }

@@ -556,6 +556,21 @@ export interface AgentBuilderDraft {
   prompt: string;
   intent: string;
   summary: string;
+  authoring:
+    | {
+        source: "llm";
+        provider: string;
+        model: string;
+        category: string;
+      }
+    | {
+        source: "heuristic";
+        fallbackReason:
+          | "provider_unavailable"
+          | "provider_error"
+          | "incomplete_output"
+          | "invalid_output";
+      };
   agent: SaveAgentInput & {
     description?: string;
   };

@@ -186,6 +186,13 @@ Prompt-to-app generation remains a supported secondary capability.
   credential-bound, SMTP reuses W6 public-address validation and pinning, and
   implicit TLS or mandatory STARTTLS with certificate validation is required.
   The deterministic `npm run verify:smtp` gate sends no live email.
+- Completed R6.2's LLM-authored AgentTemplate path. One bounded canonical
+  provider call uses structured output where supported; local validation owns
+  registered tools, trigger/schedule identity, safe typed inputs, redaction,
+  and complete fallback. Drafts expose provider/model provenance or the exact
+  deterministic fallback class. Approved Agents retain existing APIs and
+  project as valid draft Worker versions without claiming R6.6 lifecycle
+  consolidation.
 
 ## Current implementation truth
 
@@ -289,6 +296,10 @@ Implemented substrate:
 - canonical provider/model/capability and generation policy, workspace-vault
   keys for every hosted provider, structured-response mapping, one bounded
   malformed-tool correction, and secret-free readiness reporting;
+- one bounded LLM AgentTemplate authoring path with deterministic
+  trigger/schedule and registered-tool constraints, semantic validation,
+  secret redaction, explicit heuristic fallback provenance, review-before-save,
+  and valid legacy-Agent-to-Worker draft projection;
 - tool approvals, encrypted secrets, RBAC, audit, sandbox, and Playwright;
 - outbound HTTP, Slack, GitHub, TLS SMTP email, SQL, and scoped shell tool
   adapters;
@@ -301,6 +312,8 @@ Not shipped:
 
 - hardened Worker-specific browser and SQL drivers (those paths fail closed
   for Worker runs);
+- canonical-only execution for legacy Agent records; R6.2 projections remain
+  draft until R6.6 validation, migration, and API-compatibility gates pass;
 - live PacketChat/PacketPhone interoperability certification when endpoint
   credentials are available.
 
@@ -308,7 +321,7 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R6.2 - LLM-authored Worker/agent templates** in
+Continue **R6.3 - provider/model/key/capability readiness before first run** in
 [`../BACKLOG.md#r6---agent-authoring-and-execution-depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth).
 `BACKLOG.md` is the single ledger for every remaining R6-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
@@ -766,9 +779,21 @@ redaction assertions without contacting a live SMTP server. Research and
 decisions are recorded in
 [`r6-smtp-transport.md`](r6-smtp-transport.md).
 
-The exact next slice is R6.2 under
+R6.2 is complete. The Builder makes one bounded provider-routed AgentTemplate
+authoring call, uses provider-appropriate structured output, rejects
+unregistered tools or deterministic trigger/schedule substitution, validates
+typed non-sensitive inputs and all string/list limits, and redacts
+secret-shaped assignments. Provider unavailable/error, incomplete, and
+invalid results return the deterministic draft with visible provenance.
+Approval retains the existing Agent API. `npm run verify:agent-template`
+certifies the valid canonical Worker draft projection and its required
+`projection.requires_validation` warning without making live calls. Research
+and decisions are recorded in
+[`r6-agent-template-authoring.md`](r6-agent-template-authoring.md).
+
+The exact next slice is R6.3 under
 [`R6 - agent authoring and execution depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth):
-add LLM-authored Worker/agent templates beyond the heuristic draft builder.
+show provider/model/key/capability readiness before first run.
 After each gate passes, continue through R6-R8 using that backlog's unchecked
 checklists; use the loop document only for execution mechanics. Historical
 D/phase/track documents have been reconciled there and must not be resumed
@@ -800,9 +825,16 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,625 passed, 3 intentionally skipped live probes, 0
-  failed (1,628 total)
-- `npm run test:web` - 33 passed, 0 failed
+- `npm run test:api` - 1,629 passed, 3 intentionally skipped live probes, 0
+  failed (1,632 total)
+- `npm run test:web` - 34 passed, 0 failed
+- focused R6.2 AgentTemplate schema, best-effort JSON, semantic constraints,
+  redaction, deterministic fallback, service merge, Agent approval, route
+  compatibility, and UI provenance gate - 79 passed, 0 failed
+- `npm run verify:agent-template` - all 7 structured-schema, registered-tool,
+  redaction, deterministic-trigger, invalid-substitution fallback, canonical
+  Worker projection, and lifecycle-warning assertions passed without a live
+  provider or external tool call
 - focused R6.1 SMTP, credential, network, runtime-binding, policy-order, and
   registry-bypass gate - 35 passed, 0 failed
 - `npm run verify:smtp` - all 7 encrypted-storage, address-pinning, TLS,
@@ -936,6 +968,6 @@ Expected branch: `codex/packetagent-foundation`.
 Expected remotes: PacketAgent `origin` and the read-only historical
 `taskloom-source`.
 
-Expected status after the latest pushed R2 checkpoint: clean. Stop if the active folder is
+Expected status after the latest pushed R6.2 checkpoint: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

@@ -72,6 +72,11 @@ import {
 } from "../security/redaction.js";
 import { generateId, now } from "../auth-utils";
 import {
+  generateAgentTemplateViaLlm,
+  type AgentTemplateFallbackReason,
+  type AgentTemplateGenerationResult,
+} from "../agent-builder/llm-template.js";
+import {
   activationActivityId,
   activationSignalStableKey,
   type AuthenticatedContext,
@@ -137,6 +142,7 @@ export interface AgentDraftResult {
 export interface AgentBuilderPromptInput {
   prompt?: string;
   preset?: import("../model-routing-presets.js").ModelRoutingPresetId;
+  signal?: AbortSignal;
 }
 
 interface AgentBuilderWebhookTriggerReadiness extends WebhookTriggerReadiness {
@@ -162,6 +168,17 @@ export interface AgentBuilderDraft {
   prompt: string;
   intent: string;
   summary: string;
+  authoring:
+    | {
+        source: "llm";
+        provider: string;
+        model: string;
+        category: string;
+      }
+    | {
+        source: "heuristic";
+        fallbackReason: AgentTemplateFallbackReason;
+      };
   integrationMetadata: Phase71IntegrationMetadata;
   agent: {
     name: string;
@@ -218,6 +235,13 @@ export interface AgentBuilderApproveResult {
   agent: ReturnType<typeof decorateAgentWithProvider>;
   firstRun?: ReturnType<typeof decorateRun>;
   sampleInputs?: Record<string, string | number | boolean>;
+}
+
+export interface AgentBuilderDraftDependencies {
+  readonly generateTemplate?: (
+    input: Parameters<typeof generateAgentTemplateViaLlm>[0],
+    options?: Parameters<typeof generateAgentTemplateViaLlm>[1],
+  ) => Promise<AgentTemplateGenerationResult>;
 }
 
 export type AgentRunTraceSpanKind =
@@ -1507,6 +1531,7 @@ function buildDryRunTranscript(
 export async function generateAgentBuilderDraftAsync(
   context: AuthenticatedContext,
   input: AgentBuilderPromptInput,
+  dependencies: AgentBuilderDraftDependencies = {},
 ): Promise<AgentBuilderDraft> {
   const prompt = String(input.prompt ?? "").trim();
   if (prompt.length < 12) throw httpError(400, "prompt must be at least 12 characters");
@@ -1535,17 +1560,42 @@ export async function generateAgentBuilderDraftAsync(
       : listDefaultToolSummaries().map((tool) => tool.name)
   ).sort();
   const intent = inferAgentBuilderIntent(prompt);
-  const recommendedTools = recommendAgentTools(intent, prompt, availableTools);
-  const inputSchema = buildAgentBuilderInputSchema(intent, prompt);
+  const heuristicRecommendedTools = recommendAgentTools(intent, prompt, availableTools);
+  const heuristicInputSchema = buildAgentBuilderInputSchema(intent, prompt);
   const integrationMetadata = buildAgentPhase71IntegrationMetadata(prompt);
-  const sampleInputs = buildAgentSampleInputs(inputSchema);
   const triggerKind = inferAgentTriggerKind(intent, prompt);
   const schedule = triggerKind === "schedule" ? inferAgentSchedule(prompt) : undefined;
   const webhookReadiness = buildAgentBuilderWebhookReadiness(triggerKind);
   const scheduleReadiness = buildAgentBuilderScheduleReadiness(triggerKind, schedule);
-  const name = buildAgentBuilderName(prompt, intent);
+  const generated = await (dependencies.generateTemplate ?? generateAgentTemplateViaLlm)(
+    {
+      prompt,
+      workspaceId: context.workspace.id,
+      preset: input.preset,
+      allowedTools: availableTools,
+      recommendedTools: heuristicRecommendedTools,
+      triggerKind,
+      schedule,
+    },
+    input.signal ? { signal: input.signal } : undefined,
+  );
+  const authoredTemplate = generated.source === "llm" ? generated.template : undefined;
+  const recommendedTools = [
+    ...new Set([...heuristicRecommendedTools, ...(authoredTemplate?.tools ?? [])]),
+  ];
+  const inputSchema =
+    authoredTemplate && authoredTemplate.inputSchema.length > 0
+      ? authoredTemplate.inputSchema.map((field) => ({
+          ...field,
+          ...(field.options ? { options: [...field.options] } : {}),
+        }))
+      : heuristicInputSchema;
+  const sampleInputs = buildAgentSampleInputs(inputSchema);
+  const name = authoredTemplate?.name ?? buildAgentBuilderName(prompt, intent);
   const playbook = applyAgentIntegrationPlaybookSteps(
-    buildAgentBuilderPlaybook(intent, prompt),
+    authoredTemplate
+      ? authoredTemplate.playbook.map((step) => ({ ...step }))
+      : buildAgentBuilderPlaybook(intent, prompt),
     integrationMetadata,
   );
   const missingTools = recommendedTools.filter((tool) => !availableTools.includes(tool));
@@ -1562,13 +1612,25 @@ export async function generateAgentBuilderDraftAsync(
   return {
     prompt,
     intent,
-    summary: `${name} will ${summarizeAgentPrompt(prompt)}`,
+    summary: authoredTemplate?.summary ?? `${name} will ${summarizeAgentPrompt(prompt)}`,
+    authoring:
+      generated.source === "llm"
+        ? {
+            source: "llm",
+            provider: generated.provider,
+            model: generated.model,
+            category: generated.template.category,
+          }
+        : {
+            source: "heuristic",
+            fallbackReason: generated.fallbackReason,
+          },
     integrationMetadata,
     agent: {
       name,
-      description: summarizeAgentPrompt(prompt),
+      description: authoredTemplate?.description ?? summarizeAgentPrompt(prompt),
       instructions: applyAgentIntegrationInstructions(
-        buildAgentBuilderInstructions(prompt, intent),
+        authoredTemplate?.instructions ?? buildAgentBuilderInstructions(prompt, intent),
         integrationMetadata,
       ),
       providerId: selectedProvider?.id,
@@ -1620,13 +1682,17 @@ export async function generateAgentBuilderDraftAsync(
       acceptanceChecks: [
         "Agent draft is saved with generated instructions, input schema, tools, and trigger.",
         "Missing provider or tool setup is visible before first run.",
+        ...(authoredTemplate?.acceptanceChecks ?? []),
         ...integrationMetadata.requested.map(
           (integration) =>
             `${integration.label} flow references ${integration.envVars.join(", ")} and remains draft-safe until setup is complete.`,
         ),
         "First test run records output, logs, transcript, and any tool calls.",
       ],
-      openQuestions: buildAgentBuilderOpenQuestions(intent, prompt),
+      openQuestions:
+        authoredTemplate && authoredTemplate.openQuestions.length > 0
+          ? [...authoredTemplate.openQuestions]
+          : buildAgentBuilderOpenQuestions(intent, prompt),
     },
     readiness: {
       provider: {
@@ -1670,9 +1736,11 @@ export async function generateAgentBuilderDraftAsync(
 export async function approveAgentBuilderDraftAsync(
   context: AuthenticatedContext,
   input: AgentBuilderApproveInput,
+  dependencies: AgentBuilderDraftDependencies = {},
 ): Promise<AgentBuilderApproveResult> {
   const draft =
-    input.draft ?? (await generateAgentBuilderDraftAsync(context, { prompt: input.prompt }));
+    input.draft ??
+    (await generateAgentBuilderDraftAsync(context, { prompt: input.prompt }, dependencies));
   const created = await createAgentAsync(context, {
     ...draft.agent,
     status: input.status ?? draft.agent.status ?? "active",

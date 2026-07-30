@@ -11,6 +11,7 @@ import type {
 import { I } from "../icons";
 import {
   agentEditorPath,
+  agentAuthoringLabel,
   coerceSampleValue,
   draftToolNames,
   firstRunReadinessTone,
@@ -337,6 +338,17 @@ function DraftSummary({
               <span className="dot"></span>
               {savedAgent ? "saved" : "draft"}
             </span>
+            <span
+              className={`pill ${draft.authoring.source === "llm" ? "info" : "muted"}`}
+              title={
+                draft.authoring.source === "heuristic"
+                  ? `LLM authoring fallback: ${draft.authoring.fallbackReason}`
+                  : `Template category: ${draft.authoring.category}`
+              }
+            >
+              <span className="dot"></span>
+              {draft.authoring.source === "llm" ? "LLM-authored" : "deterministic"}
+            </span>
           </div>
           <p className="muted" style={{ fontSize: 13, marginTop: 6, marginBottom: 10 }}>
             {draft.summary}
@@ -344,6 +356,9 @@ function DraftSummary({
           <div className="mono muted" style={{ fontSize: 11 }}>
             {draft.intent} - {draft.agent.triggerKind ?? "manual"} -{" "}
             {draft.agent.model ?? draft.readiness.provider.selectedModel ?? "model pending"}
+          </div>
+          <div className="mono muted" style={{ fontSize: 10.5, marginTop: 4 }}>
+            {agentAuthoringLabel(draft)}
           </div>
         </div>
       </div>

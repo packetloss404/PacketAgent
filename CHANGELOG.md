@@ -6,6 +6,30 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R6.2 LLM-authored agent templates
+
+- Added one bounded provider-routed authoring call for reusable agent
+  templates, using strict JSON Schema for capable providers and a bounded
+  best-effort JSON contract for providers without schema mode.
+- Added semantic validation for category, registered tools, deterministic
+  trigger/schedule identity, typed non-sensitive inputs, playbook size,
+  acceptance checks, and output bounds. Secret-like assignments are redacted
+  before draft data reaches the UI or save path.
+- Preserved the deterministic builder as an explicit fallback for unavailable,
+  failed, incomplete, or invalid provider output and surfaced provider/model
+  authoring provenance or the exact fallback class in the draft workbench.
+- Kept integration setup, tool registration, trigger selection, review, and
+  approval deterministic. Approved agents retain existing APIs and project to
+  valid draft Worker versions; canonical-only execution remains R6.6.
+- Added focused provider, semantic-validation, service, route, and UI coverage
+  plus `npm run verify:agent-template`, which performs no live provider or
+  external tool calls.
+- Typecheck, zero-warning lint, repository formatting, the production web
+  build, 34 web tests, 79 focused backend tests, the seven-assertion
+  AgentTemplate verifier, and 1,632 API tests pass (1,629 passed with three
+  intentional live interoperability skips).
+- Resume at R6.3 provider/model/key/capability readiness before first run.
+
 ### 2026-07-29 - R6.1 vault-backed SMTP transport
 
 - Added a Nodemailer-backed default `email_send` transport with mandatory

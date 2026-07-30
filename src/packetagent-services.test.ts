@@ -38,6 +38,12 @@ import { getDefaultToolRegistry, resetDefaultToolRegistryForTests } from "./tool
 type RunAgentRunResult = Extract<RunAgentResult, { run: unknown }>["run"];
 type RunAgentApprovalResult = Extract<RunAgentResult, { approval: unknown }>["approval"];
 
+const heuristicAgentTemplateDeps = {
+  async generateTemplate() {
+    return { source: "heuristic", fallbackReason: "provider_unavailable" } as const;
+  },
+};
+
 function expectRun(result: RunAgentResult): RunAgentRunResult {
   assert.ok("run" in result, `expected a run result, received ${JSON.stringify(result)}`);
   return result.run;
@@ -287,12 +293,20 @@ test("agent prompt generation returns a structured builder draft", async () => {
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
-  const draft = await generateAgentBuilderDraftAsync(auth.context, {
-    prompt:
-      "Build an agent that monitors support tickets daily, summarizes urgent escalations, opens blockers for unresolved incidents, and reports outcomes to operators.",
-  });
+  const draft = await generateAgentBuilderDraftAsync(
+    auth.context,
+    {
+      prompt:
+        "Build an agent that monitors support tickets daily, summarizes urgent escalations, opens blockers for unresolved incidents, and reports outcomes to operators.",
+    },
+    heuristicAgentTemplateDeps,
+  );
 
   assert.equal(draft.agent.status, "active");
+  assert.deepEqual(draft.authoring, {
+    source: "heuristic",
+    fallbackReason: "provider_unavailable",
+  });
   assert.equal(draft.agent.triggerKind, "schedule");
   assert.equal(draft.agent.schedule, "0 8 * * 1-5");
   assert.match(draft.agent.name ?? "", /Support|agent/i);
@@ -324,16 +338,110 @@ test("agent prompt generation returns a structured builder draft", async () => {
   assert.ok(draft.readiness.firstRun.blockers.length >= 0);
 });
 
+test("agent builder merges an LLM-authored AgentTemplate through deterministic runtime bounds", async () => {
+  resetStoreForTests();
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
+
+  const draft = await generateAgentBuilderDraftAsync(
+    auth.context,
+    {
+      prompt:
+        "Build a manual research agent that reads a public source URL and emails a concise evidence report.",
+    },
+    {
+      async generateTemplate(input) {
+        assert.ok(input.allowedTools.includes("http_fetch"));
+        assert.ok(input.allowedTools.includes("email_send"));
+        assert.equal(input.triggerKind, "manual");
+        assert.equal(input.schedule, undefined);
+        return {
+          source: "llm",
+          provider: "openai",
+          model: "gpt-agent-template-test",
+          template: {
+            category: "research",
+            name: "Evidence briefing agent",
+            summary: "Reads one source and prepares a concise evidence briefing.",
+            description: "Reviews a public source and stops after one evidence briefing.",
+            instructions:
+              "Read only the supplied public source. Prepare one evidence briefing with findings, risks, and the next action, then stop.",
+            tools: ["http_fetch", "email_send"],
+            triggerKind: "manual",
+            inputSchema: [
+              {
+                key: "source_url",
+                label: "Source URL",
+                type: "url",
+                required: true,
+                defaultValue: "https://example.com/evidence",
+              },
+            ],
+            playbook: [
+              {
+                id: "llm_step_1",
+                title: "Read evidence",
+                instruction: "Read the supplied public source.",
+              },
+              {
+                id: "llm_step_2",
+                title: "Prepare briefing",
+                instruction: "Report findings, risks, and the next action, then stop.",
+              },
+            ],
+            acceptanceChecks: ["The briefing identifies its source and unresolved risks."],
+            openQuestions: ["Which configured recipient should receive later live runs?"],
+          },
+        };
+      },
+    },
+  );
+
+  assert.deepEqual(draft.authoring, {
+    source: "llm",
+    provider: "openai",
+    model: "gpt-agent-template-test",
+    category: "research",
+  });
+  assert.equal(draft.agent.name, "Evidence briefing agent");
+  assert.equal(draft.agent.triggerKind, "manual");
+  assert.equal(draft.agent.schedule, undefined);
+  assert.ok(draft.agent.enabledTools.includes("http_fetch"));
+  assert.ok(draft.agent.enabledTools.includes("email_send"));
+  assert.deepEqual(draft.agent.inputSchema, [
+    {
+      key: "source_url",
+      label: "Source URL",
+      type: "url",
+      required: true,
+      defaultValue: "https://example.com/evidence",
+    },
+  ]);
+  assert.deepEqual(draft.sampleInputs, { source_url: "https://example.com/evidence" });
+  assert.equal(draft.agent.playbook[0].title, "Read evidence");
+  assert.ok(
+    draft.plan.acceptanceChecks.includes(
+      "The briefing identifies its source and unresolved risks.",
+    ),
+  );
+  assert.deepEqual(draft.plan.openQuestions, [
+    "Which configured recipient should receive later live runs?",
+  ]);
+});
+
 test("agent builder drafts surface missing tool setup as first-run blockers", async () => {
   resetStoreForTests();
   const restoreTools = installOnlyTestToolRegistry(["read_workflow_brief"]);
 
   try {
     const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
-    const draft = await generateAgentBuilderDraftAsync(auth.context, {
-      prompt:
-        "Send Slack notifications for GitHub pull requests and email owners when review is needed.",
-    });
+    const draft = await generateAgentBuilderDraftAsync(
+      auth.context,
+      {
+        prompt:
+          "Send Slack notifications for GitHub pull requests and email owners when review is needed.",
+      },
+      heuristicAgentTemplateDeps,
+    );
 
     assert.ok(draft.readiness.tools.recommended.includes("slack_post_webhook"));
     assert.ok(draft.readiness.tools.recommended.includes("github_api"));
@@ -360,10 +468,14 @@ test("agent builder drafts carry phase 71 integration flows and env setup refere
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
-  const draft = await generateAgentBuilderDraftAsync(auth.context, {
-    prompt:
-      "Create a daily agent that reads GitHub issues, sends Slack alerts, emails owners, and updates Stripe billing notes for escalations.",
-  });
+  const draft = await generateAgentBuilderDraftAsync(
+    auth.context,
+    {
+      prompt:
+        "Create a daily agent that reads GitHub issues, sends Slack alerts, emails owners, and updates Stripe billing notes for escalations.",
+    },
+    heuristicAgentTemplateDeps,
+  );
 
   assert.equal(draft.agent.triggerKind, "schedule");
   assert.deepEqual(
@@ -430,10 +542,14 @@ test("agent prompt generation can create an approved agent", async () => {
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
-  const result = await approveAgentBuilderDraftAsync(auth.context, {
-    prompt:
-      "Create a webhook agent to triage customer incidents, open blockers for critical risks, and log a concise summary.",
-  });
+  const result = await approveAgentBuilderDraftAsync(
+    auth.context,
+    {
+      prompt:
+        "Create a webhook agent to triage customer incidents, open blockers for critical risks, and log a concise summary.",
+    },
+    heuristicAgentTemplateDeps,
+  );
 
   assert.equal(result.created, true);
   assert.ok(result.agent);
@@ -465,11 +581,15 @@ test("agent prompt generation can attach a first preview run with sample inputs"
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
-  const result = await approveAgentBuilderDraftAsync(auth.context, {
-    prompt:
-      "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
-    runPreview: true,
-  });
+  const result = await approveAgentBuilderDraftAsync(
+    auth.context,
+    {
+      prompt:
+        "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
+      runPreview: true,
+    },
+    heuristicAgentTemplateDeps,
+  );
 
   assert.equal(result.created, true);
   assert.ok(result.agent);
@@ -493,10 +613,14 @@ test("agent prompt generation can attach a first preview run with sample inputs"
 test("agent builder preview respects first-run readiness blockers", async () => {
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
-  const draft = await generateAgentBuilderDraftAsync(auth.context, {
-    prompt:
-      "Create a research assistant agent that reviews a source URL and reports the next action.",
-  });
+  const draft = await generateAgentBuilderDraftAsync(
+    auth.context,
+    {
+      prompt:
+        "Create a research assistant agent that reviews a source URL and reports the next action.",
+    },
+    heuristicAgentTemplateDeps,
+  );
   const runsBefore = listAgentRuns(auth.context).runs.length;
 
   const result = await approveAgentBuilderDraftAsync(auth.context, {

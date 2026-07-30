@@ -667,10 +667,22 @@ test("builder agent draft can be approved into an agent", async () => {
         "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
     }),
   });
-  const draftBody = (await draftResponse.json()) as { draft?: { agent?: { name?: string } } };
+  const draftBody = (await draftResponse.json()) as {
+    draft?: {
+      agent?: { name?: string };
+      authoring?: { source?: string; fallbackReason?: string; provider?: string; model?: string };
+    };
+  };
 
   assert.equal(draftResponse.status, 200);
-  assert.equal(draftBody.draft?.agent?.name, "Release audit agent");
+  assert.ok(draftBody.draft?.agent?.name);
+  assert.ok(["llm", "heuristic"].includes(draftBody.draft?.authoring?.source ?? ""));
+  if (draftBody.draft?.authoring?.source === "llm") {
+    assert.ok(draftBody.draft.authoring.provider);
+    assert.ok(draftBody.draft.authoring.model);
+  } else {
+    assert.ok(draftBody.draft?.authoring?.fallbackReason);
+  }
 
   const approveResponse = await app.request("/api/app/builder/agent-draft/approve", {
     method: "POST",
