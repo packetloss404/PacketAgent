@@ -15,6 +15,7 @@ import { canEditWorkflowRole, canManageWorkspaceRole } from "@/lib/roles";
 import type {
   AgentInputField,
   AgentInputFieldType,
+  AgentMemoryEntry,
   AgentPlaybookStep,
   AgentRecord,
   AgentRunRecord,
@@ -41,6 +42,7 @@ interface PendingRunApproval {
   approval: ToolCapabilityApprovalRequest;
   inputs: RunInputPayload;
   triggerKind: AgentTriggerKind;
+  evaluation?: { kind: "first_run" };
 }
 
 type RunAgentResult = RunAgentResponse;
@@ -64,6 +66,9 @@ export function AgentEditorView() {
   const [triggerKind, setTriggerKind] = useState<AgentTriggerKind>("manual");
   const [schedule, setSchedule] = useState("");
   const [inputSchema, setInputSchema] = useState<AgentInputField[]>([]);
+  const [memory, setMemory] = useState<AgentMemoryEntry[]>([]);
+  const [evaluationExpectedOutput, setEvaluationExpectedOutput] = useState("");
+  const [evaluationTools, setEvaluationTools] = useState<string[]>([]);
   const [enabledTools, setEnabledTools] = useState<string[]>([]);
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [runInputs, setRunInputs] = useState<Record<string, string>>({});
@@ -106,6 +111,9 @@ export function AgentEditorView() {
           setSchedule(detail.agent.schedule ?? "");
           setExpandedRun(detail.runs[0]?.id ?? null);
           setInputSchema(detail.agent.inputSchema ?? []);
+          setMemory(detail.agent.memory ?? []);
+          setEvaluationExpectedOutput(detail.agent.evaluationSpec?.expectedOutput ?? "");
+          setEvaluationTools(detail.agent.evaluationSpec?.requiredTools ?? []);
           setEnabledTools(detail.agent.enabledTools ?? []);
           setRunInputs(seedRunInputs(detail.agent.inputSchema ?? []));
         }
@@ -141,6 +149,7 @@ export function AgentEditorView() {
     () => describeNextRun(schedule, triggerKind),
     [schedule, triggerKind],
   );
+  const firstRunEvaluationPending = !runs.some((run) => run.evaluation?.kind === "first_run");
   const scheduleValidation = triggerKind === "schedule" ? validateCronSchedule(schedule) : null;
   const showScheduleValidation =
     triggerKind === "schedule" && scheduleValidation && scheduleTouched;
@@ -192,6 +201,11 @@ export function AgentEditorView() {
       status: fieldValue(form, "status") as AgentStatus,
       inputSchema,
       enabledTools,
+      memory,
+      evaluationSpec: {
+        expectedOutput: evaluationExpectedOutput,
+        requiredTools: evaluationTools,
+      },
     };
 
     if (scheduleValidation) {
@@ -213,6 +227,9 @@ export function AgentEditorView() {
       setSchedule(nextAgent.schedule ?? "");
       setInputSchema(nextAgent.inputSchema ?? []);
       setEnabledTools(nextAgent.enabledTools ?? []);
+      setMemory(nextAgent.memory ?? []);
+      setEvaluationExpectedOutput(nextAgent.evaluationSpec?.expectedOutput ?? "");
+      setEvaluationTools(nextAgent.evaluationSpec?.requiredTools ?? []);
       setRunInputs(seedRunInputs(nextAgent.inputSchema ?? []));
       setPendingApproval(null);
       setPlaybookReviewRunId(null);
@@ -303,6 +320,7 @@ export function AgentEditorView() {
 
   const updateEnabledTools = (next: string[]) => {
     setEnabledTools(next);
+    setEvaluationTools((current) => current.filter((tool) => next.includes(tool)));
     if (pendingApproval) {
       setPendingApproval(null);
       setError(null);
@@ -339,12 +357,14 @@ export function AgentEditorView() {
     requestTriggerKind: AgentTriggerKind,
     approvalMessage: string,
     successMessage: string,
+    evaluation?: { kind: "first_run" },
   ) => {
     if (isApprovalResult(result)) {
       setPendingApproval({
         approval: result.approval,
         inputs,
         triggerKind: result.approval.triggerKind ?? requestTriggerKind,
+        evaluation,
       });
       setMessage(approvalMessage);
       return;
@@ -370,14 +390,20 @@ export function AgentEditorView() {
     setPendingApproval(null);
     try {
       const inputs = buildRunInputPayload(inputSchema, runInputs);
-      const result = await api.runAgent(agent.id, { triggerKind: requestTriggerKind, inputs });
+      const evaluation = firstRunEvaluationPending ? ({ kind: "first_run" } as const) : undefined;
+      const result = await api.runAgent(agent.id, {
+        triggerKind: requestTriggerKind,
+        inputs,
+        evaluation,
+      });
       await completeRunRequest(
         agent.id,
         result,
         inputs,
         requestTriggerKind,
         "Tool approval required before launch.",
-        "Agent run recorded.",
+        evaluation ? "First-run evaluation recorded." : "Agent run recorded.",
+        evaluation,
       );
     } catch (e) {
       setError((e as Error).message);
@@ -396,6 +422,7 @@ export function AgentEditorView() {
       const result = await api.runAgent(agent.id, {
         triggerKind: pending.triggerKind,
         inputs: pending.inputs,
+        evaluation: pending.evaluation,
         toolApproval: {
           decision: "launch",
           token: pending.approval.approvalToken,
@@ -408,7 +435,8 @@ export function AgentEditorView() {
         pending.inputs,
         pending.triggerKind,
         "Tool approval was refreshed. Review the updated request before launching.",
-        "Agent run launched.",
+        pending.evaluation ? "First-run evaluation recorded." : "Agent run launched.",
+        pending.evaluation,
       );
     } catch (e) {
       setError((e as Error).message);
@@ -468,7 +496,7 @@ export function AgentEditorView() {
                 ) : (
                   <I.play size={13} />
                 )}{" "}
-                Run now
+                {firstRunEvaluationPending ? "Evaluate first run" : "Run now"}
               </button>
               {canManageAgent && (
                 <button
@@ -769,11 +797,84 @@ export function AgentEditorView() {
 
                 <Section
                   number="05 / 05"
-                  kicker="INPUT SCHEMA"
-                  title="Typed parameters"
-                  sub="Validated server-side. Coerced into typed inputs on every run."
+                  kicker="MEMORY · INPUTS · EVALUATION"
+                  title="First-run contract"
+                  sub="Bounded non-secret context, saved input examples, and deterministic evaluation expectations."
                 >
+                  <div className="kicker" style={{ marginBottom: 8 }}>
+                    MEMORY
+                  </div>
+                  <MemoryEditor memory={memory} onChange={setMemory} />
+                  <div
+                    className="kicker"
+                    style={{
+                      marginTop: 16,
+                      paddingTop: 16,
+                      borderTop: "1px solid var(--line)",
+                      marginBottom: 8,
+                    }}
+                  >
+                    INPUT SCHEMA & EXAMPLES
+                  </div>
                   <InputSchemaEditor schema={inputSchema} onChange={updateInputSchema} />
+                  <div
+                    style={{
+                      marginTop: 16,
+                      paddingTop: 16,
+                      borderTop: "1px solid var(--line)",
+                    }}
+                  >
+                    <Field label="Expected output · operator review context">
+                      <textarea
+                        className="field"
+                        rows={3}
+                        maxLength={1_200}
+                        value={evaluationExpectedOutput}
+                        onChange={(event) => setEvaluationExpectedOutput(event.target.value)}
+                      />
+                    </Field>
+                    <div className="label" style={{ marginTop: 10 }}>
+                      Required successful tool calls
+                    </div>
+                    {enabledTools.length === 0 ? (
+                      <div className="mono muted" style={{ fontSize: 11 }}>
+                        No enabled tool is required.
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {enabledTools.map((tool) => (
+                          <label
+                            key={tool}
+                            className="mono"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              fontSize: 11,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={evaluationTools.includes(tool)}
+                              onChange={(event) =>
+                                setEvaluationTools((current) =>
+                                  event.target.checked
+                                    ? Array.from(new Set([...current, tool]))
+                                    : current.filter((candidate) => candidate !== tool),
+                                )
+                              }
+                            />
+                            {tool}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mono muted" style={{ fontSize: 10.5, marginTop: 8 }}>
+                      Pass/fail is structural: saved input example, successful bounded run,
+                      non-empty output, and these tool calls. Expected-output text is shown for
+                      review, not graded by a second model.
+                    </p>
+                  </div>
                 </Section>
 
                 <div
@@ -844,7 +945,11 @@ export function AgentEditorView() {
                     ) : (
                       <I.play size={13} />
                     )}
-                    {canRunAgent ? " Execute" : " Member role required"}
+                    {canRunAgent
+                      ? firstRunEvaluationPending
+                        ? " Evaluate first run"
+                        : " Execute"
+                      : " Member role required"}
                   </button>
                   {pendingApproval && (
                     <ApprovalPanel
@@ -955,6 +1060,7 @@ export function AgentEditorView() {
                               }}
                             >
                               <RunTranscript steps={r.transcript} />
+                              {r.evaluation && <FirstRunEvaluationPanel run={r} />}
                               {r.toolCalls && r.toolCalls.length > 0 && (
                                 <div>
                                   <div
@@ -1110,7 +1216,8 @@ function lines(value: string) {
 function seedRunInputs(schema: AgentInputField[]): Record<string, string> {
   const next: Record<string, string> = {};
   for (const f of schema) {
-    if (f.defaultValue !== undefined) next[f.key] = f.defaultValue;
+    if (f.exampleValue !== undefined) next[f.key] = f.exampleValue;
+    else if (f.defaultValue !== undefined) next[f.key] = f.defaultValue;
     else if (f.type === "boolean") next[f.key] = "false";
     else next[f.key] = "";
   }
@@ -1739,6 +1846,78 @@ function ToolPicker({
   );
 }
 
+function MemoryEditor({
+  memory,
+  onChange,
+}: {
+  memory: AgentMemoryEntry[];
+  onChange: (next: AgentMemoryEntry[]) => void;
+}) {
+  const update = (index: number, patch: Partial<AgentMemoryEntry>) =>
+    onChange(
+      memory.map((entry, candidate) => (candidate === index ? { ...entry, ...patch } : entry)),
+    );
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {memory.length === 0 && (
+        <div className="card muted" style={{ padding: "12px 14px", fontSize: 12 }}>
+          — no saved context · secrets belong in credential references —
+        </div>
+      )}
+      {memory.map((entry, index) => (
+        <div
+          key={entry.id}
+          className="card"
+          style={{
+            padding: 10,
+            display: "grid",
+            gridTemplateColumns: "minmax(120px, 0.35fr) minmax(0, 1fr) auto",
+            gap: 8,
+            alignItems: "start",
+          }}
+        >
+          <input
+            className="field"
+            value={entry.label}
+            maxLength={80}
+            aria-label={`Memory ${index + 1} label`}
+            onChange={(event) => update(index, { label: event.target.value })}
+          />
+          <textarea
+            className="field"
+            value={entry.content}
+            maxLength={1_000}
+            rows={2}
+            aria-label={`Memory ${index + 1} content`}
+            onChange={(event) => update(index, { content: event.target.value })}
+          />
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ color: "var(--danger)" }}
+            aria-label={`Remove memory ${index + 1}`}
+            onClick={() => onChange(memory.filter((_, candidate) => candidate !== index))}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <div>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={memory.length >= 12}
+          onClick={() =>
+            onChange([...memory, { id: `memory_${Date.now()}`, label: "Context", content: "" }])
+          }
+        >
+          <I.plus size={11} /> Add memory
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── InputSchemaEditor ──────────────────────────────────────────────────────
 function InputSchemaEditor({
   schema,
@@ -1781,6 +1960,7 @@ function InputSchemaEditor({
                 <th>Req</th>
                 <th>Options</th>
                 <th>Default</th>
+                <th>Example</th>
                 <th></th>
               </tr>
             </thead>
@@ -1869,6 +2049,15 @@ function InputSchemaEditor({
                       placeholder="—"
                       value={f.defaultValue ?? ""}
                       onChange={(e) => update(index, { defaultValue: e.target.value })}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="field"
+                      style={{ fontSize: 12, padding: "5px 8px" }}
+                      placeholder="first run"
+                      value={f.exampleValue ?? ""}
+                      onChange={(e) => update(index, { exampleValue: e.target.value })}
                     />
                   </td>
                   <td>
@@ -2008,6 +2197,88 @@ export function RunTranscript({ steps }: { steps: AgentRunStep[] | undefined }) 
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function FirstRunEvaluationPanel({ run }: { run: AgentRunRecord }) {
+  const evaluation = run.evaluation;
+  if (!evaluation) return null;
+
+  return (
+    <div
+      role="group"
+      aria-label="First-run evaluation evidence"
+      style={{
+        border: `1px solid ${
+          evaluation.status === "passed" ? "rgba(74,222,128,0.28)" : "rgba(248,113,113,0.34)"
+        }`,
+        background:
+          evaluation.status === "passed" ? "rgba(74,222,128,0.035)" : "rgba(248,113,113,0.045)",
+        borderRadius: 6,
+        padding: 10,
+        display: "grid",
+        gap: 9,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <div className="kicker">FIRST-RUN EVALUATION</div>
+        <span className={`pill ${evaluation.status === "passed" ? "good" : "danger"}`}>
+          {evaluation.status}
+        </span>
+      </div>
+      <div style={{ display: "grid", gap: 5 }}>
+        {evaluation.checks.map((check) => (
+          <div
+            key={check.id}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "52px minmax(0, 1fr)",
+              gap: 8,
+              alignItems: "start",
+            }}
+          >
+            <span className={`pill ${check.status === "passed" ? "good" : "danger"}`}>
+              {check.status === "passed" ? "PASS" : "FAIL"}
+            </span>
+            <span style={{ minWidth: 0 }}>
+              <span className="mono" style={{ display: "block", fontSize: 11 }}>
+                {check.label}
+              </span>
+              <span className="muted" style={{ display: "block", fontSize: 10.5 }}>
+                {check.note}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 8,
+        }}
+      >
+        <div>
+          <div className="kicker" style={{ marginBottom: 4 }}>
+            EXPECTED OUTPUT
+          </div>
+          <div className="mono muted" style={{ fontSize: 10.5, whiteSpace: "pre-wrap" }}>
+            {evaluation.expected.output || "Non-empty output."}
+          </div>
+        </div>
+        <div>
+          <div className="kicker" style={{ marginBottom: 4 }}>
+            ACTUAL OUTPUT
+          </div>
+          <div className="mono muted" style={{ fontSize: 10.5, whiteSpace: "pre-wrap" }}>
+            {evaluation.actual.output || "No output captured."}
+          </div>
+        </div>
+      </div>
+      <div className="muted" style={{ fontSize: 10.5, lineHeight: 1.45 }}>
+        {evaluation.notes.join(" ")}
+      </div>
     </div>
   );
 }

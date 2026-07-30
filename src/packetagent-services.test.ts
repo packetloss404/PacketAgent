@@ -35,6 +35,12 @@ import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./packetage
 import { registerDefaultTools } from "./tools/bootstrap";
 import { getDefaultToolRegistry, resetDefaultToolRegistryForTests } from "./tools/registry";
 import { providerCatalogEntry } from "./providers/catalog.js";
+import {
+  ProviderRouter,
+  resetDefaultRouterForTests,
+  setDefaultRouter,
+} from "./providers/router.js";
+import type { LLMProvider, ProviderCallOptions, ProviderStreamChunk } from "./providers/types.js";
 
 type RunAgentRunResult = Extract<RunAgentResult, { run: unknown }>["run"];
 type RunAgentApprovalResult = Extract<RunAgentResult, { approval: unknown }>["approval"];
@@ -201,6 +207,46 @@ test("agent tool runtime settings persist on create and update", () => {
   assert.equal(updated.agent.routeKey, "agent.fast");
 });
 
+test("agent memory and input examples reject secret-like values", () => {
+  resetStoreForTests();
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
+
+  assert.throws(
+    () =>
+      createAgent(auth.context, {
+        name: "Unsafe memory agent",
+        description: "Should reject secret-bearing memory.",
+        instructions: "Use safe operator context to produce a concise answer.",
+        memory: [
+          {
+            id: "memory-1",
+            label: "Credential note",
+            content: "api_key=supersecretvalue12345",
+          },
+        ],
+      }),
+    /non-secret context/i,
+  );
+  assert.throws(
+    () =>
+      createAgent(auth.context, {
+        name: "Unsafe example agent",
+        description: "Should reject secret-bearing examples.",
+        instructions: "Use safe sample inputs to produce a concise answer.",
+        inputSchema: [
+          {
+            key: "api_key",
+            label: "API key",
+            type: "string",
+            required: true,
+            exampleValue: "sk_live_not_for_examples",
+          },
+        ],
+      }),
+    /input example.*must not contain a secret/i,
+  );
+});
+
 test("agent runs with enabled tools request launch approval before execution", async () => {
   registerDefaultTools();
   resetStoreForTests();
@@ -348,6 +394,10 @@ test("agent prompt generation returns a structured builder draft", async () => {
     ],
   );
   assert.deepEqual(draft.sampleInputs, { mailbox: "support", urgency_threshold: "medium" });
+  assert.ok(draft.agent.memory.length >= 1);
+  assert.match(draft.agent.memory[0].content, /support/i);
+  assert.ok(draft.agent.evaluationSpec.expectedOutput.length > 0);
+  assert.deepEqual(draft.agent.evaluationSpec.requiredTools, draft.agent.enabledTools);
   assert.ok(draft.plan.steps.length >= 3);
   assert.equal(draft.readiness.webhook.recommended, false);
   assert.equal(draft.readiness.schedule.recommended, true);
@@ -610,7 +660,106 @@ test("agent prompt generation can create an approved agent", async () => {
   assert.equal(detail.agent.playbook?.[0].title, "Understand request");
 });
 
-test("agent prompt generation can attach a first preview run with sample inputs", async () => {
+test("agent builder persists examples and records a real first-run evaluation", async () => {
+  resetStoreForTests();
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
+  const providerCalls: ProviderCallOptions[] = [];
+  const provider: LLMProvider = {
+    name: "openai",
+    async call(options) {
+      providerCalls.push(options);
+      return {
+        content: "Release evidence reviewed. No blocking issue was found.",
+        finishReason: "stop",
+        usage: { promptTokens: 18, completionTokens: 10, costUsd: 0.0004 },
+        model: options.model,
+        providerName: "openai",
+      };
+    },
+    async *stream(): AsyncIterable<ProviderStreamChunk> {
+      yield { done: true };
+    },
+    async models() {
+      return ["gpt-agent-runtime-test"];
+    },
+  };
+  const router = new ProviderRouter();
+  router.register("openai", provider);
+  setDefaultRouter(router);
+
+  try {
+    const generated = await generateAgentBuilderDraftAsync(
+      auth.context,
+      {
+        prompt:
+          "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
+      },
+      heuristicAgentTemplateDeps,
+    );
+    const result = await approveAgentBuilderDraftAsync(auth.context, {
+      draft: {
+        ...generated,
+        agent: {
+          ...generated.agent,
+          tools: [],
+          enabledTools: [],
+          evaluationSpec: {
+            ...generated.agent.evaluationSpec,
+            requiredTools: [],
+          },
+        },
+        readiness: {
+          ...generated.readiness,
+          firstRun: {
+            canRun: true,
+            blockers: [],
+            message: "Ready for deterministic first-run evaluation.",
+          },
+        },
+      },
+      runPreview: true,
+    });
+
+    assert.equal(result.created, true);
+    assert.ok(result.agent);
+    assert.ok(result.firstRun);
+    assert.equal(result.firstRun.agentId, result.agent.id);
+    assert.equal(result.firstRun.status, "success");
+    assert.equal(result.firstRun.inputs?.release_label, "next release");
+    assert.equal(result.firstRun.inputs?.evidence_url, "https://example.com");
+    assert.equal(result.firstRun.evaluation?.status, "passed");
+    assert.deepEqual(result.firstRun.evaluation?.expected.inputs, result.sampleInputs);
+    assert.equal(
+      result.firstRun.evaluation?.actual.output,
+      "Release evidence reviewed. No blocking issue was found.",
+    );
+    assert.equal(providerCalls.length, 1);
+    assert.match(
+      providerCalls[0].messages.map((message) => message.content).join("\n"),
+      /MEMORY \(operator-authored, non-secret context\)/,
+    );
+
+    const detail = getAgent(auth.context, result.agent.id);
+    assert.equal(detail.runs[0].id, result.firstRun.id);
+    assert.equal(
+      detail.runs[0].evaluation?.schemaVersion,
+      "packetagent.agent-first-run-evaluation/v1",
+    );
+    assert.equal(
+      detail.agent.inputSchema.find((field) => field.key === "release_label")?.exampleValue,
+      "next release",
+    );
+    assert.equal(
+      detail.agent.inputSchema.find((field) => field.key === "evidence_url")?.exampleValue,
+      "https://example.com",
+    );
+  } finally {
+    resetDefaultRouterForTests();
+  }
+});
+
+test("agent builder preserves examples while tool-enabled evaluation waits for approval", async () => {
+  registerDefaultTools();
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
 
@@ -618,7 +767,7 @@ test("agent prompt generation can attach a first preview run with sample inputs"
     auth.context,
     {
       prompt:
-        "Create a release audit agent that reviews evidence URLs, checks the release label, and reports blockers before launch.",
+        "Create a research agent that reads one public source URL and returns a concise evidence summary.",
       runPreview: true,
     },
     heuristicAgentTemplateDeps,
@@ -626,21 +775,19 @@ test("agent prompt generation can attach a first preview run with sample inputs"
 
   assert.equal(result.created, true);
   assert.ok(result.agent);
-  assert.ok(result.firstRun);
-  assert.equal(result.firstRun.agentId, result.agent.id);
-  assert.equal(result.firstRun.status, "success");
-  assert.equal(result.firstRun.inputs?.release_label, "next release");
-  assert.equal(result.firstRun.inputs?.evidence_url, "https://example.com");
-  assert.match(result.firstRun.output ?? "", /preview dry run|did not call a model/i);
-  assert.ok(result.firstRun.transcript?.some((step) => step.title === "Understand request"));
-  assert.ok(
-    result.firstRun.logs?.some((entry) =>
-      entry.message.includes("without invoking tools or a model"),
-    ),
-  );
+  assert.equal(result.firstRun, undefined);
+  assert.ok(result.firstRunApproval);
+  assert.ok(result.firstRunApproval.tools.some((tool) => tool.name === "http_fetch"));
 
   const detail = getAgent(auth.context, result.agent.id);
-  assert.equal(detail.runs[0].id, result.firstRun.id);
+  const exampleField = detail.agent.inputSchema[0];
+  assert.ok(exampleField);
+  assert.notEqual(result.sampleInputs?.[exampleField.key], undefined);
+  assert.equal(detail.runs.length, 0);
+  assert.equal(exampleField.exampleValue, String(result.sampleInputs?.[exampleField.key]));
+  assert.ok(detail.agent.memory?.length);
+  assert.ok(detail.agent.evaluationSpec?.requiredTools.includes("http_fetch"));
+  assert.deepEqual(detail.agent.evaluationSpec?.requiredTools, detail.agent.enabledTools);
 });
 
 test("agent builder preview respects first-run readiness blockers", async () => {

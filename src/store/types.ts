@@ -357,6 +357,18 @@ export interface AgentInputField {
   description?: string;
   options?: string[];
   defaultValue?: string;
+  exampleValue?: string;
+}
+
+export interface AgentMemoryEntry {
+  id: string;
+  label: string;
+  content: string;
+}
+
+export interface AgentEvaluationSpec {
+  expectedOutput: string;
+  requiredTools: string[];
 }
 
 export interface AgentRecord {
@@ -374,6 +386,8 @@ export interface AgentRecord {
   schedule?: string;
   triggerKind?: AgentTriggerKind;
   playbook?: AgentPlaybookStep[];
+  memory?: AgentMemoryEntry[];
+  evaluationSpec?: AgentEvaluationSpec;
   status: AgentStatus;
   createdByUserId: string;
   templateId?: string;
@@ -648,6 +662,36 @@ export interface AgentRunToolCall {
   status: "ok" | "error" | "timeout";
 }
 
+export type AgentEvaluationCheckStatus = "passed" | "failed";
+
+export interface AgentEvaluationCheck {
+  id: "inputs" | "run_status" | "output" | "tool_calls";
+  label: string;
+  status: AgentEvaluationCheckStatus;
+  note: string;
+}
+
+export interface AgentFirstRunEvaluation {
+  schemaVersion: "packetagent.agent-first-run-evaluation/v1";
+  kind: "first_run";
+  status: AgentEvaluationCheckStatus;
+  expected: {
+    inputs: Record<string, string | number | boolean>;
+    output: string;
+    toolCalls: string[];
+  };
+  actual: {
+    inputs: Record<string, string | number | boolean>;
+    output?: string;
+    toolCalls: Array<{ name: string; status: AgentRunToolCall["status"] }>;
+    runStatus: AgentRunStatus;
+    model?: string;
+  };
+  checks: AgentEvaluationCheck[];
+  notes: string[];
+  evaluatedAt: string;
+}
+
 export interface AgentRunRecord {
   id: string;
   workspaceId: string;
@@ -665,6 +709,7 @@ export interface AgentRunRecord {
   toolCalls?: AgentRunToolCall[];
   modelUsed?: string;
   costUsd?: number;
+  evaluation?: AgentFirstRunEvaluation;
   createdAt: string;
   updatedAt: string;
 }

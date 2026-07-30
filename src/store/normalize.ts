@@ -32,6 +32,15 @@ export function normalizeStore(data: Partial<PacketAgentData>): PacketAgentData 
     agents: (data.agents ?? []).map((entry) => ({
       ...entry,
       inputSchema: Array.isArray(entry.inputSchema) ? entry.inputSchema : [],
+      memory: Array.isArray(entry.memory) ? entry.memory : [],
+      evaluationSpec: entry.evaluationSpec
+        ? {
+            expectedOutput: entry.evaluationSpec.expectedOutput ?? "",
+            requiredTools: Array.isArray(entry.evaluationSpec.requiredTools)
+              ? entry.evaluationSpec.requiredTools
+              : [],
+          }
+        : undefined,
     })),
     generatedApps: data.generatedApps ?? [],
     providers: data.providers ?? [],

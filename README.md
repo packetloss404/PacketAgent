@@ -510,8 +510,16 @@ secret-free key-source metadata, distinguishes configured models from live
 verified models, and shows streaming, tool-use, and structured-output support.
 Missing runtimes block the first run; conditional capabilities are carried
 into R6.4 evaluation.
+R6.4 adds editable bounded non-secret memory, saved typed input examples, and
+expected-output review context in both the Builder and Agent editor. Builder
+approval persists the examples, then uses the real bounded Agent loop; enabled
+tools still require the existing explicit launch approval. The resulting
+versioned evaluation records exact input matching, run success, non-empty
+redacted output, required successful tool calls, model identity, and review
+notes across JSON, SQLite, managed Postgres, Agent detail, and run traces. It
+does not make a second model call or claim an automatic semantic score.
 
-The exact resume point is R6.4 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+The exact resume point is R6.5 in [BACKLOG.md](BACKLOG.md), the sole ledger for
 the conditional live W10 check and all remaining R6-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.

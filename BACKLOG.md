@@ -455,12 +455,12 @@ Status: complete as of 2026-07-29. Resume at R6.
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1-R6.3 are complete; resume at R6.4.
+Status: in progress. R6.1-R6.4 are complete; resume at R6.5.
 
 - [x] Wire the default SMTP transport through vault-backed credentials.
 - [x] Add LLM-authored Worker/agent templates beyond the heuristic builder.
 - [x] Show provider/model/key/capability readiness before first run.
-- [ ] Add editable memory/input examples and first-run evaluation.
+- [x] Add editable memory/input examples and first-run evaluation.
 - [ ] Add signed, versioned agent/Worker import and export.
 - [ ] Consolidate legacy agent execution onto canonical Workers only after
       compatibility and migration tests pass.
@@ -517,6 +517,25 @@ Status: in progress. R6.1-R6.3 are complete; resume at R6.4.
   and 1,635 API tests pass (1,632 passed with three intentional live
   interoperability skips).
   Resume at R6.4 editable memory/input examples and first-run evaluation.
+- R6.4 result: the Builder and Agent editor now persist bounded non-secret
+  memory, typed input examples, expected-output review context, and required
+  evaluation tools. Builder approval saves examples before readiness or
+  approval gates, then runs the real bounded Agent loop instead of fabricating
+  a successful preview. Tool-capable evaluations retain the existing explicit
+  launch approval. The versioned first-run evidence compares saved and actual
+  inputs, run status, non-empty redacted output, and successful required tool
+  calls; expected output remains visible operator-review context rather than a
+  fabricated second-model score. Evaluation evidence survives JSON, SQLite,
+  and managed-Postgres storage, is included in dedicated Agent-run backfill and
+  verification, and appears in Builder, Agent run detail, and the run trace.
+  `npm run verify:agent-first-run` certifies the boundary without network
+  calls. Research and design evidence live in
+  [`dev/r6-agent-first-run-evaluation.md`](dev/r6-agent-first-run-evaluation.md).
+  Typecheck, zero-warning lint, repository formatting, the production web
+  build, 37 web tests, 81 focused backend tests, the seven-assertion verifier,
+  and 1,642 API tests pass (1,639 passed with three intentional live
+  interoperability skips).
+  Resume at R6.5 signed, versioned agent/Worker import and export.
 
 ### R7 - Builder and frontend maintainability
 
@@ -628,10 +647,12 @@ planning plus zip/git-ready export.
 ### Existing agent path
 
 - Shipped: six new tools are registered in the default runtime catalog (`http_fetch`, `slack_post_webhook`, `github_api`, `email_send`, `sql_query`, and `shell_for_agent`), manual tool-enabled runs now have the first-call Launch / Edit tools / Cancel approval flow, `/builder` separates app and agent intent, and run detail exposes a trace inspector.
-- Remaining depth: LLM-authored Worker/agent-template generation beyond the
-  current heuristic draft builder, first-run evaluation, portable signed
-  import/export, and broader end-to-end agent happy-path tests. Resource-scoped
-  runtime enforcement and the default hardened SMTP adapter are shipped.
+- Remaining depth: portable signed import/export, canonical-only legacy Agent
+  execution after compatibility migration, and broader end-to-end agent
+  happy-path tests. LLM-authored templates, provider readiness, editable
+  memory/input examples, deterministic first-run evaluation,
+  resource-scoped runtime enforcement, and the default hardened SMTP adapter
+  are shipped.
 
 ### Sandbox and execution farm
 
@@ -671,9 +692,11 @@ planning plus zip/git-ready export.
 
 ### Agent depth (continuing)
 
-- Improve provider readiness: show which provider, model, key, and tool permissions are required before first run.
-- Add first-run evaluation: expected input, actual output, tool calls, and pass/fail notes.
-- Add agent memory / input schema examples that users can edit from the Builder.
+- Shipped: provider/model/key/capability readiness before first run.
+- Shipped: deterministic first-run evidence with expected inputs, actual
+  output, required tool calls, and pass/fail notes.
+- Shipped: bounded non-secret Agent memory and editable Builder/Agent input
+  examples.
 - Add agent import/export so templates and generated agents can move between installs.
 
 ### Self-host publish

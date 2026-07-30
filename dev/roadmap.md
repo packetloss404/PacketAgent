@@ -85,8 +85,11 @@ review-before-save, and a certified canonical Worker draft projection. R6.3
 now aligns Agent authoring, readiness, saved model, and restart-safe
 execution to one canonical preset resolution, with secret-free credential
 source, configured-but-unverified model state, and explicit capability
-support. Resume at R6.4 editable memory/input examples and first-run
-evaluation in
+support. R6.4 adds bounded editable non-secret memory, persisted typed input
+examples, real first-run execution behind the existing tool approval, and
+versioned deterministic input/run/output/tool evidence across every storage
+mode and the Agent run trace. Resume at R6.5 signed, versioned Agent/Worker
+import and export in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r6---agent-authoring-and-execution-depth).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

@@ -19,6 +19,8 @@ import {
   recordActivity,
   type AgentInputField,
   type AgentInputFieldType,
+  type AgentEvaluationSpec,
+  type AgentMemoryEntry,
   type AgentPlaybookStep,
   type AgentRecord,
   type AgentRunLogEntry,
@@ -84,6 +86,7 @@ import {
   type AgentBuilderProviderContext,
   type AgentBuilderProviderReadiness,
 } from "../agent-builder/readiness.js";
+import { buildAgentFirstRunEvaluation } from "../agent-builder/first-run-evaluation.js";
 import {
   activationActivityId,
   activationSignalStableKey,
@@ -129,6 +132,8 @@ export interface AgentDraft {
     schedule?: string;
     triggerKind: AgentTriggerKind;
     playbook: AgentPlaybookStep[];
+    memory: AgentMemoryEntry[];
+    evaluationSpec: AgentEvaluationSpec;
     status: AgentStatus;
     inputSchema: AgentInputField[];
   };
@@ -200,6 +205,8 @@ export interface AgentBuilderDraft {
     triggerKind: AgentTriggerKind;
     schedule?: string;
     playbook: AgentPlaybookStep[];
+    memory: AgentMemoryEntry[];
+    evaluationSpec: AgentEvaluationSpec;
     status: AgentStatus;
     inputSchema: AgentInputField[];
   };
@@ -236,6 +243,7 @@ export interface AgentBuilderApproveResult {
   created: true;
   agent: ReturnType<typeof decorateAgentWithProvider>;
   firstRun?: ReturnType<typeof decorateRun>;
+  firstRunApproval?: ToolCapabilityApprovalRequest;
   sampleInputs?: Record<string, string | number | boolean>;
 }
 
@@ -408,6 +416,17 @@ export function generateAgentDraftFromPrompt(
       schedule,
       triggerKind,
       playbook,
+      memory: [
+        {
+          id: "memory-operating-intent",
+          label: "Operating intent",
+          content: redactSensitiveString(primaryAction).slice(0, 1_000),
+        },
+      ],
+      evaluationSpec: {
+        expectedOutput: `Complete the saved playbook for ${redactSensitiveString(primaryAction)} and return a non-empty result.`,
+        requiredTools: enabledTools,
+      },
       status:
         options.status && ["active", "paused", "archived"].includes(options.status)
           ? options.status
@@ -502,6 +521,8 @@ export function createAgent(context: AuthenticatedContext, input: AgentInput) {
         schedule: normalized.schedule,
         triggerKind: normalized.triggerKind,
         playbook: normalized.playbook,
+        memory: normalized.memory,
+        evaluationSpec: normalized.evaluationSpec,
         status: normalized.status,
         templateId: normalized.templateId,
         inputSchema: normalized.inputSchema,
@@ -554,6 +575,8 @@ export async function createAgentAsync(context: AuthenticatedContext, input: Age
         schedule: normalized.schedule,
         triggerKind: normalized.triggerKind,
         playbook: normalized.playbook,
+        memory: normalized.memory,
+        evaluationSpec: normalized.evaluationSpec,
         status: normalized.status,
         templateId: normalized.templateId,
         inputSchema: normalized.inputSchema,
@@ -601,7 +624,7 @@ export function updateAgent(
       throw httpError(404, "agent not found");
     }
 
-    const normalized = normalizeAgentInput({ ...existing, ...input });
+    const normalized = normalizeAgentInput(mergeAgentUpdateInput(existing, input));
     validateProvider(data, context.workspace.id, normalized.providerId);
 
     const agent = upsertAgent(
@@ -619,6 +642,8 @@ export function updateAgent(
         schedule: normalized.schedule,
         triggerKind: normalized.triggerKind,
         playbook: normalized.playbook,
+        memory: normalized.memory,
+        evaluationSpec: normalized.evaluationSpec,
         status: normalized.status,
         templateId: normalized.templateId ?? existing.templateId,
         inputSchema: normalized.inputSchema,
@@ -665,7 +690,7 @@ export async function updateAgentAsync(
       throw httpError(404, "agent not found");
     }
 
-    const normalized = normalizeAgentInput({ ...existing, ...input });
+    const normalized = normalizeAgentInput(mergeAgentUpdateInput(existing, input));
     validateProvider(data, context.workspace.id, normalized.providerId);
 
     const agent = upsertAgent(
@@ -683,6 +708,8 @@ export async function updateAgentAsync(
         schedule: normalized.schedule,
         triggerKind: normalized.triggerKind,
         playbook: normalized.playbook,
+        memory: normalized.memory,
+        evaluationSpec: normalized.evaluationSpec,
         status: normalized.status,
         templateId: normalized.templateId ?? existing.templateId,
         inputSchema: normalized.inputSchema,
@@ -806,6 +833,7 @@ export interface RunAgentInput {
   triggerKind?: string;
   inputs?: Record<string, unknown>;
   toolApproval?: RunAgentToolApprovalPayload | null;
+  evaluation?: { kind: "first_run" } | null;
 }
 
 export type RunAgentToolApprovalPayload = Partial<ToolCapabilityApprovalInput> & {
@@ -847,7 +875,9 @@ export async function runAgent(
   }
   const inputs = validateAgentInputs(agent.inputSchema ?? [], rawInputs);
   const enabledTools = agent.enabledTools ?? [];
-  const useToolLoop = enabledTools.length > 0;
+  const firstRunExpectedInputs =
+    input.evaluation?.kind === "first_run" ? agentExampleInputs(agent) : undefined;
+  const useToolLoop = enabledTools.length > 0 || firstRunExpectedInputs !== undefined;
 
   if (useToolLoop) {
     if (getToolApprovalDecision(input.toolApproval) === "cancel") {
@@ -858,7 +888,12 @@ export async function runAgent(
         triggerKind,
         timestamp,
       });
-      return { run: decorateRun(run) };
+      return finalizeAgentRun({
+        context,
+        agent,
+        run,
+        expectedInputs: firstRunExpectedInputs,
+      });
     }
 
     const registeredEnabledTools = resolveRegisteredToolDefinitions(enabledTools);
@@ -883,7 +918,12 @@ export async function runAgent(
       triggerKind,
       timestamp,
     });
-    return { run: decorateRun(run) };
+    return finalizeAgentRun({
+      context,
+      agent,
+      run,
+      expectedInputs: firstRunExpectedInputs,
+    });
   }
 
   return mutateStoreAsync((store) => {
@@ -972,6 +1012,47 @@ export async function runAgent(
 
     return { run: decorateRun(run) };
   });
+}
+
+function agentExampleInputs(agent: AgentRecord): Record<string, string | number | boolean> {
+  const raw = Object.fromEntries(
+    (agent.inputSchema ?? []).flatMap((field) =>
+      field.exampleValue === undefined ? [] : [[field.key, field.exampleValue]],
+    ),
+  );
+  return validateAgentInputs(agent.inputSchema ?? [], raw);
+}
+
+async function finalizeAgentRun(input: {
+  context: AuthenticatedContext;
+  agent: AgentRecord;
+  run: AgentRunRecord;
+  expectedInputs?: Record<string, string | number | boolean>;
+}): Promise<{ run: ReturnType<typeof decorateRun> }> {
+  if (!input.expectedInputs) return { run: decorateRun(input.run) };
+  const evaluation = buildAgentFirstRunEvaluation({
+    run: input.run,
+    expectedInputs: input.expectedInputs,
+    spec: input.agent.evaluationSpec ?? {
+      expectedOutput: "",
+      requiredTools: [],
+    },
+  });
+  const run = await mutateStoreAsync((store) => {
+    const stored = store.agentRuns.find(
+      (entry) => entry.id === input.run.id && entry.workspaceId === input.context.workspace.id,
+    );
+    if (!stored) throw httpError(404, "agent run not found after first-run evaluation");
+    return upsertAgentRun(
+      store,
+      {
+        ...stored,
+        evaluation,
+      },
+      evaluation.evaluatedAt,
+    );
+  });
+  return { run: decorateRun(run) };
 }
 
 type AgentToolCapabilityApprovalContext = {
@@ -1148,6 +1229,12 @@ async function runAgentWithToolLoop(args: {
   ];
 
   const userPromptParts = [agent.instructions];
+  if ((agent.memory ?? []).length > 0) {
+    userPromptParts.push("MEMORY (operator-authored, non-secret context):");
+    for (const entry of agent.memory ?? []) {
+      userPromptParts.push(`- ${entry.label}: ${entry.content}`);
+    }
+  }
   if (Object.keys(inputs).length > 0) {
     userPromptParts.push("INPUTS:");
     for (const [k, v] of Object.entries(inputs))
@@ -1161,7 +1248,11 @@ async function runAgentWithToolLoop(args: {
 
   const logs: AgentRunLogEntry[] = [
     { at: timestamp, level: "info", message: `Tool-loop run started for ${agent.name}.` },
-    { at: timestamp, level: "info", message: `Tools enabled: ${enabledTools.join(", ")}` },
+    {
+      at: timestamp,
+      level: "info",
+      message: `Tools enabled: ${enabledTools.join(", ") || "none"}`,
+    },
     ...executionTarget.notes.map((message) => ({ at: timestamp, level: "info" as const, message })),
   ];
 
@@ -1514,7 +1605,7 @@ async function recordFailedAgentExecutionRun(input: {
       ),
     );
 
-    return { run: decorateRun(run) };
+    return { run };
   });
 }
 
@@ -1639,11 +1730,22 @@ export async function generateAgentBuilderDraftAsync(
       ) ?? null)
     : null;
   const missingTools = recommendedTools.filter((tool) => !availableTools.includes(tool));
+  const enabledRuntimeTools = recommendedTools.filter((tool) => availableTools.includes(tool));
   const blockers = [
     ...providerReadiness.blockers,
     ...(missingTools.length > 0
       ? [`Remove or implement missing tools: ${missingTools.join(", ")}.`]
       : []),
+  ];
+  const acceptanceChecks = [
+    "Agent draft is saved with generated instructions, input schema, tools, and trigger.",
+    "Missing provider or tool setup is visible before first run.",
+    ...(authoredTemplate?.acceptanceChecks ?? []),
+    ...integrationMetadata.requested.map(
+      (integration) =>
+        `${integration.label} flow references ${integration.envVars.join(", ")} and remains draft-safe until setup is complete.`,
+    ),
+    "First test run records output, logs, transcript, tool calls, and a deterministic evaluation.",
   ];
 
   return {
@@ -1673,13 +1775,18 @@ export async function generateAgentBuilderDraftAsync(
       providerId: selectedProvider?.id,
       model: providerContext.selected?.model,
       tools: recommendedTools,
-      enabledTools: recommendedTools.filter((tool) => availableTools.includes(tool)),
+      enabledTools: enabledRuntimeTools,
       routeKey: providerContext.selected
         ? agentProviderRouteKey(providerContext.selected.provider)
         : "agent.reasoning",
       triggerKind,
       schedule,
       playbook,
+      memory: buildAgentBuilderMemory(intent, acceptanceChecks),
+      evaluationSpec: {
+        expectedOutput: acceptanceChecks.join(" ").slice(0, 1_200),
+        requiredTools: enabledRuntimeTools,
+      },
       status: "active",
       inputSchema,
     },
@@ -1718,16 +1825,7 @@ export async function generateAgentBuilderDraftAsync(
             "Save the draft, run it with sample inputs, then inspect transcript, tool calls, and output.",
         },
       ],
-      acceptanceChecks: [
-        "Agent draft is saved with generated instructions, input schema, tools, and trigger.",
-        "Missing provider or tool setup is visible before first run.",
-        ...(authoredTemplate?.acceptanceChecks ?? []),
-        ...integrationMetadata.requested.map(
-          (integration) =>
-            `${integration.label} flow references ${integration.envVars.join(", ")} and remains draft-safe until setup is complete.`,
-        ),
-        "First test run records output, logs, transcript, and any tool calls.",
-      ],
+      acceptanceChecks,
       openQuestions:
         authoredTemplate && authoredTemplate.openQuestions.length > 0
           ? [...authoredTemplate.openQuestions]
@@ -1770,23 +1868,60 @@ export async function approveAgentBuilderDraftAsync(
   input: AgentBuilderApproveInput,
   dependencies: AgentBuilderDraftDependencies = {},
 ): Promise<AgentBuilderApproveResult> {
-  const draft =
+  const generatedDraft =
     input.draft ??
     (await generateAgentBuilderDraftAsync(context, { prompt: input.prompt }, dependencies));
+  const sampleInputs = validateAgentInputs(
+    generatedDraft.agent.inputSchema ?? [],
+    input.sampleInputs ?? generatedDraft.sampleInputs ?? {},
+  );
+  const draft: AgentBuilderDraft = {
+    ...generatedDraft,
+    sampleInputs,
+    agent: {
+      ...generatedDraft.agent,
+      inputSchema: generatedDraft.agent.inputSchema.map((field) => ({
+        ...field,
+        ...(field.key in sampleInputs
+          ? { exampleValue: formatInputValue(sampleInputs[field.key]) }
+          : {}),
+      })),
+    },
+  };
   const created = await createAgentAsync(context, {
     ...draft.agent,
     status: input.status ?? draft.agent.status ?? "active",
   });
 
-  if (!input.runPreview) return { draft, created: true, agent: created.agent };
-  if (!draft.readiness.firstRun.canRun) return { draft, created: true, agent: created.agent };
+  if (!input.runPreview) {
+    return { draft, created: true, agent: created.agent, sampleInputs };
+  }
+  if (!draft.readiness.firstRun.canRun) {
+    return { draft, created: true, agent: created.agent, sampleInputs };
+  }
 
-  const sampleInputs = validateAgentInputs(
-    created.agent.inputSchema ?? [],
-    input.sampleInputs ?? draft.sampleInputs ?? {},
-  );
-  const firstRun = await recordAgentPreviewRun(context, created.agent, sampleInputs);
-  return { draft, created: true, agent: created.agent, firstRun, sampleInputs };
+  const firstRunResult = await runAgent(context, created.agent.id, {
+    triggerKind: "manual",
+    inputs: sampleInputs,
+    toolApproval: null,
+    evaluation: { kind: "first_run" },
+  });
+  if ("approval" in firstRunResult) {
+    return {
+      draft,
+      created: true,
+      agent: created.agent,
+      firstRunApproval: firstRunResult.approval,
+      sampleInputs,
+    };
+  }
+  return {
+    draft,
+    created: true,
+    agent: created.agent,
+    firstRun: firstRunResult.run,
+    sampleInputs,
+  };
 }
 
 async function recordAgentPreviewRun(
@@ -2159,6 +2294,24 @@ function buildAgentBuilderInstructions(prompt: string, intent: string): string {
     "Use enabled tools when they help. If a provider, credential, or integration is missing, explain the blocker.",
     "Return a concise final answer with completed work, follow-up items, and risks.",
   ].join("\n");
+}
+
+function buildAgentBuilderMemory(
+  intent: string,
+  acceptanceChecks: readonly string[],
+): AgentMemoryEntry[] {
+  return [
+    {
+      id: "memory-operating-intent",
+      label: "Operating intent",
+      content: redactSensitiveString(intent).slice(0, 1_000),
+    },
+    {
+      id: "memory-success-context",
+      label: "Success context",
+      content: redactSensitiveString(acceptanceChecks.join("\n")).slice(0, 1_000),
+    },
+  ];
 }
 
 function buildAgentBuilderPlaybook(intent: string, prompt: string): AgentPlaybookStep[] {
@@ -3542,6 +3695,9 @@ function decorateRun(run: AgentRunRecord) {
       output: redactSensitiveValue(call.output),
       error: call.error ? redactSensitiveString(call.error) : undefined,
     })),
+    evaluation: run.evaluation
+      ? (redactSensitiveValue(run.evaluation) as AgentRunRecord["evaluation"])
+      : undefined,
     durationMs,
     canCancel: run.status === "queued" || run.status === "running",
     canRetry:
@@ -3562,6 +3718,8 @@ type AgentInput = {
   schedule?: string | null;
   triggerKind?: AgentTriggerKind | string | null;
   playbook?: Array<Partial<AgentPlaybookStep>> | null;
+  memory?: Array<Partial<AgentMemoryEntry>> | null;
+  evaluationSpec?: Partial<AgentEvaluationSpec> | null;
   status?: AgentStatus;
   templateId?: string | null;
   inputSchema?: AgentInputField[];
@@ -3631,6 +3789,8 @@ function normalizeAgentInput(
     | "schedule"
     | "triggerKind"
     | "playbook"
+    | "memory"
+    | "evaluationSpec"
     | "templateId"
     | "enabledTools"
     | "routeKey"
@@ -3669,6 +3829,8 @@ function normalizeAgentInput(
         .filter(Boolean)
         .slice(0, 24)
     : undefined;
+  const memory = normalizeAgentMemory(input.memory ?? undefined);
+  const evaluationSpec = normalizeAgentEvaluationSpec(input.evaluationSpec, enabledTools ?? []);
 
   return {
     name,
@@ -3682,10 +3844,79 @@ function normalizeAgentInput(
     schedule: stringOrUndefined(input.schedule),
     triggerKind,
     playbook,
+    memory,
+    evaluationSpec,
     status,
     templateId: stringOrUndefined(input.templateId),
     inputSchema,
   };
+}
+
+function mergeAgentUpdateInput(existing: AgentRecord, input: AgentInput): AgentInput {
+  const merged: AgentInput = { ...existing, ...input };
+  if (input.enabledTools !== undefined && input.evaluationSpec === undefined) {
+    const enabledTools = new Set(
+      (Array.isArray(input.enabledTools) ? input.enabledTools : [])
+        .map((tool) => String(tool).trim())
+        .filter(Boolean),
+    );
+    merged.evaluationSpec = {
+      expectedOutput: existing.evaluationSpec?.expectedOutput ?? "",
+      requiredTools: (existing.evaluationSpec?.requiredTools ?? []).filter((tool) =>
+        enabledTools.has(tool),
+      ),
+    };
+  }
+  return merged;
+}
+
+function normalizeAgentMemory(
+  input: Array<Partial<AgentMemoryEntry>> | undefined,
+): AgentMemoryEntry[] {
+  if (!input || !Array.isArray(input)) return [];
+  return input.slice(0, 12).flatMap((entry) => {
+    const label = String(entry?.label ?? "")
+      .trim()
+      .slice(0, 80);
+    const content = String(entry?.content ?? "")
+      .trim()
+      .slice(0, 1_000);
+    if (!label && !content) return [];
+    if (!label || !content)
+      throw httpError(400, "agent memory entries require a label and content");
+    if (isSensitiveKey(label) || redactSensitiveString(content) !== content) {
+      throw httpError(
+        400,
+        "agent memory must contain non-secret context; use a credential reference for secrets",
+      );
+    }
+    return [{ id: stringOrUndefined(entry?.id) ?? generateId(), label, content }];
+  });
+}
+
+function normalizeAgentEvaluationSpec(
+  input: Partial<AgentEvaluationSpec> | null | undefined,
+  enabledTools: string[],
+): AgentEvaluationSpec {
+  const expectedOutput = String(input?.expectedOutput ?? "")
+    .trim()
+    .slice(0, 1_200);
+  if (redactSensitiveString(expectedOutput) !== expectedOutput) {
+    throw httpError(400, "agent evaluation expectations must not contain secret-like assignments");
+  }
+  const requiredTools = Array.from(
+    new Set(
+      (Array.isArray(input?.requiredTools) ? input.requiredTools : enabledTools)
+        .map((tool) => String(tool).trim())
+        .filter(Boolean)
+        .slice(0, 24),
+    ),
+  );
+  const undeclared = requiredTools.filter((tool) => !enabledTools.includes(tool));
+  if (undeclared.length > 0) {
+    throw httpError(400, `evaluation tools must be enabled on the agent: ${undeclared.join(", ")}`);
+  }
+  return { expectedOutput, requiredTools };
 }
 
 function normalizePlaybook(
@@ -3734,6 +3965,10 @@ function normalizeInputSchema(raw: unknown): AgentInputField[] {
     const description = stringOrUndefined(item.description);
     const required = Boolean(item.required);
     const defaultValue = stringOrUndefined(item.defaultValue);
+    const exampleValue = stringOrUndefined(item.exampleValue);
+    if (exampleValue && exampleValue.length > 1_000) {
+      throw httpError(400, `input example "${key}" must be 1000 characters or fewer`);
+    }
     let options: string[] | undefined;
     if (type === "enum") {
       options = Array.isArray(item.options)
@@ -3745,7 +3980,29 @@ function normalizeInputSchema(raw: unknown): AgentInputField[] {
       if (!options.length) throw httpError(400, `enum field "${key}" requires at least one option`);
     }
 
-    fields.push({ key, label, type, required, description, options, defaultValue });
+    if (exampleValue !== undefined) {
+      if (isSensitiveKey(key) || redactSensitiveString(exampleValue) !== exampleValue) {
+        throw httpError(
+          400,
+          `input example "${key}" must not contain a secret; use a credential reference at run time`,
+        );
+      }
+      coerceInputValue(
+        { key, label, type, required, description, options, defaultValue },
+        exampleValue,
+      );
+    }
+
+    fields.push({
+      key,
+      label,
+      type,
+      required,
+      description,
+      options,
+      defaultValue,
+      exampleValue,
+    });
   }
 
   return fields;

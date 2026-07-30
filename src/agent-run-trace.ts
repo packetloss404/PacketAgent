@@ -17,6 +17,7 @@ export type AgentRunTraceSpanType =
   | "tool_call"
   | "log"
   | "output"
+  | "evaluation"
   | "error";
 export type AgentRunTraceSpanStatus =
   | AgentRunStatus
@@ -236,6 +237,38 @@ export function deriveAgentRunTraceSpans(
         costUsd,
         orderAt: outputAt,
         orderGroup: 90,
+        orderIndex: 0,
+      }),
+    );
+  }
+
+  if (run.evaluation) {
+    const passedChecks = run.evaluation.checks.filter((check) => check.status === "passed").length;
+    spans.push(
+      makeDraftSpan({
+        id: `${run.id}:evaluation`,
+        runId: run.id,
+        type: "evaluation",
+        title: "First-run evaluation",
+        status: run.evaluation.status === "passed" ? "success" : "failed",
+        startedAt: run.evaluation.evaluatedAt,
+        completedAt: run.evaluation.evaluatedAt,
+        durationMs: null,
+        summary: `${passedChecks}/${run.evaluation.checks.length} deterministic checks passed.`,
+        input: sanitizePayload(run.evaluation.expected, limits),
+        output: sanitizePayload(
+          {
+            actual: run.evaluation.actual,
+            checks: run.evaluation.checks,
+            notes: run.evaluation.notes,
+          },
+          limits,
+        ),
+        modelUsed: run.evaluation.actual.model
+          ? sanitizeTitle(run.evaluation.actual.model, limits)
+          : modelUsed,
+        orderAt: run.evaluation.evaluatedAt,
+        orderGroup: 92,
         orderIndex: 0,
       }),
     );

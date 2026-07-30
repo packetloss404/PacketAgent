@@ -308,6 +308,7 @@ app.post("/api/app/agents/:agentId/runs", async (c) => {
         triggerKind: body?.triggerKind,
         inputs,
         toolApproval: body?.toolApproval,
+        evaluation: body?.evaluation,
       },
     );
     return c.json(result, "approval" in result ? 200 : 201);

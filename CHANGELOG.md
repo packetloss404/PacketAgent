@@ -6,6 +6,29 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R6.4 Agent first-run evaluation
+
+- Added editable bounded non-secret Agent memory, typed input examples, and an
+  expected-output/required-tool evaluation contract to the Builder and Agent
+  editor.
+- Persisted Builder sample inputs on the input schema before readiness and
+  approval gates, and replaced the primary Builder's synthetic successful
+  preview with a real bounded Agent execution.
+- Preserved explicit launch approval for tool-capable first evaluations and
+  injected memory only as labeled operator-authored context, never as
+  credential storage or additional authority.
+- Added versioned deterministic evidence for saved-versus-actual inputs, run
+  status, non-empty redacted output, required successful tool calls, model
+  identity, pass/fail notes, and expected-versus-actual operator review.
+- Added SQLite migration and dedicated Agent-run repository/backfill support,
+  JSON and managed-Postgres parity, run-trace evidence, expanded run-detail UI,
+  adversarial redaction tests, and `npm run verify:agent-first-run`.
+- Typecheck, zero-warning lint, repository formatting, the production web
+  build, 37 web tests, 81 focused backend tests, the seven-assertion verifier,
+  and 1,642 API tests pass (1,639 passed with three intentional live
+  interoperability skips).
+- Resume at R6.5 signed, versioned Agent/Worker import and export.
+
 ### 2026-07-29 - R6.3 agent execution readiness
 
 - Aligned LLM AgentTemplate authoring, pre-run readiness, the saved exact

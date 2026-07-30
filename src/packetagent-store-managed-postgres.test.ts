@@ -14,6 +14,7 @@ import {
   mutateStoreAsync,
   setManagedPostgresStoreClientFactoryForTests,
   type PacketAgentData,
+  upsertAgent,
   upsertRequirement,
 } from "./packetagent-store";
 
@@ -292,6 +293,119 @@ test("async indexed helpers read through the managed Postgres document store", a
       const queries = client.normalizedQueries();
       assert.equal(
         queries.some((query) => query.startsWith("select payload from packetagent_document_store")),
+        true,
+      );
+    },
+  );
+});
+
+test("managed Postgres preserves agent memory, examples, and first-run evaluation evidence", async () => {
+  const client = new FakeManagedPostgresClient();
+  client.payloadJson = JSON.stringify(createSeedStore());
+  const timestamp = "2026-07-29T15:00:00.000Z";
+
+  await withManagedStoreEnv(
+    {
+      PACKETAGENT_STORE: "postgres",
+      PACKETAGENT_DATABASE_URL: "postgres://packetagent:secret@db.example.com/packetagent",
+    },
+    client,
+    async () => {
+      await mutateStoreAsync((data) => {
+        upsertAgent(
+          data,
+          {
+            id: "agent_managed_first_run",
+            workspaceId: "alpha",
+            name: "Managed first-run evaluator",
+            description: "Exercises managed persistence for the Agent first-run contract.",
+            instructions: "Evaluate the supplied release label and return a concise summary.",
+            tools: [],
+            enabledTools: [],
+            routeKey: "agent.provider.openai",
+            memory: [
+              {
+                id: "memory-managed-1",
+                label: "Release policy",
+                content: "Report blockers before recommending launch.",
+              },
+            ],
+            evaluationSpec: {
+              expectedOutput: "A concise blocker summary.",
+              requiredTools: [],
+            },
+            status: "active",
+            createdByUserId: "user_alpha",
+            inputSchema: [
+              {
+                key: "release_label",
+                label: "Release label",
+                type: "string",
+                required: true,
+                exampleValue: "2026.07",
+              },
+            ],
+          },
+          timestamp,
+        );
+        data.agentRuns.unshift({
+          id: "run_managed_first_run",
+          workspaceId: "alpha",
+          agentId: "agent_managed_first_run",
+          title: "Managed first-run evaluation",
+          status: "success",
+          triggerKind: "manual",
+          inputs: { release_label: "2026.07" },
+          output: "No blockers found.",
+          startedAt: timestamp,
+          completedAt: timestamp,
+          logs: [],
+          evaluation: {
+            schemaVersion: "packetagent.agent-first-run-evaluation/v1",
+            kind: "first_run",
+            status: "passed",
+            expected: {
+              inputs: { release_label: "2026.07" },
+              output: "A concise blocker summary.",
+              toolCalls: [],
+            },
+            actual: {
+              inputs: { release_label: "2026.07" },
+              output: "No blockers found.",
+              toolCalls: [],
+              runStatus: "success",
+              model: "gpt-agent-runtime-test",
+            },
+            checks: [
+              {
+                id: "run_status",
+                label: "Run succeeded",
+                status: "passed",
+                note: "The bounded Agent run completed successfully.",
+              },
+            ],
+            notes: ["Expected output is operator-review context, not a semantic model score."],
+            evaluatedAt: timestamp,
+          },
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
+      });
+
+      clearStoreCacheForTests();
+      const reloaded = await loadStoreAsync();
+      const agent = reloaded.agents.find((entry) => entry.id === "agent_managed_first_run");
+      const run = reloaded.agentRuns.find((entry) => entry.id === "run_managed_first_run");
+
+      assert.equal(agent?.memory?.[0].label, "Release policy");
+      assert.equal(agent?.inputSchema[0].exampleValue, "2026.07");
+      assert.equal(agent?.evaluationSpec?.expectedOutput, "A concise blocker summary.");
+      assert.equal(run?.evaluation?.status, "passed");
+      assert.equal(run?.evaluation?.actual.output, "No blockers found.");
+      assert.equal(
+        (await listAgentsForWorkspaceIndexedAsync("alpha")).some(
+          (entry) => entry.id === "agent_managed_first_run",
+        ),
         true,
       );
     },

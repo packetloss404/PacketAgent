@@ -5,9 +5,11 @@ import type {
   AgentBuilderApproveResult,
   AgentBuilderDraft,
   AgentInputField,
+  AgentMemoryEntry,
   AgentRecord,
   AgentRunRecord,
   BuilderModelPresetId,
+  ToolCapabilityApprovalRequest,
 } from "@/lib/types";
 import { I } from "../icons";
 import {
@@ -16,6 +18,7 @@ import {
   coerceSampleValue,
   draftToolNames,
   firstRunReadinessTone,
+  firstRunEvaluationTone,
   formatSampleValue,
   inputValueForField,
   providerCapabilityReadinessTone,
@@ -57,6 +60,10 @@ export function AgentBuilderPanel({
   const [runPreview, setRunPreview] = useState(true);
   const [savedAgent, setSavedAgent] = useState<AgentRecord | null>(null);
   const [firstRun, setFirstRun] = useState<AgentRunRecord | null>(null);
+  const [firstRunApproval, setFirstRunApproval] = useState<ToolCapabilityApprovalRequest | null>(
+    null,
+  );
+  const [firstRunRunning, setFirstRunRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoGenerateStarted = useRef(false);
 
@@ -76,6 +83,7 @@ export function AgentBuilderPanel({
     setError(null);
     setSavedAgent(null);
     setFirstRun(null);
+    setFirstRunApproval(null);
     setMode("drafting");
     try {
       const nextDraft = await api.generateAgentBuilderDraft({
@@ -129,6 +137,7 @@ export function AgentBuilderPanel({
       );
       setSavedAgent(result.agent ?? null);
       setFirstRun(result.firstRun ?? null);
+      setFirstRunApproval(result.firstRunApproval ?? null);
       if (result.agent) onAgentSaved?.(result.agent, result);
       setMode("saved");
     } catch (e) {
@@ -140,6 +149,62 @@ export function AgentBuilderPanel({
   const updateSample = (key: string, value: string | boolean) => {
     const field = schemaByKey.get(key);
     setSampleInputs((prev) => ({ ...prev, [key]: coerceSampleValue(field, value) }));
+  };
+
+  const updateMemory = (memory: AgentMemoryEntry[]) => {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            agent: { ...current.agent, memory },
+          }
+        : current,
+    );
+  };
+
+  const updateExpectedOutput = (expectedOutput: string) => {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            agent: {
+              ...current.agent,
+              evaluationSpec: {
+                expectedOutput,
+                requiredTools: current.agent.evaluationSpec?.requiredTools ?? [],
+              },
+            },
+          }
+        : current,
+    );
+  };
+
+  const launchFirstRun = async () => {
+    if (!savedAgent || !firstRunApproval || firstRunRunning) return;
+    setFirstRunRunning(true);
+    setError(null);
+    try {
+      const result = await api.runAgent(savedAgent.id, {
+        triggerKind: "manual",
+        inputs: sampleInputs,
+        evaluation: { kind: "first_run" },
+        toolApproval: {
+          decision: "launch",
+          token: firstRunApproval.approvalToken,
+          approvedTools: firstRunApproval.tools.map((tool) => tool.name),
+        },
+      });
+      if (result.approval) {
+        setFirstRunApproval(result.approval);
+        return;
+      }
+      setFirstRun(result.run);
+      setFirstRunApproval(null);
+    } catch (launchError) {
+      setError((launchError as Error).message);
+    } finally {
+      setFirstRunRunning(false);
+    }
   };
 
   return (
@@ -258,9 +323,15 @@ export function AgentBuilderPanel({
             <DraftSummary draft={draft} savedAgent={savedAgent} />
             <ReadinessGrid draft={draft} />
             <DraftPlan draft={draft} />
-            <AgentConfiguration draft={draft} />
+            <AgentConfiguration
+              draft={draft}
+              editable={!savedAgent}
+              onMemoryChange={updateMemory}
+              onExpectedOutputChange={updateExpectedOutput}
+            />
             <SampleInputs
               draft={draft}
+              editable={!savedAgent}
               sampleInputs={sampleInputs}
               issues={sampleInputIssues}
               onUpdate={updateSample}
@@ -277,7 +348,18 @@ export function AgentBuilderPanel({
               }}
               onOpenAgent={() => savedAgent && navigate(agentEditorPath(savedAgent.id))}
             />
-            {(firstRun || savedAgent) && <FirstRunPanel run={firstRun} agent={savedAgent} />}
+            {(firstRun || firstRunApproval || savedAgent) && (
+              <FirstRunPanel
+                run={firstRun}
+                agent={savedAgent}
+                approval={firstRunApproval}
+                running={firstRunRunning}
+                onLaunch={() => {
+                  void launchFirstRun();
+                }}
+                onCancel={() => setFirstRunApproval(null)}
+              />
+            )}
           </section>
         )}
       </div>
@@ -563,8 +645,19 @@ function DraftPlan({ draft }: { draft: AgentBuilderDraft }) {
   );
 }
 
-function AgentConfiguration({ draft }: { draft: AgentBuilderDraft }) {
+function AgentConfiguration({
+  draft,
+  editable,
+  onMemoryChange,
+  onExpectedOutputChange,
+}: {
+  draft: AgentBuilderDraft;
+  editable: boolean;
+  onMemoryChange: (memory: AgentMemoryEntry[]) => void;
+  onExpectedOutputChange: (value: string) => void;
+}) {
   const tools = draftToolNames(draft);
+  const memory = draft.agent.memory ?? [];
   return (
     <div className="card" style={{ padding: 16 }}>
       <div className="kicker" style={{ marginBottom: 10 }}>
@@ -592,6 +685,122 @@ function AgentConfiguration({ draft }: { draft: AgentBuilderDraft }) {
         <p style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--silver-200)", margin: 0 }}>
           {draft.agent.instructions}
         </p>
+      </div>
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <div className="kicker">Memory</div>
+          <span className="mono muted" style={{ fontSize: 10.5 }}>
+            non-secret context · {memory.length}/12
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ marginLeft: "auto" }}
+            disabled={!editable || memory.length >= 12}
+            onClick={() =>
+              onMemoryChange([
+                ...memory,
+                {
+                  id: `memory_${Date.now()}`,
+                  label: "Context",
+                  content: "",
+                },
+              ])
+            }
+          >
+            <I.plus size={11} /> Add
+          </button>
+        </div>
+        {memory.length === 0 ? (
+          <div className="mono muted" style={{ fontSize: 11 }}>
+            No saved context. Add bounded, non-secret facts for real model-backed Agent runs.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {memory.map((entry, index) => (
+              <div
+                key={entry.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(120px, 0.35fr) minmax(0, 1fr) auto",
+                  gap: 8,
+                  alignItems: "start",
+                }}
+              >
+                <input
+                  className="field"
+                  aria-label={`Memory ${index + 1} label`}
+                  value={entry.label}
+                  maxLength={80}
+                  disabled={!editable}
+                  onChange={(event) =>
+                    onMemoryChange(
+                      memory.map((candidate, candidateIndex) =>
+                        candidateIndex === index
+                          ? { ...candidate, label: event.target.value }
+                          : candidate,
+                      ),
+                    )
+                  }
+                />
+                <textarea
+                  className="field"
+                  aria-label={`Memory ${index + 1} content`}
+                  value={entry.content}
+                  maxLength={1_000}
+                  rows={2}
+                  disabled={!editable}
+                  style={{ resize: "vertical" }}
+                  onChange={(event) =>
+                    onMemoryChange(
+                      memory.map((candidate, candidateIndex) =>
+                        candidateIndex === index
+                          ? { ...candidate, content: event.target.value }
+                          : candidate,
+                      ),
+                    )
+                  }
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  aria-label={`Remove memory ${index + 1}`}
+                  disabled={!editable}
+                  style={{ color: "var(--danger)" }}
+                  onClick={() =>
+                    onMemoryChange(memory.filter((_, candidateIndex) => candidateIndex !== index))
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+        <div className="kicker" style={{ marginBottom: 6 }}>
+          First-run expected output
+        </div>
+        <textarea
+          className="field"
+          value={draft.agent.evaluationSpec?.expectedOutput ?? ""}
+          maxLength={1_200}
+          rows={3}
+          disabled={!editable}
+          style={{ resize: "vertical" }}
+          onChange={(event) => onExpectedOutputChange(event.target.value)}
+        />
+        {!editable && (
+          <div className="mono muted" style={{ fontSize: 10.5, marginTop: 6 }}>
+            Saved configuration is frozen here. Open the Agent editor to make another revision.
+          </div>
+        )}
+        <div className="mono muted" style={{ fontSize: 10.5, marginTop: 6 }}>
+          Structural pass/fail checks use run status, saved example inputs, non-empty output, and
+          required tools. This description stays visible for operator review and is not scored by a
+          second model.
+        </div>
       </div>
       <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
         <div className="kicker" style={{ marginBottom: 6 }}>
@@ -636,11 +845,13 @@ function AgentConfiguration({ draft }: { draft: AgentBuilderDraft }) {
 
 function SampleInputs({
   draft,
+  editable,
   sampleInputs,
   issues,
   onUpdate,
 }: {
   draft: AgentBuilderDraft;
+  editable: boolean;
   sampleInputs: AgentBuilderSampleInputs;
   issues: AgentBuilderSampleInputIssue[];
   onUpdate: (key: string, value: string | boolean) => void;
@@ -653,12 +864,16 @@ function SampleInputs({
   return (
     <div className="card" style={{ padding: 16 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
-        <div className="kicker">Sample inputs</div>
+        <div className="kicker">First-run input example</div>
         <span className="mono muted" style={{ fontSize: 10.5 }}>
           {Object.keys(sampleInputs).length} field
           {Object.keys(sampleInputs).length === 1 ? "" : "s"}
         </span>
       </div>
+      <p className="muted" style={{ fontSize: 11.5, marginTop: -2, marginBottom: 10 }}>
+        These values are saved on the input schema and become the expected inputs for the first-run
+        evaluation.
+      </p>
       {schema.length === 0 && looseKeys.length === 0 ? (
         <div
           className="mono muted"
@@ -683,6 +898,7 @@ function SampleInputs({
             <SampleInputControl
               key={field.key}
               field={field}
+              editable={editable}
               value={sampleInputs[field.key]}
               issue={issuesByKey.get(field.key)}
               onUpdate={onUpdate}
@@ -693,6 +909,7 @@ function SampleInputs({
               <span className="label">{key}</span>
               <input
                 className="field"
+                disabled={!editable}
                 value={inputValueForField(sampleInputs[key])}
                 onChange={(e) => onUpdate(key, e.target.value)}
               />
@@ -706,11 +923,13 @@ function SampleInputs({
 
 function SampleInputControl({
   field,
+  editable,
   value,
   issue,
   onUpdate,
 }: {
   field: AgentInputField;
+  editable: boolean;
   value: string | number | boolean | undefined;
   issue?: string;
   onUpdate: (key: string, value: string | boolean) => void;
@@ -721,6 +940,7 @@ function SampleInputControl({
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input
             type="checkbox"
+            disabled={!editable}
             checked={value === true}
             onChange={(e) => onUpdate(field.key, e.target.checked)}
             style={{ accentColor: "var(--green)" }}
@@ -747,6 +967,7 @@ function SampleInputControl({
         </span>
         <select
           className="field"
+          disabled={!editable}
           value={inputValueForField(value)}
           onChange={(e) => onUpdate(field.key, e.target.value)}
         >
@@ -773,6 +994,7 @@ function SampleInputControl({
       </span>
       <input
         className="field"
+        disabled={!editable}
         type={field.type === "number" ? "number" : field.type === "url" ? "url" : "text"}
         value={inputValueForField(value)}
         placeholder={field.description}
@@ -890,7 +1112,54 @@ function ApproveCard({
   );
 }
 
-function FirstRunPanel({ run, agent }: { run: AgentRunRecord | null; agent: AgentRecord | null }) {
+function FirstRunPanel({
+  run,
+  agent,
+  approval,
+  running,
+  onLaunch,
+  onCancel,
+}: {
+  run: AgentRunRecord | null;
+  agent: AgentRecord | null;
+  approval: ToolCapabilityApprovalRequest | null;
+  running: boolean;
+  onLaunch: () => void;
+  onCancel: () => void;
+}) {
+  if (approval) {
+    return (
+      <div className="card" style={{ padding: 16, borderColor: "rgba(240,180,41,0.35)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <I.shield size={14} style={{ color: "var(--warn)" }} />
+          <div className="kicker">First-run tool approval</div>
+          <span className="pill warn" style={{ marginLeft: "auto" }}>
+            <span className="dot"></span>
+            approval required
+          </span>
+        </div>
+        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginTop: 8 }}>
+          {approval.summary}
+        </p>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+          {approval.tools.map((tool) => (
+            <span key={tool.name} className={`pill ${tool.risk === "high" ? "danger" : "warn"}`}>
+              {tool.name} · {tool.side}
+            </span>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button type="button" className="btn btn-primary" disabled={running} onClick={onLaunch}>
+            {running ? <I.refresh size={13} /> : <I.play size={13} />}
+            {running ? " Running evaluation" : " Approve & run evaluation"}
+          </button>
+          <button type="button" className="btn" disabled={running} onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (!run) {
     return (
       <div className="card" style={{ padding: 16 }}>
@@ -957,6 +1226,62 @@ function FirstRunPanel({ run, agent }: { run: AgentRunRecord | null; agent: Agen
           }}
         >
           {run.error}
+        </div>
+      )}
+      {run.evaluation && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div className="kicker">Evaluation</div>
+            <span className={`pill ${firstRunEvaluationTone(run)}`} style={{ marginLeft: "auto" }}>
+              <span className="dot"></span>
+              {run.evaluation.status}
+            </span>
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {run.evaluation.checks.map((check) => (
+              <div
+                key={check.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(120px, 0.35fr) auto minmax(0, 1fr)",
+                  gap: 8,
+                  alignItems: "baseline",
+                }}
+              >
+                <span style={{ fontSize: 12, color: "var(--silver-200)" }}>{check.label}</span>
+                <span className={`pill ${check.status === "passed" ? "good" : "danger"}`}>
+                  {check.status}
+                </span>
+                <span className="muted" style={{ fontSize: 11.5 }}>
+                  {check.note}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+              gap: 10,
+              marginTop: 10,
+            }}
+          >
+            <div>
+              <div className="label">Expected output</div>
+              <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.45, margin: 0 }}>
+                {run.evaluation.expected.output || "Non-empty output."}
+              </p>
+            </div>
+            <div>
+              <div className="label">Actual output</div>
+              <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.45, margin: 0 }}>
+                {run.evaluation.actual.output || "No output captured."}
+              </p>
+            </div>
+          </div>
+          <div className="mono muted" style={{ fontSize: 10.5, marginTop: 8 }}>
+            {run.evaluation.notes.join(" ")}
+          </div>
         </div>
       )}
       {run.transcript && run.transcript.length > 0 && (

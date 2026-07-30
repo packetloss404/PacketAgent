@@ -1179,7 +1179,7 @@ R5 research, implementation decisions, and cumulative gate evidence live in
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1-R6.3 are complete; resume at R6.4.
+Status: in progress. R6.1-R6.4 are complete; resume at R6.5.
 
 1. [Complete 2026-07-29] Wire the default SMTP transport through the
    vault-backed credential path. The Worker sender and TLS policy are
@@ -1205,7 +1205,14 @@ Status: in progress. R6.1-R6.3 are complete; resume at R6.4.
    closed without a usable environment or workspace-vault key; local
    configuration remains explicitly unverified. See
    [`r6-agent-readiness.md`](r6-agent-readiness.md).
-4. Add editable memory and input-schema examples plus first-run evaluation.
+4. [Complete 2026-07-29] Add editable memory and input-schema examples plus
+   first-run evaluation. Builder approval persists typed examples and runs the
+   real bounded Agent loop after the existing tool launch approval. Versioned
+   deterministic evidence covers saved inputs, run status, redacted output,
+   required successful tool calls, and operator-review notes across JSON,
+   SQLite, managed Postgres, Builder, Agent detail, and run traces. It makes no
+   second model judge call. See
+   [`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md).
 5. Add signed, versioned agent/Worker import and export.
 6. Consolidate legacy agent execution onto the canonical Worker lifecycle only
    after compatibility and migration tests prove no API regression.

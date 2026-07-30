@@ -13,6 +13,7 @@ import { setGeneratedAppFileTreeValidatorForTests } from "./app-routes/builder-c
 import { shutdownDefaultGeneratedAppRuntimeProcessPool } from "./generated-app-runtime/server.js";
 import { login } from "./packetagent-services";
 import { upsertApiKey } from "./security/api-key-store.js";
+import { registerDefaultTools } from "./tools/bootstrap.js";
 import {
   clearStoreCacheForTests,
   createSeedStore,
@@ -654,6 +655,7 @@ test("generated apps list is workspace-scoped and returns lightweight summaries"
 });
 
 test("builder agent draft can be approved into an agent", async () => {
+  registerDefaultTools();
   resetStoreForTests();
   const app = createTestApp();
   const alpha = login({ email: "alpha@packetagent.local", password: "demo12345" });
@@ -669,7 +671,7 @@ test("builder agent draft can be approved into an agent", async () => {
   });
   const draftBody = (await draftResponse.json()) as {
     draft?: {
-      agent?: { name?: string; model?: string; routeKey?: string };
+      agent?: { name?: string; model?: string; routeKey?: string; enabledTools?: string[] };
       authoring?: { source?: string; fallbackReason?: string; provider?: string; model?: string };
       readiness?: {
         provider?: {
@@ -682,6 +684,7 @@ test("builder agent draft can be approved into an agent", async () => {
             structuredOutput?: { status?: string };
           };
         };
+        firstRun?: { canRun?: boolean; blockers?: string[] };
       };
     };
   };
@@ -713,11 +716,21 @@ test("builder agent draft can be approved into an agent", async () => {
   const approveBody = (await approveResponse.json()) as {
     agent?: { id?: string };
     firstRun?: { status?: string };
+    firstRunApproval?: { tools?: Array<{ name?: string }> };
   };
 
   assert.equal(approveResponse.status, 201);
   assert.ok(approveBody.agent?.id);
-  assert.equal(approveBody.firstRun?.status, "success");
+  assert.equal(approveBody.firstRun, undefined);
+  if (draftBody.draft?.readiness?.firstRun?.canRun) {
+    assert.deepEqual(
+      approveBody.firstRunApproval?.tools?.map((tool) => tool.name),
+      draftBody.draft.agent?.enabledTools,
+    );
+  } else {
+    assert.equal(approveBody.firstRunApproval, undefined);
+    assert.ok((draftBody.draft?.readiness?.firstRun?.blockers?.length ?? 0) > 0);
+  }
   assert.ok(loadStore().agents.some((agent) => agent.id === approveBody.agent?.id));
 
   const agentPublishStateResponse = await app.request(

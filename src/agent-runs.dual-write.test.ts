@@ -24,6 +24,7 @@ interface AgentRunRow {
   transcript: string | null;
   model_used: string | null;
   cost_usd: number | null;
+  evaluation: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -40,7 +41,7 @@ function readDedicated(dbPath: string): AgentRunRow[] {
         `
       select id, workspace_id, agent_id, title, status, trigger_kind,
         started_at, completed_at, inputs, output, error,
-        logs, tool_calls, transcript, model_used, cost_usd,
+        logs, tool_calls, transcript, model_used, cost_usd, evaluation,
         created_at, updated_at
       from agent_runs
       order by created_at, id
@@ -186,6 +187,32 @@ test("upsertAgentRun round-trips transcript, logs, and toolCalls through both si
         status: "ok" as const,
       },
     ];
+    const evaluation = {
+      schemaVersion: "packetagent.agent-first-run-evaluation/v1" as const,
+      kind: "first_run" as const,
+      status: "passed" as const,
+      expected: {
+        inputs: { query: "x" },
+        output: "A useful result.",
+        toolCalls: ["search"],
+      },
+      actual: {
+        inputs: { query: "x" },
+        output: "done",
+        toolCalls: [{ name: "search", status: "ok" as const }],
+        runStatus: "success" as const,
+      },
+      checks: [
+        {
+          id: "tool_calls" as const,
+          label: "Required tool calls",
+          status: "passed" as const,
+          note: "All tools completed.",
+        },
+      ],
+      notes: ["All deterministic checks passed."],
+      evaluatedAt: "2026-07-29T12:00:01.000Z",
+    };
 
     upsertAgentRun(
       data,
@@ -197,6 +224,7 @@ test("upsertAgentRun round-trips transcript, logs, and toolCalls through both si
         transcript,
         logs,
         toolCalls,
+        evaluation,
       },
       "2026-04-26T12:00:00.000Z",
     );
@@ -204,12 +232,14 @@ test("upsertAgentRun round-trips transcript, logs, and toolCalls through both si
     assert.deepEqual(data.agentRuns[0].transcript, transcript);
     assert.deepEqual(data.agentRuns[0].logs, logs);
     assert.deepEqual(data.agentRuns[0].toolCalls, toolCalls);
+    assert.deepEqual(data.agentRuns[0].evaluation, evaluation);
 
     const dedicated = readDedicated(dbPath);
     assert.equal(dedicated.length, 1);
     assert.deepEqual(JSON.parse(dedicated[0].transcript ?? "null"), transcript);
     assert.deepEqual(JSON.parse(dedicated[0].logs), logs);
     assert.deepEqual(JSON.parse(dedicated[0].tool_calls ?? "null"), toolCalls);
+    assert.deepEqual(JSON.parse(dedicated[0].evaluation ?? "null"), evaluation);
   } finally {
     restore();
     rmSync(tempDir, { recursive: true, force: true });

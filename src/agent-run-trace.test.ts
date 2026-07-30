@@ -218,3 +218,49 @@ test("deriveAgentRunTraceSpans handles legacy empty runs", () => {
     costUsd: null,
   });
 });
+
+test("deriveAgentRunTraceSpans exposes first-run evaluation evidence", () => {
+  const run = makeRun({
+    id: "run_evaluation",
+    completedAt: "2026-05-27T16:00:01.000Z",
+    evaluation: {
+      schemaVersion: "packetagent.agent-first-run-evaluation/v1",
+      kind: "first_run",
+      status: "passed",
+      expected: {
+        inputs: { release_label: "2026.05" },
+        output: "A concise blocker summary.",
+        toolCalls: ["http_fetch"],
+      },
+      actual: {
+        inputs: { release_label: "2026.05" },
+        output: "No blocker found.",
+        toolCalls: [{ name: "http_fetch", status: "ok" }],
+        runStatus: "success",
+        model: "gpt-evaluation-test",
+      },
+      checks: [
+        {
+          id: "inputs",
+          label: "Expected input example",
+          status: "passed",
+          note: "The run used the saved input example.",
+        },
+      ],
+      notes: ["Expected output remains operator-review context."],
+      evaluatedAt: "2026-05-27T16:00:02.000Z",
+    },
+  });
+
+  const evaluation = deriveAgentRunTraceSpans(run).find((span) => span.type === "evaluation");
+
+  assert.equal(evaluation?.status, "success");
+  assert.equal(evaluation?.summary, "1/1 deterministic checks passed.");
+  assert.equal(evaluation?.modelUsed, "gpt-evaluation-test");
+  assert.deepEqual(evaluation?.input, {
+    inputs: { release_label: "2026.05" },
+    output: "A concise blocker summary.",
+    toolCalls: ["http_fetch"],
+  });
+  assert.match(JSON.stringify(evaluation?.output), /No blocker found/);
+});

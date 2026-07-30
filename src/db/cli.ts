@@ -1521,7 +1521,7 @@ function readAgentRunDedicatedRows(dbPath: string): AgentRunRecord[] {
         `
       select id, workspace_id, agent_id, title, status, trigger_kind,
         started_at, completed_at, inputs, output, error,
-        logs, tool_calls, transcript, model_used, cost_usd,
+        logs, tool_calls, transcript, model_used, cost_usd, evaluation,
         created_at, updated_at
       from agent_runs
     `,
@@ -1543,6 +1543,7 @@ function readAgentRunDedicatedRows(dbPath: string): AgentRunRecord[] {
       transcript: string | null;
       model_used: string | null;
       cost_usd: number | null;
+      evaluation: string | null;
       created_at: string;
       updated_at: string;
     }>;
@@ -1569,6 +1570,12 @@ function readAgentRunDedicatedRows(dbPath: string): AgentRunRecord[] {
         record.toolCalls = parseAgentRunJsonArray<AgentRunToolCall>(row.tool_calls);
       if (row.model_used !== null) record.modelUsed = row.model_used;
       if (row.cost_usd !== null) record.costUsd = row.cost_usd;
+      if (row.evaluation !== null) {
+        const evaluation = parseAgentRunJsonObject<NonNullable<AgentRunRecord["evaluation"]>>(
+          row.evaluation,
+        );
+        if (evaluation) record.evaluation = evaluation;
+      }
       return record;
     });
   } finally {
@@ -1587,6 +1594,17 @@ function parseAgentRunJsonArray<T>(raw: string | null): T[] {
     return Array.isArray(parsed) ? (parsed as T[]) : [];
   } catch {
     return [];
+  }
+}
+
+function parseAgentRunJsonObject<T>(raw: string): T | undefined {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as T)
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -1620,6 +1638,7 @@ function canonicalizeAgentRun(record: AgentRunRecord): string {
     transcript: record.transcript ?? null,
     modelUsed: record.modelUsed ?? null,
     costUsd: record.costUsd ?? null,
+    evaluation: record.evaluation ?? null,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   });

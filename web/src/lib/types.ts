@@ -128,6 +128,18 @@ export interface AgentInputField {
   description?: string;
   options?: string[];
   defaultValue?: string;
+  exampleValue?: string;
+}
+
+export interface AgentMemoryEntry {
+  id: string;
+  label: string;
+  content: string;
+}
+
+export interface AgentEvaluationSpec {
+  expectedOutput: string;
+  requiredTools: string[];
 }
 
 export interface AgentRunLogEntry {
@@ -329,6 +341,8 @@ export interface AgentRecord {
   schedule?: string;
   triggerKind?: AgentTriggerKind;
   playbook?: AgentPlaybookStep[];
+  memory?: AgentMemoryEntry[];
+  evaluationSpec?: AgentEvaluationSpec;
   status: AgentStatus;
   createdByUserId: string;
   templateId?: string;
@@ -368,11 +382,38 @@ export interface AgentRunRecord {
   toolCalls?: AgentRunToolCall[];
   modelUsed?: string;
   costUsd?: number;
+  evaluation?: AgentFirstRunEvaluation;
   createdAt: string;
   updatedAt: string;
   durationMs?: number | null;
   canCancel?: boolean;
   canRetry?: boolean;
+}
+
+export interface AgentFirstRunEvaluation {
+  schemaVersion: "packetagent.agent-first-run-evaluation/v1";
+  kind: "first_run";
+  status: "passed" | "failed";
+  expected: {
+    inputs: Record<string, string | number | boolean>;
+    output: string;
+    toolCalls: string[];
+  };
+  actual: {
+    inputs: Record<string, string | number | boolean>;
+    output?: string;
+    toolCalls: Array<{ name: string; status: "ok" | "error" | "timeout" }>;
+    runStatus: AgentRunStatus;
+    model?: string;
+  };
+  checks: Array<{
+    id: "inputs" | "run_status" | "output" | "tool_calls";
+    label: string;
+    status: "passed" | "failed";
+    note: string;
+  }>;
+  notes: string[];
+  evaluatedAt: string;
 }
 
 export type AgentRunTraceSpanStatus =
@@ -397,6 +438,7 @@ export type AgentRunTraceSpanKind =
   | "tool"
   | "tool_call"
   | "log"
+  | "evaluation"
   | "error"
   | "output";
 
@@ -499,6 +541,7 @@ export type RunAgentInput = {
   triggerKind?: AgentTriggerKind;
   inputs?: Record<string, string | number | boolean>;
   toolApproval?: ToolCapabilityApprovalInput;
+  evaluation?: { kind: "first_run" };
 };
 
 export type RunAgentResponse =
@@ -542,6 +585,8 @@ export type SaveAgentInput = {
   schedule?: string;
   triggerKind?: AgentTriggerKind;
   playbook?: AgentPlaybookStep[];
+  memory?: AgentMemoryEntry[];
+  evaluationSpec?: AgentEvaluationSpec;
   status?: AgentStatus;
   templateId?: string;
   inputSchema?: AgentInputField[];
@@ -643,6 +688,7 @@ export interface AgentBuilderApproveResult {
   created: true;
   agent?: AgentRecord;
   firstRun?: AgentRunRecord;
+  firstRunApproval?: ToolCapabilityApprovalRequest;
   sampleInputs?: Record<string, string | number | boolean>;
 }
 

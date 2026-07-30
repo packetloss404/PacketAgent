@@ -137,6 +137,11 @@ export function runStatusTone(run: AgentRunRecord | undefined): ReadinessTone {
   return "muted";
 }
 
+export function firstRunEvaluationTone(run: AgentRunRecord | undefined): ReadinessTone {
+  if (!run?.evaluation) return "muted";
+  return run.evaluation.status === "passed" ? "good" : "danger";
+}
+
 export function agentEditorPath(agentId: string | undefined): string {
   return agentId ? `/agents/${agentId}` : "/agents";
 }

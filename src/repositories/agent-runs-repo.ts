@@ -229,9 +229,9 @@ export function sqliteAgentRunsRepository(deps: AgentRunsRepositoryDeps = {}): A
           insert or replace into agent_runs (
             id, workspace_id, agent_id, title, status, trigger_kind,
             started_at, completed_at, inputs, output, error,
-            logs, tool_calls, transcript, model_used, cost_usd,
+            logs, tool_calls, transcript, model_used, cost_usd, evaluation,
             created_at, updated_at
-          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         ).run(
           record.id,
@@ -250,6 +250,7 @@ export function sqliteAgentRunsRepository(deps: AgentRunsRepositoryDeps = {}): A
           record.transcript === undefined ? null : JSON.stringify(record.transcript),
           record.modelUsed ?? null,
           record.costUsd ?? null,
+          record.evaluation === undefined ? null : JSON.stringify(record.evaluation),
           record.createdAt,
           record.updatedAt,
         );
@@ -288,6 +289,7 @@ interface AgentRunRow {
   transcript: string | null;
   model_used: string | null;
   cost_usd: number | null;
+  evaluation: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -313,6 +315,10 @@ function rowToRecord(row: AgentRunRow): AgentRunRecord {
   if (row.tool_calls !== null) record.toolCalls = parseJsonArray<AgentRunToolCall>(row.tool_calls);
   if (row.model_used !== null) record.modelUsed = row.model_used;
   if (row.cost_usd !== null) record.costUsd = row.cost_usd;
+  if (row.evaluation !== null) {
+    const evaluation = parseJsonObject<NonNullable<AgentRunRecord["evaluation"]>>(row.evaluation);
+    if (evaluation) record.evaluation = evaluation;
+  }
   return record;
 }
 
@@ -335,6 +341,17 @@ function parseInputs(raw: string): Record<string, string | number | boolean> {
     return {};
   } catch {
     return {};
+  }
+}
+
+function parseJsonObject<T>(raw: string): T | undefined {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as T)
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 

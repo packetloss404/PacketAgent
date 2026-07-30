@@ -255,12 +255,42 @@ test("SQLite store preserves critical app behavior parity", async (t) => {
         description: "Exercises DB-backed agent writes",
         instructions: "Record a local run for parity testing.",
         tools: [],
-        inputSchema: [{ key: "ticket", label: "Ticket", type: "string", required: true }],
+        memory: [
+          {
+            id: "memory-sqlite-parity",
+            label: "Triage policy",
+            content: "Report the ticket identifier in the result.",
+          },
+        ],
+        evaluationSpec: {
+          expectedOutput: "A concise ticket summary.",
+          requiredTools: [],
+        },
+        inputSchema: [
+          {
+            key: "ticket",
+            label: "Ticket",
+            type: "string",
+            required: true,
+            exampleValue: "SQL-1",
+          },
+        ],
       }),
     });
-    const createdBody = (await created.json()) as { agent: { id: string; name: string } };
+    const createdBody = (await created.json()) as {
+      agent: {
+        id: string;
+        name: string;
+        memory: Array<{ label: string; content: string }>;
+        evaluationSpec: { expectedOutput: string; requiredTools: string[] };
+        inputSchema: Array<{ key: string; exampleValue?: string }>;
+      };
+    };
     assert.equal(created.status, 201);
     assert.equal(createdBody.agent.name, "SQLite parity agent");
+    assert.equal(createdBody.agent.memory[0].label, "Triage policy");
+    assert.equal(createdBody.agent.evaluationSpec.expectedOutput, "A concise ticket summary.");
+    assert.equal(createdBody.agent.inputSchema[0].exampleValue, "SQL-1");
 
     const run = await app.request(`/api/app/agents/${createdBody.agent.id}/runs`, {
       method: "POST",
@@ -444,6 +474,7 @@ function createTestApp(modules: RuntimeModules) {
         triggerKind?: string;
         inputs?: Record<string, unknown>;
         toolApproval?: unknown;
+        evaluation?: { kind: "first_run" };
       };
       const result = await modules.services.runAgent(
         modules.rbacModule.requirePrivateWorkspaceRole(c, "member"),
@@ -452,6 +483,7 @@ function createTestApp(modules: RuntimeModules) {
           triggerKind: body.triggerKind,
           inputs: body.inputs ?? {},
           toolApproval: body.toolApproval as never,
+          evaluation: body.evaluation,
         },
       );
       return c.json(result, "approval" in result ? 200 : 201);

@@ -199,6 +199,13 @@ Prompt-to-app generation remains a supported secondary capability.
   configured-but-unverified model state, and explicit streaming, tool-use, and
   structured-output support. Missing runtimes fail closed; model-dependent
   capabilities remain visible for R6.4 evaluation.
+- Completed R6.4's bounded Agent memory, saved typed input examples, and real
+  first-run evaluation. Builder approval persists examples before readiness or
+  tool-approval gates, then uses the bounded Agent loop. Versioned
+  deterministic evidence records exact inputs, run/output/tool conditions,
+  model identity, and operator-review notes without a second model judge call.
+  JSON, SQLite, and managed Postgres plus Builder, Agent detail, and run traces
+  preserve the evidence.
 
 ## Current implementation truth
 
@@ -309,6 +316,9 @@ Implemented substrate:
 - one canonical Agent preset resolution shared by authoring, secret-free
   provider/model/key/capability readiness, the saved exact model, and a
   restart-safe provider route;
+- bounded non-secret Agent memory, persisted typed input examples, expected
+  output and required-tool contracts, and versioned deterministic first-run
+  evaluation evidence through the real approval-bound Agent loop;
 - tool approvals, encrypted secrets, RBAC, audit, sandbox, and Playwright;
 - outbound HTTP, Slack, GitHub, TLS SMTP email, SQL, and scoped shell tool
   adapters;
@@ -321,7 +331,7 @@ Not shipped:
 
 - hardened Worker-specific browser and SQL drivers (those paths fail closed
   for Worker runs);
-- canonical-only execution for legacy Agent records; R6.3 projections remain
+- canonical-only execution for legacy Agent records; legacy projections remain
   draft until R6.6 validation, migration, and API-compatibility gates pass;
 - live PacketChat/PacketPhone interoperability certification when endpoint
   credentials are available.
@@ -330,7 +340,7 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R6.4 - editable memory/input examples and first-run evaluation** in
+Continue **R6.5 - signed, versioned Agent/Worker import and export** in
 [`../BACKLOG.md#r6---agent-authoring-and-execution-depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth).
 `BACKLOG.md` is the single ledger for every remaining R6-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
@@ -811,9 +821,22 @@ model-dependent capabilities remain visible for the R6.4 evaluation.
 provider calls. Research and decisions are recorded in
 [`r6-agent-readiness.md`](r6-agent-readiness.md).
 
-The exact next slice is R6.4 under
+R6.4 is complete. Builder and Agent editing now persist bounded non-secret
+memory, typed input examples, expected-output review context, and required
+evaluation tools. Builder approval saves examples before readiness or approval
+gates, then executes the real bounded Agent loop; registered enabled tools keep
+their explicit launch approval. The versioned evaluation fails closed over
+saved-versus-actual inputs, run status, redacted non-empty output, and required
+successful tool calls. The same evidence survives JSON, SQLite, managed
+Postgres, dedicated Agent-run backfill/verification, Agent detail, and run
+trace derivation. Expected output is human review context, not a fabricated
+second-model score. `npm run verify:agent-first-run` certifies seven assertions
+without network calls. Research and decisions are recorded in
+[`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md).
+
+The exact next slice is R6.5 under
 [`R6 - agent authoring and execution depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth):
-add editable memory/input examples and first-run evaluation.
+add signed, versioned Agent/Worker import and export.
 After each gate passes, continue through R6-R8 using that backlog's unchecked
 checklists; use the loop document only for execution mechanics. Historical
 D/phase/track documents have been reconciled there and must not be resumed
@@ -828,6 +851,8 @@ independently.
 - PacketADE contract: [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md)
 - W1 contract plan and decisions: [`worker-contract-plan.md`](worker-contract-plan.md)
 - W8 observability/evidence decisions: [`worker-observability-plan.md`](worker-observability-plan.md)
+- R6.4 first-run evaluation decisions:
+  [`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md)
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
 - Verification: [`TESTING.md`](TESTING.md)
 - Shipped history: [`../CHANGELOG.md`](../CHANGELOG.md)
@@ -845,9 +870,16 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,632 passed, 3 intentionally skipped live probes, 0
-  failed (1,635 total)
-- `npm run test:web` - 35 passed, 0 failed
+- `npm run test:api` - 1,639 passed, 3 intentionally skipped live probes, 0
+  failed (1,642 total)
+- `npm run test:web` - 37 passed, 0 failed
+- focused R6.4 memory, input-example, real first-run, approval, deterministic
+  evidence, redaction, trace, SQLite repository/dual-write/backfill,
+  managed-Postgres, route, and UI utility gate - 81 passed, 0 failed
+- `npm run verify:agent-first-run` - all 7 versioned-evidence, saved-input,
+  actual-output, required-tool, deterministic-pass, fail-closed, semantic-note,
+  and secret-redaction assertions passed without a live provider, tool, or
+  network call
 - focused R6.3 provider resolution, secret-free key source, model availability,
   capability readiness, stable provider route, service restart, API route, and
   UI labeling gate - 83 passed, 0 failed
@@ -995,6 +1027,6 @@ Expected branch: `codex/packetagent-foundation`.
 Expected remotes: PacketAgent `origin` and the read-only historical
 `taskloom-source`.
 
-Expected status after the latest pushed R6.3 checkpoint: clean. Stop if the active folder is
+Expected status after the latest pushed R6.4 checkpoint: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

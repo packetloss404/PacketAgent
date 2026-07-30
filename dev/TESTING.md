@@ -344,6 +344,32 @@ and executes that job through the bounded supervisor.
    The verifier uses deterministic fake providers and performs no live
    provider or external tool calls.
 
+## R6.4 Agent First-Run Evaluation Smoke
+
+1. Generate an Agent in the Builder. Edit both bounded memory entries, the
+   sample inputs, and the expected-output description. Save without running
+   and confirm the memory, `inputSchema[].exampleValue`, and evaluation
+   specification remain after reload.
+2. For an Agent with a registered enabled tool, request the first run. Confirm
+   no run is created before the explicit launch approval and that the approval
+   lists only the enabled registered tools.
+3. Approve and run with a configured provider. Confirm the model executes once
+   through the bounded Agent loop and the saved memory is labeled as
+   operator-authored non-secret context.
+4. Expand the resulting run in Agent detail. Confirm the first-run evaluation
+   shows expected and actual input, expected and actual output, tool-call
+   evidence, four pass/fail checks, and review notes.
+5. Open the run trace. Confirm a separate `evaluation` span carries the bounded
+   redacted evidence and model identity.
+6. Repeat with input drift, a failed provider setup, empty output, or a missing
+   required tool. Confirm the evaluation fails closed and never fabricates a
+   semantic score.
+7. Enter a secret-like memory value, secret-key example, or secret-like
+   expected output. Confirm save fails and no raw value reaches the Agent, run,
+   evaluation, log, or UI response.
+8. Run `npm run verify:agent-first-run`. All seven assertions must be true. The
+   verifier is deterministic and performs no provider, tool, or network call.
+
 ## W6.4 Rolling Budget Smoke
 
 1. Configure positive per-run limits plus explicit workspace and deployment

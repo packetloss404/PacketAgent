@@ -33,6 +33,7 @@ function makeRecord(overrides: Partial<AgentRunRecord> & { id: string }): AgentR
   if (overrides.toolCalls !== undefined) record.toolCalls = overrides.toolCalls;
   if (overrides.modelUsed !== undefined) record.modelUsed = overrides.modelUsed;
   if (overrides.costUsd !== undefined) record.costUsd = overrides.costUsd;
+  if (overrides.evaluation !== undefined) record.evaluation = overrides.evaluation;
   return record;
 }
 
@@ -318,6 +319,33 @@ test("sub-array round-trip preserves transcript, logs, and toolCalls", () => {
           status: "ok",
         },
       ],
+      evaluation: {
+        schemaVersion: "packetagent.agent-first-run-evaluation/v1",
+        kind: "first_run",
+        status: "passed",
+        expected: {
+          inputs: { query: "foo" },
+          output: "A useful result.",
+          toolCalls: ["search"],
+        },
+        actual: {
+          inputs: { query: "foo" },
+          output: "ok",
+          toolCalls: [{ name: "search", status: "ok" }],
+          runStatus: "success",
+          model: "model-test",
+        },
+        checks: [
+          {
+            id: "run_status",
+            label: "Run completed",
+            status: "passed",
+            note: "The run completed.",
+          },
+        ],
+        notes: ["All deterministic checks passed."],
+        evaluatedAt: "2026-07-29T12:00:01.000Z",
+      },
     });
     repo.upsert(record);
     const found = repo.find("ws_a", "run_complex");
