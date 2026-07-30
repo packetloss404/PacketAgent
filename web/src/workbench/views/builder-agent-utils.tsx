@@ -82,6 +82,42 @@ export function providerReadinessTone(draft: AgentBuilderDraft): ReadinessTone {
   return draft.readiness.provider.configured ? "good" : "warn";
 }
 
+export function providerCredentialLabel(draft: AgentBuilderDraft): string {
+  const source = draft.readiness.provider.credentialSource;
+  if (source === "workspace_vault") return "key: workspace vault";
+  if (source === "environment") return "key: process environment";
+  if (source === "local") return "key: not required (local)";
+  return "key: missing";
+}
+
+export function providerCapabilitySummary(draft: AgentBuilderDraft): string {
+  const capabilities = draft.readiness.provider.capabilities;
+  const toolUse = capabilities.toolUse.required
+    ? `tool use ${capabilities.toolUse.support}`
+    : "tool use not required";
+  return `${toolUse}; structured output ${capabilities.structuredOutput.support}; streaming ${
+    capabilities.streaming.supported ? "supported" : "missing"
+  }`;
+}
+
+export function providerCapabilityReadinessTone(draft: AgentBuilderDraft): ReadinessTone {
+  const capabilities = draft.readiness.provider.capabilities;
+  if (
+    capabilities.streaming.status === "missing" ||
+    (capabilities.toolUse.required && capabilities.toolUse.support === "none")
+  ) {
+    return "danger";
+  }
+  if (
+    capabilities.toolUse.status === "conditional" ||
+    capabilities.structuredOutput.status === "conditional" ||
+    capabilities.structuredOutput.status === "best_effort"
+  ) {
+    return "warn";
+  }
+  return draft.readiness.provider.configured ? "good" : "muted";
+}
+
 export function toolReadinessTone(draft: AgentBuilderDraft): ReadinessTone {
   if (draft.readiness.tools.missing.length > 0) return "warn";
   if (draftToolNames(draft).length > 0) return "good";

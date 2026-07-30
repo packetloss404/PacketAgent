@@ -319,6 +319,31 @@ and executes that job through the bounded supervisor.
    calls, and certifies structured schema use, tool/trigger constraints,
    redaction, invalid-output fallback, and canonical Worker draft projection.
 
+## R6.3 Agent Provider Readiness Smoke
+
+1. Configure one hosted provider through an environment key or workspace-vault
+   key, choose a Builder preset, and generate an Agent draft. Confirm authoring
+   provenance, readiness, the saved model, and the saved provider route all
+   identify the same resolved provider/model.
+2. Confirm the readiness cards show provider registration, exact model,
+   secret-free key source, `configured_unverified` model availability, and
+   streaming/tool-use/structured-output support. No key value or vault
+   credential reference may appear in the response or UI.
+3. Remove every usable provider for the preset. Confirm readiness blocks the
+   first run and a required tool-use capability is `missing`, not
+   `conditional`.
+4. Configure the local preset. Confirm it is labeled keyless but the selected
+   model remains `configured_unverified`; configuration is not proof that the
+   model exists at the endpoint.
+5. Use a provider with model-dependent tool use or structured output. Confirm
+   the conditional state and first-run verification warning remain visible.
+6. Save the Agent, reconstruct the services/router, and confirm its stable
+   provider route resolves to the original provider and the saved exact model
+   overrides any route default.
+7. Run `npm run verify:agent-readiness`. All seven assertions must be true.
+   The verifier uses deterministic fake providers and performs no live
+   provider or external tool calls.
+
 ## W6.4 Rolling Budget Smoke
 
 1. Configure positive per-run limits plus explicit workspace and deployment

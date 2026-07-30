@@ -81,8 +81,12 @@ strict `smtp_config` values from the encrypted vault only after recipient
 policy approval. R6.2 replaces heuristic-only agent drafting with one bounded,
 schema-constrained provider authoring call plus deterministic semantic
 validation, registered-tool/trigger bounds, visible fallback provenance,
-review-before-save, and a certified canonical Worker draft projection. Resume
-at R6.3 provider/model/key/capability readiness in
+review-before-save, and a certified canonical Worker draft projection. R6.3
+now aligns Agent authoring, readiness, saved model, and restart-safe
+execution to one canonical preset resolution, with secret-free credential
+source, configured-but-unverified model state, and explicit capability
+support. Resume at R6.4 editable memory/input examples and first-run
+evaluation in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r6---agent-authoring-and-execution-depth).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

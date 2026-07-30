@@ -34,6 +34,7 @@ import { SESSION_COOKIE_NAME } from "./auth-utils";
 import { loadStore, resetStoreForTests, snapshotForWorkspace } from "./packetagent-store";
 import { registerDefaultTools } from "./tools/bootstrap";
 import { getDefaultToolRegistry, resetDefaultToolRegistryForTests } from "./tools/registry";
+import { providerCatalogEntry } from "./providers/catalog.js";
 
 type RunAgentRunResult = Extract<RunAgentResult, { run: unknown }>["run"];
 type RunAgentApprovalResult = Extract<RunAgentResult, { approval: unknown }>["approval"];
@@ -42,7 +43,26 @@ const heuristicAgentTemplateDeps = {
   async generateTemplate() {
     return { source: "heuristic", fallbackReason: "provider_unavailable" } as const;
   },
+  async resolveProviderContext() {
+    return readyOpenAiProviderContext("gpt-agent-runtime-test");
+  },
 };
+
+function readyOpenAiProviderContext(model: string, preset: "fast" | "smart" = "fast") {
+  return {
+    preset,
+    vaultProviders: ["openai" as const],
+    selected: {
+      provider: "openai" as const,
+      label: "OpenAI",
+      model,
+      local: false,
+      registered: true,
+      credentialSource: "workspace_vault" as const,
+      capabilities: providerCatalogEntry("openai").capabilities,
+    },
+  };
+}
 
 function expectRun(result: RunAgentResult): RunAgentRunResult {
   assert.ok("run" in result, `expected a run result, received ${JSON.stringify(result)}`);
@@ -347,8 +367,13 @@ test("agent builder merges an LLM-authored AgentTemplate through deterministic r
     {
       prompt:
         "Build a manual research agent that reads a public source URL and emails a concise evidence report.",
+      preset: "smart",
     },
     {
+      async resolveProviderContext(input) {
+        assert.equal(input.preset, "smart");
+        return readyOpenAiProviderContext("gpt-agent-template-test", "smart");
+      },
       async generateTemplate(input) {
         assert.ok(input.allowedTools.includes("http_fetch"));
         assert.ok(input.allowedTools.includes("email_send"));
@@ -405,6 +430,14 @@ test("agent builder merges an LLM-authored AgentTemplate through deterministic r
   assert.equal(draft.agent.name, "Evidence briefing agent");
   assert.equal(draft.agent.triggerKind, "manual");
   assert.equal(draft.agent.schedule, undefined);
+  assert.equal(draft.agent.model, "gpt-agent-template-test");
+  assert.equal(draft.agent.routeKey, "agent.provider.openai");
+  assert.equal(draft.readiness.provider.selectedProviderKind, "openai");
+  assert.equal(draft.readiness.provider.preset, "smart");
+  assert.equal(draft.readiness.provider.credentialSource, "workspace_vault");
+  assert.equal(draft.readiness.provider.modelAvailability, "configured_unverified");
+  assert.equal(draft.readiness.provider.capabilities.toolUse.required, true);
+  assert.equal(draft.readiness.provider.capabilities.toolUse.status, "ready");
   assert.ok(draft.agent.enabledTools.includes("http_fetch"));
   assert.ok(draft.agent.enabledTools.includes("email_send"));
   assert.deepEqual(draft.agent.inputSchema, [

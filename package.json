@@ -75,7 +75,8 @@
     "verify:preview-isolation": "node --import tsx src/app-preview-isolation-verify-cli.ts",
     "verify:container-hardening": "node --import tsx src/container-hardening-verify-cli.ts",
     "verify:smtp": "node --import tsx src/smtp-verify-cli.ts",
-    "verify:agent-template": "node --import tsx src/agent-template-verify-cli.ts"
+    "verify:agent-template": "node --import tsx src/agent-template-verify-cli.ts",
+    "verify:agent-readiness": "node --import tsx src/agent-readiness-verify-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

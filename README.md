@@ -503,8 +503,15 @@ deterministic triggers and registered-tool bounds, and visibly falls back to
 the heuristic builder on unavailable, failed, incomplete, or invalid output.
 Users still review before save. Saved agents project to valid canonical Worker
 drafts; they are not deployed through the unified Worker lifecycle until R6.6.
+R6.3 makes execution readiness explicit before save: the same canonical preset
+resolution now drives authoring, the displayed provider and exact model, the
+saved model, and a restart-safe execution route. The Builder reports only
+secret-free key-source metadata, distinguishes configured models from live
+verified models, and shows streaming, tool-use, and structured-output support.
+Missing runtimes block the first run; conditional capabilities are carried
+into R6.4 evaluation.
 
-The exact resume point is R6.3 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+The exact resume point is R6.4 in [BACKLOG.md](BACKLOG.md), the sole ledger for
 the conditional live W10 check and all remaining R6-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.

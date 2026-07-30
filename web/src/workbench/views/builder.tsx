@@ -807,7 +807,12 @@ export function BuilderView() {
       )}
 
       {builderKind === "agent" && mode !== "empty" && (
-        <AgentBuilderPanel initialPrompt={prompt} embedded autoGenerate={agentAutoGenerate} />
+        <AgentBuilderPanel
+          initialPrompt={prompt}
+          embedded
+          autoGenerate={agentAutoGenerate}
+          preset={composerPreset}
+        />
       )}
 
       {builderKind === "app" && mode === "drafting" && (

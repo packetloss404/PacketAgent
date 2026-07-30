@@ -1179,7 +1179,7 @@ R5 research, implementation decisions, and cumulative gate evidence live in
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1-R6.2 are complete; resume at R6.3.
+Status: in progress. R6.1-R6.3 are complete; resume at R6.4.
 
 1. [Complete 2026-07-29] Wire the default SMTP transport through the
    vault-backed credential path. The Worker sender and TLS policy are
@@ -1197,7 +1197,14 @@ Status: in progress. R6.1-R6.2 are complete; resume at R6.3.
    canonical Worker draft projection without claiming R6.6 lifecycle
    consolidation. See
    [`r6-agent-template-authoring.md`](r6-agent-template-authoring.md).
-3. Show provider/model/key/capability readiness before first run.
+3. [Complete 2026-07-29] Show provider/model/key/capability readiness before
+   first run. Agent authoring, readiness, saved model, and restart-safe
+   execution route use one canonical preset resolution. The UI distinguishes
+   secret-free key source, configured-but-unverified model availability, and
+   native/conditional/best-effort/missing capabilities. Hosted providers fail
+   closed without a usable environment or workspace-vault key; local
+   configuration remains explicitly unverified. See
+   [`r6-agent-readiness.md`](r6-agent-readiness.md).
 4. Add editable memory and input-schema examples plus first-run evaluation.
 5. Add signed, versioned agent/Worker import and export.
 6. Consolidate legacy agent execution onto the canonical Worker lifecycle only

@@ -6,6 +6,28 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R6.3 agent execution readiness
+
+- Aligned LLM AgentTemplate authoring, pre-run readiness, the saved exact
+  model, and restart-safe execution routes to one canonical preset resolution.
+- Added a secret-free readiness contract for provider registration,
+  environment/workspace-vault/local key source, configured-but-unverified
+  model availability, and streaming, tool-use, and structured-output support.
+- Made missing provider runtimes and credentials block the first run while
+  preserving explicit conditional and best-effort capability states for the
+  R6.4 evaluation.
+- Added stable provider-specific Agent routes so a saved Agent retains its
+  provider after process reconstruction, with its exact saved model preventing
+  route-default drift.
+- Added service-reload, API-route, and UI utility coverage plus
+  `npm run verify:agent-readiness`, which performs no live provider calls and
+  checks that verifier output contains no key material.
+- Typecheck, zero-warning lint, repository formatting, the production web
+  build, 35 web tests, 83 focused backend tests, the seven-assertion verifier,
+  and 1,635 API tests pass (1,632 passed with three intentional live
+  interoperability skips).
+- Resume at R6.4 editable memory/input examples and first-run evaluation.
+
 ### 2026-07-29 - R6.2 LLM-authored agent templates
 
 - Added one bounded provider-routed authoring call for reusable agent

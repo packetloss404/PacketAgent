@@ -669,8 +669,20 @@ test("builder agent draft can be approved into an agent", async () => {
   });
   const draftBody = (await draftResponse.json()) as {
     draft?: {
-      agent?: { name?: string };
+      agent?: { name?: string; model?: string; routeKey?: string };
       authoring?: { source?: string; fallbackReason?: string; provider?: string; model?: string };
+      readiness?: {
+        provider?: {
+          selectedProviderKind?: string;
+          selectedModel?: string;
+          credentialSource?: string;
+          modelAvailability?: string;
+          capabilities?: {
+            toolUse?: { required?: boolean; status?: string };
+            structuredOutput?: { status?: string };
+          };
+        };
+      };
     };
   };
 
@@ -683,6 +695,15 @@ test("builder agent draft can be approved into an agent", async () => {
   } else {
     assert.ok(draftBody.draft?.authoring?.fallbackReason);
   }
+  assert.ok(draftBody.draft?.readiness?.provider?.selectedProviderKind);
+  assert.equal(draftBody.draft?.agent?.model, draftBody.draft?.readiness?.provider?.selectedModel);
+  assert.equal(
+    draftBody.draft?.agent?.routeKey,
+    `agent.provider.${draftBody.draft?.readiness?.provider?.selectedProviderKind}`,
+  );
+  assert.notEqual(draftBody.draft?.readiness?.provider?.credentialSource, "none");
+  assert.equal(draftBody.draft?.readiness?.provider?.modelAvailability, "configured_unverified");
+  assert.equal(draftBody.draft?.readiness?.provider?.capabilities?.toolUse?.required, true);
 
   const approveResponse = await app.request("/api/app/builder/agent-draft/approve", {
     method: "POST",

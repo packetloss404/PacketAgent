@@ -455,11 +455,11 @@ Status: complete as of 2026-07-29. Resume at R6.
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1-R6.2 are complete; resume at R6.3.
+Status: in progress. R6.1-R6.3 are complete; resume at R6.4.
 
 - [x] Wire the default SMTP transport through vault-backed credentials.
 - [x] Add LLM-authored Worker/agent templates beyond the heuristic builder.
-- [ ] Show provider/model/key/capability readiness before first run.
+- [x] Show provider/model/key/capability readiness before first run.
 - [ ] Add editable memory/input examples and first-run evaluation.
 - [ ] Add signed, versioned agent/Worker import and export.
 - [ ] Consolidate legacy agent execution onto canonical Workers only after
@@ -501,6 +501,22 @@ Status: in progress. R6.1-R6.2 are complete; resume at R6.3.
   1,632 API tests pass (1,629 passed with three intentional live
   interoperability skips).
   Resume at R6.3 provider/model/key/capability readiness.
+- R6.3 result: Agent authoring, pre-run readiness, saved model, and restart-safe
+  execution route now share one canonical preset resolution. The Builder shows
+  the exact provider/model, secret-free environment/workspace-vault/local key
+  source, registration state, unverified model availability, and streaming,
+  tool-use, and structured-output support before save. Missing runtimes block;
+  conditional capabilities remain explicit for R6.4 evaluation; and local
+  keyless configuration is never mislabeled as a verified model. Stable
+  provider routes survive process reconstruction while the saved exact model
+  prevents default drift. `npm run verify:agent-readiness` certifies this
+  boundary without live provider calls. Research and design evidence live in
+  [`dev/r6-agent-readiness.md`](dev/r6-agent-readiness.md).
+  Typecheck, zero-warning lint, repository formatting, the production web
+  build, 35 web tests, 83 focused backend tests, the seven-assertion verifier,
+  and 1,635 API tests pass (1,632 passed with three intentional live
+  interoperability skips).
+  Resume at R6.4 editable memory/input examples and first-run evaluation.
 
 ### R7 - Builder and frontend maintainability
 

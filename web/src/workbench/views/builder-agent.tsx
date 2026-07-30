@@ -7,6 +7,7 @@ import type {
   AgentInputField,
   AgentRecord,
   AgentRunRecord,
+  BuilderModelPresetId,
 } from "@/lib/types";
 import { I } from "../icons";
 import {
@@ -17,6 +18,9 @@ import {
   firstRunReadinessTone,
   formatSampleValue,
   inputValueForField,
+  providerCapabilityReadinessTone,
+  providerCapabilitySummary,
+  providerCredentialLabel,
   providerReadinessTone,
   runStatusTone,
   safeJson,
@@ -34,6 +38,7 @@ export interface AgentBuilderPanelProps {
   initialPrompt?: string;
   embedded?: boolean;
   autoGenerate?: boolean;
+  preset?: BuilderModelPresetId;
   onAgentSaved?: (agent: AgentRecord, result: AgentBuilderApproveResult) => void;
 }
 
@@ -41,6 +46,7 @@ export function AgentBuilderPanel({
   initialPrompt = "",
   embedded = false,
   autoGenerate = false,
+  preset = "smart",
   onAgentSaved,
 }: AgentBuilderPanelProps) {
   const navigate = useNavigate();
@@ -72,7 +78,10 @@ export function AgentBuilderPanel({
     setFirstRun(null);
     setMode("drafting");
     try {
-      const nextDraft = await api.generateAgentBuilderDraft({ prompt: prompt.trim() });
+      const nextDraft = await api.generateAgentBuilderDraft({
+        prompt: prompt.trim(),
+        preset,
+      });
       const nextSampleInputs = sampleInputsForDraft(nextDraft);
       setDraft(nextDraft);
       setSampleInputs(nextSampleInputs);
@@ -85,7 +94,7 @@ export function AgentBuilderPanel({
       setError((e as Error).message);
       setMode(draft ? "drafted" : "empty");
     }
-  }, [draft, prompt, working]);
+  }, [draft, preset, prompt, working]);
 
   useEffect(() => {
     if (
@@ -385,7 +394,40 @@ function ReadinessGrid({ draft }: { draft: AgentBuilderDraft }) {
           "Provider pending"
         }
         body={draft.readiness.provider.message}
-        meta={draft.readiness.provider.selectedModel ?? draft.agent.model}
+        meta={providerCredentialLabel(draft)}
+      />
+      <ReadinessCard
+        icon={<I.cpu size={14} />}
+        label="Model"
+        tone={draft.readiness.provider.selectedModel ? "warn" : "danger"}
+        statusLabel={
+          draft.readiness.provider.modelAvailability === "configured_unverified"
+            ? "unverified"
+            : "missing"
+        }
+        title={draft.readiness.provider.selectedModel ?? "Model pending"}
+        body={
+          draft.readiness.provider.warnings[0] ??
+          "Choose a provider and model before the first run."
+        }
+        meta={`preset: ${draft.readiness.provider.preset}`}
+      />
+      <ReadinessCard
+        icon={<I.shield size={14} />}
+        label="Capabilities"
+        tone={providerCapabilityReadinessTone(draft)}
+        statusLabel={draft.readiness.provider.capabilities.toolUse.status}
+        title={
+          draft.readiness.provider.capabilities.toolUse.required
+            ? `Tool use: ${draft.readiness.provider.capabilities.toolUse.support}`
+            : "No runtime tool use required"
+        }
+        body={providerCapabilitySummary(draft)}
+        meta={
+          draft.readiness.provider.warnings.find((warning) =>
+            /tool use|structured output/i.test(warning),
+          ) ?? "Catalog capability policy"
+        }
       />
       <ReadinessCard
         icon={<I.settings size={14} />}
@@ -418,6 +460,7 @@ function ReadinessCard({
   title,
   body,
   meta,
+  statusLabel,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -425,6 +468,7 @@ function ReadinessCard({
   title: string;
   body: string;
   meta?: string;
+  statusLabel?: string;
 }) {
   return (
     <div className="card" style={{ padding: 13 }}>
@@ -446,7 +490,7 @@ function ReadinessCard({
         <div className="kicker">{label}</div>
         <span className={`pill ${tone}`} style={{ marginLeft: "auto" }}>
           <span className="dot"></span>
-          {tone === "good" ? "ready" : tone === "warn" ? "setup" : tone}
+          {statusLabel ?? (tone === "good" ? "ready" : tone === "warn" ? "setup" : tone)}
         </span>
       </div>
       <div style={{ color: "var(--silver-100)", fontSize: 13, fontWeight: 600 }}>{title}</div>

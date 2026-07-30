@@ -584,9 +584,33 @@ export interface AgentBuilderDraft {
   readiness: {
     provider: {
       configured: boolean;
+      preset: BuilderModelPresetId;
       selectedProviderId?: string;
+      selectedProviderKind?: Exclude<BuilderProviderName, "stub">;
       selectedProviderName?: string;
       selectedModel?: string;
+      registered: boolean;
+      credentialSource: "environment" | "workspace_vault" | "local" | "none";
+      credentialStatus: "ready" | "not_required" | "missing";
+      modelAvailability: "configured_unverified" | "missing";
+      capabilities: {
+        streaming: {
+          supported: boolean;
+          status: "ready" | "missing";
+        };
+        toolUse: {
+          required: boolean;
+          support: "native" | "conditional" | "deterministic" | "none";
+          status: "ready" | "conditional" | "best_effort" | "missing" | "not_required";
+        };
+        structuredOutput: {
+          requiredForAuthoring: boolean;
+          support: "native" | "conditional" | "none";
+          status: "ready" | "conditional" | "best_effort" | "missing" | "not_required";
+        };
+      };
+      blockers: string[];
+      warnings: string[];
       message: string;
     };
     tools: {

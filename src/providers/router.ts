@@ -48,7 +48,35 @@ export const DEFAULT_ROUTES: Record<string, ProviderRoute> = {
     provider: "openrouter",
     model: providerModel("openrouter", "smart"),
   },
+  "agent.provider.anthropic": {
+    provider: "anthropic",
+    model: providerModel("anthropic", "smart"),
+  },
+  "agent.provider.openai": {
+    provider: "openai",
+    model: providerModel("openai", "smart"),
+  },
+  "agent.provider.openrouter": {
+    provider: "openrouter",
+    model: providerModel("openrouter", "smart"),
+  },
+  "agent.provider.minimax": {
+    provider: "minimax",
+    model: providerModel("minimax", "smart"),
+  },
+  "agent.provider.ollama": {
+    provider: "ollama",
+    model: providerModel("ollama", "smart"),
+  },
+  "agent.provider.gemini": {
+    provider: "gemini",
+    model: providerModel("gemini", "smart"),
+  },
 };
+
+export function agentProviderRouteKey(provider: Exclude<ProviderName, "stub">): string {
+  return `agent.provider.${provider}`;
+}
 
 /**
  * True when the running process has a Gemini API key in env (either name).

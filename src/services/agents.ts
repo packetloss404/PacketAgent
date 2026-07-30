@@ -46,7 +46,9 @@ import {
 } from "../agent-run-trace.js";
 import { AGENT_TEMPLATES, findAgentTemplate } from "../agent-templates.js";
 import { DEFAULT_PROVIDER_NAMES } from "../providers/bootstrap.js";
-import { getDefaultRouter } from "../providers/router.js";
+import { providerCatalogEntry } from "../providers/catalog.js";
+import { providerHasCredentials } from "../providers/preset-resolver.js";
+import { agentProviderRouteKey, getDefaultRouter } from "../providers/router.js";
 import type { ProviderName } from "../providers/types.js";
 import { listDefaultToolSummaries } from "../tools/bootstrap.js";
 import {
@@ -76,6 +78,12 @@ import {
   type AgentTemplateFallbackReason,
   type AgentTemplateGenerationResult,
 } from "../agent-builder/llm-template.js";
+import {
+  buildAgentBuilderProviderReadiness,
+  resolveAgentBuilderProviderContext,
+  type AgentBuilderProviderContext,
+  type AgentBuilderProviderReadiness,
+} from "../agent-builder/readiness.js";
 import {
   activationActivityId,
   activationSignalStableKey,
@@ -198,13 +206,7 @@ export interface AgentBuilderDraft {
   sampleInputs: Record<string, string | number | boolean>;
   plan: AgentBuilderDraftPlan;
   readiness: {
-    provider: {
-      configured: boolean;
-      selectedProviderId?: string;
-      selectedProviderName?: string;
-      selectedModel?: string;
-      message: string;
-    };
+    provider: AgentBuilderProviderReadiness;
     tools: {
       recommended: string[];
       available: string[];
@@ -242,6 +244,9 @@ export interface AgentBuilderDraftDependencies {
     input: Parameters<typeof generateAgentTemplateViaLlm>[0],
     options?: Parameters<typeof generateAgentTemplateViaLlm>[1],
   ) => Promise<AgentTemplateGenerationResult>;
+  readonly resolveProviderContext?: (
+    input: Parameters<typeof resolveAgentBuilderProviderContext>[0],
+  ) => Promise<AgentBuilderProviderContext>;
 }
 
 export type AgentRunTraceSpanKind =
@@ -1334,6 +1339,21 @@ function resolveAgentExecutionTarget(
     blockers.push(
       `Route ${routeKey} targets provider ${route.provider}, but that provider is not registered in this runtime.`,
     );
+  } else {
+    const vaultProviders = data.apiKeys
+      .filter((key) => key.workspaceId === workspaceId)
+      .map((key) => key.provider as ProviderName);
+    if (!providerHasCredentials(route.provider, process.env, vaultProviders)) {
+      blockers.push(
+        `Route ${routeKey} targets provider ${route.provider}, but no usable environment or workspace-vault key is configured.`,
+      );
+    }
+    const toolUse = providerCatalogEntry(route.provider).capabilities.toolUse;
+    if ((agent.enabledTools?.length ?? 0) > 0 && toolUse === "conditional") {
+      notes.push(
+        `Tool use is model-dependent for ${route.provider}; this run will verify the selected model at execution time.`,
+      );
+    }
   }
   return { providerName: undefined, model, blockers, notes };
 }
@@ -1547,10 +1567,6 @@ export async function generateAgentBuilderDraftAsync(
         Number(right.status === "connected") - Number(left.status === "connected") ||
         left.name.localeCompare(right.name),
     );
-  const selectedProvider =
-    providers.find((provider) => provider.status === "connected" && provider.apiKeyConfigured) ??
-    providers[0] ??
-    null;
   const registeredTools = getDefaultToolRegistry()
     .list()
     .map((tool) => tool.name);
@@ -1567,6 +1583,12 @@ export async function generateAgentBuilderDraftAsync(
   const schedule = triggerKind === "schedule" ? inferAgentSchedule(prompt) : undefined;
   const webhookReadiness = buildAgentBuilderWebhookReadiness(triggerKind);
   const scheduleReadiness = buildAgentBuilderScheduleReadiness(triggerKind, schedule);
+  const providerContext = await (
+    dependencies.resolveProviderContext ?? resolveAgentBuilderProviderContext
+  )({
+    workspaceId: context.workspace.id,
+    preset: input.preset,
+  });
   const generated = await (dependencies.generateTemplate ?? generateAgentTemplateViaLlm)(
     {
       prompt,
@@ -1577,7 +1599,14 @@ export async function generateAgentBuilderDraftAsync(
       triggerKind,
       schedule,
     },
-    input.signal ? { signal: input.signal } : undefined,
+    {
+      ...(providerContext.selected?.instance
+        ? { provider: providerContext.selected.instance }
+        : {}),
+      ...(providerContext.selected?.model ? { model: providerContext.selected.model } : {}),
+      vaultProviders: providerContext.vaultProviders,
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
   );
   const authoredTemplate = generated.source === "llm" ? generated.template : undefined;
   const recommendedTools = [
@@ -1598,12 +1627,20 @@ export async function generateAgentBuilderDraftAsync(
       : buildAgentBuilderPlaybook(intent, prompt),
     integrationMetadata,
   );
+  const providerReadiness = buildAgentBuilderProviderReadiness(providerContext, {
+    requiresToolUse: recommendedTools.length > 0,
+    authoringUsesLlm: generated.source === "llm",
+  });
+  const selectedProvider = providerContext.selected
+    ? (providers.find(
+        (provider) =>
+          provider.kind === providerContext.selected?.provider &&
+          isProviderReadyForAgentRuns(data, context.workspace.id, provider),
+      ) ?? null)
+    : null;
   const missingTools = recommendedTools.filter((tool) => !availableTools.includes(tool));
-  const providerConfigured = selectedProvider
-    ? isProviderReadyForAgentRuns(data, context.workspace.id, selectedProvider)
-    : false;
   const blockers = [
-    ...(!providerConfigured ? ["Connect a provider API key before running with LLM tools."] : []),
+    ...providerReadiness.blockers,
     ...(missingTools.length > 0
       ? [`Remove or implement missing tools: ${missingTools.join(", ")}.`]
       : []),
@@ -1634,10 +1671,12 @@ export async function generateAgentBuilderDraftAsync(
         integrationMetadata,
       ),
       providerId: selectedProvider?.id,
-      model: selectedProvider?.defaultModel,
+      model: providerContext.selected?.model,
       tools: recommendedTools,
       enabledTools: recommendedTools.filter((tool) => availableTools.includes(tool)),
-      routeKey: "agent.reasoning",
+      routeKey: providerContext.selected
+        ? agentProviderRouteKey(providerContext.selected.provider)
+        : "agent.reasoning",
       triggerKind,
       schedule,
       playbook,
@@ -1696,19 +1735,12 @@ export async function generateAgentBuilderDraftAsync(
     },
     readiness: {
       provider: {
-        configured: providerConfigured,
+        ...providerReadiness,
         ...(selectedProvider
           ? {
               selectedProviderId: selectedProvider.id,
-              selectedProviderName: selectedProvider.name,
-              selectedModel: selectedProvider.defaultModel,
             }
           : {}),
-        message: providerConfigured
-          ? `${selectedProvider?.name} is ready for first run.`
-          : selectedProvider
-            ? `${selectedProvider.name} exists but still needs an API key or connected status.`
-            : "Add an OpenAI, Anthropic, Ollama, or custom provider before real LLM execution.",
       },
       tools: {
         recommended: recommendedTools,

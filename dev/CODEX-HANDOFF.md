@@ -193,6 +193,12 @@ Prompt-to-app generation remains a supported secondary capability.
   deterministic fallback class. Approved Agents retain existing APIs and
   project as valid draft Worker versions without claiming R6.6 lifecycle
   consolidation.
+- Completed R6.3's pre-run provider readiness. Agent authoring, readiness,
+  saved exact model, and stable execution route use one canonical preset
+  resolution. Drafts expose secret-free key-source metadata,
+  configured-but-unverified model state, and explicit streaming, tool-use, and
+  structured-output support. Missing runtimes fail closed; model-dependent
+  capabilities remain visible for R6.4 evaluation.
 
 ## Current implementation truth
 
@@ -300,6 +306,9 @@ Implemented substrate:
   trigger/schedule and registered-tool constraints, semantic validation,
   secret redaction, explicit heuristic fallback provenance, review-before-save,
   and valid legacy-Agent-to-Worker draft projection;
+- one canonical Agent preset resolution shared by authoring, secret-free
+  provider/model/key/capability readiness, the saved exact model, and a
+  restart-safe provider route;
 - tool approvals, encrypted secrets, RBAC, audit, sandbox, and Playwright;
 - outbound HTTP, Slack, GitHub, TLS SMTP email, SQL, and scoped shell tool
   adapters;
@@ -312,7 +321,7 @@ Not shipped:
 
 - hardened Worker-specific browser and SQL drivers (those paths fail closed
   for Worker runs);
-- canonical-only execution for legacy Agent records; R6.2 projections remain
+- canonical-only execution for legacy Agent records; R6.3 projections remain
   draft until R6.6 validation, migration, and API-compatibility gates pass;
 - live PacketChat/PacketPhone interoperability certification when endpoint
   credentials are available.
@@ -321,7 +330,7 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R6.3 - provider/model/key/capability readiness before first run** in
+Continue **R6.4 - editable memory/input examples and first-run evaluation** in
 [`../BACKLOG.md#r6---agent-authoring-and-execution-depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth).
 `BACKLOG.md` is the single ledger for every remaining R6-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
@@ -791,9 +800,20 @@ certifies the valid canonical Worker draft projection and its required
 and decisions are recorded in
 [`r6-agent-template-authoring.md`](r6-agent-template-authoring.md).
 
-The exact next slice is R6.3 under
+R6.3 is complete. Agent authoring, pre-run readiness, the saved exact model,
+and the restart-safe execution route now share one canonical preset
+resolution. Readiness reports the provider/model, registration, secret-free
+environment/workspace-vault/local key source, configured-but-unverified model
+availability, and catalog streaming/tool-use/structured-output capability.
+Missing runtimes block; local providers remain explicitly unverified; and
+model-dependent capabilities remain visible for the R6.4 evaluation.
+`npm run verify:agent-readiness` certifies seven assertions without live
+provider calls. Research and decisions are recorded in
+[`r6-agent-readiness.md`](r6-agent-readiness.md).
+
+The exact next slice is R6.4 under
 [`R6 - agent authoring and execution depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth):
-show provider/model/key/capability readiness before first run.
+add editable memory/input examples and first-run evaluation.
 After each gate passes, continue through R6-R8 using that backlog's unchecked
 checklists; use the loop document only for execution mechanics. Historical
 D/phase/track documents have been reconciled there and must not be resumed
@@ -825,9 +845,16 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,629 passed, 3 intentionally skipped live probes, 0
-  failed (1,632 total)
-- `npm run test:web` - 34 passed, 0 failed
+- `npm run test:api` - 1,632 passed, 3 intentionally skipped live probes, 0
+  failed (1,635 total)
+- `npm run test:web` - 35 passed, 0 failed
+- focused R6.3 provider resolution, secret-free key source, model availability,
+  capability readiness, stable provider route, service restart, API route, and
+  UI labeling gate - 83 passed, 0 failed
+- `npm run verify:agent-readiness` - all 7 exact preset, key-source,
+  conditional-capability, configured-model, keyless-local, unresolved-runtime,
+  and persisted-route assertions passed without a live provider or external
+  tool call
 - focused R6.2 AgentTemplate schema, best-effort JSON, semantic constraints,
   redaction, deterministic fallback, service merge, Agent approval, route
   compatibility, and UI provenance gate - 79 passed, 0 failed
@@ -968,6 +995,6 @@ Expected branch: `codex/packetagent-foundation`.
 Expected remotes: PacketAgent `origin` and the read-only historical
 `taskloom-source`.
 
-Expected status after the latest pushed R6.2 checkpoint: clean. Stop if the active folder is
+Expected status after the latest pushed R6.3 checkpoint: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.
