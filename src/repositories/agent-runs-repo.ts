@@ -227,16 +227,22 @@ export function sqliteAgentRunsRepository(deps: AgentRunsRepositoryDeps = {}): A
         db.prepare(
           `
           insert or replace into agent_runs (
-            id, workspace_id, agent_id, title, status, trigger_kind,
+            id, workspace_id, agent_id,
+            worker_definition_id, worker_version_id, worker_deployment_id, worker_run_id,
+            title, status, trigger_kind,
             started_at, completed_at, inputs, output, error,
             logs, tool_calls, transcript, model_used, cost_usd, evaluation,
             created_at, updated_at
-          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         ).run(
           record.id,
           record.workspaceId,
           record.agentId ?? null,
+          record.workerDefinitionId ?? null,
+          record.workerVersionId ?? null,
+          record.workerDeploymentId ?? null,
+          record.workerRunId ?? null,
           record.title,
           record.status,
           record.triggerKind ?? null,
@@ -276,6 +282,10 @@ interface AgentRunRow {
   id: string;
   workspace_id: string;
   agent_id: string | null;
+  worker_definition_id: string | null;
+  worker_version_id: string | null;
+  worker_deployment_id: string | null;
+  worker_run_id: string | null;
   title: string;
   status: AgentRunStatus;
   trigger_kind: AgentTriggerKind | null;
@@ -305,6 +315,14 @@ function rowToRecord(row: AgentRunRow): AgentRunRecord {
     updatedAt: row.updated_at,
   };
   if (row.agent_id !== null) record.agentId = row.agent_id;
+  if (row.worker_definition_id !== null) {
+    record.workerDefinitionId = row.worker_definition_id;
+  }
+  if (row.worker_version_id !== null) record.workerVersionId = row.worker_version_id;
+  if (row.worker_deployment_id !== null) {
+    record.workerDeploymentId = row.worker_deployment_id;
+  }
+  if (row.worker_run_id !== null) record.workerRunId = row.worker_run_id;
   if (row.trigger_kind !== null) record.triggerKind = row.trigger_kind;
   if (row.transcript !== null) record.transcript = parseJsonArray<AgentRunStep>(row.transcript);
   if (row.started_at !== null) record.startedAt = row.started_at;

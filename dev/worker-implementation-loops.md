@@ -1179,7 +1179,7 @@ R5 research, implementation decisions, and cumulative gate evidence live in
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1-R6.5 are complete; resume at R6.6.
+Status: complete. R6.1-R6.6 passed their gates on 2026-07-29.
 
 1. [Complete 2026-07-29] Wire the default SMTP transport through the
    vault-backed credential path. The Worker sender and TLS policy are
@@ -1223,13 +1223,22 @@ Status: in progress. R6.1-R6.5 are complete; resume at R6.6.
    idempotent import assigns fresh IDs, records digest/fingerprint provenance,
    and always lands paused. See
    [`r6-agent-worker-portability.md`](r6-agent-worker-portability.md).
-6. Consolidate legacy agent execution onto the canonical Worker lifecycle only
-   after compatibility and migration tests prove no API regression.
+6. [Complete 2026-07-29] Consolidate legacy Agent execution onto the canonical
+   Worker lifecycle. Accepted launches materialize deterministic definitions,
+   content-derived immutable versions, compiled deployments, and idempotently
+   admitted Worker runs/jobs before execution. Agent run records are linked
+   compatibility views; automatic schedules use canonical cron activation;
+   control targets W7; approval-bound legacy tool declarations never become
+   wildcard resource grants; and persistence/migration parity is certified by
+   `npm run verify:agent-canonical-execution`. See
+   [`r6-agent-canonical-execution.md`](r6-agent-canonical-execution.md).
 
 Gate: an authored agent can be evaluated, exported/imported, and operated as a
 canonical Worker without losing legacy compatibility.
 
 ### R7 - Builder and frontend maintainability
+
+Status: in progress. Resume at R7.1.
 
 1. Split remaining god views and route modules along established feature seams.
 2. Add shared accessible loading/error/empty boundaries and keyboard-safe

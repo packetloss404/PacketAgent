@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileWorkerCapabilityPolicy } from "../../workers/capabilities.js";
+import {
+  compileWorkerCapabilityPolicy,
+  WORKER_APPROVAL_BOUND_RESOURCE,
+} from "../../workers/capabilities.js";
 import { makeWorkerVersionContent } from "../../workers/__tests__/fixtures.js";
 import type { WorkerCompiledPolicy } from "../../workers/types.js";
 import type { WorkerToolRuntimeServices } from "../../workers/runtime-services.js";
@@ -65,6 +68,94 @@ test("executeTool denies an undeclared Worker resource before the handler", asyn
   assert.equal(handled, 0);
   assert.equal(decisions[0].allowed, false);
   assert.equal(decisions[0].code, "capability_not_granted");
+});
+
+test("approval-bound capabilities deny by default and allow only the exact approved operation", async () => {
+  let handled = 0;
+  const decisions: ToolPolicyDecision[] = [];
+  const content = makeWorkerVersionContent({
+    tools: [
+      {
+        id: "release-read",
+        tool: "http_fetch",
+        verbs: ["GET"],
+        resources: [WORKER_APPROVAL_BOUND_RESOURCE],
+        effect: "read",
+        approval: "always",
+      },
+    ],
+  });
+  const policy = compileWorkerCapabilityPolicy({
+    workerVersionContentDigest: computeWorkerVersionContentDigest(content),
+    requestedCapabilities: content.tools,
+    allowedCapabilityIds: content.policy.permissions.allowedCapabilityIds,
+    credentialRefs: content.credentialRefs,
+  }).policy;
+  const tool = workerHttpTool(async () => {
+    handled += 1;
+    return { ok: true };
+  });
+  const input = { url: "https://dynamic.example.test/releases" };
+
+  const denied = await executeTool({
+    tool,
+    input,
+    context: workerContext(policy, async (decision) => {
+      decisions.push(decision);
+    }),
+  });
+  assert.equal(denied.status, "error");
+  assert.equal(decisions[0].code, "approval_required");
+  assert.equal(handled, 0);
+
+  const base = workerContext(policy, async (decision) => {
+    decisions.push(decision);
+  });
+  const approved = await executeTool({
+    tool,
+    input,
+    context: {
+      ...base,
+      worker: {
+        ...base.worker!,
+        approval: {
+          grantId: "approval-grant-1",
+          attentionRequestId: "attention-1",
+          actionId: "call-1",
+          capabilityId: decisions[0].capabilityId!,
+          operationDigest: decisions[0].operationDigest,
+          policyDigest: policy.policyDigest,
+          scope: "once",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        },
+      },
+    },
+  });
+  assert.equal(approved.status, "ok");
+  assert.equal(handled, 1);
+
+  const different = await executeTool({
+    tool,
+    input: { url: "https://different.example.test/releases" },
+    context: {
+      ...base,
+      worker: {
+        ...base.worker!,
+        approval: {
+          grantId: "approval-grant-1",
+          attentionRequestId: "attention-1",
+          actionId: "call-1",
+          capabilityId: decisions[0].capabilityId!,
+          operationDigest: decisions[0].operationDigest,
+          policyDigest: policy.policyDigest,
+          scope: "once",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        },
+      },
+    },
+  });
+  assert.equal(different.status, "error");
+  assert.equal(handled, 1);
 });
 
 test("Worker credentials resolve only after policy approval and immediately before hardened I/O", async () => {

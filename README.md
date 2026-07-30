@@ -502,8 +502,8 @@ uses strict JSON Schema when the selected provider supports structured output,
 always performs local semantic validation and redaction, preserves
 deterministic triggers and registered-tool bounds, and visibly falls back to
 the heuristic builder on unavailable, failed, incomplete, or invalid output.
-Users still review before save. Saved agents project to valid canonical Worker
-drafts; they are not deployed through the unified Worker lifecycle until R6.6.
+Users still review before save. At the R6.2 checkpoint, saved agents projected
+to valid canonical Worker drafts without yet entering the unified lifecycle.
 R6.3 makes execution readiness explicit before save: the same canonical preset
 resolution now drives authoring, the displayed provider and exact model, the
 saved model, and a restart-safe execution route. The Builder reports only
@@ -513,8 +513,8 @@ Missing runtimes block the first run; conditional capabilities are carried
 into R6.4 evaluation.
 R6.4 adds editable bounded non-secret memory, saved typed input examples, and
 expected-output review context in both the Builder and Agent editor. Builder
-approval persists the examples, then uses the real bounded Agent loop; enabled
-tools still require the existing explicit launch approval. The resulting
+approval persists the examples, then starts the real bounded execution path;
+enabled tools still require the existing explicit launch approval. The resulting
 versioned evaluation records exact input matching, run success, non-empty
 redacted output, required successful tool calls, model identity, and review
 notes across JSON, SQLite, managed Postgres, Agent detail, and run traces. It
@@ -531,10 +531,14 @@ requires explicit admin acknowledgement. Export omits local IDs, credentials,
 provider destinations, webhook tokens, history, and active state. Import
 preflight exposes signature/trust and provider/tool readiness; the idempotent
 mutation assigns fresh IDs and always lands paused with a draft Worker
-projection. R6.6 still owns canonical-only Agent execution and migration.
+projection. R6.6 completes the consolidation: every accepted legacy Agent
+launch and active schedule enters the canonical Worker lifecycle before
+execution. Agent run APIs now read a linked compatibility projection over the
+Worker run, while checkpoints, action approvals, effects, budgets, events,
+evidence, control, and terminal state remain canonical Worker authority.
 
-The exact resume point is R6.6 in [BACKLOG.md](BACKLOG.md), the sole ledger for
-the conditional live W10 check and all remaining R6-R8 work. New Codex projects
+The exact resume point is R7.1 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+the conditional live W10 check and all remaining R7-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.
 

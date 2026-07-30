@@ -78,7 +78,8 @@
     "verify:agent-template": "node --import tsx src/agent-template-verify-cli.ts",
     "verify:agent-readiness": "node --import tsx src/agent-readiness-verify-cli.ts",
     "verify:agent-first-run": "node --import tsx src/agent-first-run-verify-cli.ts",
-    "verify:agent-portability": "node --import tsx src/agent-portability-verify-cli.ts"
+    "verify:agent-portability": "node --import tsx src/agent-portability-verify-cli.ts",
+    "verify:agent-canonical-execution": "node --import tsx src/agent-canonical-execution-verify-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

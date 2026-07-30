@@ -23,6 +23,7 @@ export const WORKER_ROLLOUT_SCHEMA_VERSION = "packetagent.worker-rollout/v1" as 
 
 export type WorkerLifecycleOperation =
   | "definition.create"
+  | "definition.update"
   | "version.create"
   | "version.update_draft"
   | "version.validate"

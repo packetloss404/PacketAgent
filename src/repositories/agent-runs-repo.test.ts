@@ -23,6 +23,16 @@ function makeRecord(overrides: Partial<AgentRunRecord> & { id: string }): AgentR
     updatedAt: overrides.updatedAt ?? "2026-04-26T10:00:00.000Z",
   };
   if (overrides.agentId !== undefined) record.agentId = overrides.agentId;
+  if (overrides.workerDefinitionId !== undefined) {
+    record.workerDefinitionId = overrides.workerDefinitionId;
+  }
+  if (overrides.workerVersionId !== undefined) {
+    record.workerVersionId = overrides.workerVersionId;
+  }
+  if (overrides.workerDeploymentId !== undefined) {
+    record.workerDeploymentId = overrides.workerDeploymentId;
+  }
+  if (overrides.workerRunId !== undefined) record.workerRunId = overrides.workerRunId;
   if (overrides.triggerKind !== undefined) record.triggerKind = overrides.triggerKind;
   if (overrides.transcript !== undefined) record.transcript = overrides.transcript;
   if (overrides.startedAt !== undefined) record.startedAt = overrides.startedAt;
@@ -85,6 +95,10 @@ test("upsert then list returns the record verbatim", () => {
       id: "run_1",
       workspaceId: "ws_a",
       agentId: "agent_a",
+      workerDefinitionId: "worker_definition_a",
+      workerVersionId: "worker_version_a",
+      workerDeploymentId: "worker_deployment_a",
+      workerRunId: "worker_run_a",
       title: "Build report",
       status: "success",
       triggerKind: "manual",

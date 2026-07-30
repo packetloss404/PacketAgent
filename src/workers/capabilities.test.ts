@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileWorkerCapabilityPolicy, WorkerCapabilityCompilationError } from "./capabilities.js";
+import {
+  approvalBoundWorkerToolCapabilities,
+  compileWorkerCapabilityPolicy,
+  WORKER_APPROVAL_BOUND_RESOURCE,
+  WorkerCapabilityCompilationError,
+} from "./capabilities.js";
 import type { WorkerDeploymentCapabilityGrant, WorkerToolCapability } from "./types.js";
 import { makeWorkerVersionContent } from "./__tests__/fixtures.js";
 import { computeWorkerVersionContentDigest, validateWorkerVersionContent } from "./validation.js";
@@ -94,6 +99,68 @@ test("deployment grants can narrow resources and tighten approval but never broa
         },
       ]),
     "capability.grant_relaxes_approval",
+  );
+});
+
+test("approval-bound resources compile only for capabilities that always require approval", () => {
+  const content = makeWorkerVersionContent({
+    tools: [
+      capability({
+        resources: [WORKER_APPROVAL_BOUND_RESOURCE],
+        approval: "always",
+      }),
+    ],
+  });
+  const compiled = compile(content);
+
+  assert.deepEqual(compiled.grants, [
+    {
+      capabilityId: "release-read",
+      verbs: ["GET"],
+      resources: [WORKER_APPROVAL_BOUND_RESOURCE],
+      approval: "always",
+    },
+  ]);
+  assert.equal(compiled.policy.capabilities[0].resource, WORKER_APPROVAL_BOUND_RESOURCE);
+
+  assertCompilationIssue(
+    () =>
+      compile(
+        makeWorkerVersionContent({
+          tools: [
+            capability({
+              resources: [WORKER_APPROVAL_BOUND_RESOURCE],
+              approval: "never",
+            }),
+          ],
+        }),
+      ),
+    "capability.approval_bound_requires_approval",
+  );
+});
+
+test("approval-bound legacy tool expansion emits every registered verb grouped by effect", () => {
+  assert.deepEqual(approvalBoundWorkerToolCapabilities(["http_fetch", "http_fetch"], "legacy"), [
+    {
+      id: "legacy:http_fetch:read",
+      tool: "http_fetch",
+      verbs: ["GET"],
+      resources: [WORKER_APPROVAL_BOUND_RESOURCE],
+      effect: "read",
+      approval: "always",
+    },
+    {
+      id: "legacy:http_fetch:write",
+      tool: "http_fetch",
+      verbs: ["DELETE", "PATCH", "POST", "PUT"],
+      resources: [WORKER_APPROVAL_BOUND_RESOURCE],
+      effect: "write",
+      approval: "always",
+    },
+  ]);
+  assertCompilationIssue(
+    () => approvalBoundWorkerToolCapabilities(["missing_tool"]),
+    "capability.unknown_tool",
   );
 });
 

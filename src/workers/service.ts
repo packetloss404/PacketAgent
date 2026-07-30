@@ -61,6 +61,13 @@ export interface CreateWorkerVersionInput extends WorkerCommandContext {
   readonly source: WorkerSourceProvenance;
 }
 
+export interface UpdateWorkerDefinitionInput extends WorkerCommandContext {
+  readonly workerDefinitionId: string;
+  readonly expectedUpdatedAt: string;
+  readonly name: string;
+  readonly description: string;
+}
+
 export interface UpdateWorkerDraftVersionInput extends WorkerCommandContext {
   readonly workerVersionId: string;
   readonly expectedContentDigest: string;
@@ -126,6 +133,7 @@ export interface WorkerLifecycleService {
     afterSequence?: number,
   ): ReturnType<WorkerRepository["listEvents"]>;
   createDefinition(input: CreateWorkerDefinitionInput): Promise<WorkerLifecycleCommandResponse>;
+  updateDefinition(input: UpdateWorkerDefinitionInput): Promise<WorkerLifecycleCommandResponse>;
   createVersion(input: CreateWorkerVersionInput): Promise<WorkerLifecycleCommandResponse>;
   updateDraftVersion(input: UpdateWorkerDraftVersionInput): Promise<WorkerLifecycleCommandResponse>;
   validateVersion(input: ChangeWorkerVersionStatusInput): Promise<WorkerLifecycleCommandResponse>;
@@ -240,6 +248,53 @@ export function createWorkerLifecycleService(
             summary: `Worker ${definition.name} created with draft version 1.`,
           });
           return { definition, version };
+        },
+      );
+    },
+    updateDefinition(input) {
+      return executeCommand(
+        repository,
+        now,
+        id,
+        input,
+        "definition.update",
+        input.workerDefinitionId,
+        {
+          workerDefinitionId: input.workerDefinitionId,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+          name: input.name,
+          description: input.description,
+        },
+        (transaction, timestamp) => {
+          const previous = requireDefinition(transaction, input.workerDefinitionId);
+          if (previous.status === "retired") {
+            throw new WorkerLifecycleError(
+              "conflict",
+              "A retired WorkerDefinition cannot be updated.",
+            );
+          }
+          if (previous.updatedAt !== input.expectedUpdatedAt) {
+            throw new WorkerLifecycleError(
+              "conflict",
+              "WorkerDefinition was changed by another command.",
+            );
+          }
+          const definition: WorkerDefinition = {
+            ...previous,
+            name: requireNonEmpty(input.name, "name"),
+            description: requireNonEmpty(input.description, "description"),
+            updatedAt: timestamp,
+          };
+          assertWorkerDefinitionUpdate(previous, definition);
+          assertValidWorkerDefinition(definition);
+          transaction.replaceDefinition(definition);
+          appendEvent(transaction, id, timestamp, {
+            type: "worker.definition.updated",
+            definition,
+            actor: input.actor,
+            summary: `Worker ${definition.name} metadata updated.`,
+          });
+          return { definition };
         },
       );
     },

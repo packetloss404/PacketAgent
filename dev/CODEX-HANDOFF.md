@@ -216,6 +216,15 @@ Prompt-to-app generation remains a supported secondary capability.
   IDs, records digest/fingerprint audit provenance, and always lands paused.
   `npm run verify:agent-portability` is the offline executable gate. Design
   evidence lives in `dev/r6-agent-worker-portability.md`.
+- Completed R6.6's canonical Agent execution boundary. Every accepted legacy
+  Agent launch and active schedule now materializes and admits a canonical
+  Worker run before provider or tool work. The Agent run is a linked
+  compatibility read model; cancel targets W7 Worker control; schedule
+  reconciliation removes legacy recurrence; and approval-bound legacy tool
+  declarations cannot become wildcard resource grants. JSON, SQLite, and
+  managed Postgres preserve the canonical links. `npm run
+verify:agent-canonical-execution` is the offline executable gate. Design and
+  implementation evidence lives in `dev/r6-agent-canonical-execution.md`.
 
 ## Current implementation truth
 
@@ -313,7 +322,8 @@ Implemented substrate:
 - encrypted HTTPS-only PacketPhone route credentials, role-bounded approve,
   reject, pause, stop, and revoke controls, and durable single-use callbacks
   executed through W7;
-- agent definitions and capped tool-use runs;
+- agent definitions whose launch, scheduling, control, and run read models now
+  adapt to canonical Worker versions, deployments, runs, jobs, and evidence;
 - schedules, webhooks, alerts, persistent jobs, retries, and dead-letter;
 - six BYO model providers and local OpenAI-compatible/Ollama endpoints;
 - canonical provider/model/capability and generation policy, workspace-vault
@@ -328,7 +338,7 @@ Implemented substrate:
   restart-safe provider route;
 - bounded non-secret Agent memory, persisted typed input examples, expected
   output and required-tool contracts, and versioned deterministic first-run
-  evaluation evidence through the real approval-bound Agent loop;
+  evaluation evidence through the canonical approval-bound Worker runtime;
 - tool approvals, encrypted secrets, RBAC, audit, sandbox, and Playwright;
 - outbound HTTP, Slack, GitHub, TLS SMTP email, SQL, and scoped shell tool
   adapters;
@@ -341,8 +351,6 @@ Not shipped:
 
 - hardened Worker-specific browser and SQL drivers (those paths fail closed
   for Worker runs);
-- canonical-only execution for legacy Agent records; legacy projections remain
-  draft until R6.6 validation, migration, and API-compatibility gates pass;
 - live PacketChat/PacketPhone interoperability certification when endpoint
   credentials are available.
 
@@ -350,10 +358,10 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R6.6 - canonical-only legacy Agent execution after compatibility
-and migration proof** in
-[`../BACKLOG.md#r6---agent-authoring-and-execution-depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth).
-`BACKLOG.md` is the single ledger for every remaining R6-R8 task.
+Continue **R7.1 - split remaining oversized views and route modules along
+established feature seams** in
+[`../BACKLOG.md#r7---builder-and-frontend-maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability).
+`BACKLOG.md` is the single ledger for every remaining R7-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
 active work absent from the backlog.
 
@@ -856,11 +864,21 @@ certifies eight assertions without network calls. Research and decisions are
 recorded in
 [`r6-agent-worker-portability.md`](r6-agent-worker-portability.md).
 
-The exact next slice is R6.6 under
-[`R6 - agent authoring and execution depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth):
-consolidate legacy Agent execution onto canonical Workers only after
-compatibility and migration tests pass.
-After each gate passes, continue through R6-R8 using that backlog's unchecked
+R6.6 is complete. Legacy Agent launch, retry, webhook, email, scheduling,
+control, run detail, trace, and first-run evaluation surfaces now adapt to one
+canonical Worker lifecycle. Deterministic materialization, idempotent
+activation, immutable version binding, W7 control, Worker events/evidence, an
+approval-bound resource sentinel, and JSON/SQLite/managed-Postgres canonical
+link parity passed the compatibility and migration gate. `npm run
+verify:agent-canonical-execution` certifies all eight assertions without a
+provider, tool, or network call. Research and decisions are recorded in
+[`r6-agent-canonical-execution.md`](r6-agent-canonical-execution.md).
+
+The exact next slice is R7.1 under
+[`R7 - Builder and frontend maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability):
+split remaining oversized views and route modules along established feature
+seams.
+After each gate passes, continue through R7-R8 using that backlog's unchecked
 checklists; use the loop document only for execution mechanics. Historical
 D/phase/track documents have been reconciled there and must not be resumed
 independently.
@@ -878,6 +896,8 @@ independently.
   [`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md)
 - R6.5 signed portability decisions:
   [`r6-agent-worker-portability.md`](r6-agent-worker-portability.md)
+- R6.6 canonical Agent execution decisions:
+  [`r6-agent-canonical-execution.md`](r6-agent-canonical-execution.md)
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
 - Verification: [`TESTING.md`](TESTING.md)
 - Shipped history: [`../CHANGELOG.md`](../CHANGELOG.md)
@@ -895,9 +915,17 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,644 passed, 3 intentionally skipped live probes, 0
-  failed (1,647 total)
+- `npm run test:api` - 1,657 passed, 3 intentionally skipped live probes, 0
+  failed (1,660 total)
 - `npm run test:web` - 39 passed, 0 failed
+- focused R6.6 canonical materialization, idempotent activation, compatibility
+  read model, immutable rollover, schedule migration, W7 stop propagation,
+  approval-bound resource enforcement, legacy-runner exclusion, and
+  JSON/SQLite/managed-Postgres parity checks - passed
+- `npm run verify:agent-canonical-execution` - all 8 lifecycle, restart-safe
+  replay, immutable-rollover, evidence, compatibility-read-model, canonical
+  stop, canonical-schedule-only, persistence, and single-engine assertions
+  passed without a live provider, tool, or network call
 - focused R6.5 canonical JSON, WorkerPackage compatibility, strict
   Agent–Worker bundle, Ed25519/DSSE, tamper and signer substitution,
   export/preflight/import, paused safety, publisher acknowledgement,
@@ -1061,6 +1089,6 @@ Expected branch: `codex/packetagent-foundation`.
 Expected remotes: PacketAgent `origin` and the read-only historical
 `taskloom-source`.
 
-Expected status after the latest pushed R6.4 checkpoint: clean. Stop if the active folder is
+Expected status after the latest pushed R6.6 checkpoint: clean. Stop if the active folder is
 `D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
 appear unexpectedly.

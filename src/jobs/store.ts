@@ -16,7 +16,6 @@ import {
   type JobStatus,
   type PacketAgentData,
 } from "../packetagent-store.js";
-import { nextAfter } from "./cron.js";
 
 const STALE_RUNNING_MS = 5 * 60 * 1000;
 
@@ -110,25 +109,11 @@ function isScheduledAgentRunJob(job: JobRecord, agentId: string): boolean {
   );
 }
 
-function activeSchedule(agent: AgentRecord): string | null {
-  const schedule = agent.schedule?.trim();
-  if (agent.status !== "active" || agent.triggerKind !== "schedule" || !schedule) return null;
-  nextAfter(schedule, new Date());
-  return schedule;
-}
-
 function cancelQueued(job: JobRecord, timestamp: string): void {
   job.status = "canceled";
   job.cancelRequested = true;
   job.completedAt = timestamp;
   job.updatedAt = timestamp;
-}
-
-function scheduledAgentPayload(
-  agentId: string,
-  payload?: Record<string, unknown>,
-): Record<string, unknown> {
-  return { ...(payload ?? {}), agentId, triggerKind: "schedule" };
 }
 
 interface ScheduledAgentResult {
@@ -140,58 +125,17 @@ function ensureScheduledAgentJob(
   data: PacketAgentData,
   agent: AgentRecord,
   timestamp: string,
-  scheduledAt?: string,
-  payload?: Record<string, unknown>,
 ): ScheduledAgentResult {
-  let schedule: string | null = null;
-  try {
-    schedule = activeSchedule(agent);
-  } catch {
-    schedule = null;
-  }
-
   const queued = data.jobs
     .filter((job) => job.status === "queued" && isScheduledAgentRunJob(job, agent.id))
     .sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
 
   const touched: JobRecord[] = [];
-
-  if (!schedule) {
-    for (const job of queued) {
-      cancelQueued(job, timestamp);
-      touched.push(job);
-    }
-    return { maintained: null, touched };
-  }
-
-  const current = queued.filter((job) => job.cron === schedule);
-  const stale = queued.filter((job) => job.cron !== schedule);
-  for (const job of stale) {
+  for (const job of queued) {
     cancelQueued(job, timestamp);
     touched.push(job);
   }
-  for (const job of current.slice(1)) {
-    cancelQueued(job, timestamp);
-    touched.push(job);
-  }
-  if (current[0]) return { maintained: current[0], touched };
-
-  const record: JobRecord = {
-    id: randomUUID(),
-    workspaceId: agent.workspaceId,
-    type: "agent.run",
-    payload: scheduledAgentPayload(agent.id, payload),
-    status: "queued",
-    attempts: 0,
-    maxAttempts: 3,
-    cron: schedule,
-    scheduledAt: scheduledAt ?? nextAfter(schedule, new Date()).toISOString(),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-  data.jobs.push(record);
-  touched.push(record);
-  return { maintained: record, touched };
+  return { maintained: null, touched };
 }
 
 export function maintainScheduledAgentJobs(agentId?: string): JobRecord[] {
@@ -216,7 +160,7 @@ export function enqueueRecurringJob(job: JobRecord, scheduledAt: string): JobRec
     return mutateStore((data) => {
       const agent = data.agents.find((entry) => entry.id === job.payload.agentId);
       if (!agent) return null;
-      const result = ensureScheduledAgentJob(data, agent, nowIso(), scheduledAt, job.payload);
+      const result = ensureScheduledAgentJob(data, agent, nowIso());
       return result.maintained;
     });
   }
@@ -383,7 +327,7 @@ async function enqueueRecurringJobViaAsyncStore(
     return mutateStoreAsync((data) => {
       const agent = data.agents.find((entry) => entry.id === job.payload.agentId);
       if (!agent) return null;
-      const result = ensureScheduledAgentJob(data, agent, nowIso(), scheduledAt, job.payload);
+      const result = ensureScheduledAgentJob(data, agent, nowIso());
       return result.maintained;
     });
   }

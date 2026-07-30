@@ -68,6 +68,55 @@ export interface WorkerCapabilityOperation {
   readonly effect: WorkerCapabilityEffect;
 }
 
+/**
+ * A capability with this sole resource never authorizes an operation directly.
+ * It only lets an approval-required capability surface an exact operation to
+ * the durable Worker attention flow.
+ */
+export const WORKER_APPROVAL_BOUND_RESOURCE = "packetagent:approval-bound" as const;
+
+export function approvalBoundWorkerToolCapabilities(
+  toolNames: readonly string[],
+  idPrefix = "approval-bound",
+): WorkerToolCapability[] {
+  const capabilities: WorkerToolCapability[] = [];
+  const seen = new Set<string>();
+  for (const rawTool of toolNames) {
+    const tool = rawTool.trim();
+    if (!tool || seen.has(tool)) continue;
+    seen.add(tool);
+    const schema = WORKER_TOOL_CAPABILITY_SCHEMAS[tool];
+    if (!schema) {
+      throw new WorkerCapabilityCompilationError([
+        {
+          path: "toolNames",
+          code: "capability.unknown_tool",
+          message: `contains unregistered Worker tool ${JSON.stringify(tool)}`,
+        },
+      ]);
+    }
+    const byEffect = new Map<WorkerCapabilityEffect, string[]>();
+    for (const [verb, effect] of Object.entries(schema.verbs)) {
+      const verbs = byEffect.get(effect) ?? [];
+      verbs.push(verb);
+      byEffect.set(effect, verbs);
+    }
+    for (const effect of ["read", "write", "execute"] as const) {
+      const verbs = byEffect.get(effect);
+      if (!verbs?.length) continue;
+      capabilities.push({
+        id: `${idPrefix}:${tool}:${effect}`,
+        tool,
+        verbs: verbs.sort(),
+        resources: [WORKER_APPROVAL_BOUND_RESOURCE],
+        effect,
+        approval: "always",
+      });
+    }
+  }
+  return capabilities;
+}
+
 const READ = { READ: "read" } as const;
 const LIST = { LIST: "read" } as const;
 const CREATE = { CREATE: "write" } as const;
@@ -320,6 +369,7 @@ function normalizeRequestedCapability(
     schema.resourceKind,
     `${pathPrefix}.resources`,
     issues,
+    capability.approval,
   );
   if (capability.approval !== "never" && capability.approval !== "always") {
     addIssue(issues, `${pathPrefix}.approval`, "capability.approval", "must be never or always");
@@ -387,7 +437,20 @@ function normalizeResources(
   kind: WorkerCapabilityResourceKind,
   pathPrefix: string,
   issues: WorkerCapabilityCompilationIssue[],
+  approval?: WorkerCapabilityApproval,
 ): string[] {
+  if (resources.length === 1 && resources[0]?.trim() === WORKER_APPROVAL_BOUND_RESOURCE) {
+    if (approval !== "always") {
+      addIssue(
+        issues,
+        pathPrefix,
+        "capability.approval_bound_requires_approval",
+        "may use the approval-bound resource only when approval is always",
+      );
+      return [];
+    }
+    return [WORKER_APPROVAL_BOUND_RESOURCE];
+  }
   const normalized: string[] = [];
   const seen = new Set<string>();
   resources.forEach((value, index) => {
@@ -651,6 +714,7 @@ function normalizeDeploymentGrants(
       schema.resourceKind,
       `${pathPrefix}.resources`,
       issues,
+      grant.approval,
     );
     for (const verb of verbs) {
       if (!requested.verbs.includes(verb)) {

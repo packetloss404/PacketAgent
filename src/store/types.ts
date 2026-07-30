@@ -696,6 +696,10 @@ export interface AgentRunRecord {
   id: string;
   workspaceId: string;
   agentId?: string;
+  workerDefinitionId?: string;
+  workerVersionId?: string;
+  workerDeploymentId?: string;
+  workerRunId?: string;
   title: string;
   status: AgentRunStatus;
   triggerKind?: AgentTriggerKind;

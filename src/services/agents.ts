@@ -49,10 +49,7 @@ import {
 } from "../agent-run-trace.js";
 import { AGENT_TEMPLATES, findAgentTemplate } from "../agent-templates.js";
 import { DEFAULT_PROVIDER_NAMES } from "../providers/bootstrap.js";
-import { providerCatalogEntry } from "../providers/catalog.js";
-import { providerHasCredentials } from "../providers/preset-resolver.js";
-import { agentProviderRouteKey, getDefaultRouter } from "../providers/router.js";
-import type { ProviderName } from "../providers/types.js";
+import { agentProviderRouteKey } from "../providers/router.js";
 import { listDefaultToolSummaries } from "../tools/bootstrap.js";
 import {
   buildWebhookTriggerReadiness,
@@ -97,6 +94,10 @@ import {
   type AgentWorkerBundle,
   type AgentWorkerBundlePublisherTrust,
 } from "../agents/portable-bundle.js";
+import { executeLegacyAgentCanonically } from "../agents/canonical-execution.js";
+import { refreshLegacyAgentRunFromCanonical } from "../agents/canonical-run-compatibility.js";
+import { reconcileLegacyAgentWorkers } from "../agents/canonical-reconciliation.js";
+import { createWorkerControlService } from "../workers/control-service.js";
 import {
   activationActivityId,
   activationSignalStableKey,
@@ -815,7 +816,7 @@ export async function importAgentBundleAsync(
       replayed: false,
     };
   });
-  maintainScheduledAgentJobs(result.agent.id);
+  await reconcileLegacyAgentWorkers(result.agent.id);
   return {
     ...result,
     preview,
@@ -926,7 +927,7 @@ export async function createAgentAsync(context: AuthenticatedContext, input: Age
 
     return { agent: decorateAgent(data, agent) };
   });
-  maintainScheduledAgentJobs(result.agent.id);
+  await reconcileLegacyAgentWorkers(result.agent.id);
   return result;
 }
 
@@ -1058,7 +1059,7 @@ export async function updateAgentAsync(
 
     return { agent: decorateAgent(data, agent) };
   });
-  maintainScheduledAgentJobs(result.agent.id);
+  await reconcileLegacyAgentWorkers(result.agent.id);
   return result;
 }
 
@@ -1148,7 +1149,7 @@ export async function archiveAgentAsync(context: AuthenticatedContext, agentId: 
 
     return { agent: decorateAgent(data, agent) };
   });
-  maintainScheduledAgentJobs(result.agent.id);
+  await reconcileLegacyAgentWorkers(result.agent.id);
   return result;
 }
 
@@ -1157,6 +1158,7 @@ export interface RunAgentInput {
   inputs?: Record<string, unknown>;
   toolApproval?: RunAgentToolApprovalPayload | null;
   evaluation?: { kind: "first_run" } | null;
+  idempotencyKey?: string;
 }
 
 export type RunAgentToolApprovalPayload = Partial<ToolCapabilityApprovalInput> & {
@@ -1200,9 +1202,9 @@ export async function runAgent(
   const enabledTools = agent.enabledTools ?? [];
   const firstRunExpectedInputs =
     input.evaluation?.kind === "first_run" ? agentExampleInputs(agent) : undefined;
-  const useToolLoop = enabledTools.length > 0 || firstRunExpectedInputs !== undefined;
+  const requiresLaunchReview = enabledTools.length > 0 || firstRunExpectedInputs !== undefined;
 
-  if (useToolLoop) {
+  if (requiresLaunchReview) {
     if (getToolApprovalDecision(input.toolApproval) === "cancel") {
       const { run } = await recordCanceledAgentExecutionRun({
         context,
@@ -1220,7 +1222,7 @@ export async function runAgent(
     }
 
     const registeredEnabledTools = resolveRegisteredToolDefinitions(enabledTools);
-    if (registeredEnabledTools.length > 0) {
+    if (triggerKind === "manual" && registeredEnabledTools.length > 0) {
       const approvalInput = buildToolCapabilityApprovalContext({
         context,
         agent,
@@ -1233,107 +1235,69 @@ export async function runAgent(
         return { approval: await buildAgentToolCapabilityApprovalRequest(approvalInput) };
       }
     }
-
-    const { run } = await runAgentWithToolLoop({
-      context,
-      agent,
-      inputs,
-      triggerKind,
-      timestamp,
-    });
-    return finalizeAgentRun({
-      context,
-      agent,
-      run,
-      expectedInputs: firstRunExpectedInputs,
-    });
+    const registeredToolNames = new Set(
+      registeredEnabledTools.map((definition) => definition.name),
+    );
+    const missingTools = enabledTools.filter((toolName) => !registeredToolNames.has(toolName));
+    if (missingTools.length > 0) {
+      const error = `Agent execution setup required: Enabled tools are not registered in the runtime: ${missingTools.join(", ")}.`;
+      const { run } = await recordFailedAgentExecutionRun({
+        context,
+        agent,
+        inputs,
+        triggerKind,
+        timestamp,
+        runId: generateId(),
+        logs: [{ at: timestamp, level: "error", message: error }],
+        error,
+      });
+      return finalizeAgentRun({
+        context,
+        agent,
+        run,
+        expectedInputs: firstRunExpectedInputs,
+      });
+    }
   }
 
-  return mutateStoreAsync((store) => {
-    const liveAgent = findAgent(store, agentId);
-    if (!liveAgent) throw httpError(404, "agent not found");
-    const provider = liveAgent.providerId ? findProvider(store, liveAgent.providerId) : null;
-    const providerReady = provider
-      ? isProviderReadyForAgentRuns(store, context.workspace.id, provider)
-      : false;
-    const transcript = buildDryRunTranscript(liveAgent.playbook ?? [], timestamp);
-
-    const logs: AgentRunLogEntry[] = [
-      { at: timestamp, level: "info", message: `Dry run started for ${liveAgent.name}.` },
-      {
-        at: timestamp,
-        level: "warn",
-        message:
-          "No model or runtime tools were invoked; this run only records the planned local transcript.",
-      },
-    ];
-    if (provider) {
-      logs.push({
-        at: timestamp,
-        level: providerReady ? "info" : "warn",
-        message: providerReady
-          ? `Provider ${provider.name} is configured, but this dry run did not call it.`
-          : `Provider ${provider.name} is not ready for real execution: ${provider.status}.`,
-      });
-    } else {
-      logs.push({
-        at: timestamp,
-        level: "warn",
-        message:
-          "No provider is selected for this agent; configure a provider and enabled tools for real execution.",
-      });
-    }
-    for (const field of liveAgent.inputSchema ?? []) {
-      if (field.key in inputs) {
-        logs.push({
-          at: timestamp,
-          level: "info",
-          message: `Input ${field.key} = ${formatInputValue(inputs[field.key])}`,
-        });
-      }
-    }
-    logs.push({
-      at: timestamp,
-      level: "info",
-      message:
-        "Dry run recorded locally. Enable registered tools to execute through the agent loop.",
+  const execution = await executeLegacyAgentCanonically({
+    context,
+    agent,
+    inputs,
+    triggerKind,
+    idempotencyKey: input.idempotencyKey,
+  });
+  if (!execution.replayed) {
+    await mutateStoreAsync((store) => {
+      recordActivity(
+        store,
+        makeActivity(
+          context.workspace.id,
+          "workspace",
+          "agent.run",
+          {
+            type: "user",
+            id: context.user.id,
+            displayName: context.user.displayName,
+          },
+          {
+            title: execution.run.title,
+            agentId: agent.id,
+            runId: execution.run.id,
+            workerRunId: execution.run.workerRunId,
+            status: execution.run.status,
+            triggerKind,
+          },
+          timestamp,
+        ),
+      );
     });
-
-    const run = upsertAgentRun(
-      store,
-      {
-        workspaceId: context.workspace.id,
-        agentId: liveAgent.id,
-        title: `${liveAgent.name} dry run recorded`,
-        status: "success",
-        triggerKind,
-        transcript,
-        startedAt: timestamp,
-        completedAt: timestamp,
-        inputs: Object.keys(inputs).length ? inputs : undefined,
-        output: buildDryRunOutput(liveAgent.name, inputs),
-        logs,
-      },
-      timestamp,
-    );
-
-    recordActivity(
-      store,
-      makeActivity(
-        context.workspace.id,
-        "workspace",
-        "agent.run",
-        {
-          type: "user",
-          id: context.user.id,
-          displayName: context.user.displayName,
-        },
-        { title: run.title, agentId: liveAgent.id, runId: run.id, status: run.status, triggerKind },
-        timestamp,
-      ),
-    );
-
-    return { run: decorateRun(run) };
+  }
+  return finalizeAgentRun({
+    context,
+    agent,
+    run: execution.run,
+    expectedInputs: firstRunExpectedInputs,
   });
 }
 
@@ -1516,273 +1480,6 @@ function approvalVerificationPassed(result: unknown): boolean {
   if (typeof verification.approved === "boolean") return verification.approved;
   if (typeof verification.verified === "boolean") return verification.verified;
   return false;
-}
-
-async function runAgentWithToolLoop(args: {
-  context: AuthenticatedContext;
-  agent: AgentRecord;
-  inputs: Record<string, string | number | boolean>;
-  triggerKind: AgentTriggerKind;
-  timestamp: string;
-}): Promise<{ run: AgentRunRecord }> {
-  const { context, agent, inputs, triggerKind, timestamp } = args;
-  const { runAgentLoop } = await import("../tools/agent-loop.js");
-  const { closeBrowserSession } = await import("../tools/browser-runtime.js");
-  const enabledTools = agent.enabledTools ?? [];
-  const routeKey = agent.routeKey || "agent.reasoning";
-  const runId = generateId();
-  const storeSnapshot = await loadStoreAsync();
-  const executionTarget = resolveAgentExecutionTarget(
-    storeSnapshot,
-    context.workspace.id,
-    agent,
-    routeKey,
-  );
-  const registeredToolNames = new Set(
-    getDefaultToolRegistry()
-      .list()
-      .map((tool) => tool.name),
-  );
-  const missingTools = enabledTools.filter((tool) => !registeredToolNames.has(tool));
-  const blockers = [
-    ...executionTarget.blockers,
-    ...(missingTools.length > 0
-      ? [`Enabled tools are not registered in the runtime: ${missingTools.join(", ")}.`]
-      : []),
-  ];
-
-  const userPromptParts = [agent.instructions];
-  if ((agent.memory ?? []).length > 0) {
-    userPromptParts.push("MEMORY (operator-authored, non-secret context):");
-    for (const entry of agent.memory ?? []) {
-      userPromptParts.push(`- ${entry.label}: ${entry.content}`);
-    }
-  }
-  if (Object.keys(inputs).length > 0) {
-    userPromptParts.push("INPUTS:");
-    for (const [k, v] of Object.entries(inputs))
-      userPromptParts.push(`- ${k}: ${formatInputValue(v)}`);
-  }
-  if ((agent.playbook ?? []).length > 0) {
-    userPromptParts.push("PLAYBOOK:");
-    for (const step of agent.playbook ?? [])
-      userPromptParts.push(`- ${step.title}: ${step.instruction}`);
-  }
-
-  const logs: AgentRunLogEntry[] = [
-    { at: timestamp, level: "info", message: `Tool-loop run started for ${agent.name}.` },
-    {
-      at: timestamp,
-      level: "info",
-      message: `Tools enabled: ${enabledTools.join(", ") || "none"}`,
-    },
-    ...executionTarget.notes.map((message) => ({ at: timestamp, level: "info" as const, message })),
-  ];
-
-  if (blockers.length > 0) {
-    for (const blocker of blockers) logs.push({ at: timestamp, level: "error", message: blocker });
-    return recordFailedAgentExecutionRun({
-      context,
-      agent,
-      inputs,
-      triggerKind,
-      timestamp,
-      runId,
-      logs,
-      error: `Agent execution setup required: ${blockers.join(" ")}`,
-    });
-  }
-
-  let loopResult: Awaited<ReturnType<typeof runAgentLoop>> | null = null;
-  let loopError: string | undefined;
-  try {
-    loopResult = await runAgentLoop({
-      workspaceId: context.workspace.id,
-      userId: context.user.id,
-      runId,
-      agentId: agent.id,
-      routeKey,
-      providerName: executionTarget.providerName,
-      model: executionTarget.model,
-      systemPrompt:
-        "You are a workspace agent. Use the supplied tools to complete the user's task. When finished, return a concise final answer.",
-      userPrompt: userPromptParts.join("\n"),
-      toolNames: enabledTools,
-      maxTurns: 8,
-    });
-  } catch (error) {
-    loopError = (error as Error).message;
-    logs.push({
-      at: new Date().toISOString(),
-      level: "error",
-      message: `Loop crashed: ${loopError}`,
-    });
-  } finally {
-    try {
-      await closeBrowserSession(runId);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const completedAt = new Date().toISOString();
-  const ok = loopResult !== null && !loopError && loopResult.finishReason !== "error";
-  for (const tc of loopResult?.toolCalls ?? []) {
-    logs.push({
-      at: tc.completedAt,
-      level: tc.status === "ok" ? "info" : tc.status === "timeout" ? "warn" : "error",
-      message: `${tc.toolName}: ${tc.status}${tc.error ? ` — ${tc.error}` : ""}`,
-    });
-  }
-  if (loopResult) {
-    logs.push({
-      at: completedAt,
-      level: "info",
-      message: `Finished in ${loopResult.turnsUsed} turn(s) using ${loopResult.modelUsed} ($${loopResult.costUsd.toFixed(4)}).`,
-    });
-  }
-
-  return mutateStoreAsync((store) => {
-    const run = upsertAgentRun(
-      store,
-      {
-        workspaceId: context.workspace.id,
-        agentId: agent.id,
-        title: ok ? `${agent.name} run completed` : `${agent.name} run failed`,
-        status: ok ? "success" : "failed",
-        triggerKind,
-        startedAt: timestamp,
-        completedAt,
-        inputs: Object.keys(inputs).length ? inputs : undefined,
-        output: loopResult?.finalContent,
-        error:
-          loopError ??
-          (loopResult?.finishReason === "max_turns" ? "Loop exceeded max_turns." : undefined),
-        logs,
-        toolCalls: loopResult?.toolCalls.map((tc) => ({
-          id: tc.id,
-          toolName: tc.toolName,
-          input: tc.input,
-          output: tc.output,
-          ...(tc.error ? { error: tc.error } : {}),
-          ...(tc.artifacts ? { artifacts: tc.artifacts } : {}),
-          durationMs: tc.durationMs,
-          startedAt: tc.startedAt,
-          completedAt: tc.completedAt,
-          status: tc.status,
-        })),
-        modelUsed: loopResult?.modelUsed,
-        costUsd: loopResult?.costUsd,
-      },
-      timestamp,
-    );
-
-    recordActivity(
-      store,
-      makeActivity(
-        context.workspace.id,
-        "workspace",
-        "agent.run",
-        {
-          type: "user",
-          id: context.user.id,
-          displayName: context.user.displayName,
-        },
-        { title: run.title, agentId: agent.id, runId: run.id, status: run.status, triggerKind },
-        timestamp,
-      ),
-    );
-
-    return { run };
-  });
-}
-
-function resolveAgentExecutionTarget(
-  data: PacketAgentData,
-  workspaceId: string,
-  agent: AgentRecord,
-  routeKey: string,
-): { providerName?: ProviderName; model?: string; blockers: string[]; notes: string[] } {
-  const blockers: string[] = [];
-  const notes: string[] = [];
-  const router = getDefaultRouter();
-
-  if (agent.providerId) {
-    const provider = findProvider(data, agent.providerId);
-    if (!provider || provider.workspaceId !== workspaceId) {
-      return {
-        blockers: [`Selected provider ${agent.providerId} is not available in this workspace.`],
-        notes,
-      };
-    }
-
-    const providerName = providerNameForKind(provider.kind);
-    const model = agent.model || provider.defaultModel;
-    notes.push(`Using agent provider ${provider.name} with model ${model}.`);
-
-    if (!providerName) {
-      blockers.push(
-        `Provider ${provider.name} uses kind "${provider.kind}", which is not wired to the agent runtime yet.`,
-      );
-    } else if (!router.has(providerName)) {
-      blockers.push(
-        `Provider ${provider.name} (${providerName}) is configured on the agent but not registered in this runtime.`,
-      );
-    }
-    if (!isProviderReadyForAgentRuns(data, workspaceId, provider)) {
-      blockers.push(
-        `Provider ${provider.name} is not ready for real execution; connect its API key or enable the provider before running.`,
-      );
-    }
-
-    return { providerName: providerName ?? undefined, model, blockers, notes };
-  }
-
-  const route = router.resolve(routeKey);
-  const model = agent.model || route.model;
-  notes.push(
-    agent.model
-      ? `Using route ${routeKey} provider ${route.provider} with agent model override ${agent.model}.`
-      : `Using route ${routeKey} provider ${route.provider} with model ${route.model}.`,
-  );
-  if (route.provider === "stub") {
-    blockers.push(
-      `Route ${routeKey} resolves to the stub provider; choose a real provider before executing tools.`,
-    );
-  } else if (!router.has(route.provider)) {
-    blockers.push(
-      `Route ${routeKey} targets provider ${route.provider}, but that provider is not registered in this runtime.`,
-    );
-  } else {
-    const vaultProviders = data.apiKeys
-      .filter((key) => key.workspaceId === workspaceId)
-      .map((key) => key.provider as ProviderName);
-    if (!providerHasCredentials(route.provider, process.env, vaultProviders)) {
-      blockers.push(
-        `Route ${routeKey} targets provider ${route.provider}, but no usable environment or workspace-vault key is configured.`,
-      );
-    }
-    const toolUse = providerCatalogEntry(route.provider).capabilities.toolUse;
-    if ((agent.enabledTools?.length ?? 0) > 0 && toolUse === "conditional") {
-      notes.push(
-        `Tool use is model-dependent for ${route.provider}; this run will verify the selected model at execution time.`,
-      );
-    }
-  }
-  return { providerName: undefined, model, blockers, notes };
-}
-
-function providerNameForKind(kind: ProviderKind): ProviderName | null {
-  if (
-    kind === "openai" ||
-    kind === "anthropic" ||
-    kind === "minimax" ||
-    kind === "ollama" ||
-    kind === "gemini" ||
-    kind === "openrouter"
-  )
-    return kind;
-  return null;
 }
 
 async function recordCanceledAgentExecutionRun(input: {
@@ -3358,6 +3055,58 @@ export function cancelAgentRun(context: AuthenticatedContext, runId: string) {
 
 export async function cancelAgentRunAsync(context: AuthenticatedContext, runId: string) {
   const timestamp = now();
+  const snapshot = await loadStoreAsync();
+  const compatibilityRun = snapshot.agentRuns.find(
+    (entry) => entry.workspaceId === context.workspace.id && entry.id === runId,
+  );
+  if (compatibilityRun?.workerRunId) {
+    if (compatibilityRun.status !== "queued" && compatibilityRun.status !== "running") {
+      throw httpError(409, "only queued or running runs can be canceled");
+    }
+    const workerRun = snapshot.workerRuns.find(
+      (entry) =>
+        entry.workspaceId === context.workspace.id && entry.id === compatibilityRun.workerRunId,
+    );
+    if (!workerRun) {
+      throw httpError(409, "canonical Worker run is missing");
+    }
+    await createWorkerControlService().stopRun({
+      workspaceId: context.workspace.id,
+      actor: {
+        type: "user",
+        id: context.user.id,
+        displayName: context.user.displayName,
+      },
+      idempotencyKey: `legacy-agent-run:cancel:${compatibilityRun.id}:${workerRun.revision}`,
+      expectedRevision: workerRun.revision,
+      workerRunId: workerRun.id,
+    });
+    const updated = await refreshLegacyAgentRunFromCanonical(context.workspace.id, workerRun.id);
+    if (!updated) throw httpError(409, "canonical Worker run compatibility refresh failed");
+    await mutateStoreAsync((data) => {
+      recordActivity(
+        data,
+        makeActivity(
+          context.workspace.id,
+          "workspace",
+          "agent.run_canceled",
+          {
+            type: "user",
+            id: context.user.id,
+            displayName: context.user.displayName,
+          },
+          {
+            title: `Run canceled: ${updated.title}`,
+            agentId: updated.agentId,
+            runId: updated.id,
+            workerRunId: updated.workerRunId,
+          },
+          timestamp,
+        ),
+      );
+    });
+    return { run: decorateRun(updated) };
+  }
   return mutateStoreAsync((data) => {
     const run = data.agentRuns.find(
       (entry) => entry.workspaceId === context.workspace.id && entry.id === runId,

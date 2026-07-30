@@ -114,6 +114,8 @@ import {
 import { createPacketChatNotificationTransport } from "./workers/packetchat.js";
 import { createPacketPhoneNotificationTransport } from "./workers/packetphone.js";
 import { createWorkerExecutionJobHandler } from "./workers/runtime/job-handler.js";
+import { reconcileLegacyAgentWorkers } from "./agents/canonical-reconciliation.js";
+import { refreshLegacyAgentRunFromCanonical } from "./agents/canonical-run-compatibility.js";
 import { createWorkerRecoveryCoordinator } from "./workers/runtime/recovery.js";
 import {
   WORKER_CRON_ACTIVATION_JOB_TYPE,
@@ -357,6 +359,7 @@ app.post("/api/app/agents/:agentId/runs", async (c) => {
         inputs,
         toolApproval: body?.toolApproval,
         evaluation: body?.evaluation,
+        idempotencyKey: c.req.header("Idempotency-Key"),
       },
     );
     return c.json(result, "approval" in result ? 200 : 201);
@@ -621,7 +624,11 @@ app.route("/api", workerPackageEventRoutes);
 app.route("/api/packet-products", packetProductCallbackRoutes);
 
 export const scheduler = new JobScheduler({ leaderLock: selectSchedulerLeaderLock() });
-const workerExecutionJobHandler = createWorkerExecutionJobHandler();
+const workerExecutionJobHandler = createWorkerExecutionJobHandler({
+  onRunUpdated: async (workspaceId, workerRunId) => {
+    await refreshLegacyAgentRunFromCanonical(workspaceId, workerRunId);
+  },
+});
 const workerAttentionDeadlineJobHandler = createWorkerAttentionDeadlineJobHandler();
 const workerNotificationDeliveryJobHandler = createWorkerNotificationDeliveryJobHandler(
   createWorkerNotificationService({
@@ -680,6 +687,7 @@ scheduler.register({
       triggerKind: payload.triggerKind,
       inputs: payload.inputs,
       toolApproval: undefined,
+      idempotencyKey: job.id,
     });
     if ("approval" in result) {
       return {
@@ -719,7 +727,9 @@ scheduler.register({
 scheduler.register({
   type: WORKER_CRON_ACTIVATION_JOB_TYPE,
   async handle(job) {
-    return handleWorkerCronActivationJob(job);
+    const result = await handleWorkerCronActivationJob(job);
+    await refreshLegacyAgentRunFromCanonical(job.workspaceId, result.runId);
+    return result;
   },
 });
 scheduler.register({
@@ -795,6 +805,12 @@ export function assertServerStartupRuntimeSupported(env: NodeJS.ProcessEnv = pro
 export async function startServer(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   assertServerStartupRuntimeSupported(env);
   bootstrapServerRuntime();
+  const legacyAgentReconciliation = await reconcileLegacyAgentWorkers();
+  if (legacyAgentReconciliation.failures.length > 0) {
+    console.warn(
+      `PacketAgent left ${legacyAgentReconciliation.failures.length} legacy Agent(s) inert because their current Worker projection did not validate.`,
+    );
+  }
   await projectWorkerCronTriggers();
   await ensureWorkerCronProjectionJob();
   scheduler.start();

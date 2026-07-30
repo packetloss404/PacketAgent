@@ -447,7 +447,7 @@ test("enqueueRecurringJob writes a non-scheduled-agent job to the dedicated tabl
   }
 });
 
-test("enqueueRecurringJob writes a scheduled agent job and any cancelled stale entries", () => {
+test("enqueueRecurringJob does not recreate a legacy scheduled Agent job", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
   const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
@@ -469,25 +469,14 @@ test("enqueueRecurringJob writes a scheduled agent job and any cancelled stale e
       updatedAt: "2026-04-26T12:00:00.000Z",
     };
     const result = enqueueRecurringJob(seedJob, "2026-04-26T12:05:00.000Z");
-    assert.ok(result);
-    assert.equal(result.workspaceId, "workspace_a");
-    assert.equal(result.type, "agent.run");
-
-    const dedicated = findDedicatedJob(dbPath, result.id);
-    assert.ok(dedicated);
-    assert.equal(dedicated.status, "queued");
-    assert.equal(dedicated.cron, "*/5 * * * *");
-    assert.equal(dedicated.scheduled_at, "2026-04-26T12:05:00.000Z");
-
-    const appRecord = findAppRecordJob(dbPath, result.id);
-    assert.equal(appRecord, null);
+    assert.equal(result, null);
   } finally {
     restore();
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
-test("maintainScheduledAgentJobs writes maintained records to the dedicated table", () => {
+test("maintainScheduledAgentJobs no longer creates legacy recurrence records", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
   const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
@@ -496,25 +485,14 @@ test("maintainScheduledAgentJobs writes maintained records to the dedicated tabl
     seedAgentDirectly(dbPath, makeAgent({ id: "agent_alpha" }));
 
     const maintained = maintainScheduledAgentJobs("agent_alpha");
-    assert.equal(maintained.length, 1);
-    const record = maintained[0];
-    assert.equal(record.type, "agent.run");
-    assert.equal(record.payload.agentId, "agent_alpha");
-
-    const dedicated = findDedicatedJob(dbPath, record.id);
-    assert.ok(dedicated, "dedicated row should exist for the maintained job");
-    assert.equal(dedicated.status, "queued");
-    assert.equal(dedicated.cron, "*/5 * * * *");
-
-    const appRecord = findAppRecordJob(dbPath, record.id);
-    assert.equal(appRecord, null);
+    assert.equal(maintained.length, 0);
   } finally {
     restore();
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
-test("maintainScheduledAgentJobs writes cancellations of stale scheduled jobs to the dedicated table", () => {
+test("maintainScheduledAgentJobs cancels an existing legacy scheduled job", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "packetagent-jobs-dual-"));
   const dbPath = join(tempDir, "packetagent.sqlite");
   migrateDatabase({ dbPath });
@@ -522,30 +500,19 @@ test("maintainScheduledAgentJobs writes cancellations of stale scheduled jobs to
   try {
     seedAgentDirectly(dbPath, makeAgent({ id: "agent_alpha", schedule: "*/10 * * * *" }));
 
-    // First pass produces one queued job with cron "*/10 * * * *".
-    const first = maintainScheduledAgentJobs("agent_alpha");
-    assert.equal(first.length, 1);
-    const initialId = first[0].id;
-    assert.equal(first[0].cron, "*/10 * * * *");
+    const legacy = enqueueJob({
+      workspaceId: "workspace_a",
+      type: "agent.run",
+      payload: { agentId: "agent_alpha", triggerKind: "schedule" },
+      cron: "*/10 * * * *",
+    });
+    const maintained = maintainScheduledAgentJobs("agent_alpha");
+    assert.equal(maintained.length, 0);
 
-    // Now change the agent's schedule. The next maintain should cancel the stale job and create a new one.
-    seedAgentDirectly(dbPath, makeAgent({ id: "agent_alpha", schedule: "*/15 * * * *" }));
-
-    const second = maintainScheduledAgentJobs("agent_alpha");
-    assert.equal(second.length, 1);
-    const newId = second[0].id;
-    assert.notEqual(newId, initialId);
-
-    // The dedicated table should now reflect both: the cancelled stale job and the newly maintained one.
-    const dedicatedStale = findDedicatedJob(dbPath, initialId);
+    const dedicatedStale = findDedicatedJob(dbPath, legacy.id);
     assert.ok(dedicatedStale);
     assert.equal(dedicatedStale.status, "canceled");
     assert.equal(dedicatedStale.cancel_requested, 1);
-
-    const dedicatedNew = findDedicatedJob(dbPath, newId);
-    assert.ok(dedicatedNew);
-    assert.equal(dedicatedNew.status, "queued");
-    assert.equal(dedicatedNew.cron, "*/15 * * * *");
   } finally {
     restore();
     rmSync(tempDir, { recursive: true, force: true });

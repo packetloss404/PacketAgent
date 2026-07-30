@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { recordedCall } from "../../providers/ledger.js";
 import { getDefaultRouter, type ProviderRouter } from "../../providers/router.js";
-import type { ProviderName, ProviderToolDef } from "../../providers/types.js";
+import type { ProviderCallResult, ProviderName, ProviderToolDef } from "../../providers/types.js";
 import { executeTool, preflightWorkerToolPolicy } from "../../tools/executor.js";
 import { getDefaultToolRegistry, type ToolRegistry } from "../../tools/registry.js";
 import type { ToolContext, ToolDefinition, ToolResult } from "../../tools/types.js";
@@ -63,19 +63,21 @@ export function createWorkerProviderPort(
           model: route.model,
         },
         () =>
-          router.call({
-            workspaceId: request.workspaceId,
-            routeKey: request.routeKey,
-            provider: route.provider,
-            model: route.model,
-            messages: [
-              { role: "system", content: request.systemPrompt },
-              { role: "user", content: request.userPrompt },
-            ],
-            ...(tools.length > 0 ? { tools } : {}),
-            maxTokens: 2048,
-            signal: request.signal,
-          }),
+          route.provider === "stub"
+            ? Promise.resolve(stubWorkerCall(request, route.model))
+            : router.call({
+                workspaceId: request.workspaceId,
+                routeKey: request.routeKey,
+                provider: route.provider,
+                model: route.model,
+                messages: [
+                  { role: "system", content: request.systemPrompt },
+                  { role: "user", content: request.userPrompt },
+                ],
+                ...(tools.length > 0 ? { tools } : {}),
+                maxTokens: 2048,
+                signal: request.signal,
+              }),
       );
       return {
         providerCallId: request.providerCallId,
@@ -92,6 +94,54 @@ export function createWorkerProviderPort(
       };
     },
   };
+}
+
+function stubWorkerCall(request: WorkerRuntimeProviderRequest, model: string): ProviderCallResult {
+  const content =
+    request.phase === "evaluate"
+      ? JSON.stringify({
+          predicateId: declaredPredicateId(request.userPrompt),
+          matched: true,
+          evidence: "Deterministic local Worker stub completed the bounded objective.",
+        })
+      : "Deterministic local Worker stub completed the bounded objective.";
+  return {
+    content,
+    finishReason: "stop",
+    usage: {
+      promptTokens: approximateWorkerTokens(`${request.systemPrompt}\n${request.userPrompt}`),
+      completionTokens: approximateWorkerTokens(content),
+      costUsd: 0,
+    },
+    model,
+    providerName: "stub",
+  };
+}
+
+function declaredPredicateId(userPrompt: string): string {
+  const line = userPrompt.split("\n").find((entry) => entry.startsWith("EXIT PREDICATES: "));
+  if (line) {
+    try {
+      const parsed = JSON.parse(line.slice("EXIT PREDICATES: ".length)) as unknown;
+      if (Array.isArray(parsed)) {
+        const predicate = parsed.find(
+          (entry): entry is { id: string } =>
+            typeof entry === "object" &&
+            entry !== null &&
+            "id" in entry &&
+            typeof entry.id === "string",
+        );
+        if (predicate) return predicate.id;
+      }
+    } catch {
+      // The supervisor will reject an undeclared fallback predicate.
+    }
+  }
+  return "stub-objective-satisfied";
+}
+
+function approximateWorkerTokens(value: string): number {
+  return Math.max(1, Math.ceil(value.length / 4));
 }
 
 export function createWorkerToolPort(

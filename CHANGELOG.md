@@ -6,6 +6,33 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R6.6 canonical Agent execution
+
+- Removed the legacy Agent execution choice. Accepted manual, retry, webhook,
+  email, and scheduled launches now materialize deterministic Worker
+  definitions, immutable content-derived versions, compiled deployments, and
+  idempotently admitted Worker runs/jobs before provider or tool work.
+- Converted Agent run persistence and APIs into a compatibility read model
+  linked to canonical definition, version, deployment, and run IDs. Output,
+  errors, cost/model data, tool summaries, traces, evaluation, and terminal
+  status refresh from Worker state and evidence.
+- Routed Agent cancellation through W7 Worker control and migrated active
+  schedules to canonical cron activation. Reconciliation cancels obsolete
+  legacy recurring jobs, preserves paused posture, retires archived Agents,
+  and pauses the last deployment when edited content becomes invalid.
+- Added an approval-bound resource sentinel for legacy whole-tool declarations.
+  It permits the model to request a concrete action but grants no wildcard
+  resource; exact operation, policy digest, and durable approval remain
+  mandatory at the runtime boundary.
+- Added canonical-link persistence and backfill verification for JSON, SQLite,
+  and managed Postgres plus the offline eight-assertion
+  `npm run verify:agent-canonical-execution` gate.
+- Typecheck, zero-warning lint, repository formatting, the production web
+  build, all 39 web tests, focused execution/migration/persistence coverage,
+  the canonical-execution verifier, and 1,660 API tests pass (1,657 passed with
+  three intentional live interoperability skips).
+- R6 is complete. Resume at R7.1 view and route decomposition.
+
 ### 2026-07-29 - R6.5 signed Agent–Worker portability
 
 - Added the strict `packetagent.agent-worker-bundle/v1` envelope with complete

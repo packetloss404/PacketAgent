@@ -1109,6 +1109,33 @@ Required Agent–Worker portability verification:
    it must return the first imported Agent. Reuse that key with another valid
    bundle and confirm it returns a conflict.
 
+Required canonical Agent execution verification:
+
+1. Run `npm run verify:agent-canonical-execution`. Confirm all eight assertions
+   and the top-level `ok` field are `true`. This gate makes no provider, tool,
+   or network call.
+2. Launch a providerless/tool-less Agent twice with the same
+   `Idempotency-Key`. Confirm the second response has the same Agent run and
+   canonical Worker run IDs, and only one `worker.run` job exists.
+3. Reuse that key with different inputs. Confirm the launch fails with an
+   idempotency conflict before provider or tool work.
+4. Inspect the Agent run detail. Confirm it includes canonical definition,
+   version, deployment, and run IDs and derives output, terminal state, trace,
+   model/cost, tool summaries, and evaluation from Worker records/events.
+5. Cancel a queued or running Agent run. Confirm a W7 `stop_run` command is
+   issued for the linked Worker run and the compatibility status refreshes to
+   canceled.
+6. Activate a scheduled Agent, restart the service, and reconcile. Confirm the
+   deployment has one canonical cron trigger, no recurring `agent.run` job is
+   recreated, and the next delivery enters through the Worker activation
+   inbox.
+7. Edit an active scheduled Agent to name an unsupported tool. Confirm
+   reconciliation cancels its canonical cron job and pauses the last valid
+   deployment rather than falling back to legacy execution.
+8. Run the SQLite backfill/verify and managed-Postgres parity suites. Confirm
+   the four canonical link columns survive reconstruction and one workspace
+   cannot resolve another workspace's Worker run.
+
 ## Operations Sanity
 
 1. Visit `/operations`.

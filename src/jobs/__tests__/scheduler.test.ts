@@ -374,7 +374,7 @@ test("cron job re-enqueues itself after success", async () => {
   assert.ok(cronJobs.some((j) => j.status === "queued"));
 });
 
-test("scheduled agents maintain one future agent.run job", () => {
+test("scheduled agents do not maintain legacy agent.run recurrence jobs", () => {
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { agent } = createAgent(auth.context, {
@@ -390,9 +390,7 @@ test("scheduled agents maintain one future agent.run job", () => {
   const queued = listJobs(auth.context.workspace.id, { status: "queued" }).filter(
     (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
   );
-  assert.equal(queued.length, 1);
-  assert.equal(queued[0].cron, "*/15 * * * *");
-  assert.equal(queued[0].payload.triggerKind, "schedule");
+  assert.equal(queued.length, 0);
 });
 
 test("non-schedule or inactive agents do not keep queued scheduled jobs", () => {
@@ -434,7 +432,7 @@ test("invalid agent cron schedules do not enqueue jobs", () => {
   assert.equal(queued.length, 0);
 });
 
-test("scheduler runs a seeded scheduled agent.run job", async () => {
+test("scheduler cancels a seeded legacy scheduled agent.run job", async () => {
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { agent } = createAgent(auth.context, {
@@ -443,10 +441,12 @@ test("scheduler runs a seeded scheduled agent.run job", async () => {
     triggerKind: "schedule",
     schedule: "*/20 * * * *",
   });
-  const seeded = listJobs(auth.context.workspace.id, { status: "queued" }).find(
-    (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
-  );
-  assert.ok(seeded);
+  const seeded = enqueueJob({
+    workspaceId: auth.context.workspace.id,
+    type: "agent.run",
+    payload: { agentId: agent.id, triggerKind: "schedule" },
+    cron: "*/20 * * * *",
+  });
   updateJob(seeded.id, { scheduledAt: new Date().toISOString() });
 
   const ran: string[] = [];
@@ -461,13 +461,13 @@ test("scheduler runs a seeded scheduled agent.run job", async () => {
   scheduler.start();
   for (let i = 0; i < 50; i++) {
     const fresh = findJob(seeded.id);
-    if (fresh?.status === "success") break;
+    if (fresh?.status === "canceled") break;
     await wait(30);
   }
   await scheduler.stop();
 
-  assert.deepEqual(ran, [agent.id]);
-  assert.equal(findJob(seeded.id)?.status, "success");
+  assert.deepEqual(ran, []);
+  assert.equal(findJob(seeded.id)?.status, "canceled");
 });
 
 test("scheduler registers leader probe on start and unregisters on stop", async () => {
@@ -537,7 +537,7 @@ test("scheduler records job-type metrics for successful runs", async () => {
   assert.ok((metrics.lastDurationMs ?? -1) >= 0);
 });
 
-test("recurring scheduled agent jobs preserve payload inputs", () => {
+test("completed legacy Agent schedule jobs do not recur", () => {
   resetStoreForTests();
   const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
   const { agent } = createAgent(auth.context, {
@@ -546,13 +546,18 @@ test("recurring scheduled agent jobs preserve payload inputs", () => {
     triggerKind: "schedule",
     schedule: "*/20 * * * *",
   });
-  const seeded = listJobs(auth.context.workspace.id, { status: "queued" }).find(
-    (job) => job.type === "agent.run" && job.payload.agentId === agent.id,
-  );
-  assert.ok(seeded);
+  const seeded = enqueueJob({
+    workspaceId: auth.context.workspace.id,
+    type: "agent.run",
+    payload: {
+      agentId: agent.id,
+      triggerKind: "schedule",
+      inputs: { mailbox: "support@example.com" },
+    },
+    cron: "*/20 * * * *",
+  });
   updateJob(seeded.id, {
     status: "success",
-    payload: { ...seeded.payload, inputs: { mailbox: "support@example.com" } },
   });
 
   const next = enqueueRecurringJob(
@@ -560,9 +565,7 @@ test("recurring scheduled agent jobs preserve payload inputs", () => {
     new Date(Date.now() + 60_000).toISOString(),
   );
 
-  assert.deepEqual(next?.payload.inputs, { mailbox: "support@example.com" });
-  assert.equal(next?.payload.agentId, agent.id);
-  assert.equal(next?.payload.triggerKind, "schedule");
+  assert.equal(next, null);
 });
 
 // --- Reliability bug regression tests ---------------------------------------

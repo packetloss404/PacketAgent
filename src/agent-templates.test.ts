@@ -116,17 +116,18 @@ test("runAgent validates required inputs and records logs", async () => {
   });
 
   assert.equal(run.status, "success");
-  assert.match(run.title, /dry run recorded/);
+  assert.match(run.title, /run completed/);
   assert.equal(run.inputs?.release_label, "v1.2.3");
   assert.equal(run.inputs?.evidence_url, "https://example.com/evidence");
-  assert.match(run.output ?? "", /did not call a model, external provider, or runtime tools/i);
+  assert.match(run.output ?? "", /local Worker stub/i);
+  assert.ok(run.workerDefinitionId);
+  assert.ok(run.workerVersionId);
+  assert.ok(run.workerDeploymentId);
+  assert.ok(run.workerRunId);
   assert.ok((run.logs ?? []).length >= 2);
   assert.ok(
-    (run.logs ?? []).some((entry: { message: string }) => entry.message.includes("release_label")),
-  );
-  assert.ok(
     (run.logs ?? []).some((entry: { message: string }) =>
-      entry.message.includes("No model or runtime tools were invoked"),
+      entry.message.includes("Worker provider"),
     ),
   );
 });

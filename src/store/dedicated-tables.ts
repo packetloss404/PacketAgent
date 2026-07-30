@@ -283,9 +283,11 @@ function loadDedicatedAgentRuns(db: DatabaseSync): AgentRunRecord[] {
   const rows = db
     .prepare(
       `
-    select id, workspace_id, agent_id, title, status, trigger_kind,
+    select id, workspace_id, agent_id,
+      worker_definition_id, worker_version_id, worker_deployment_id, worker_run_id,
+      title, status, trigger_kind,
       started_at, completed_at, inputs, output, error,
-      logs, tool_calls, transcript, model_used, cost_usd,
+      logs, tool_calls, transcript, model_used, cost_usd, evaluation,
       created_at, updated_at
     from agent_runs
     order by created_at desc, id asc
@@ -295,6 +297,10 @@ function loadDedicatedAgentRuns(db: DatabaseSync): AgentRunRecord[] {
     id: string;
     workspace_id: string;
     agent_id: string | null;
+    worker_definition_id: string | null;
+    worker_version_id: string | null;
+    worker_deployment_id: string | null;
+    worker_run_id: string | null;
     title: string;
     status: AgentRunStatus;
     trigger_kind: AgentTriggerKind | null;
@@ -308,6 +314,7 @@ function loadDedicatedAgentRuns(db: DatabaseSync): AgentRunRecord[] {
     transcript: string | null;
     model_used: string | null;
     cost_usd: number | null;
+    evaluation: string | null;
     created_at: string;
     updated_at: string;
   }>;
@@ -322,6 +329,14 @@ function loadDedicatedAgentRuns(db: DatabaseSync): AgentRunRecord[] {
       updatedAt: row.updated_at,
     };
     if (row.agent_id !== null) record.agentId = row.agent_id;
+    if (row.worker_definition_id !== null) {
+      record.workerDefinitionId = row.worker_definition_id;
+    }
+    if (row.worker_version_id !== null) record.workerVersionId = row.worker_version_id;
+    if (row.worker_deployment_id !== null) {
+      record.workerDeploymentId = row.worker_deployment_id;
+    }
+    if (row.worker_run_id !== null) record.workerRunId = row.worker_run_id;
     if (row.trigger_kind !== null) record.triggerKind = row.trigger_kind;
     if (row.transcript !== null)
       record.transcript = parseJsonArrayValue<AgentRunStep>(row.transcript);
@@ -335,6 +350,12 @@ function loadDedicatedAgentRuns(db: DatabaseSync): AgentRunRecord[] {
       record.toolCalls = parseJsonArrayValue<AgentRunToolCall>(row.tool_calls);
     if (row.model_used !== null) record.modelUsed = row.model_used;
     if (row.cost_usd !== null) record.costUsd = row.cost_usd;
+    if (row.evaluation !== null) {
+      const evaluation = parseJsonRecord(row.evaluation) as unknown as NonNullable<
+        AgentRunRecord["evaluation"]
+      >;
+      record.evaluation = evaluation;
+    }
     return record;
   });
 }
@@ -984,17 +1005,23 @@ function persistDedicatedAgentRuns(db: DatabaseSync, records: AgentRunRecord[]):
   db.exec("delete from agent_runs");
   const stmt = db.prepare(`
     insert or replace into agent_runs (
-      id, workspace_id, agent_id, title, status, trigger_kind,
+      id, workspace_id, agent_id,
+      worker_definition_id, worker_version_id, worker_deployment_id, worker_run_id,
+      title, status, trigger_kind,
       started_at, completed_at, inputs, output, error,
-      logs, tool_calls, transcript, model_used, cost_usd,
+      logs, tool_calls, transcript, model_used, cost_usd, evaluation,
       created_at, updated_at
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const record of records) {
     stmt.run(
       record.id,
       record.workspaceId,
       record.agentId ?? null,
+      record.workerDefinitionId ?? null,
+      record.workerVersionId ?? null,
+      record.workerDeploymentId ?? null,
+      record.workerRunId ?? null,
       record.title,
       record.status,
       record.triggerKind ?? null,
@@ -1008,6 +1035,7 @@ function persistDedicatedAgentRuns(db: DatabaseSync, records: AgentRunRecord[]):
       record.transcript === undefined ? null : JSON.stringify(record.transcript),
       record.modelUsed ?? null,
       record.costUsd ?? null,
+      record.evaluation === undefined ? null : JSON.stringify(record.evaluation),
       record.createdAt,
       record.updatedAt,
     );

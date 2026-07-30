@@ -352,6 +352,10 @@ test("managed Postgres preserves agent memory, examples, and first-run evaluatio
           id: "run_managed_first_run",
           workspaceId: "alpha",
           agentId: "agent_managed_first_run",
+          workerDefinitionId: "worker_definition_managed",
+          workerVersionId: "worker_version_managed",
+          workerDeploymentId: "worker_deployment_managed",
+          workerRunId: "worker_run_managed",
           title: "Managed first-run evaluation",
           status: "success",
           triggerKind: "manual",
@@ -402,6 +406,10 @@ test("managed Postgres preserves agent memory, examples, and first-run evaluatio
       assert.equal(agent?.evaluationSpec?.expectedOutput, "A concise blocker summary.");
       assert.equal(run?.evaluation?.status, "passed");
       assert.equal(run?.evaluation?.actual.output, "No blockers found.");
+      assert.equal(run?.workerDefinitionId, "worker_definition_managed");
+      assert.equal(run?.workerVersionId, "worker_version_managed");
+      assert.equal(run?.workerDeploymentId, "worker_deployment_managed");
+      assert.equal(run?.workerRunId, "worker_run_managed");
       assert.equal(
         (await listAgentsForWorkspaceIndexedAsync("alpha")).some(
           (entry) => entry.id === "agent_managed_first_run",

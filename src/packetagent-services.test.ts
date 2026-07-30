@@ -668,8 +668,17 @@ test("agent builder persists examples and records a real first-run evaluation", 
     name: "openai",
     async call(options) {
       providerCalls.push(options);
+      const evaluation = options.messages.some((message) =>
+        message.content.includes("evaluation phase"),
+      );
       return {
-        content: "Release evidence reviewed. No blocking issue was found.",
+        content: evaluation
+          ? JSON.stringify({
+              predicateId: "legacy-objective-satisfied",
+              matched: true,
+              evidence: "The release evidence review produced a bounded result.",
+            })
+          : "Release evidence reviewed. No blocking issue was found.",
         finishReason: "stop",
         usage: { promptTokens: 18, completionTokens: 10, costUsd: 0.0004 },
         model: options.model,
@@ -733,10 +742,10 @@ test("agent builder persists examples and records a real first-run evaluation", 
       result.firstRun.evaluation?.actual.output,
       "Release evidence reviewed. No blocking issue was found.",
     );
-    assert.equal(providerCalls.length, 1);
+    assert.equal(providerCalls.length, 2);
     assert.match(
       providerCalls[0].messages.map((message) => message.content).join("\n"),
-      /MEMORY \(operator-authored, non-secret context\)/,
+      /Legacy memory \(operator-authored, non-secret context\)/,
     );
 
     const detail = getAgent(auth.context, result.agent.id);

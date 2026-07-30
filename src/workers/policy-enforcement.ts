@@ -6,6 +6,7 @@ import type {
 } from "../tools/types.js";
 import {
   normalizeWorkerCapabilityOperation,
+  WORKER_APPROVAL_BOUND_RESOURCE,
   workerCapabilityResourceContains,
   workerCompiledPolicyDigest,
   type WorkerCapabilityOperation,
@@ -126,8 +127,10 @@ export function evaluateWorkerToolPolicy(input: {
   const matches = [...byCapability.entries()]
     .filter(([, candidate]) =>
       operation.resources.every((resource) =>
-        candidate.resources.some((upperBound) =>
-          workerCapabilityResourceContains(upperBound, resource),
+        candidate.resources.some(
+          (upperBound) =>
+            (candidate.approval === "always" && upperBound === WORKER_APPROVAL_BOUND_RESOURCE) ||
+            workerCapabilityResourceContains(upperBound, resource),
         ),
       ),
     )

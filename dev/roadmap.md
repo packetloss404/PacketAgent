@@ -5,7 +5,7 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **R6 - agent authoring and execution depth**. Repository/session state
+Current active loop: **R7 - Builder and frontend maintainability**. Repository/session state
 for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
@@ -92,10 +92,13 @@ mode and the Agent run trace. R6.5 adds the strict signed
 `packetagent.agent-worker-bundle/v1` transfer boundary: full portable Agent
 authoring, its deterministic Worker draft projection, RFC 8785/SHA-256
 digests, Ed25519 DSSE, explicit publisher-fingerprint trust, secret/local-state
-exclusion, reviewed preflight, and idempotent paused import. Resume at R6.6
-canonical-only legacy Agent execution after compatibility and migration proof
+exclusion, reviewed preflight, and idempotent paused import. R6.6 then routes
+every accepted legacy Agent launch and active schedule through deterministic
+Worker materialization, canonical activation, the fenced supervisor, W7
+control, and a linked compatibility read model with JSON, SQLite, and managed
+Postgres parity. R6 is complete. Resume at R7.1 view and route decomposition
 in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#r6---agent-authoring-and-execution-depth).
+[`worker-implementation-loops.md`](worker-implementation-loops.md#r7---builder-and-frontend-maintainability).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,
 validates SQLite migration/restore integrity and foreign keys, rejects corrupt

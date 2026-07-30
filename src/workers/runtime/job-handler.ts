@@ -28,6 +28,7 @@ export interface WorkerExecutionJobHandlerDependencies {
   readonly attention?: WorkerAttentionService;
   readonly budgets?: WorkerRollingBudgetPort;
   readonly ownerId?: (job: JobRecord) => string;
+  readonly onRunUpdated?: (workspaceId: string, workerRunId: string) => Promise<void> | void;
 }
 
 export function createWorkerExecutionJobHandler(
@@ -68,6 +69,7 @@ export function createWorkerExecutionJobHandler(
         );
       }
       if (acquisition.disposition === "terminal") {
+        await dependencies.onRunUpdated?.(job.workspaceId, workerRunId);
         return {
           workerRunId: acquisition.run.id,
           status: acquisition.run.status,
@@ -76,6 +78,7 @@ export function createWorkerExecutionJobHandler(
         };
       }
       if (acquisition.disposition === "paused") {
+        await dependencies.onRunUpdated?.(job.workspaceId, workerRunId);
         return {
           workerRunId: acquisition.run.id,
           status: acquisition.run.status,
@@ -129,6 +132,7 @@ export function createWorkerExecutionJobHandler(
           signal: context.signal,
           ...(startupError ? { startupError } : {}),
         });
+        await dependencies.onRunUpdated?.(job.workspaceId, workerRunId);
         return {
           workerRunId: result.run.id,
           status: result.run.status,
@@ -144,6 +148,7 @@ export function createWorkerExecutionJobHandler(
             now: runtimePorts.clock.now(),
           })
           .catch(() => undefined);
+        await dependencies.onRunUpdated?.(job.workspaceId, workerRunId);
         if (error instanceof WorkerRuntimeReleasedError) {
           throw new JobReleasedError(error.message);
         }

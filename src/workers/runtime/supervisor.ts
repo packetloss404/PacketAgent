@@ -939,11 +939,7 @@ function providerRequest(
 function executableCapabilities(
   context: WorkerRuntimeContext,
 ): readonly WorkerCompiledCapability[] {
-  return (
-    context.deployment.compiledPolicy?.capabilities.filter(
-      (capability) => capability.approval === "never",
-    ) ?? []
-  );
+  return context.deployment.compiledPolicy?.capabilities ?? [];
 }
 
 function retryBackoffMs(policy: WorkerRetryPolicy, failure: number): number {

@@ -1519,7 +1519,9 @@ function readAgentRunDedicatedRows(dbPath: string): AgentRunRecord[] {
     const rows = db
       .prepare(
         `
-      select id, workspace_id, agent_id, title, status, trigger_kind,
+      select id, workspace_id, agent_id,
+        worker_definition_id, worker_version_id, worker_deployment_id, worker_run_id,
+        title, status, trigger_kind,
         started_at, completed_at, inputs, output, error,
         logs, tool_calls, transcript, model_used, cost_usd, evaluation,
         created_at, updated_at
@@ -1530,6 +1532,10 @@ function readAgentRunDedicatedRows(dbPath: string): AgentRunRecord[] {
       id: string;
       workspace_id: string;
       agent_id: string | null;
+      worker_definition_id: string | null;
+      worker_version_id: string | null;
+      worker_deployment_id: string | null;
+      worker_run_id: string | null;
       title: string;
       status: AgentRunStatus;
       trigger_kind: AgentTriggerKind | null;
@@ -1558,6 +1564,14 @@ function readAgentRunDedicatedRows(dbPath: string): AgentRunRecord[] {
         updatedAt: row.updated_at,
       };
       if (row.agent_id !== null) record.agentId = row.agent_id;
+      if (row.worker_definition_id !== null) {
+        record.workerDefinitionId = row.worker_definition_id;
+      }
+      if (row.worker_version_id !== null) record.workerVersionId = row.worker_version_id;
+      if (row.worker_deployment_id !== null) {
+        record.workerDeploymentId = row.worker_deployment_id;
+      }
+      if (row.worker_run_id !== null) record.workerRunId = row.worker_run_id;
       if (row.trigger_kind !== null) record.triggerKind = row.trigger_kind;
       if (row.transcript !== null)
         record.transcript = parseAgentRunJsonArray<AgentRunStep>(row.transcript);
@@ -1625,6 +1639,10 @@ function canonicalizeAgentRun(record: AgentRunRecord): string {
     id: record.id,
     workspaceId: record.workspaceId,
     agentId: record.agentId ?? null,
+    workerDefinitionId: record.workerDefinitionId ?? null,
+    workerVersionId: record.workerVersionId ?? null,
+    workerDeploymentId: record.workerDeploymentId ?? null,
+    workerRunId: record.workerRunId ?? null,
     title: record.title,
     status: record.status,
     triggerKind: record.triggerKind ?? null,

@@ -455,14 +455,14 @@ Status: complete as of 2026-07-29. Resume at R6.
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1-R6.5 are complete; resume at R6.6.
+Status: complete. R6.1-R6.6 passed their gates on 2026-07-29.
 
 - [x] Wire the default SMTP transport through vault-backed credentials.
 - [x] Add LLM-authored Worker/agent templates beyond the heuristic builder.
 - [x] Show provider/model/key/capability readiness before first run.
 - [x] Add editable memory/input examples and first-run evaluation.
 - [x] Add signed, versioned agent/Worker import and export.
-- [ ] Consolidate legacy agent execution onto canonical Workers only after
+- [x] Consolidate legacy agent execution onto canonical Workers only after
       compatibility and migration tests pass.
 - Gate: authored agents can be evaluated, moved between installs, and operated
   canonically without losing compatibility.
@@ -560,8 +560,30 @@ Status: in progress. R6.1-R6.5 are complete; resume at R6.6.
   eight-assertion verifier, and 1,647 API tests pass (1,644 passed with three
   intentional live interoperability skips). Resume at R6.6 canonical-only
   legacy Agent execution after compatibility and migration tests.
+- R6.6 result: every accepted legacy Agent launch now materializes one
+  deterministic canonical Worker definition, immutable content-derived
+  version, compiled deployment, idempotently admitted Worker run, and
+  `worker.run` job before provider or tool work begins. Agent run records are
+  compatibility read models linked to canonical definition/version/deployment/
+  run IDs; cancel propagates through W7 Worker control. Active Agent schedules
+  migrate to canonical cron activation, queued legacy schedule jobs are
+  canceled, and failed projection makes the last deployment inert. An
+  approval-bound resource sentinel lets legacy whole-tool declarations request
+  concrete actions without granting wildcard resources; exact canonical
+  approval remains the runtime authority. JSON, SQLite, and managed-Postgres
+  persistence carry the canonical links. `npm run
+verify:agent-canonical-execution` certifies the eight-part boundary without
+  network calls. Research and implementation evidence live in
+  [`dev/r6-agent-canonical-execution.md`](dev/r6-agent-canonical-execution.md).
+  Typecheck, zero-warning lint, repository formatting, the production web
+  build, 39 web tests, focused execution/migration/persistence coverage, and
+  the eight-assertion verifier pass. The 1,660-test API suite passes with 1,657
+  passed and three intentional live interoperability skips. R6 is complete.
+  Resume at R7.1 view and route decomposition.
 
 ### R7 - Builder and frontend maintainability
+
+Status: in progress. Resume at R7.1.
 
 - [ ] Split remaining oversized views and routes along established seams.
 - [ ] Add shared accessible loading/error/empty boundaries and keyboard-safe
@@ -671,12 +693,14 @@ planning plus zip/git-ready export.
 ### Existing agent path
 
 - Shipped: six new tools are registered in the default runtime catalog (`http_fetch`, `slack_post_webhook`, `github_api`, `email_send`, `sql_query`, and `shell_for_agent`), manual tool-enabled runs now have the first-call Launch / Edit tools / Cancel approval flow, `/builder` separates app and agent intent, and run detail exposes a trace inspector.
-- Remaining depth: canonical-only legacy Agent execution after compatibility
-  migration and broader end-to-end agent happy-path tests. Portable signed
+- Shipped: legacy Agent launches, automatic schedules, control, evaluation, and
+  read APIs now adapt to the canonical Worker lifecycle. Portable signed
   import/export, LLM-authored templates, provider readiness, editable
   memory/input examples, deterministic first-run evaluation,
   resource-scoped runtime enforcement, and the default hardened SMTP adapter
-  are shipped.
+  are also complete.
+- Remaining depth: broader end-to-end Agent/Worker happy paths are tracked in
+  R8, after the R7 frontend maintainability gate.
 
 ### Sandbox and execution farm
 
