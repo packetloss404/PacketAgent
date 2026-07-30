@@ -2,6 +2,8 @@ import type {
   ActivityDetailPayload,
   ActivityRecord,
   AgentBuilderApproveResult,
+  AgentBundleImportPreview,
+  AgentBundleImportResult,
   AgentBuilderDraft,
   AgentBuilderDraftResult,
   AgentPromptDraftResult,
@@ -422,6 +424,26 @@ export const api = {
   },
   getAgent: (id: string) =>
     j<{ agent: AgentRecord; runs: AgentRunRecord[] }>(`/api/app/agents/${id}`),
+  downloadAgentBundle: (id: string) =>
+    downloadBinary(`/api/app/agents/${encodeURIComponent(id)}/export`),
+  validateAgentBundleImport: (bundle: unknown) =>
+    j<AgentBundleImportPreview>("/api/app/agents/import/validate", {
+      method: "POST",
+      body: JSON.stringify({ bundle }),
+    }),
+  importAgentBundle: (input: {
+    bundle: unknown;
+    acknowledgeUntrustedPublisher: boolean;
+    idempotencyKey: string;
+  }) =>
+    j<AgentBundleImportResult>("/api/app/agents/import", {
+      method: "POST",
+      headers: { "Idempotency-Key": input.idempotencyKey },
+      body: JSON.stringify({
+        bundle: input.bundle,
+        acknowledgeUntrustedPublisher: input.acknowledgeUntrustedPublisher,
+      }),
+    }),
   createAgent: (body: SaveAgentInput) =>
     j<{ agent: AgentRecord }>("/api/app/agents", {
       method: "POST",

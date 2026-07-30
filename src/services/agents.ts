@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   findAgentForWorkspaceIndexed,
   findAgentRunForWorkspaceIndexed,
@@ -88,6 +89,15 @@ import {
 } from "../agent-builder/readiness.js";
 import { buildAgentFirstRunEvaluation } from "../agent-builder/first-run-evaluation.js";
 import {
+  AGENT_WORKER_BUNDLE_MAX_BYTES,
+  AGENT_WORKER_BUNDLE_SCHEMA_VERSION,
+  AgentWorkerBundleSecretError,
+  sealAgentWorkerBundle,
+  verifyAgentWorkerBundle,
+  type AgentWorkerBundle,
+  type AgentWorkerBundlePublisherTrust,
+} from "../agents/portable-bundle.js";
+import {
   activationActivityId,
   activationSignalStableKey,
   type AuthenticatedContext,
@@ -101,6 +111,53 @@ export interface AgentDraftOptions {
   providerId?: string | null;
   model?: string | null;
   status?: AgentStatus;
+}
+
+export interface AgentBundleImportPreview {
+  schemaVersion: typeof AGENT_WORKER_BUNDLE_SCHEMA_VERSION;
+  bundleDigest: string;
+  agent: {
+    name: string;
+    triggerKind: AgentTriggerKind;
+    schedule?: string;
+    toolCount: number;
+    inputCount: number;
+  };
+  worker: {
+    contentDigest: string;
+    status: "draft";
+  };
+  publisher: {
+    keyId: string;
+    trust: AgentWorkerBundlePublisherTrust;
+    signatureVerified: true;
+    acknowledgementRequired: boolean;
+  };
+  readiness: {
+    provider: {
+      status: "resolved" | "needs_setup";
+      hint?: {
+        kind: ProviderKind;
+        name: string;
+      };
+      providerId?: string;
+      providerName?: string;
+    };
+    missingTools: string[];
+  };
+  importPolicy: {
+    status: "paused";
+    credentialsIncluded: false;
+    webhookTokenIncluded: false;
+    runHistoryIncluded: false;
+    localIdsIncluded: false;
+  };
+}
+
+export interface ImportAgentBundleInput {
+  bundle: unknown;
+  acknowledgeUntrustedPublisher?: boolean;
+  idempotencyKey: string;
 }
 
 export interface AgentDraftInput extends AgentDraftOptions {
@@ -496,6 +553,272 @@ export async function getAgentAsync(context: AuthenticatedContext, agentId: stri
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .slice(0, 20)
       .map(decorateRun),
+  };
+}
+
+export async function exportAgentBundleAsync(
+  context: AuthenticatedContext,
+  agentId: string,
+): Promise<{ bundle: AgentWorkerBundle; fileName: string }> {
+  const data = await loadStoreAsync();
+  const agent = data.agents.find(
+    (entry) =>
+      entry.workspaceId === context.workspace.id &&
+      entry.id === agentId &&
+      entry.status !== "archived",
+  );
+  if (!agent) throw httpError(404, "agent not found");
+  const provider = agent.providerId
+    ? (data.providers.find(
+        (entry) => entry.workspaceId === context.workspace.id && entry.id === agent.providerId,
+      ) ?? null)
+    : null;
+  let bundle: AgentWorkerBundle;
+  try {
+    bundle = sealAgentWorkerBundle({ agent, provider });
+  } catch (error) {
+    if (error instanceof AgentWorkerBundleSecretError) {
+      throw httpError(409, error.message);
+    }
+    throw error;
+  }
+  return {
+    bundle,
+    fileName: `${portableFileStem(agent.name)}.packetagent-agent.json`,
+  };
+}
+
+export async function validateAgentBundleImportAsync(
+  context: AuthenticatedContext,
+  value: unknown,
+): Promise<AgentBundleImportPreview> {
+  assertAgentBundleBodyBound(value);
+  const verification = verifyAgentWorkerBundle(value);
+  if (!verification.ok) {
+    throw httpError(
+      400,
+      `agent bundle verification failed: ${verification.issues
+        .slice(0, 4)
+        .map((entry) => `${entry.path} ${entry.message}`)
+        .join("; ")}`,
+    );
+  }
+  const data = await loadStoreAsync();
+  const provider = resolvePortableAgentProvider(
+    data.providers.filter((entry) => entry.workspaceId === context.workspace.id),
+    verification.value.agent.providerHint,
+  );
+  const registeredTools = new Set(
+    getDefaultToolRegistry()
+      .list()
+      .map((tool) => tool.name),
+  );
+  return {
+    schemaVersion: verification.value.schemaVersion,
+    bundleDigest: verification.value.integrity.digest,
+    agent: {
+      name: verification.value.agent.name,
+      triggerKind: verification.value.agent.triggerKind,
+      ...(verification.value.agent.schedule ? { schedule: verification.value.agent.schedule } : {}),
+      toolCount: verification.value.agent.enabledTools.length,
+      inputCount: verification.value.agent.inputSchema.length,
+    },
+    worker: {
+      contentDigest: verification.value.worker.contentDigest,
+      status: "draft",
+    },
+    publisher: {
+      ...verification.publisher,
+      acknowledgementRequired: verification.publisher.trust === "untrusted",
+    },
+    readiness: {
+      provider: {
+        status: provider ? "resolved" : "needs_setup",
+        ...(verification.value.agent.providerHint
+          ? {
+              hint: {
+                kind: verification.value.agent.providerHint.kind,
+                name: verification.value.agent.providerHint.name,
+              },
+            }
+          : {}),
+        ...(provider ? { providerId: provider.id, providerName: provider.name } : {}),
+      },
+      missingTools: verification.value.agent.enabledTools.filter(
+        (tool) => !registeredTools.has(tool),
+      ),
+    },
+    importPolicy: {
+      status: "paused",
+      credentialsIncluded: false,
+      webhookTokenIncluded: false,
+      runHistoryIncluded: false,
+      localIdsIncluded: false,
+    },
+  };
+}
+
+export async function importAgentBundleAsync(
+  context: AuthenticatedContext,
+  input: ImportAgentBundleInput,
+) {
+  const idempotencyKey = String(input.idempotencyKey ?? "").trim();
+  if (!idempotencyKey) throw httpError(400, "Idempotency-Key header is required");
+  if (idempotencyKey.length > 256) {
+    throw httpError(400, "Idempotency-Key header must be at most 256 characters");
+  }
+  const preview = await validateAgentBundleImportAsync(context, input.bundle);
+  const verification = verifyAgentWorkerBundle(input.bundle);
+  if (!verification.ok) {
+    throw httpError(400, "agent bundle verification failed");
+  }
+  if (
+    verification.publisher.trust === "untrusted" &&
+    input.acknowledgeUntrustedPublisher !== true
+  ) {
+    throw httpError(
+      409,
+      `publisher ${verification.publisher.keyId} is not configured as trusted; explicitly acknowledge this fingerprint to import`,
+    );
+  }
+
+  const bundle = verification.value;
+  const data = await loadStoreAsync();
+  const provider = resolvePortableAgentProvider(
+    data.providers.filter((entry) => entry.workspaceId === context.workspace.id),
+    bundle.agent.providerHint,
+  );
+  const normalized = normalizeAgentInput({
+    name: bundle.agent.name,
+    description: bundle.agent.description,
+    instructions: bundle.agent.instructions,
+    providerId: provider?.id,
+    model: bundle.agent.model,
+    tools: [...bundle.agent.tools],
+    enabledTools: [...bundle.agent.enabledTools],
+    routeKey: bundle.agent.routeKey,
+    schedule: bundle.agent.schedule,
+    triggerKind: bundle.agent.triggerKind,
+    playbook: bundle.agent.playbook.map((entry) => ({ ...entry })),
+    memory: bundle.agent.memory.map((entry) => ({ ...entry })),
+    evaluationSpec: {
+      expectedOutput: bundle.agent.evaluationSpec.expectedOutput,
+      requiredTools: [...bundle.agent.evaluationSpec.requiredTools],
+    },
+    status: "paused",
+    inputSchema: bundle.agent.inputSchema.map((entry) => ({
+      ...entry,
+      ...(entry.options ? { options: [...entry.options] } : {}),
+    })),
+  });
+  const receiptId = agentImportReceiptId(context.workspace.id, idempotencyKey);
+  const timestamp = now();
+  const result = await mutateStoreAsync((store) => {
+    const existingReceipt = store.activities.find((entry) => entry.id === receiptId);
+    if (existingReceipt) {
+      if (existingReceipt.data.bundleDigest !== bundle.integrity.digest) {
+        throw httpError(
+          409,
+          "Idempotency-Key was already used for a different Agent bundle import",
+        );
+      }
+      const existingAgent = store.agents.find(
+        (entry) =>
+          entry.workspaceId === context.workspace.id &&
+          entry.id === existingReceipt.data.agentId &&
+          entry.status !== "archived",
+      );
+      if (!existingAgent) {
+        throw httpError(409, "the prior Agent bundle import receipt no longer has a live Agent");
+      }
+      const existingProvider = existingAgent.providerId
+        ? (store.providers.find(
+            (entry) =>
+              entry.workspaceId === context.workspace.id && entry.id === existingAgent.providerId,
+          ) ?? null)
+        : null;
+      return {
+        agent: decorateAgentWithProvider(existingAgent, existingProvider),
+        replayed: true,
+      };
+    }
+
+    validateProvider(store, context.workspace.id, normalized.providerId);
+    const agent = upsertAgent(
+      store,
+      {
+        workspaceId: context.workspace.id,
+        name: normalized.name,
+        description: normalized.description,
+        instructions: normalized.instructions,
+        providerId: normalized.providerId,
+        model: normalized.model,
+        tools: normalized.tools,
+        enabledTools: normalized.enabledTools,
+        routeKey: normalized.routeKey,
+        schedule: normalized.schedule,
+        triggerKind: normalized.triggerKind,
+        playbook: normalized.playbook,
+        memory: normalized.memory,
+        evaluationSpec: normalized.evaluationSpec,
+        status: "paused",
+        inputSchema: normalized.inputSchema,
+        createdByUserId: context.user.id,
+      },
+      timestamp,
+    );
+    recordActivity(
+      store,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.created",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        { title: `Agent imported: ${agent.name}`, agentId: agent.id },
+        timestamp,
+      ),
+    );
+    recordActivity(
+      store,
+      makeActivity(
+        context.workspace.id,
+        "workspace",
+        "agent.bundle_imported",
+        {
+          type: "user",
+          id: context.user.id,
+          displayName: context.user.displayName,
+        },
+        {
+          title: `Signed Agent bundle imported: ${agent.name}`,
+          agentId: agent.id,
+          bundleDigest: bundle.integrity.digest,
+          workerContentDigest: bundle.worker.contentDigest,
+          publisherKeyId: verification.publisher.keyId,
+          publisherTrust:
+            verification.publisher.trust === "untrusted"
+              ? "acknowledged"
+              : verification.publisher.trust,
+          status: "paused",
+        },
+        timestamp,
+        receiptId,
+      ),
+      { dedupe: true },
+    );
+    return {
+      agent: decorateAgentWithProvider(agent, provider),
+      replayed: false,
+    };
+  });
+  maintainScheduledAgentJobs(result.agent.id);
+  return {
+    ...result,
+    preview,
   };
 }
 
@@ -3726,6 +4049,57 @@ type AgentInput = {
 };
 
 const TRIGGER_KINDS: AgentTriggerKind[] = ["manual", "schedule", "webhook", "email"];
+
+function assertAgentBundleBodyBound(value: unknown): void {
+  let encoded: string;
+  try {
+    encoded = JSON.stringify(value);
+  } catch {
+    throw httpError(400, "agent bundle must be valid JSON");
+  }
+  if (Buffer.byteLength(encoded, "utf8") > AGENT_WORKER_BUNDLE_MAX_BYTES) {
+    throw httpError(
+      413,
+      `agent bundle exceeds the ${AGENT_WORKER_BUNDLE_MAX_BYTES}-byte import limit`,
+    );
+  }
+}
+
+function resolvePortableAgentProvider(
+  providers: readonly ProviderRecord[],
+  hint: AgentWorkerBundle["agent"]["providerHint"],
+): ProviderRecord | null {
+  if (!hint) return null;
+  const candidates = providers
+    .filter((provider) => provider.kind === hint.kind)
+    .sort((left, right) => {
+      const leftName = left.name === hint.name ? 0 : 1;
+      const rightName = right.name === hint.name ? 0 : 1;
+      if (leftName !== rightName) return leftName - rightName;
+      const leftReady = left.status === "connected" ? 0 : 1;
+      const rightReady = right.status === "connected" ? 0 : 1;
+      if (leftReady !== rightReady) return leftReady - rightReady;
+      return left.id.localeCompare(right.id);
+    });
+  if (candidates[0]?.name === hint.name) return candidates[0];
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function agentImportReceiptId(workspaceId: string, idempotencyKey: string): string {
+  return `agent_import_${createHash("sha256")
+    .update(`${workspaceId}\0${idempotencyKey}`)
+    .digest("hex")}`;
+}
+
+function portableFileStem(name: string): string {
+  const stem = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return stem || "agent";
+}
 
 type ProviderInput = {
   name?: string;

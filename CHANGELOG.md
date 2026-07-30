@@ -6,6 +6,35 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-07-29 - R6.5 signed Agent–Worker portability
+
+- Added the strict `packetagent.agent-worker-bundle/v1` envelope with complete
+  portable Agent authoring, a deterministic canonical Worker draft projection,
+  closed field/version validation, and a 512 KiB verification bound.
+- Reused one shared RFC 8785 canonical JSON and DSSE pre-authentication
+  implementation for Agent bundles and `WorkerPackage v1`, including the
+  verified negative-zero erratum hardening.
+- Added SHA-256 content/envelope digests, Ed25519 signing derived from
+  `MASTER_KEY` in production, embedded SPKI verification material, full
+  publisher fingerprints, configured trust, and explicit acknowledgement for
+  a cryptographically valid unconfigured publisher.
+- Excluded workspace/user/Agent/provider/playbook/memory IDs, credentials,
+  provider destinations, webhook authority, run/evidence/publish history, and
+  active state from exports. Provider binding crosses installs only as a
+  non-secret resolution hint.
+- Added admin export, preflight, and idempotent import APIs. Imports repeat
+  verification, assign fresh IDs, emit a digest/fingerprint audit receipt, and
+  always land paused with a draft Worker projection.
+- Added Projects import review and Agent export controls, provider/tool
+  readiness, publisher fingerprint gating, focused backend and workbench
+  coverage, and the eight-assertion offline
+  `npm run verify:agent-portability` gate.
+- Typecheck, zero-warning lint, repository formatting, the production web
+  build, 39 web tests, 11 focused portability/package tests, and the
+  eight-assertion verifier pass.
+- Resume at R6.6 canonical-only legacy Agent execution after compatibility and
+  migration tests.
+
 ### 2026-07-29 - R6.4 Agent first-run evaluation
 
 - Added editable bounded non-secret Agent memory, typed input examples, and an

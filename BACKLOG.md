@@ -455,13 +455,13 @@ Status: complete as of 2026-07-29. Resume at R6.
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1-R6.4 are complete; resume at R6.5.
+Status: in progress. R6.1-R6.5 are complete; resume at R6.6.
 
 - [x] Wire the default SMTP transport through vault-backed credentials.
 - [x] Add LLM-authored Worker/agent templates beyond the heuristic builder.
 - [x] Show provider/model/key/capability readiness before first run.
 - [x] Add editable memory/input examples and first-run evaluation.
-- [ ] Add signed, versioned agent/Worker import and export.
+- [x] Add signed, versioned agent/Worker import and export.
 - [ ] Consolidate legacy agent execution onto canonical Workers only after
       compatibility and migration tests pass.
 - Gate: authored agents can be evaluated, moved between installs, and operated
@@ -536,6 +536,30 @@ Status: in progress. R6.1-R6.4 are complete; resume at R6.5.
   and 1,642 API tests pass (1,639 passed with three intentional live
   interoperability skips).
   Resume at R6.5 signed, versioned agent/Worker import and export.
+- R6.5 result: `packetagent.agent-worker-bundle/v1` now carries the complete
+  portable authored Agent configuration plus its deterministic canonical
+  Worker draft projection. RFC 8785 canonical bytes, SHA-256 digests, exact
+  DSSE framing, and an Ed25519 install identity bind the envelope; strict
+  validation rejects unknown fields, unsupported versions, projection/digest
+  drift, changed payload bytes, malformed keys, and invalid signatures before
+  any write. Production signing is domain-separated from `MASTER_KEY`;
+  configured publisher fingerprints are read from
+  `PACKETAGENT_AGENT_BUNDLE_TRUSTED_KEY_IDS`, while a valid unconfigured
+  fingerprint requires explicit admin acknowledgement. Export omits all
+  workspace/user/Agent/provider/playbook/memory IDs, provider destinations,
+  credentials, webhook tokens, run/evidence/publish history, and active state.
+  Import preflight exposes signature/trust and provider/tool readiness; the
+  idempotent mutation assigns fresh IDs, persists a digest/fingerprint audit
+  receipt, and always lands paused with a draft Worker projection. The
+  Projects and Agent editor surfaces expose reviewed import and download
+  flows. `npm run verify:agent-portability` certifies the eight-part boundary
+  without network calls. Research and design evidence live in
+  [`dev/r6-agent-worker-portability.md`](dev/r6-agent-worker-portability.md).
+  Typecheck, zero-warning lint, repository formatting, the production web
+  build, 39 web tests, 11 focused portability/package tests, the
+  eight-assertion verifier, and 1,647 API tests pass (1,644 passed with three
+  intentional live interoperability skips). Resume at R6.6 canonical-only
+  legacy Agent execution after compatibility and migration tests.
 
 ### R7 - Builder and frontend maintainability
 
@@ -647,9 +671,9 @@ planning plus zip/git-ready export.
 ### Existing agent path
 
 - Shipped: six new tools are registered in the default runtime catalog (`http_fetch`, `slack_post_webhook`, `github_api`, `email_send`, `sql_query`, and `shell_for_agent`), manual tool-enabled runs now have the first-call Launch / Edit tools / Cancel approval flow, `/builder` separates app and agent intent, and run detail exposes a trace inspector.
-- Remaining depth: portable signed import/export, canonical-only legacy Agent
-  execution after compatibility migration, and broader end-to-end agent
-  happy-path tests. LLM-authored templates, provider readiness, editable
+- Remaining depth: canonical-only legacy Agent execution after compatibility
+  migration and broader end-to-end agent happy-path tests. Portable signed
+  import/export, LLM-authored templates, provider readiness, editable
   memory/input examples, deterministic first-run evaluation,
   resource-scoped runtime enforcement, and the default hardened SMTP adapter
   are shipped.
@@ -697,7 +721,9 @@ planning plus zip/git-ready export.
   output, required tool calls, and pass/fail notes.
 - Shipped: bounded non-secret Agent memory and editable Builder/Agent input
   examples.
-- Add agent import/export so templates and generated agents can move between installs.
+- Shipped: signed Agent import/export moves templates and generated Agents
+  between installs without local IDs, secrets, active schedules, or run
+  history; imports are reviewed and paused.
 
 ### Self-host publish
 

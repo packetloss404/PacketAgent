@@ -88,8 +88,13 @@ source, configured-but-unverified model state, and explicit capability
 support. R6.4 adds bounded editable non-secret memory, persisted typed input
 examples, real first-run execution behind the existing tool approval, and
 versioned deterministic input/run/output/tool evidence across every storage
-mode and the Agent run trace. Resume at R6.5 signed, versioned Agent/Worker
-import and export in
+mode and the Agent run trace. R6.5 adds the strict signed
+`packetagent.agent-worker-bundle/v1` transfer boundary: full portable Agent
+authoring, its deterministic Worker draft projection, RFC 8785/SHA-256
+digests, Ed25519 DSSE, explicit publisher-fingerprint trust, secret/local-state
+exclusion, reviewed preflight, and idempotent paused import. Resume at R6.6
+canonical-only legacy Agent execution after compatibility and migration proof
+in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r6---agent-authoring-and-execution-depth).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

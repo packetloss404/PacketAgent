@@ -1179,7 +1179,7 @@ R5 research, implementation decisions, and cumulative gate evidence live in
 
 ### R6 - Agent authoring and execution depth
 
-Status: in progress. R6.1-R6.4 are complete; resume at R6.5.
+Status: in progress. R6.1-R6.5 are complete; resume at R6.6.
 
 1. [Complete 2026-07-29] Wire the default SMTP transport through the
    vault-backed credential path. The Worker sender and TLS policy are
@@ -1213,7 +1213,16 @@ Status: in progress. R6.1-R6.4 are complete; resume at R6.5.
    SQLite, managed Postgres, Builder, Agent detail, and run traces. It makes no
    second model judge call. See
    [`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md).
-5. Add signed, versioned agent/Worker import and export.
+5. [Complete 2026-07-29] Add signed, versioned Agent/Worker import and export.
+   The strict `packetagent.agent-worker-bundle/v1` envelope carries the
+   complete portable authored Agent plus its deterministic canonical Worker
+   draft, binds canonical bytes and type through SHA-256 plus Ed25519 DSSE,
+   and classifies local/configured/untrusted publisher fingerprints. Export
+   strips local IDs, credentials, destinations, webhook authority, history,
+   and active state. Admin preflight exposes signature/trust and readiness;
+   idempotent import assigns fresh IDs, records digest/fingerprint provenance,
+   and always lands paused. See
+   [`r6-agent-worker-portability.md`](r6-agent-worker-portability.md).
 6. Consolidate legacy agent execution onto the canonical Worker lifecycle only
    after compatibility and migration tests prove no API regression.
 

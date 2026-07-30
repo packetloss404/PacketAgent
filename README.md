@@ -368,6 +368,7 @@ Common environment variables:
 | `PACKETAGENT_GENERATED_APP_PORT`                  | `8787`                     | Host port used by a generated publish package. The container always listens on `8080`.                                                                                                                |
 | `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY`        | _unset_                    | Optional HMAC-SHA256 key for generated-app manifest authenticity; must be at least 32 bytes. Per-file and canonical-manifest SHA-256 verification is always enabled.                                  |
 | `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID`     | `packetagent-local`        | Non-secret label recorded with an optional publish-manifest signature.                                                                                                                                |
+| `PACKETAGENT_AGENT_BUNDLE_TRUSTED_KEY_IDS`        | _unset_                    | Comma-separated SHA-256 SPKI fingerprints trusted for signed Agent–Worker imports. A cryptographically valid unlisted publisher requires explicit admin acknowledgement.                              |
 | `PACKETAGENT_ARTIFACT_SERVING_ENABLED`            | `false`                    | Opt in to artifact-file serving. Reads still require an authenticated viewer in the workspace that owns the exact run ID in the URL.                                                                  |
 | `PACKETAGENT_LEGACY_TEMPLATES`                    | _unset_                    | Set to `1` to force the legacy template path and skip the file-tree codegen orchestrator entirely. The previous opt-in flag `PACKETAGENT_FILETREE_CODEGEN=1` is preserved as a no-op for back-compat. |
 | `PACKETAGENT_PROVIDER_PRIORITY`                   | _unset_                    | Comma-separated provider override (e.g. `ollama,openrouter,anthropic`). Applied to every preset; first registered provider with a configured key wins.                                                |
@@ -410,7 +411,7 @@ returned by these routes.
 
 ## Engineering & testing
 
-PacketAgent is TypeScript ESM on Node >=22.5 with a React/Vite frontend. The code uses strict typechecking, dependency injection in many runtime boundaries, and feature directories for providers, tools, jobs, sandboxing, repositories, activation, codegen, and security. The inherited lint baseline currently contains 143 warnings and is tracked as cleanup debt.
+PacketAgent is TypeScript ESM on Node >=22.5 with a React/Vite frontend. The code uses strict typechecking, dependency injection in many runtime boundaries, and feature directories for providers, tools, jobs, sandboxing, repositories, activation, codegen, and security. The repository lint gate currently passes with zero warnings.
 
 The W8.3 validation ran **1,452 API tests** (1,451 passed, 1 skipped) plus **25 web tests** with no failures, covering separate retention windows, pre-persistence and read-boundary redaction, read-only dry runs, bounded tenant cleanup, terminal-only compaction, artifact deletion ports, idempotent tombstones, retention-explained gaps, and stable JSON/SQLite/managed-Postgres parity in addition to the W8.2 and prior Worker gates.
 
@@ -518,8 +519,21 @@ versioned evaluation records exact input matching, run success, non-empty
 redacted output, required successful tool calls, model identity, and review
 notes across JSON, SQLite, managed Postgres, Agent detail, and run traces. It
 does not make a second model call or claim an automatic semantic score.
+R6.5 adds a separate self-host portability contract rather than weakening the
+PacketADE-only `WorkerPackage v1` source boundary. A strict signed
+`packetagent.agent-worker-bundle/v1` download contains the complete portable
+Agent authoring plus its deterministic canonical Worker draft projection.
+RFC 8785 canonical bytes, SHA-256 digests, and Ed25519 DSSE bind the content
+and media type. Production derives the signing identity from `MASTER_KEY`;
+remote publisher fingerprints can be configured through
+`PACKETAGENT_AGENT_BUNDLE_TRUSTED_KEY_IDS`, and an otherwise valid publisher
+requires explicit admin acknowledgement. Export omits local IDs, credentials,
+provider destinations, webhook tokens, history, and active state. Import
+preflight exposes signature/trust and provider/tool readiness; the idempotent
+mutation assigns fresh IDs and always lands paused with a draft Worker
+projection. R6.6 still owns canonical-only Agent execution and migration.
 
-The exact resume point is R6.5 in [BACKLOG.md](BACKLOG.md), the sole ledger for
+The exact resume point is R6.6 in [BACKLOG.md](BACKLOG.md), the sole ledger for
 the conditional live W10 check and all remaining R6-R8 work. New Codex projects
 should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
 Phase 3 or legacy handoff documents.

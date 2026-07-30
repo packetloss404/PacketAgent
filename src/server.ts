@@ -15,6 +15,7 @@ import {
   createProviderAsync,
   createWorkspaceEnvVarAsync,
   deleteWorkspaceEnvVarByIdAsync,
+  exportAgentBundleAsync,
   generateAgentFromPromptAsync,
   getAgentAsync,
   getAgentRunDetailAsync,
@@ -29,6 +30,7 @@ import {
   listProvidersAsync,
   listReleaseHistoryAsync,
   listWorkspaceEnvVarsForUserAsync,
+  importAgentBundleAsync,
   retryAgentRun,
   recordRunAsPlaybookAsync,
   runAgent,
@@ -36,6 +38,7 @@ import {
   updateAgentAsync,
   updateProviderAsync,
   updateWorkspaceEnvVarAsync,
+  validateAgentBundleImportAsync,
 } from "./packetagent-services.js";
 import { requirePrivateWorkspaceRoleAsync } from "./rbac.js";
 import { appRoutes } from "./app-routes.js";
@@ -84,6 +87,7 @@ import { workerOperatorRoutes } from "./worker-operator-routes.js";
 import { workerPackageRoutes } from "./worker-package-routes.js";
 import { workerPackageEventRoutes } from "./worker-package-event-routes.js";
 import { packetProductCallbackRoutes } from "./packet-product-callback-routes.js";
+import { AGENT_WORKER_BUNDLE_MAX_BYTES } from "./agents/portable-bundle.js";
 import {
   ALERTS_EVALUATE_JOB_TYPE,
   ensureAlertsCronJobAsync,
@@ -251,6 +255,50 @@ app.post("/api/app/agents/generate-from-prompt", async (c) => {
         body.sampleInputs && typeof body.sampleInputs === "object" ? body.sampleInputs : undefined,
     });
     return c.json(result, result.created ? 201 : 200);
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+app.post("/api/app/agents/import/validate", async (c) => {
+  try {
+    const body = await readAgentBundleBody(c, false);
+    return c.json(
+      await validateAgentBundleImportAsync(
+        await requirePrivateWorkspaceRoleAsync(c, "admin"),
+        body.bundle,
+      ),
+    );
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+app.post("/api/app/agents/import", async (c) => {
+  try {
+    const body = await readAgentBundleBody(c, true);
+    return c.json(
+      await importAgentBundleAsync(await requirePrivateWorkspaceRoleAsync(c, "admin"), {
+        bundle: body.bundle,
+        acknowledgeUntrustedPublisher: body.acknowledgeUntrustedPublisher === true,
+        idempotencyKey: c.req.header("Idempotency-Key") ?? "",
+      }),
+      201,
+    );
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+app.get("/api/app/agents/:agentId/export", async (c) => {
+  try {
+    const exported = await exportAgentBundleAsync(
+      await requirePrivateWorkspaceRoleAsync(c, "admin"),
+      c.req.param("agentId"),
+    );
+    c.header("Cache-Control", "no-store");
+    c.header("Content-Disposition", `attachment; filename="${exported.fileName}"`);
+    return c.json(exported.bundle);
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -867,6 +915,54 @@ async function readJsonBody(c: Context): Promise<Record<string, unknown>> {
   } catch {
     throw Object.assign(new Error("request body must be valid JSON"), { status: 400 });
   }
+}
+
+async function readAgentBundleBody(
+  c: Context,
+  allowAcknowledgement: boolean,
+): Promise<Record<string, unknown>> {
+  const contentType = c.req.header("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw Object.assign(new Error("request body must use application/json"), { status: 415 });
+  }
+  const text = await c.req.text();
+  if (Buffer.byteLength(text, "utf8") > AGENT_WORKER_BUNDLE_MAX_BYTES + 4_096) {
+    throw Object.assign(new Error("Agent bundle request exceeds the bounded import limit"), {
+      status: 413,
+    });
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw Object.assign(new Error("request body must be valid JSON"), { status: 400 });
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw Object.assign(new Error("request body must be a JSON object"), { status: 400 });
+  }
+  const body = value as Record<string, unknown>;
+  const allowed = new Set([
+    "bundle",
+    ...(allowAcknowledgement ? ["acknowledgeUntrustedPublisher"] : []),
+  ]);
+  const unexpected = Object.keys(body).find((key) => !allowed.has(key));
+  if (unexpected) {
+    throw Object.assign(new Error(`request field ${unexpected} is not allowed`), { status: 400 });
+  }
+  if (!Object.hasOwn(body, "bundle")) {
+    throw Object.assign(new Error("request field bundle is required"), { status: 400 });
+  }
+  if (
+    allowAcknowledgement &&
+    body.acknowledgeUntrustedPublisher !== undefined &&
+    typeof body.acknowledgeUntrustedPublisher !== "boolean"
+  ) {
+    throw Object.assign(
+      new Error("request field acknowledgeUntrustedPublisher must be a boolean"),
+      { status: 400 },
+    );
+  }
+  return body;
 }
 
 function isEnvTruthy(value: string | undefined): boolean {

@@ -67,6 +67,10 @@ test("canonical package JSON uses deterministic code-unit ordering and strict I-
     () => canonicalWorkerPackageJson({ invalid: "\ud800" }),
     /unpaired Unicode surrogate/i,
   );
+  assert.throws(
+    () => canonicalWorkerPackageJson({ amount: -0 }),
+    /must not contain negative zero/i,
+  );
 });
 
 test("unknown WorkerPackage major versions and unexpected secret fields fail closed", async () => {

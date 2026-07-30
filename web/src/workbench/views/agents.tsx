@@ -1,36 +1,124 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { I } from "../icons";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
+import { useWorkbench } from "../workbench-state";
 import { api } from "@/lib/api";
-import type { AgentRecord, GeneratedAppSummary } from "@/lib/types";
+import { canManageWorkspaceRole } from "@/lib/roles";
+import type { AgentBundleImportPreview, AgentRecord, GeneratedAppSummary } from "@/lib/types";
 
 const EMPTY_AGENTS: AgentRecord[] = [];
 const EMPTY_APPS: GeneratedAppSummary[] = [];
 
 export function AgentsView() {
   const navigate = useNavigate();
+  const role = useWorkbench().session.workspace.role;
+  const canManageAgents = canManageWorkspaceRole(role);
   const [tab, setTab] = useState<"projects" | "templates">("projects");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importBundle, setImportBundle] = useState<unknown>(null);
+  const [importPreview, setImportPreview] = useState<AgentBundleImportPreview | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [acknowledgePublisher, setAcknowledgePublisher] = useState(false);
+
+  const chooseImport = () => {
+    setImportError(null);
+    fileInputRef.current?.click();
+  };
+
+  const readImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImportBusy(true);
+    setImportError(null);
+    setImportPreview(null);
+    setAcknowledgePublisher(false);
+    try {
+      if (file.size > 512 * 1024) {
+        throw new Error("Agent bundle exceeds the 512 KiB import limit.");
+      }
+      const parsed: unknown = JSON.parse(await file.text());
+      const preview = await api.validateAgentBundleImport(parsed);
+      setImportBundle(parsed);
+      setImportPreview(preview);
+    } catch (error) {
+      setImportBundle(null);
+      setImportError((error as Error).message);
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
+  const applyImport = async () => {
+    if (!importPreview || importBundle === null) return;
+    setImportBusy(true);
+    setImportError(null);
+    try {
+      const result = await api.importAgentBundle({
+        bundle: importBundle,
+        acknowledgeUntrustedPublisher: acknowledgePublisher,
+        idempotencyKey: globalThis.crypto?.randomUUID?.() ?? `agent-import-${Date.now()}`,
+      });
+      setImportPreview(null);
+      setImportBundle(null);
+      navigate(`/agents/${result.agent.id}`);
+    } catch (error) {
+      setImportError((error as Error).message);
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
+  const closeImport = () => {
+    if (importBusy) return;
+    setImportBundle(null);
+    setImportPreview(null);
+    setImportError(null);
+    setAcknowledgePublisher(false);
+  };
 
   return (
     <>
       <Topbar
         crumbs={["__WS__", "Projects"]}
         actions={
-          <button
-            type="button"
-            className="top-btn"
-            style={{
-              background: "var(--green)",
-              color: "#0E1A02",
-              borderColor: "var(--green)",
-              fontWeight: 600,
-            }}
-            onClick={() => navigate("/builder")}
-          >
-            <I.plus size={13} /> New build
-          </button>
+          <>
+            {canManageAgents && (
+              <button
+                type="button"
+                className="top-btn"
+                onClick={chooseImport}
+                disabled={importBusy}
+              >
+                <I.upload size={13} /> {importBusy ? "Checking…" : "Import agent"}
+              </button>
+            )}
+            <button
+              type="button"
+              className="top-btn"
+              style={{
+                background: "var(--green)",
+                color: "#0E1A02",
+                borderColor: "var(--green)",
+                fontWeight: 600,
+              }}
+              onClick={() => navigate("/builder")}
+            >
+              <I.plus size={13} /> New build
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={(event) => {
+                void readImport(event);
+              }}
+              hidden
+            />
+          </>
         }
       />
 
@@ -55,7 +143,189 @@ export function AgentsView() {
 
       {tab === "projects" && <ProjectsCatalog onOpenAgent={(a) => navigate(`/agents/${a.id}`)} />}
       {tab === "templates" && <AgentTemplates onCreated={(a) => navigate(`/agents/${a.id}`)} />}
+      {(importPreview || importError) && (
+        <AgentImportDialog
+          preview={importPreview}
+          error={importError}
+          busy={importBusy}
+          acknowledgePublisher={acknowledgePublisher}
+          onAcknowledgePublisher={setAcknowledgePublisher}
+          onImport={() => {
+            void applyImport();
+          }}
+          onClose={closeImport}
+        />
+      )}
     </>
+  );
+}
+
+export function AgentImportDialog({
+  preview,
+  error,
+  busy,
+  acknowledgePublisher,
+  onAcknowledgePublisher,
+  onImport,
+  onClose,
+}: {
+  preview: AgentBundleImportPreview | null;
+  error: string | null;
+  busy: boolean;
+  acknowledgePublisher: boolean;
+  onAcknowledgePublisher: (value: boolean) => void;
+  onImport: () => void;
+  onClose: () => void;
+}) {
+  const needsAcknowledgement = preview?.publisher.acknowledgementRequired === true;
+  return (
+    <div
+      role="presentation"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 80,
+        background: "rgba(4, 8, 12, 0.78)",
+        display: "grid",
+        placeItems: "center",
+        padding: 24,
+      }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agent-import-title"
+        className="card"
+        style={{ width: "min(620px, 100%)", padding: 20 }}
+      >
+        <div className="kicker">SIGNED AGENT–WORKER BUNDLE</div>
+        <h2 id="agent-import-title" className="h2" style={{ marginTop: 5 }}>
+          {preview ? `Import ${preview.agent.name}` : "Agent import failed"}
+        </h2>
+        {error && (
+          <div
+            className="mono"
+            style={{
+              marginTop: 14,
+              padding: 12,
+              fontSize: 11.5,
+              color: "var(--danger)",
+              border: "1px solid rgba(242,107,92,0.3)",
+              borderRadius: 6,
+            }}
+          >
+            {error}
+          </div>
+        )}
+        {preview && (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 10,
+                marginTop: 16,
+              }}
+            >
+              <ImportFact label="Import state" value="paused" />
+              <ImportFact label="Worker state" value="draft projection" />
+              <ImportFact
+                label="Provider"
+                value={
+                  preview.readiness.provider.status === "resolved"
+                    ? (preview.readiness.provider.providerName ?? "resolved")
+                    : "setup required"
+                }
+              />
+              <ImportFact
+                label="Configuration"
+                value={`${preview.agent.toolCount} tools · ${preview.agent.inputCount} inputs`}
+              />
+            </div>
+            <div style={{ marginTop: 14, fontSize: 12 }}>
+              <div className="muted" style={{ marginBottom: 5 }}>
+                Publisher fingerprint
+              </div>
+              <div
+                className="mono"
+                style={{
+                  fontSize: 10.5,
+                  overflowWrap: "anywhere",
+                  color: preview.publisher.trust === "untrusted" ? "var(--warn)" : "var(--green)",
+                }}
+              >
+                {preview.publisher.keyId} · signature verified · {preview.publisher.trust}
+              </div>
+            </div>
+            {preview.readiness.missingTools.length > 0 && (
+              <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
+                Tool setup required after import: {preview.readiness.missingTools.join(", ")}
+              </p>
+            )}
+            <p className="muted" style={{ fontSize: 12, lineHeight: 1.5, marginTop: 14 }}>
+              New local IDs will be assigned. Credentials, webhook tokens, run history, and active
+              schedules are never imported.
+            </p>
+            {needsAcknowledgement && (
+              <label
+                style={{
+                  display: "flex",
+                  gap: 9,
+                  alignItems: "flex-start",
+                  marginTop: 14,
+                  fontSize: 12,
+                  color: "var(--silver-200)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={acknowledgePublisher}
+                  onChange={(event) => onAcknowledgePublisher(event.target.checked)}
+                />
+                I obtained this bundle from a source I trust and acknowledge the unconfigured
+                publisher fingerprint above.
+              </label>
+            )}
+          </>
+        )}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
+          <button type="button" className="btn btn-sm" onClick={onClose} disabled={busy}>
+            Close
+          </button>
+          {preview && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{
+                background: "var(--green)",
+                color: "#0E1A02",
+                borderColor: "var(--green)",
+              }}
+              onClick={onImport}
+              disabled={busy || (needsAcknowledgement && !acknowledgePublisher)}
+            >
+              {busy ? "Importing…" : "Import paused agent"}
+            </button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ImportFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ border: "1px solid var(--line-2)", borderRadius: 6, padding: "9px 10px" }}>
+      <div className="muted" style={{ fontSize: 10 }}>
+        {label}
+      </div>
+      <div className="mono" style={{ fontSize: 11.5, marginTop: 3 }}>
+        {value}
+      </div>
+    </div>
   );
 }
 

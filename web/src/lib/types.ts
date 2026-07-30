@@ -352,6 +352,53 @@ export interface AgentRecord {
   archivedAt?: string;
 }
 
+export interface AgentBundleImportPreview {
+  schemaVersion: "packetagent.agent-worker-bundle/v1";
+  bundleDigest: string;
+  agent: {
+    name: string;
+    triggerKind: AgentTriggerKind;
+    schedule?: string;
+    toolCount: number;
+    inputCount: number;
+  };
+  worker: {
+    contentDigest: string;
+    status: "draft";
+  };
+  publisher: {
+    keyId: string;
+    trust: "local" | "configured" | "untrusted";
+    signatureVerified: true;
+    acknowledgementRequired: boolean;
+  };
+  readiness: {
+    provider: {
+      status: "resolved" | "needs_setup";
+      hint?: {
+        kind: ProviderKind;
+        name: string;
+      };
+      providerId?: string;
+      providerName?: string;
+    };
+    missingTools: string[];
+  };
+  importPolicy: {
+    status: "paused";
+    credentialsIncluded: false;
+    webhookTokenIncluded: false;
+    runHistoryIncluded: false;
+    localIdsIncluded: false;
+  };
+}
+
+export interface AgentBundleImportResult {
+  agent: AgentRecord;
+  replayed: boolean;
+  preview: AgentBundleImportPreview;
+}
+
 export interface AgentRunToolCall {
   id: string;
   toolName: string;

@@ -76,6 +76,7 @@ export function AgentEditorView() {
   const [recordingRunId, setRecordingRunId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -253,6 +254,27 @@ export function AgentEditorView() {
       setError((e as Error).message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const exportBundle = async () => {
+    if (!agent || !canManageAgent) return;
+    setExporting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const exported = await api.downloadAgentBundle(agent.id);
+      const url = URL.createObjectURL(exported.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = exported.fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage("Signed Agent–Worker bundle exported.");
+    } catch (exportError) {
+      setError((exportError as Error).message);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -498,6 +520,18 @@ export function AgentEditorView() {
                 )}{" "}
                 {firstRunEvaluationPending ? "Evaluate first run" : "Run now"}
               </button>
+              {canManageAgent && (
+                <button
+                  type="button"
+                  className="top-btn"
+                  onClick={() => {
+                    void exportBundle();
+                  }}
+                  disabled={saving || exporting}
+                >
+                  <I.download size={13} /> {exporting ? "Exporting…" : "Export"}
+                </button>
+              )}
               {canManageAgent && (
                 <button
                   type="button"

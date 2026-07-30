@@ -1079,6 +1079,36 @@ Required container-hardening verification:
    `verify:sandbox-policy`, `verify:sandbox-egress`,
    `verify:preview-isolation`, and `verify:container-hardening`.
 
+Required Agent–Worker portability verification:
+
+1. Run `npm run verify:agent-portability`. Confirm all eight assertions and
+   the top-level `ok` field are `true`. This gate makes no network call.
+2. As an admin, open an existing Agent and choose **Export**. Confirm the
+   downloaded name ends in `.packetagent-agent.json`, the schema is
+   `packetagent.agent-worker-bundle/v1`, and it contains SHA-256 Agent-bundle
+   and Worker-content digests plus one Ed25519 DSSE signature.
+3. Search the JSON for the source workspace ID, user ID, Agent ID, provider ID,
+   webhook token, provider base URL, run output, and any known credential
+   value. None may be present.
+4. In **Projects**, choose **Import agent** and select the file. Confirm
+   preflight shows signature verification, the publisher fingerprint,
+   provider/tool readiness, `paused` Agent state, and `draft` Worker state
+   before enabling the mutation.
+5. Import the file. Confirm the Agent receives fresh local IDs, retains memory,
+   input examples, evaluation expectations, playbook, trigger, and schedule,
+   but is paused and has no webhook token, credentials, runs, or scheduled
+   execution.
+6. Move a file from another installation. Confirm an unconfigured publisher
+   keeps the import button disabled until the displayed fingerprint is
+   explicitly acknowledged. To pre-trust a verified publisher, add the exact
+   fingerprint to `PACKETAGENT_AGENT_BUNDLE_TRUSTED_KEY_IDS` and restart.
+7. Change any signed Agent or Worker field without resealing. Confirm preflight
+   rejects the file. Add an unknown field or change the major schema version
+   and confirm it also fails before creating an Agent.
+8. Repeat an import request with the same `Idempotency-Key` and exact bundle;
+   it must return the first imported Agent. Reuse that key with another valid
+   bundle and confirm it returns a conflict.
+
 ## Operations Sanity
 
 1. Visit `/operations`.

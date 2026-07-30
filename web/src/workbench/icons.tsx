@@ -111,6 +111,16 @@ export const I = {
       <path d="M12 19V5M6 11l6-6 6 6" />
     </Icon>
   ),
+  upload: (p: P) => (
+    <Icon {...p}>
+      <path d="M12 16V4M7 9l5-5 5 5M5 20h14" />
+    </Icon>
+  ),
+  download: (p: P) => (
+    <Icon {...p}>
+      <path d="M12 4v12M7 11l5 5 5-5M5 20h14" />
+    </Icon>
+  ),
   chevDown: (p: P) => (
     <Icon {...p}>
       <path d="M6 9l6 6 6-6" />

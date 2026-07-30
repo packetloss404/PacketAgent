@@ -57,6 +57,9 @@ export {
   listAgents,
   listAgentsAsync,
   getAgent,
+  exportAgentBundleAsync,
+  validateAgentBundleImportAsync,
+  importAgentBundleAsync,
   generateAgentDraftFromPrompt,
   generateAgentFromPromptAsync,
   getAgentAsync,
@@ -104,6 +107,8 @@ export {
 
 export type {
   AgentDraftOptions,
+  AgentBundleImportPreview,
+  ImportAgentBundleInput,
   AgentDraftInput,
   AgentDraftPlanItem,
   AgentDraft,

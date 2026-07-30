@@ -206,6 +206,16 @@ Prompt-to-app generation remains a supported secondary capability.
   model identity, and operator-review notes without a second model judge call.
   JSON, SQLite, and managed Postgres plus Builder, Agent detail, and run traces
   preserve the evidence.
+- Completed R6.5's signed Agent–Worker portability boundary. The strict v1
+  envelope carries portable Agent authoring plus its deterministic canonical
+  Worker draft, binds RFC 8785 bytes and media type with SHA-256 and Ed25519
+  DSSE, and exposes local/configured/untrusted publisher fingerprints. Export
+  omits all install-local IDs, credentials, provider destinations, webhook
+  authority, history, and active state. Admin preflight verifies the entire
+  envelope and shows provider/tool readiness; idempotent import assigns fresh
+  IDs, records digest/fingerprint audit provenance, and always lands paused.
+  `npm run verify:agent-portability` is the offline executable gate. Design
+  evidence lives in `dev/r6-agent-worker-portability.md`.
 
 ## Current implementation truth
 
@@ -340,7 +350,8 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R6.5 - signed, versioned Agent/Worker import and export** in
+Continue **R6.6 - canonical-only legacy Agent execution after compatibility
+and migration proof** in
 [`../BACKLOG.md#r6---agent-authoring-and-execution-depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth).
 `BACKLOG.md` is the single ledger for every remaining R6-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
@@ -834,9 +845,21 @@ second-model score. `npm run verify:agent-first-run` certifies seven assertions
 without network calls. Research and decisions are recorded in
 [`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md).
 
-The exact next slice is R6.5 under
+R6.5 is complete. The strict signed Agent–Worker bundle carries portable Agent
+authoring plus its deterministic Worker draft while excluding local IDs,
+credentials, network destinations, webhook authority, history, and active
+state. RFC 8785/SHA-256/Ed25519 DSSE verification and publisher-fingerprint
+trust happen before any write. Admin import is preflighted, explicitly
+acknowledges an unconfigured publisher, is idempotent, assigns fresh IDs, emits
+an audit receipt, and always lands paused. `npm run verify:agent-portability`
+certifies eight assertions without network calls. Research and decisions are
+recorded in
+[`r6-agent-worker-portability.md`](r6-agent-worker-portability.md).
+
+The exact next slice is R6.6 under
 [`R6 - agent authoring and execution depth`](../BACKLOG.md#r6---agent-authoring-and-execution-depth):
-add signed, versioned Agent/Worker import and export.
+consolidate legacy Agent execution onto canonical Workers only after
+compatibility and migration tests pass.
 After each gate passes, continue through R6-R8 using that backlog's unchecked
 checklists; use the loop document only for execution mechanics. Historical
 D/phase/track documents have been reconciled there and must not be resumed
@@ -853,6 +876,8 @@ independently.
 - W8 observability/evidence decisions: [`worker-observability-plan.md`](worker-observability-plan.md)
 - R6.4 first-run evaluation decisions:
   [`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md)
+- R6.5 signed portability decisions:
+  [`r6-agent-worker-portability.md`](r6-agent-worker-portability.md)
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
 - Verification: [`TESTING.md`](TESTING.md)
 - Shipped history: [`../CHANGELOG.md`](../CHANGELOG.md)
@@ -870,9 +895,18 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,639 passed, 3 intentionally skipped live probes, 0
-  failed (1,642 total)
-- `npm run test:web` - 37 passed, 0 failed
+- `npm run test:api` - 1,644 passed, 3 intentionally skipped live probes, 0
+  failed (1,647 total)
+- `npm run test:web` - 39 passed, 0 failed
+- focused R6.5 canonical JSON, WorkerPackage compatibility, strict
+  Agent–Worker bundle, Ed25519/DSSE, tamper and signer substitution,
+  export/preflight/import, paused safety, publisher acknowledgement,
+  idempotency, secret-export refusal, and workbench review gate - 11 passed, 0
+  failed
+- `npm run verify:agent-portability` - all 8 versioned-envelope,
+  canonical-digest, exact-DSSE, authoring-depth, Worker-projection,
+  local-state-exclusion, explicit-trust, and tamper-failure assertions passed
+  without a live provider, tool, or network call
 - focused R6.4 memory, input-example, real first-run, approval, deterministic
   evidence, redaction, trace, SQLite repository/dual-write/backfill,
   managed-Postgres, route, and UI utility gate - 81 passed, 0 failed
