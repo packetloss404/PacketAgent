@@ -51,5 +51,5 @@ entered through the workbench use the encrypted vault.
 **Which provider should I pick?** Anthropic (Claude) is the smoothest. OpenAI works too. If you want everything free and local, install [Ollama](https://ollama.com) and use that - no key needed.
 
 **Something went wrong.** Read the message in the terminal - it usually tells
-you exactly what to do. The project README has the long version. For a new Codex
-project, use [`../dev/CODEX-HANDOFF.md`](../dev/CODEX-HANDOFF.md).
+you exactly what to do. The project README has the long version. For a new
+working session, use [`../HANDOFF.md`](../HANDOFF.md).

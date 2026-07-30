@@ -5,8 +5,10 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **R7 - Builder and frontend maintainability**. Repository/session state
-for a new Codex project lives in [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
+Current active loop: **R7 - Builder and frontend maintainability**. The short
+repository/session resume point lives in [`../HANDOFF.md`](../HANDOFF.md);
+the detailed implementation ledger is
+[`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
 complete. W6.5 closes the adversarial bypass gate across every registered tool.

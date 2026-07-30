@@ -63,7 +63,8 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [CLOUD.md](CLOUD.md) inventories the hosted-only capabilities PacketAgent intentionally does not ship as self-host, and what a hypothetical PacketAgent Cloud product would need to ship them.
 - [CHANGELOG.md](CHANGELOG.md) records notable product and platform changes.
 - [BACKLOG.md](BACKLOG.md) is the single implementation ledger for all remaining autonomous-worker and inherited platform work.
-- [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md) is the authoritative state and resume point for a new Codex project.
+- [HANDOFF.md](HANDOFF.md) is the short, exact resume point for a new working session.
+- [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md) retains the detailed implementation inventory and verification history.
 - [dev/worker-implementation-loops.md](dev/worker-implementation-loops.md) turns W2-W10 and the inherited backlog into dependency-ordered implementation and verification loops.
 - [dev/packetade-packetagent-handoff.md](dev/packetade-packetagent-handoff.md) defines the versioned WorkerPackage v1 contract and PacketADE deployment lifecycle.
 - [dev/taskloom-to-packetagent.md](dev/taskloom-to-packetagent.md) records rename compatibility and repository migration details.
@@ -72,6 +73,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [dev/persistence-authority.md](dev/persistence-authority.md) records the physical authority, migration stages, and compatibility-facade decision for every control-plane store mode.
 - [dev/r2-provider-policy.md](dev/r2-provider-policy.md) records the researched provider capability, structured-output, correction, vault, and readiness contract.
 - [dev/r6-smtp-transport.md](dev/r6-smtp-transport.md) records the vault-backed SMTP trust boundary, configuration contract, research, and executable verification.
+- [dev/r7-frontend-maintainability.md](dev/r7-frontend-maintainability.md) records the measured frontend/route decomposition audit and executable R7.1 subloops.
 - [dev/roadmap.md](dev/roadmap.md) captures the broader roadmap after the MVP path is reliable.
 - [Canonical Worker implementation report](output/pdf/packetagent-worker-implementation-report.pdf) is the committed pre-W10.3 pause snapshot summarizing W1-W10.2 and its verification.
 - [Packet suite integration reality check](output/pdf/packet-suite-integration-reality-check.pdf) is the matching pre-W10.3 snapshot separating PacketAgent-side work from changes required in the other Packet repositories.
@@ -537,10 +539,12 @@ execution. Agent run APIs now read a linked compatibility projection over the
 Worker run, while checkpoints, action approvals, effects, budgets, events,
 evidence, control, and terminal state remain canonical Worker authority.
 
-The exact resume point is R7.1 in [BACKLOG.md](BACKLOG.md), the sole ledger for
-the conditional live W10 check and all remaining R7-R8 work. New Codex projects
-should begin with [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md), not the archived
-Phase 3 or legacy handoff documents.
+The exact resume point is R7.1a in [HANDOFF.md](HANDOFF.md): continue the
+controlled Agent editor decomposition, then work through the measured Builder
+route, app Builder, Agent Builder, and Settings seams. [BACKLOG.md](BACKLOG.md)
+remains the sole ledger for the conditional live W10 check and all remaining
+R7-R8 work. New working sessions should begin with the root handoff, not the
+archived Phase 3 or legacy handoff documents.
 
 For current product changes, see [CHANGELOG.md](CHANGELOG.md). The repository is
 published at `git@github.com:packetloss404/PacketAgent.git`; a website, issue

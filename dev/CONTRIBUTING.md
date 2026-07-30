@@ -1,8 +1,10 @@
 # Contributing to PacketAgent
 
-PacketAgent is MIT-licensed and self-hosted. The new repository remote has not
-been created yet, so this guide describes local contribution flow. Start with
-[`CODEX-HANDOFF.md`](CODEX-HANDOFF.md) when opening a new Codex project.
+PacketAgent is MIT-licensed and self-hosted. The canonical repository is
+`git@github.com:packetloss404/PacketAgent.git`. Start with the root
+[`HANDOFF.md`](../HANDOFF.md) when opening a new working session; use
+[`CODEX-HANDOFF.md`](CODEX-HANDOFF.md) for the detailed implementation
+inventory.
 
 ## Getting started
 

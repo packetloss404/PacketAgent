@@ -5,17 +5,20 @@ PacketAgent was created from the full TaskLoom Git history on 2026-07-27. The or
 ## Repository state
 
 - New working directory: `D:\projects\PacketAgent`
-- Foundation branch: `codex/packetagent-foundation`
+- Primary branch: `main`
 - Historical source remote: `taskloom-source`
-- Future PacketAgent remote: not configured yet
+- PacketAgent remote: `origin` at
+  `git@github.com:packetloss404/PacketAgent.git`
 
 All committed local TaskLoom branches and worktrees were already ancestors of TaskLoom `main`. One uncommitted Builder viewport/grid fix was reviewed and carried into the PacketAgent foundation branch.
 
 The historical source remote is deliberately not named `origin`, which prevents an accidental PacketAgent push to the TaskLoom repository.
 
-When opening the renamed repository as a new Codex project, continue from
-[`CODEX-HANDOFF.md`](CODEX-HANDOFF.md). Do not reconstruct state from the
-original TaskLoom checkout or archived handoff documents.
+When opening the renamed repository in a new working session, continue from
+the root [`HANDOFF.md`](../HANDOFF.md), then consult
+[`CODEX-HANDOFF.md`](CODEX-HANDOFF.md) for detailed evidence. Do not
+reconstruct state from the original TaskLoom checkout or archived handoff
+documents.
 
 ## Runtime compatibility
 

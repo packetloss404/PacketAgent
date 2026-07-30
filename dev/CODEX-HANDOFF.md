@@ -1093,11 +1093,11 @@ git remote -v
 npm run typecheck
 ```
 
-Expected branch: `codex/packetagent-foundation`.
+Expected branch after the 2026-07-30 handoff merge: `main`.
 
 Expected remotes: PacketAgent `origin` and the read-only historical
 `taskloom-source`.
 
-Expected status after the latest pushed R6.6 checkpoint: clean. Stop if the active folder is
-`D:\projects\taskloom`, the foundation commit is absent, or unrelated changes
-appear unexpectedly.
+Expected status after the root `HANDOFF.md` checkpoint: clean. Stop if the
+active folder is `D:\projects\taskloom`, the foundation commit is absent, or
+unrelated changes appear unexpectedly.

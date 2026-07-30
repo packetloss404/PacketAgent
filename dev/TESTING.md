@@ -123,7 +123,8 @@ Last automated W10.4 baseline (2026-07-28):
 - Production web build: passed
 - ESLint: 0 errors, 145 inherited warnings
 
-See [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md) for the full repository state.
+See [`../HANDOFF.md`](../HANDOFF.md) for the exact resume point and
+[`CODEX-HANDOFF.md`](CODEX-HANDOFF.md) for the full repository state.
 
 Estimated time: 25-35 minutes for a full pass; about 10 minutes for the golden path.
 

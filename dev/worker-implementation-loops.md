@@ -44,10 +44,10 @@ When a loop is active:
    command changes.
 5. Commit a reviewable slice or tightly coupled pair of slices. Do not combine
    unrelated inherited cleanup with a Worker loop.
-6. Run the full loop gate. If it passes, update `BACKLOG.md`,
-   `dev/roadmap.md`, `dev/CODEX-HANDOFF.md`, public truth in `README.md`, and
-   shipped history in `CHANGELOG.md`; commit the gate; then continue to the
-   next loop.
+6. Run the full loop gate. If it passes, update `BACKLOG.md`, the short
+   `HANDOFF.md`, `dev/roadmap.md`, `dev/CODEX-HANDOFF.md`, public truth in
+   `README.md`, and shipped history in `CHANGELOG.md`; commit the gate; then
+   continue to the next loop.
 7. Never push to `taskloom-source`. Publish PacketAgent commits only to the
    confirmed `origin` remote.
 

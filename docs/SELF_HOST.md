@@ -605,7 +605,7 @@ Both stop short of deleting generated app workspaces under `data/generated-apps/
 
 ## What's next
 
-- When moving to a new Codex project, start with [dev/CODEX-HANDOFF.md](../dev/CODEX-HANDOFF.md).
+- When moving to a new working session, start with [HANDOFF.md](../HANDOFF.md).
 - Read [dev/roadmap.md](../dev/roadmap.md) for current product direction.
 - Read [CLOUD.md](../CLOUD.md) to understand what self-host intentionally does not do, and what a hypothetical PacketAgent Cloud product would have to own.
 - Read [BACKLOG.md](../BACKLOG.md) for W1-W10 and the inherited lower-priority backlog.

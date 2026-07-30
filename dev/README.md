@@ -6,7 +6,8 @@ Documentation for people working on PacketAgent - self-hosters running a node, c
 
 | Path                                                                   | Audience     | Purpose                                                                                                                      |
 | ---------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md)                                 | Contributors | Authoritative state and resume point when opening a new Codex project.                                                       |
+| [`../HANDOFF.md`](../HANDOFF.md)                                       | Contributors | Short, exact resume point for a new working session.                                                                         |
+| [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md)                                 | Contributors | Detailed implementation inventory and verification history.                                                                  |
 | [`roadmap.md`](roadmap.md)                                             | Everyone     | Current state and what's next. No commitments - priority is set by issue activity.                                           |
 | [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md) | Contributors | Versioned deployment and event contract between PacketADE and PacketAgent.                                                   |
 | [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)             | Operators    | Rename, repository, environment, and data-file compatibility notes.                                                          |
@@ -22,12 +23,14 @@ Start with the [top-level README getting-started section](../README.md#getting-s
 ## For contributors
 
 Read [`../AGENTS.md`](../AGENTS.md),
+[`../HANDOFF.md`](../HANDOFF.md),
 [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md), and
 [`CONTRIBUTING.md`](CONTRIBUTING.md) first. They cover autonomous-worker
 invariants, current repository state, naming, startup, tests, and code
-conventions. The PacketAgent GitHub repository has not been configured yet.
-Until an `origin` exists, use `BACKLOG.md` for coordination and treat GitHub
-URLs in historical documents as intended future locations.
+conventions. Publish PacketAgent work only to
+`git@github.com:packetloss404/PacketAgent.git`; the `taskloom-source` remote is
+historical and read-only by convention. Use `BACKLOG.md` for implementation
+coordination.
 
 ## For releases
 
@@ -45,7 +48,7 @@ work but are not active plans:
 - `../REPO_REVIEW.md`
 - `../REPO_REVIEW_NOTES.md`
 
-Use the current Codex handoff, roadmap, and backlog instead.
+Use the root handoff, detailed Codex handoff, roadmap, and backlog instead.
 
 ## Conventions
 
