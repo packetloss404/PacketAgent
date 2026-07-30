@@ -225,6 +225,14 @@ Prompt-to-app generation remains a supported secondary capability.
   managed Postgres preserve the canonical links. `npm run
 verify:agent-canonical-execution` is the offline executable gate. Design and
   implementation evidence lives in `dev/r6-agent-canonical-execution.md`.
+- Started R7.1 with a measured decomposition audit and the first Agent editor
+  seam. Typed launch/playbook/approval helpers and run/evaluation/tool-call
+  presenters now have focused modules and six characterization tests; the
+  existing presenter exports remain compatible. The source view fell from
+  2,443 to 2,095 lines while parent-owned state and API behavior stayed
+  unchanged. Typecheck, zero-warning lint, formatting, and 45 web tests pass.
+  Exact subloops and research links live in
+  `dev/r7-frontend-maintainability.md`.
 
 ## Current implementation truth
 
@@ -358,8 +366,8 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R7.1 - split remaining oversized views and route modules along
-established feature seams** in
+Continue **R7.1a - extract the Agent editor's controlled approval, playbook,
+tool, memory, input, and run-history components, then its controller state** in
 [`../BACKLOG.md#r7---builder-and-frontend-maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability).
 `BACKLOG.md` is the single ledger for every remaining R7-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
@@ -876,8 +884,9 @@ provider, tool, or network call. Research and decisions are recorded in
 
 The exact next slice is R7.1 under
 [`R7 - Builder and frontend maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability):
-split remaining oversized views and route modules along established feature
-seams.
+finish the Agent editor controlled-component/controller split, then continue
+through the audited Builder route, app Builder, Agent Builder, and Settings
+seams in [`r7-frontend-maintainability.md`](r7-frontend-maintainability.md).
 After each gate passes, continue through R7-R8 using that backlog's unchecked
 checklists; use the loop document only for execution mechanics. Historical
 D/phase/track documents have been reconciled there and must not be resumed

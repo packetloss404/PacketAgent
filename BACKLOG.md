@@ -583,7 +583,9 @@ verify:agent-canonical-execution` certifies the eight-part boundary without
 
 ### R7 - Builder and frontend maintainability
 
-Status: in progress. Resume at R7.1.
+Status: in progress. R7.1 audit and Agent editor decomposition are underway;
+resume at the controlled editor components in
+[`dev/r7-frontend-maintainability.md`](dev/r7-frontend-maintainability.md).
 
 - [ ] Split remaining oversized views and routes along established seams.
 - [ ] Add shared accessible loading/error/empty boundaries and keyboard-safe
