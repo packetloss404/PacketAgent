@@ -583,12 +583,11 @@ verify:agent-canonical-execution` certifies the eight-part boundary without
 
 ### R7 - Builder and frontend maintainability
 
-Status: in progress. R7.1a-R7.1d Agent editor, Builder route, App Builder, and
-Agent Builder decomposition are complete; resume at R7.1e Settings view
-decomposition in
+Status: in progress. R7.1's five-module ownership audit is complete; resume at
+R7.2 accessible state boundaries and keyboard-safe primitives in
 [`dev/r7-frontend-maintainability.md`](dev/r7-frontend-maintainability.md).
 
-- [ ] Split remaining oversized views and routes along established seams.
+- [x] Split remaining oversized views and routes along established seams.
 - [ ] Add shared accessible loading/error/empty boundaries and keyboard-safe
       primitives.
 - [ ] Remove duplicate client fetch/format utilities after characterization.

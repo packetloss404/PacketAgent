@@ -105,7 +105,9 @@ facade. R7.1c moves App Builder state, streaming, and mutations into a bounded
 controller hook behind the existing feature-owned thread and tab components.
 R7.1d keeps one parent-owned Agent draft while separating its controller,
 readiness/review, configuration/sample-input, and approval/first-run surfaces.
-Resume at R7.1e Settings view decomposition in
+R7.1e splits Settings into bounded access, credentials/workspace, and
+audit/advanced modules and closes the five-module ownership audit. Resume at
+R7.2 accessible state boundaries and keyboard-safe interactions in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r7---builder-and-frontend-maintainability).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

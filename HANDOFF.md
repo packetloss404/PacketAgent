@@ -28,8 +28,9 @@ TaskLoom naming is compatibility-only.
 - R1-R6 are complete.
 - R7, Builder and frontend maintainability, is active.
 - R8, release reliability and production packaging, follows R7.
-- The exact active slice is **R7.1e: split the oversized Settings view along
-  its existing section and destructive-workspace-action seams**.
+- R7.1's five-module ownership audit is complete.
+- The exact active slice is **R7.2: add shared accessible loading, error, and
+  empty boundaries plus keyboard-safe interactive primitives**.
 
 R6.6 removed the legacy Agent execution choice. Accepted Agent launches and
 active schedules now materialize and enter the canonical Worker lifecycle
@@ -51,8 +52,8 @@ R7.1 is in progress:
 - Nine focused characterization tests cover typed payloads, playbook
   validation, approval risk, controlled empty/populated states, run history,
   evaluation evidence, tool calls, and bounded serialization.
-- R7.1b is complete. The former 4,381-line Builder route module is now a
-  12-line compatibility facade over eleven feature-owned modules covering
+- R7.1b is complete. The former 4,381-line Builder route module is now an
+  11-line compatibility facade over eleven feature-owned modules covering
   contracts, draft/apply, generated-app lookup/export, iteration and its pure
   transforms, checkpoints, publish handlers, publish artifacts, Agent publish,
   smoke validation, and route registration.
@@ -75,21 +76,28 @@ R7.1 is in progress:
 - Two new rendering characterizations cover provider and capability truth,
   authored plan review, editable memory/expected output and sample validation,
   approval copy, and the empty first-run state. The web suite now has 51 tests.
+- R7.1e is complete. Settings fell from 1,041 to a 105-line tab controller;
+  access, credentials/workspace, audit/advanced presentation, and typed
+  advanced-entry data live in modules between 108 and 340 lines.
+- Two Settings characterizations cover viewer permission boundaries and the
+  controlled member, invitation, share, API-key, audit, and advanced empty
+  states. The full five-module re-audit has no named production view or route
+  module above 1,000 lines. The web suite now has 53 tests.
 
 ## Exact resume point
 
-Continue R7.1e in `web/src/workbench/views/settings.tsx`:
+Continue R7.2 across the critical Builder and Worker workbench surfaces:
 
-1. Characterize the existing settings sections, permission gates, and
-   destructive workspace actions before moving behavior.
-2. Extract feature-owned sections with explicit values, permission flags, and
-   action callbacks while retaining one closest-common controller.
-3. Preserve API mutations, confirmation boundaries, navigation, and role
-   behavior while reducing the production view below 1,000 lines.
-4. Add focused controlled-section coverage and run the standard R7 subloop
-   gate.
-5. Re-run the five-module line-count audit; if every module is bounded, close
-   R7.1 and continue R7.2's accessible state-boundary work.
+1. Inventory duplicated loading/error/empty markup and non-keyboard interactive
+   elements, starting with Builder tabs and canonical Worker list/detail.
+2. Add the smallest shared state-boundary and keyboard-safe primitives with
+   explicit live-region, focus, pressed/selected, and retry semantics.
+3. Migrate one critical surface at a time without changing data fetching or
+   visual direction.
+4. Add stable component coverage for keyboard activation, focus behavior, and
+   distinct loading/error/empty announcements.
+5. Run the standard R7 gate before moving to R7.3 client utility
+   deduplication.
 
 Do not mark R7.1 complete until every production view/route module named in the
 audit is below 1,000 lines or has an explicit ownership justification, and the
@@ -101,7 +109,7 @@ repository gates pass.
 - `npm run lint` — passed with zero errors and zero warnings.
 - `npm run format:check` — passed.
 - `npm run build:web` — passed.
-- `npm run test:web` — 51 passed, 0 failed.
+- `npm run test:web` — 53 passed, 0 failed.
 - `npm run test:api` — 1,658 passed, 3 intentional live interoperability
   skips, 0 failed (1,661 total).
 - `npm run verify:agent-canonical-execution` — all 8 assertions passed without

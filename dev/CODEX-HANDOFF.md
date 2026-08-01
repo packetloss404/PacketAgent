@@ -234,7 +234,7 @@ verify:agent-canonical-execution` is the offline executable gate. Design and
   production build, and 48 web tests pass. Exact subloops and research links live in
   `dev/r7-frontend-maintainability.md`.
 - Completed R7.1b's Builder route decomposition. The 4,381-line route module
-  is now a 12-line compatibility facade over eleven feature-owned modules, all
+  is now an 11-line compatibility facade over eleven feature-owned modules, all
   below 800 lines. A deterministic 35-route inventory test plus the 46-test
   focused Builder route selection preserve authorization, store mutation,
   iteration/checkpoint, source/export, preview/smoke, publish/integrity,
@@ -255,6 +255,12 @@ verify:agent-canonical-execution` is the offline executable gate. Design and
   and controlled readiness/review, configuration/sample-input, and
   approval/first-run modules are each below 400 lines. Two rendering
   characterizations bring the web suite to 51 passing tests. Typecheck,
+  zero-warning lint, formatting, and the production web build pass.
+- Completed R7.1e and closed R7.1's five-module audit. Settings fell from 1,041
+  to a 105-line tab controller over access, credentials/workspace, and
+  audit/advanced modules at or below 340 lines. Viewer permission and controlled
+  empty-state characterizations bring the web suite to 53 passing tests. Every
+  production module named by the audit is now below 1,000 lines; typecheck,
   zero-warning lint, formatting, and the production web build pass.
 
 ## Current implementation truth
@@ -389,8 +395,9 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R7.1e - split the oversized Settings view along its existing section
-and destructive-workspace-action seams** in
+Continue **R7.2 - add shared accessible loading/error/empty boundaries and
+keyboard-safe interactive primitives across critical Builder and Worker
+surfaces** in
 [`../BACKLOG.md#r7---builder-and-frontend-maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability).
 `BACKLOG.md` is the single ledger for every remaining R7-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add

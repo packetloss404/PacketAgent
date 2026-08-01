@@ -1,6 +1,7 @@
 # R7 frontend maintainability
 
-Status: R7.1 in progress. `BACKLOG.md` remains the sole implementation ledger.
+Status: R7.1 complete. R7.2 is active; `BACKLOG.md` remains the sole
+implementation ledger.
 
 ## Goal
 
@@ -93,7 +94,7 @@ tests pass.
 
 R7.1b completed the Builder route split:
 
-- `src/app-routes/builder-core.ts` fell from 4,381 lines to a 12-line
+- `src/app-routes/builder-core.ts` fell from 4,381 lines to an 11-line
   compatibility facade;
 - eleven modules now own contracts, draft/apply, generated-app lookup/export,
   iteration, pure iteration transforms, checkpoints, publish handlers,
@@ -140,8 +141,33 @@ R7.1d completed the Agent Builder view split:
   copy, and the empty first-run state.
 
 Typecheck, zero-warning lint, formatting, production web build, and all 51 web
-tests pass. Resume R7.1e at the Settings view's section and destructive-action
-seams.
+tests pass.
+
+R7.1e completed the Settings view split:
+
+- `web/src/workbench/views/settings.tsx` fell from 1,041 to 105 lines and owns
+  only tab selection plus section data contracts;
+- member/invitation/share access, API-key/workspace credentials, audit/advanced
+  presentation, and typed advanced-entry data moved intact into modules ranging
+  from 108 to 340 lines; and
+- two rendering characterizations preserve viewer permission boundaries and
+  controlled empty states across members, invitations, shares, API keys,
+  audit, and advanced operations.
+
+The final R7.1 audit is closed:
+
+| Original module                             | Original | Bounded result                                  |
+| ------------------------------------------- | -------: | ----------------------------------------------- |
+| `src/app-routes/builder-core.ts`            |    4,381 | 11-line facade; feature modules at or below 722 |
+| `web/src/workbench/views/agent-editor.tsx`  |    2,443 | 548-line view; 537-line controller              |
+| `web/src/workbench/views/builder.tsx`       |    1,480 | 879-line view; 684-line controller              |
+| `web/src/workbench/views/builder-agent.tsx` |    1,397 | 254-line view; feature modules at or below 381  |
+| `web/src/workbench/views/settings.tsx`      |    1,041 | 105-line view; feature modules at or below 340  |
+
+Typecheck, zero-warning lint, formatting, production web build, and all 53 web
+tests pass. Resume R7.2 by inventorying shared accessible loading/error/empty
+boundaries and keyboard-unsafe interactions in critical Builder and Worker
+surfaces.
 
 ## Out of scope for R7.1
 
