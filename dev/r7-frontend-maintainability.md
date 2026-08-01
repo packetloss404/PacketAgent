@@ -89,8 +89,26 @@ R7.1a completed the Agent editor split:
   hook; every controlled/presentation module is below 400 lines.
 
 Typecheck, zero-warning lint, formatting, production web build, and all 48 web
-tests pass. Resume R7.1b at the Builder route module's iteration/checkpoint,
-publish/export, smoke, and registration seams.
+tests pass.
+
+R7.1b completed the Builder route split:
+
+- `src/app-routes/builder-core.ts` fell from 4,381 lines to a 12-line
+  compatibility facade;
+- eleven modules now own contracts, draft/apply, generated-app lookup/export,
+  iteration, pure iteration transforms, checkpoints, publish handlers,
+  publish artifacts, Agent publishing, smoke validation, and registration;
+- the modules range from 193 to 722 lines, with no route module above the
+  1,000-line audit threshold; and
+- a deterministic characterization test pins all 35 established Builder route
+  method/path pairs, while the 46-test focused API selection covers iteration,
+  checkpoints, source/export, preview/smoke, publish/integrity, rollback,
+  authorization, and workspace isolation.
+
+Typecheck, zero-warning lint, formatting, production web build, all 48 web
+tests, the focused route selection, and the full 1,661-test API suite pass.
+Resume R7.1c at the App Builder view's controller, thread, preview, tab, and
+publish seams.
 
 ## Out of scope for R7.1
 

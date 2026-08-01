@@ -28,8 +28,8 @@ TaskLoom naming is compatibility-only.
 - R1-R6 are complete.
 - R7, Builder and frontend maintainability, is active.
 - R8, release reliability and production packaging, follows R7.
-- The exact active slice is **R7.1b: split the oversized Builder route module
-  along its existing feature seams**.
+- The exact active slice is **R7.1c: split the oversized App Builder view along
+  its existing controller, thread, preview, tab, and publish seams**.
 
 R6.6 removed the legacy Agent execution choice. Accepted Agent launches and
 active schedules now materialize and enter the canonical Worker lifecycle
@@ -51,19 +51,31 @@ R7.1 is in progress:
 - Nine focused characterization tests cover typed payloads, playbook
   validation, approval risk, controlled empty/populated states, run history,
   evaluation evidence, tool calls, and bounded serialization.
+- R7.1b is complete. The former 4,381-line Builder route module is now a
+  12-line compatibility facade over eleven feature-owned modules covering
+  contracts, draft/apply, generated-app lookup/export, iteration and its pure
+  transforms, checkpoints, publish handlers, publish artifacts, Agent publish,
+  smoke validation, and route registration.
+- Every Builder route feature module is below 800 lines. A 35-route inventory
+  characterization test and the existing 46-test focused route selection
+  preserve the registration, authorization, iteration/checkpoint,
+  source/export, preview/smoke, publish/integrity, rollback, and permission
+  boundaries.
 
 ## Exact resume point
 
-Continue R7.1b in `src/app-routes/builder-core.ts`:
+Continue R7.1c in `web/src/workbench/views/builder.tsx`:
 
-1. Characterize the existing iteration/checkpoint, publish/export, smoke, and
-   registration boundaries before moving handlers.
-2. Split route registration and feature handlers into focused modules without
-   changing authorization, store mutation, response, or idempotency behavior.
-3. Keep shared state explicit and share only typed pure helpers.
-4. Run the focused route/API tests in addition to the standard R7 subloop gate.
-5. Continue the audited R7.1 order with `builder.tsx`,
-   `builder-agent.tsx`, then `settings.tsx`.
+1. Characterize the current draft/stream controller and the existing thread,
+   preview, tab, and publish state contracts before moving behavior.
+2. Retain one controller for the current draft and stream; extract focused
+   hooks and controlled feature components with explicit props and callbacks.
+3. Preserve routing, stream cancellation/retry, preview selection, iteration,
+   and publish behavior while reducing the production view below 1,000 lines.
+4. Add focused component/controller coverage and run the standard R7 subloop
+   gate.
+5. Continue the audited R7.1 order with `builder-agent.tsx`, then
+   `settings.tsx`.
 
 Do not mark R7.1 complete until every production view/route module named in the
 audit is below 1,000 lines or has an explicit ownership justification, and the
@@ -76,14 +88,13 @@ repository gates pass.
 - `npm run format:check` — passed.
 - `npm run build:web` — passed.
 - `npm run test:web` — 48 passed, 0 failed.
-- `npm run test:api` — 1,657 passed, 3 intentional live interoperability
-  skips, 0 failed (1,660 total).
+- `npm run test:api` — 1,658 passed, 3 intentional live interoperability
+  skips, 0 failed (1,661 total).
 - `npm run verify:agent-canonical-execution` — all 8 assertions passed without
   live provider, tool, or network calls.
 
-The API total is the R6.6 full-regression checkpoint. R7.1a was frontend-only
-and passed typecheck, lint, formatting, production build, and the expanded web
-suite.
+R7.1b additionally passed the 46-test focused Builder route selection and the
+full 1,661-test API regression suite.
 
 ## Known conditional or unshipped work
 
