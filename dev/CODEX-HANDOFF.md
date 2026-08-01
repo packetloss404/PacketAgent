@@ -1,6 +1,6 @@
 # Codex project handoff
 
-Last updated: 2026-07-29.
+Last updated: 2026-08-01.
 
 This is the authoritative starting point when opening `D:\projects\PacketAgent`
 as a new project in the Codex app.
@@ -8,7 +8,7 @@ as a new project in the Codex app.
 ## Open this project
 
 - Project folder: `D:\projects\PacketAgent`
-- Active local branch: `codex/packetagent-foundation`, tracking `origin/main`
+- Active local branch: `main`, tracking `origin/main`
 - Historical source remote: `taskloom-source`
 - PacketAgent `origin`: `git@github.com:packetloss404/PacketAgent.git`
 - Primary remote branch: `main`
@@ -225,13 +225,13 @@ Prompt-to-app generation remains a supported secondary capability.
   managed Postgres preserve the canonical links. `npm run
 verify:agent-canonical-execution` is the offline executable gate. Design and
   implementation evidence lives in `dev/r6-agent-canonical-execution.md`.
-- Started R7.1 with a measured decomposition audit and the first Agent editor
-  seam. Typed launch/playbook/approval helpers and run/evaluation/tool-call
-  presenters now have focused modules and six characterization tests; the
-  existing presenter exports remain compatible. The source view fell from
-  2,443 to 2,095 lines while parent-owned state and API behavior stayed
-  unchanged. Typecheck, zero-warning lint, formatting, and 45 web tests pass.
-  Exact subloops and research links live in
+- Completed R7.1a's Agent editor decomposition. Loading, mutation,
+  coordinated state, and API actions live in a 537-line controller hook;
+  controlled approval, playbook, tool, memory, input, launcher, run-history,
+  transcript, evaluation, and tool-call UI live in feature modules below 400
+  lines. The view fell from 2,443 to 548 lines without changing behavior. Nine
+  focused characterization tests, typecheck, zero-warning lint, formatting,
+  production build, and 48 web tests pass. Exact subloops and research links live in
   `dev/r7-frontend-maintainability.md`.
 
 ## Current implementation truth
@@ -366,8 +366,8 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R7.1a - extract the Agent editor's controlled approval, playbook,
-tool, memory, input, and run-history components, then its controller state** in
+Continue **R7.1b - split the oversized Builder route module along its existing
+iteration/checkpoint, publish/export, smoke, and registration seams** in
 [`../BACKLOG.md#r7---builder-and-frontend-maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability).
 `BACKLOG.md` is the single ledger for every remaining R7-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
@@ -884,8 +884,8 @@ provider, tool, or network call. Research and decisions are recorded in
 
 The exact next slice is R7.1 under
 [`R7 - Builder and frontend maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability):
-finish the Agent editor controlled-component/controller split, then continue
-through the audited Builder route, app Builder, Agent Builder, and Settings
+split the audited Builder route module, then continue through the app Builder,
+Agent Builder, and Settings
 seams in [`r7-frontend-maintainability.md`](r7-frontend-maintainability.md).
 After each gate passes, continue through R7-R8 using that backlog's unchecked
 checklists; use the loop document only for execution mechanics. Historical
@@ -926,7 +926,7 @@ handoff, the roadmap, or the backlog.
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
 - `npm run test:api` - 1,657 passed, 3 intentionally skipped live probes, 0
   failed (1,660 total)
-- `npm run test:web` - 39 passed, 0 failed
+- `npm run test:web` - 48 passed, 0 failed
 - focused R6.6 canonical materialization, idempotent activation, compatibility
   read model, immutable rollover, schedule migration, W7 stop propagation,
   approval-bound resource enforcement, legacy-runner exclusion, and

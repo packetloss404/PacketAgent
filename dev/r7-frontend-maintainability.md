@@ -71,25 +71,26 @@ repository gates pass and `BACKLOG.md` records the resulting module ownership.
 
 ## Progress
 
-R7.1a began the Agent editor split:
+R7.1a completed the Agent editor split:
 
 - typed launch input conversion, playbook validation, approval classification,
   and bounded evidence serialization now live in
   `web/src/workbench/views/agent-editor/helpers.ts`;
 - transcript, first-run evaluation, and tool-call presentation now live in
   `web/src/workbench/views/agent-editor/run-presenters.tsx`;
-- six characterization tests cover typed examples/payloads, missing playbook
+- nine characterization tests cover typed examples/payloads, missing playbook
   titles, legacy run/approval response classification, approval risk, empty and
-  populated transcript states, evaluation/tool evidence, and bounded
-  serialization;
+  populated controlled/editor/transcript states, run history, evaluation/tool
+  evidence, and bounded serialization;
 - the prior `RunTranscript` and `ToolCallTimeline` imports remain compatible;
   and
-- the original view fell from 2,443 to 2,095 lines without changing API calls
-  or parent-owned state.
+- the original view fell from 2,443 to 548 lines. Loading, mutations,
+  coordinated state, and API actions moved intact into a 537-line controller
+  hook; every controlled/presentation module is below 400 lines.
 
-Typecheck, zero-warning lint, formatting, and all 45 web tests pass. Resume
-R7.1a by extracting the controlled approval, playbook, tool, memory, input, and
-run-history components before moving controller state.
+Typecheck, zero-warning lint, formatting, production web build, and all 48 web
+tests pass. Resume R7.1b at the Builder route module's iteration/checkpoint,
+publish/export, smoke, and registration seams.
 
 ## Out of scope for R7.1
 

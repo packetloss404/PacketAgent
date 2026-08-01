@@ -1238,8 +1238,8 @@ canonical Worker without losing legacy compatibility.
 
 ### R7 - Builder and frontend maintainability
 
-Status: in progress. R7.1 audit and Agent editor decomposition are underway;
-resume at the controlled editor components in
+Status: in progress. R7.1a Agent editor decomposition is complete; resume at
+R7.1b Builder route decomposition in
 [`r7-frontend-maintainability.md`](r7-frontend-maintainability.md).
 
 1. Split remaining god views and route modules along established feature seams.

@@ -539,9 +539,9 @@ execution. Agent run APIs now read a linked compatibility projection over the
 Worker run, while checkpoints, action approvals, effects, budgets, events,
 evidence, control, and terminal state remain canonical Worker authority.
 
-The exact resume point is R7.1a in [HANDOFF.md](HANDOFF.md): continue the
-controlled Agent editor decomposition, then work through the measured Builder
-route, app Builder, Agent Builder, and Settings seams. [BACKLOG.md](BACKLOG.md)
+The exact resume point is R7.1b in [HANDOFF.md](HANDOFF.md): the Agent editor
+split is complete, and the oversized Builder route module is next, followed by
+the measured app Builder, Agent Builder, and Settings seams. [BACKLOG.md](BACKLOG.md)
 remains the sole ledger for the conditional live W10 check and all remaining
 R7-R8 work. New working sessions should begin with the root handoff, not the
 archived Phase 3 or legacy handoff documents.

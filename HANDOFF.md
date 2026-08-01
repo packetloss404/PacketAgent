@@ -1,6 +1,6 @@
 # PacketAgent handoff
 
-Updated 2026-07-30. This is the short resume document for a new working
+Updated 2026-08-01. This is the short resume document for a new working
 session. [`BACKLOG.md`](BACKLOG.md) is the sole implementation ledger;
 [`dev/CODEX-HANDOFF.md`](dev/CODEX-HANDOFF.md) retains the detailed shipped
 inventory and gate history.
@@ -28,8 +28,8 @@ TaskLoom naming is compatibility-only.
 - R1-R6 are complete.
 - R7, Builder and frontend maintainability, is active.
 - R8, release reliability and production packaging, follows R7.
-- The exact active slice is **R7.1a: finish decomposing the Agent editor along
-  controlled feature seams**.
+- The exact active slice is **R7.1b: split the oversized Builder route module
+  along its existing feature seams**.
 
 R6.6 removed the legacy Agent execution choice. Accepted Agent launches and
 active schedules now materialize and enter the canonical Worker lifecycle
@@ -38,30 +38,31 @@ linked to canonical definition, version, deployment, and run IDs. Worker
 checkpoints, approvals, effects, budgets, evidence, control, and terminal state
 remain authoritative.
 
-R7.1 has started:
+R7.1 is in progress:
 
 - [`dev/r7-frontend-maintainability.md`](dev/r7-frontend-maintainability.md)
   records the measured five-module audit and bounded subloops.
-- Agent editor typed launch/playbook/approval helpers moved to
-  `web/src/workbench/views/agent-editor/helpers.ts`.
-- Transcript, first-run evaluation, and tool-call presentation moved to
-  `web/src/workbench/views/agent-editor/run-presenters.tsx`.
-- Six characterization tests cover those seams.
-- `agent-editor.tsx` fell from 2,443 to 2,095 lines without moving its
-  parent-owned state or changing API behavior.
+- R7.1a is complete. Agent editor loading, mutations, coordinated state, and
+  API actions live in `use-agent-editor-controller.ts`; controlled approval,
+  playbook, tool, memory, input, launcher, run-history, transcript, evaluation,
+  and tool-call UI live in feature-owned modules.
+- `agent-editor.tsx` fell from 2,443 to 548 lines. Its controller is 537 lines;
+  every extracted feature module is below 400 lines.
+- Nine focused characterization tests cover typed payloads, playbook
+  validation, approval risk, controlled empty/populated states, run history,
+  evaluation evidence, tool calls, and bounded serialization.
 
 ## Exact resume point
 
-Continue R7.1a in `web/src/workbench/views/agent-editor.tsx`:
+Continue R7.1b in `src/app-routes/builder-core.ts`:
 
-1. Extract controlled approval, playbook, tool, memory, input, and run-history
-   components into the existing `agent-editor/` feature directory.
-2. Preserve `AgentEditorView` as the single owner of coordinated state while
-   those components receive explicit values and event handlers.
-3. Add characterization coverage before moving controller/network logic.
-4. Then extract the controller hook and confirm the production view is below
-   the R7.1 size threshold.
-5. Continue the audited R7.1 order: `builder-core.ts`, `builder.tsx`,
+1. Characterize the existing iteration/checkpoint, publish/export, smoke, and
+   registration boundaries before moving handlers.
+2. Split route registration and feature handlers into focused modules without
+   changing authorization, store mutation, response, or idempotency behavior.
+3. Keep shared state explicit and share only typed pure helpers.
+4. Run the focused route/API tests in addition to the standard R7 subloop gate.
+5. Continue the audited R7.1 order with `builder.tsx`,
    `builder-agent.tsx`, then `settings.tsx`.
 
 Do not mark R7.1 complete until every production view/route module named in the
@@ -74,15 +75,15 @@ repository gates pass.
 - `npm run lint` — passed with zero errors and zero warnings.
 - `npm run format:check` — passed.
 - `npm run build:web` — passed.
-- `npm run test:web` — 45 passed, 0 failed.
+- `npm run test:web` — 48 passed, 0 failed.
 - `npm run test:api` — 1,657 passed, 3 intentional live interoperability
   skips, 0 failed (1,660 total).
 - `npm run verify:agent-canonical-execution` — all 8 assertions passed without
   live provider, tool, or network calls.
 
-The API total is the R6.6 full-regression checkpoint. R7.1 changes since then
-are frontend-only and have passed typecheck, lint, formatting, production
-build, and the expanded web suite.
+The API total is the R6.6 full-regression checkpoint. R7.1a was frontend-only
+and passed typecheck, lint, formatting, production build, and the expanded web
+suite.
 
 ## Known conditional or unshipped work
 

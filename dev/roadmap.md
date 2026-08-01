@@ -98,8 +98,9 @@ exclusion, reviewed preflight, and idempotent paused import. R6.6 then routes
 every accepted legacy Agent launch and active schedule through deterministic
 Worker materialization, canonical activation, the fenced supervisor, W7
 control, and a linked compatibility read model with JSON, SQLite, and managed
-Postgres parity. R6 is complete. Resume at R7.1 view and route decomposition
-in
+Postgres parity. R6 is complete. R7.1a splits the Agent editor into a bounded
+view, controller, and feature-owned controlled components. Resume at R7.1b
+Builder route decomposition in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r7---builder-and-frontend-maintainability).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,
