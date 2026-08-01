@@ -101,7 +101,9 @@ control, and a linked compatibility read model with JSON, SQLite, and managed
 Postgres parity. R6 is complete. R7.1a splits the Agent editor into a bounded
 view, controller, and feature-owned controlled components. R7.1b splits the
 Builder route surface into bounded feature modules behind a compatibility
-facade. Resume at R7.1c App Builder view decomposition in
+facade. R7.1c moves App Builder state, streaming, and mutations into a bounded
+controller hook behind the existing feature-owned thread and tab components.
+Resume at R7.1d Agent Builder view decomposition in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#r7---builder-and-frontend-maintainability).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,

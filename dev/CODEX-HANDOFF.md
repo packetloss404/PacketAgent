@@ -242,6 +242,13 @@ verify:agent-canonical-execution` is the offline executable gate. Design and
   formatting, production web build, all 48 web tests, and the full 1,661-test
   API suite pass. Exact module ownership lives in
   `dev/r7-frontend-maintainability.md`.
+- Completed R7.1c's App Builder view decomposition. The view fell from 1,480
+  to 879 lines and composes the existing feature-owned thread and tab surfaces;
+  its current-draft state, streams, mutations, checkpoint/publish refresh,
+  retry handling, and coordinated selections moved intact into a 684-line
+  controller hook. A cold-start composition characterization brings the web
+  suite to 49 passing tests. Typecheck, zero-warning lint, formatting, and the
+  production web build pass.
 
 ## Current implementation truth
 
@@ -375,8 +382,9 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R7.1c - split the oversized App Builder view along its existing
-controller, thread, preview, tab, and publish seams** in
+Continue **R7.1d - split the oversized Agent Builder view along its existing
+controller, provider-readiness, review, save/evaluate, and first-run-result
+seams** in
 [`../BACKLOG.md#r7---builder-and-frontend-maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability).
 `BACKLOG.md` is the single ledger for every remaining R7-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add

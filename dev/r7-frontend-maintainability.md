@@ -107,8 +107,23 @@ R7.1b completed the Builder route split:
 
 Typecheck, zero-warning lint, formatting, production web build, all 48 web
 tests, the focused route selection, and the full 1,661-test API suite pass.
-Resume R7.1c at the App Builder view's controller, thread, preview, tab, and
-publish seams.
+
+R7.1c completed the App Builder view split:
+
+- `web/src/workbench/views/builder.tsx` fell from 1,480 to 879 lines and remains
+  the controlled composition over the existing thread, preview, source,
+  quality, activity, sandbox, checkpoint, and publish feature modules;
+- current draft/stream state, generation and iteration orchestration,
+  checkpoint/publish refresh, retry handling, approval, rollback, branching,
+  publishing, and coordinated selections moved intact into the 684-line
+  `web/src/workbench/views/builder/use-builder-controller.ts` hook; and
+- a server-rendered cold-start characterization locks the controlled composer,
+  starter chips, tour affordance, and pre-draft absence of preview and approval
+  surfaces.
+
+Typecheck, zero-warning lint, formatting, production web build, and all 49 web
+tests pass. Resume R7.1d at the Agent Builder view's provider-readiness,
+review, save/evaluate, and first-run-result seams.
 
 ## Out of scope for R7.1
 

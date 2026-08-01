@@ -539,12 +539,12 @@ execution. Agent run APIs now read a linked compatibility projection over the
 Worker run, while checkpoints, action approvals, effects, budgets, events,
 evidence, control, and terminal state remain canonical Worker authority.
 
-The exact resume point is R7.1c in [HANDOFF.md](HANDOFF.md): the Agent editor
-and Builder route splits are complete, and the measured App Builder view is
-next, followed by the Agent Builder and Settings seams. [BACKLOG.md](BACKLOG.md)
-remains the sole ledger for the conditional live W10 check and all remaining
-R7-R8 work. New working sessions should begin with the root handoff, not the
-archived Phase 3 or legacy handoff documents.
+The exact resume point is R7.1d in [HANDOFF.md](HANDOFF.md): the Agent editor,
+Builder route, and App Builder view splits are complete, and the measured Agent
+Builder view is next, followed by Settings. [BACKLOG.md](BACKLOG.md) remains
+the sole ledger for the conditional live W10 check and all remaining R7-R8
+work. New working sessions should begin with the root handoff, not the archived
+Phase 3 or legacy handoff documents.
 
 For current product changes, see [CHANGELOG.md](CHANGELOG.md). The repository is
 published at `git@github.com:packetloss404/PacketAgent.git`; a website, issue
