@@ -22,6 +22,7 @@ import { resetBuilderTour } from "./builder-tour-state";
 import { SandboxBuilderTab } from "./builder/tabs/sandbox";
 import { ThreadMessage } from "./builder/thread";
 import { useBuilderController } from "./builder/use-builder-controller";
+import { AccessibleTabPanel, AccessibleTabs } from "@/components/AccessibleTabs";
 
 export function BuilderView() {
   const {
@@ -112,17 +113,7 @@ export function BuilderView() {
                 setBuilderKind(resolveBuilderStartKind(nextPrompt));
               }}
             />
-            <div className="flex items-center justify-between px-3 pb-3">
-              {/* TODO Phase 2: kind + preset popover */}
-              <button
-                type="button"
-                data-tour="presets"
-                className="text-silver-400 hover:text-silver-50 px-2 py-1"
-                aria-label="Build options"
-                title="Coming in a future update: pick app vs agent and tweak the model preset"
-              >
-                ⚙
-              </button>
+            <div className="flex items-center justify-end px-3 pb-3">
               <button
                 type="button"
                 className="btn-primary btn"
@@ -692,8 +683,12 @@ export function BuilderView() {
                 minHeight: 0,
               }}
             >
-              <div className="tabbar">
-                {(
+              <AccessibleTabs
+                id="app-builder"
+                label="Builder views"
+                activeId={tab}
+                onSelect={setTab}
+                tabs={(
                   [
                     {
                       id: "preview",
@@ -749,27 +744,26 @@ export function BuilderView() {
                       : t.id === "checkpoints"
                         ? "checkpoints"
                         : undefined;
-                  return (
-                    <div
-                      key={t.id}
-                      data-tour={tourId}
-                      className={`tab ${tab === t.id ? "active" : ""}`}
-                      title={t.title}
-                      onClick={() => setTab(t.id)}
-                    >
-                      <Ico size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                      {t.label}
-                      {"count" in t && t.count !== undefined && t.count > 0 && (
-                        <span className="mono muted" style={{ fontSize: 10.5, marginLeft: 6 }}>
-                          · {t.count}
-                        </span>
-                      )}
-                    </div>
-                  );
+                  return {
+                    id: t.id,
+                    title: t.title,
+                    dataTour: tourId,
+                    label: (
+                      <>
+                        <Ico size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+                        {t.label}
+                        {"count" in t && t.count !== undefined && t.count > 0 && (
+                          <span className="mono muted" style={{ fontSize: 10.5, marginLeft: 6 }}>
+                            · {t.count}
+                          </span>
+                        )}
+                      </>
+                    ),
+                  };
                 })}
-              </div>
+              />
 
-              <div style={{ flex: 1, overflow: "auto" }}>
+              <AccessibleTabPanel id="app-builder" tabId={tab} className="builder-tab-panel">
                 {tab === "preview" && (
                   <PreviewTab
                     draft={draft}
@@ -825,7 +819,7 @@ export function BuilderView() {
                     working={working}
                   />
                 )}
-              </div>
+              </AccessibleTabPanel>
             </div>
           </div>
         )}

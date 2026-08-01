@@ -70,6 +70,7 @@ import {
 } from "../shared.js";
 import { type Context } from "hono";
 import { type GeneratedAppRecord, mutateStoreAsync } from "../../packetagent-store.js";
+import { buildGeneratedAppSmokeTranscript } from "../../generated-app-smoke-transcript.js";
 
 export async function generateAppIteration(
   c: Context,
@@ -422,6 +423,8 @@ export async function applyAppIteration(
       checkpointSource: "iteration",
       codegenSource: fileTreeFiles ? "llm-filetree" : diff.draftSource,
       fileTreeFiles,
+      smokeResult: smoke,
+      smokeSource: "iteration",
     });
     const newCheckpoint = checkpointForPublish(record, record.checkpointId);
     const newArtifact = newCheckpoint
@@ -560,24 +563,62 @@ export async function refreshBuilderPreview(c: Context) {
     };
     const record = await findGeneratedAppRecord(context, body.appId, body.checkpointId);
     if (!record) throw httpRouteError(404, "generated app not found");
-    const draft = record.draft as unknown as AppBuilderDraftContract;
+    const targetCheckpoint = checkpointForPublish(record, body.checkpointId ?? record.checkpointId);
+    if (!targetCheckpoint) throw httpRouteError(404, "checkpoint not found");
+    const targetCheckpointId = targetCheckpoint.id;
+    const draft = targetCheckpoint.draft as unknown as AppBuilderDraftContract;
     const runSmoke = Boolean(body.runSmoke || body.runBuild);
     const smoke = await runAppSmokeViaSandbox(draft, context, runSmoke, {
       appId: record.id,
-      checkpointId: record.checkpointId,
+      checkpointId: targetCheckpointId,
     });
     const previewUrl =
       runSmoke && smoke.status === "pass"
         ? previewUrlForDraft(draft, context, record.id)
-        : record.previewUrl;
+        : (targetCheckpoint.previewUrl ?? record.previewUrl);
+    const recordedAt = new Date().toISOString();
+    const smokeTranscript = buildGeneratedAppSmokeTranscript({
+      workspaceId: context.workspace.id,
+      appId: record.id,
+      checkpointId: targetCheckpointId,
+      source: "preview-refresh",
+      result: smoke,
+      recordedAt,
+    });
+    const persisted = await mutateStoreAsync((data) => {
+      const app = data.generatedApps?.find(
+        (entry) => entry.workspaceId === context.workspace.id && entry.id === record.id,
+      );
+      const checkpoint = app?.checkpoints?.find((entry) => entry.id === targetCheckpointId);
+      if (!app || !checkpoint) return false;
+      checkpoint.smokeTranscript = smokeTranscript;
+      checkpoint.smokeStatus = smoke.status;
+      checkpoint.buildStatus = runSmoke
+        ? smoke.status === "pass"
+          ? "passed"
+          : "failed"
+        : checkpoint.buildStatus;
+      if (app.checkpointId === targetCheckpointId) {
+        app.smokeStatus = checkpoint.smokeStatus;
+        app.buildStatus = checkpoint.buildStatus;
+        app.previewUrl = previewUrl;
+        app.updatedAt = recordedAt;
+      }
+      return true;
+    });
+    if (!persisted) throw httpRouteError(409, "checkpoint changed during smoke refresh");
     const snapshot = buildAppPreviewSnapshotMetadata({
       workspaceId: context.workspace.id,
       appId: record.id,
       appSlug: record.slug,
       appName: record.name,
-      checkpointId: record.checkpointId,
-      checkpointSavedAt: record.updatedAt,
-      buildStatus: runSmoke ? "passed" : record.buildStatus,
+      checkpointId: targetCheckpointId,
+      checkpointSavedAt: targetCheckpoint.createdAt,
+      buildStatus: runSmoke
+        ? smoke.status === "pass"
+          ? "passed"
+          : "failed"
+        : targetCheckpoint.buildStatus,
       smokeStatus: smoke.status,
       previewUrl,
       source: "preview",
@@ -589,25 +630,23 @@ export async function refreshBuilderPreview(c: Context) {
       previewUrl,
       previewPath: previewUrl,
       build: {
-        phase: runSmoke ? "passed" : "queued",
+        phase: runSmoke ? (smoke.status === "pass" ? "passed" : "failed") : "queued",
         checkCount: smoke.checks.length,
-        passedChecks: runSmoke ? smoke.checks.length : 0,
+        passedChecks: smoke.checks.filter((check) => check.status === "pass").length,
         buildId: snapshot.build.id,
-        revision: record.checkpointId,
+        revision: targetCheckpointId,
       },
       lastRendered: previewUrl
         ? {
             buildId: snapshot.build.id,
-            revision: record.checkpointId,
+            revision: targetCheckpointId,
             refreshedAt: new Date().toISOString(),
             previewUrl,
           }
         : undefined,
     });
-    const checkpoint = checkpointForPublish(record, body.checkpointId ?? record.checkpointId);
-    if (!checkpoint) throw httpRouteError(404, "checkpoint not found");
-    const artifact = generatedAppRuntimeArtifact(record, checkpoint);
-    const workspace = await writeGeneratedAppWorkspace(context, record, checkpoint, artifact);
+    const artifact = generatedAppRuntimeArtifact(record, targetCheckpoint);
+    const workspace = await writeGeneratedAppWorkspace(context, record, targetCheckpoint, artifact);
 
     return c.json({
       preview,
@@ -616,7 +655,8 @@ export async function refreshBuilderPreview(c: Context) {
         checks: smoke.checks,
       },
       smoke,
-      checkpoint: { id: record.checkpointId, appId: record.id, savedAt: record.updatedAt },
+      checkpoint: { id: targetCheckpointId, appId: record.id, savedAt: targetCheckpoint.createdAt },
+      smokeTranscript,
       snapshot,
       artifact: {
         entrypoint: artifact.entrypoint,

@@ -66,8 +66,9 @@ export async function runAppSmokeViaSandbox(
   runSmoke: boolean,
   options: { appId?: string; checkpointId?: string } = {},
 ) {
+  const startedAt = new Date();
   const baseline = buildAppSmokeStatusFromDraft(draft, context, runSmoke);
-  if (!runSmoke) return baseline;
+  if (!runSmoke) return withSmokeExecution(baseline, startedAt, "not-run");
 
   let validation: ValidationResult;
   try {
@@ -82,16 +83,21 @@ export async function runAppSmokeViaSandbox(
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return {
-      status: "fail" as const,
-      message: "Required generated-app sandbox validation could not run.",
-      checks: baseline.checks.map((check) => ({
-        ...check,
+    return withSmokeExecution(
+      {
         status: "fail" as const,
-        detail: `${check.detail} · validation unavailable`,
-      })),
-      blockers: [`Required sandbox validation failed closed: ${message}`],
-    };
+        message: "Required generated-app sandbox validation could not run.",
+        checks: baseline.checks.map((check) => ({
+          ...check,
+          status: "fail" as const,
+          detail: `${check.detail} · validation unavailable`,
+        })),
+        blockers: [`Required sandbox validation failed closed: ${message}`],
+      },
+      startedAt,
+      "isolated-sandbox",
+      "blocked",
+    );
   }
 
   const phaseStatus = (phase: "typecheck" | "build"): AppBuilderCheckStatus => {
@@ -123,15 +129,39 @@ export async function runAppSmokeViaSandbox(
         `${error.phase} ${error.file}${error.line ? `:${error.line}${error.column ? `:${error.column}` : ""}` : ""}: ${error.message}`,
     );
 
+  return withSmokeExecution(
+    {
+      status: validationStatus,
+      message: validation.ok
+        ? `TypeScript and Vite passed required isolated sandbox validation in ${validation.durationMs}ms.`
+        : validation.source === "blocked"
+          ? "Required isolated TypeScript/Vite validation was blocked; no success was recorded."
+          : `Generated TypeScript/Vite validation failed with ${validation.errors.length} error(s).`,
+      checks: [...phaseChecks, ...contractChecks],
+      blockers,
+    },
+    startedAt,
+    "isolated-sandbox",
+    validation.source,
+  );
+}
+
+function withSmokeExecution<T extends ReturnType<typeof smokeStatusFromChecks>>(
+  result: T,
+  startedAt: Date,
+  runner: "isolated-sandbox" | "not-run",
+  validatorSource?: string,
+) {
+  const completedAt = new Date();
   return {
-    status: validationStatus,
-    message: validation.ok
-      ? `TypeScript and Vite passed required isolated sandbox validation in ${validation.durationMs}ms.`
-      : validation.source === "blocked"
-        ? "Required isolated TypeScript/Vite validation was blocked; no success was recorded."
-        : `Generated TypeScript/Vite validation failed with ${validation.errors.length} error(s).`,
-    checks: [...phaseChecks, ...contractChecks],
-    blockers,
+    ...result,
+    execution: {
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      durationMs: Math.max(0, completedAt.getTime() - startedAt.getTime()),
+      runner,
+      ...(validatorSource ? { validatorSource } : {}),
+    },
   };
 }
 

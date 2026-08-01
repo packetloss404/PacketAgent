@@ -10,4 +10,6 @@ test("npm start launches the single-process production server without watch mode
   assert.equal(packageJson.scripts?.start, "npm run start:server");
   assert.doesNotMatch(packageJson.scripts?.start ?? "", /\bdev\b|--watch/);
   assert.doesNotMatch(packageJson.scripts?.["start:server"] ?? "", /--watch/);
+  assert.equal(packageJson.scripts?.["start:server"], "node --enable-source-maps dist/server.js");
+  assert.equal(packageJson.scripts?.["start:dev-server"], "node --import tsx src/server.ts");
 });

@@ -11,6 +11,15 @@ import type {
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
 import { workerRunDetailAccessibleState } from "../worker-operations-state";
+import { AsyncStateBoundary } from "@/components/AsyncStateBoundary";
+import {
+  formatBytes,
+  formatDuration as formatSharedDuration,
+  formatMoney,
+  formatStatusLabel,
+  formatTimestamp,
+  shortDigest,
+} from "@/lib/format";
 
 type RunControlAction = "pause" | "resume" | "stop" | "revoke";
 type AttentionAction = "approve-once" | "approve-for-run" | "reject";
@@ -123,13 +132,8 @@ export function WorkerRunDetailView() {
     return (
       <>
         <Topbar crumbs={["__WS__", "Runs", "Workers", id]} />
-        <div
-          className="muted"
-          role={accessibleState.role}
-          aria-live={accessibleState.ariaLive}
-          style={{ padding: 26 }}
-        >
-          {accessibleState.message}
+        <div style={{ padding: 26 }}>
+          <AsyncStateBoundary state={accessibleState} />
         </div>
       </>
     );
@@ -143,14 +147,11 @@ export function WorkerRunDetailView() {
           <button type="button" className="btn btn-sm" onClick={() => navigate("/runs")}>
             Back to Workers
           </button>
-          <div
-            className="card"
-            role={accessibleState.kind === "error" ? accessibleState.role : "alert"}
-            aria-live={accessibleState.kind === "error" ? accessibleState.ariaLive : "assertive"}
-            style={{ padding: 22, marginTop: 18, color: "var(--danger)" }}
-          >
-            {accessibleState.kind === "error" ? accessibleState.message : "Worker run not found."}
-          </div>
+          <AsyncStateBoundary
+            state={accessibleState}
+            onRetry={() => void detail.refresh()}
+            retryLabel="Retry Worker"
+          />
         </div>
       </>
     );
@@ -235,7 +236,7 @@ export function WorkerRunDetailView() {
         >
           <SummaryCard
             label="Live state"
-            value={run.status.replaceAll("_", " ")}
+            value={formatStatusLabel(run.status)}
             detail={run.terminalReason ?? `revision ${run.revision}`}
           />
           <SummaryCard
@@ -662,30 +663,9 @@ function EmptyState({ children }: { children: ReactNode }) {
 }
 
 function formatDuration(value: number): string {
-  if (value < 1_000) return `${value}ms`;
-  if (value < 60_000) return `${(value / 1_000).toFixed(1)}s`;
-  return `${(value / 60_000).toFixed(1)}m`;
+  return formatSharedDuration(value, { allowZero: true, includeMinutes: true });
 }
 
 function formatCount(value: number): string {
   return String(value);
-}
-
-function formatMoney(value: number): string {
-  return `$${value.toFixed(value < 0.1 ? 3 : 2)}`;
-}
-
-function formatBytes(value: number): string {
-  if (value < 1_024) return `${value} B`;
-  if (value < 1_024 * 1_024) return `${(value / 1_024).toFixed(1)} KB`;
-  return `${(value / (1_024 * 1_024)).toFixed(1)} MB`;
-}
-
-function formatTimestamp(value: string): string {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
-}
-
-function shortDigest(value: string): string {
-  return value.length > 24 ? `${value.slice(0, 20)}…` : value;
 }

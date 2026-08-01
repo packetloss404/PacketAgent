@@ -19,6 +19,7 @@ import type {
   AppBuilderApplyStatus,
   AppBuilderChangeSetResult,
   AppBuilderCheckpointListResult,
+  AppBuilderCheckpointSummary,
   AppBuilderDraft,
   AppBuilderDraftSource,
   AppBuilderDraftResult,
@@ -539,6 +540,7 @@ export const api = {
       preview: AppBuilderIterationApplyResult["preview"];
       build?: { status: string };
       smoke?: AppBuilderIterationApplyResult["smoke"];
+      smokeTranscript?: AppBuilderCheckpointSummary["smokeTranscript"];
       checkpoint?: AppBuilderIterationApplyResult["checkpoint"];
     }>("/api/app/builder/preview/refresh", { method: "POST", body: JSON.stringify(body) }),
   buildBuilderFixPrompt: (

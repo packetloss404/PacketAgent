@@ -1,25 +1,26 @@
 # PacketAgent implementation loops
 
-Status: canonical execution map for W2-W10 and the inherited backlog.
+Status: completed execution map for W2-W10 and inherited R1-R8. No automatic
+loop remains; decision-gated work requires an explicit owner choice.
 
-Last updated: 2026-07-28.
+Last updated: 2026-08-01.
 
 [`../BACKLOG.md`](../BACKLOG.md) remains the status ledger and source of gate
 truth. This document supplies the dependency order, implementation slices,
 repository seams, verification, and stop conditions needed to execute that
 ledger without rebuilding the plan after every loop.
 
-`BACKLOG.md` is the sole active implementation ledger. Every unchecked W10 or
-R1-R8 task described here must also exist there. If the two differ, follow and
-update `BACKLOG.md` before implementation; this file cannot create orphaned
-active work.
+`BACKLOG.md` is the sole active implementation ledger. The W10 and R1-R8 tasks
+described here are complete history. If this file and the backlog differ,
+follow and update `BACKLOG.md` before implementation; this file cannot create
+orphaned active work.
 
 ## Scope and authority
 
-- W1-W5 are complete. W1's decisions and verification live in
+- W1-W10 and R1-R8 are complete. W1's decisions and verification live in
   [`worker-contract-plan.md`](worker-contract-plan.md).
-- W6-W10 are the active autonomous-Worker sequence.
-- R1-R8 below are the ordered continuation of the inherited backlog after W10.
+- W2-W10 and R1-R8 below are retained as the executed autonomous-Worker and
+  inherited sequences.
 - Work explicitly marked "Later, not MVP" is decision-gated and is not part of
   the automatic queue.
 - `docs/PHASE3_SCOPE.md`, `docs/HANDOFF.md`, `REPO_REVIEW.md`,
@@ -739,7 +740,7 @@ cases, and JSON/SQLite/managed-Postgres parity.
 Outcome: PacketADE can validate, deploy, activate, close, reconnect, inspect,
 update, pause, roll back, and revoke a Worker through a versioned contract.
 
-Status: complete as of 2026-07-28. Resume at R1.
+Status: complete as of 2026-07-28. The later R1-R8 sequence is also complete.
 
 ### W9.1 - Freeze WorkerPackage v1
 
@@ -841,7 +842,7 @@ Packet surfaces without weakening W7 policy or audit guarantees.
 
 ### W10.1 - Add a notification outbox
 
-Status: complete as of 2026-07-28. Resume at R1.
+Status: complete as of 2026-07-28. The later R1-R8 sequence is also complete.
 
 - Define a versioned, channel-neutral notification envelope for attention,
   progress summaries, and terminal outcomes.
@@ -872,7 +873,7 @@ Implementation record:
 
 ### W10.2 - Implement PacketChat delivery
 
-Status: complete as of 2026-07-28. Resume at R1.
+Status: complete as of 2026-07-28. The later R1-R8 sequence is also complete.
 
 - Send concise deployment/run/version state, reason, budget, checkpoint,
   evidence link, and required action.
@@ -914,7 +915,7 @@ Implementation record:
 
 ### W10.3 - Implement PacketPhone controls
 
-Status: complete as of 2026-07-28. Resume at R1.
+Status: complete as of 2026-07-28. The later R1-R8 sequence is also complete.
 
 - Deliver approve, reject, pause, stop, and revoke actions only when the actor
   and role permit them.
@@ -955,8 +956,9 @@ Implementation record:
 
 ### W10.4 - Close the remote-control gate
 
-Status: local gate complete as of 2026-07-28. Resume at R1. Live
-interoperability remains conditional on external endpoint configuration.
+Status: local gate complete as of 2026-07-28. The later R1-R8 sequence is also
+complete. Live interoperability remains conditional on external endpoint
+configuration.
 
 - Contract-test Chat and Phone adapters locally with fake endpoints.
 - Race local and remote actions, replay callbacks, rotate credentials, restart
@@ -992,9 +994,8 @@ Implementation record:
 
 ## R1-R8 - Inherited continuation after W10
 
-These loops explain how to execute the matching unchecked R1-R8 checklists in
-`BACKLOG.md`; they do not create a separate task queue. A direct blocker may be
-pulled forward only after the backlog records that change.
+These loops record how the now-completed R1-R8 checklists in `BACKLOG.md` were
+executed; they do not create a separate task queue or imply R9.
 
 | Active backlog section                    | Execution destination                  |
 | ----------------------------------------- | -------------------------------------- |
@@ -1058,7 +1059,7 @@ focused and repository-wide gates. Design and research evidence live in
 
 ### R3 - File-tree generation depth
 
-Status: complete as of 2026-07-29. Resume at R4.
+Status: complete as of 2026-07-29.
 
 1. [Complete 2026-07-29] Classify concrete TypeScript/Vite failure clusters
    and add targeted, diagnostic- and file-budget-bounded repair prompts.
@@ -1091,7 +1092,7 @@ implementation evidence live in
 
 ### R4 - Generated-app runtime and self-host publish
 
-Status: complete as of 2026-07-29. Resume at R5.
+Status: complete as of 2026-07-29.
 
 1. [Complete 2026-07-29] Add per-app runtime health, metrics, crash visibility,
    and documented process-pool limits.
@@ -1126,7 +1127,7 @@ live interoperability skips).
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: complete as of 2026-07-29. Resume at R6.
+Status: complete as of 2026-07-29.
 
 1. [Complete 2026-07-29] Make real sandboxed `tsc` and Vite validation the
    default; remove synthetic success. The required validator uses a
@@ -1238,9 +1239,8 @@ canonical Worker without losing legacy compatibility.
 
 ### R7 - Builder and frontend maintainability
 
-Status: in progress. R7.1's five-module ownership audit is complete; resume at
-R7.2 accessible state boundaries and keyboard-safe primitives in
-[`r7-frontend-maintainability.md`](r7-frontend-maintainability.md).
+Status: complete. R7.1-R7.5 passed 2026-08-01; implementation evidence lives
+in [`r7-frontend-maintainability.md`](r7-frontend-maintainability.md).
 
 1. Split remaining god views and route modules along established feature seams.
 2. Add shared accessible loading/error/empty boundaries and keyboard-safe
@@ -1251,10 +1251,14 @@ R7.2 accessible state boundaries and keyboard-safe primitives in
    repo-wide visual rewrite.
 5. Add stable component/browser coverage for Builder app and Worker modes.
 
-Gate: critical authoring and operations views have accessible state handling,
-bounded module ownership, and regression coverage.
+Gate: passed. Critical authoring and operations views have accessible state
+handling, bounded module ownership, component coverage, and an authenticated
+real-browser Builder/Worker/keyboard pass.
 
 ### R8 - Release reliability and production packaging
+
+Status: complete. The packaging decision and requirement/evidence matrix live
+in [`r8-release-reliability.md`](r8-release-reliability.md).
 
 1. Persist smoke-test transcripts per generated app checkpoint.
 2. Add focused app and Worker happy paths: sign in, build, approve, run,
@@ -1268,8 +1272,9 @@ bounded module ownership, and regression coverage.
    unsupported "coming soon" claims.
 6. Keep generated artifacts out of Git and document cleanup/reset.
 
-Gate: the release checklist, production image, backup round-trip, automated
-happy paths, and public claims describe the same tested product.
+Gate: passed 2026-08-01. The release checklist, built plain-Node server,
+non-root/read-only production image, backup round trip, browser/app/Worker
+paths, claim audit, and public documentation describe the same tested product.
 
 ## Decision-gated work
 
@@ -1293,16 +1298,16 @@ requires an explicit owner decision.
 | Historical source                   | Current disposition                                                                                                                                              |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Phase 3 Track A, BYOK               | Complete in R2: canonical provider policy/catalog, structured decoding with bounded fallback, malformed-input correction, vault parity, and readiness reporting. |
-| Phase 3 Track B, file tree          | Core authoring, validation, projection, iteration, and bounded repair shipped; remaining work is R3.                                                             |
-| Phase 3 Track C, app runtime        | Per-app SQLite/runtime shipped; health, publish integrity, and preview isolation are R4/R5.                                                                      |
-| Phase 3 Track D, agent path         | Six tools, approval UX, Builder parity, and trace view shipped; resource-scoped enforcement is W6, SMTP/template/evaluation/import-export are R6.                |
-| Phase 3 Track E and Security        | Worker-bound capability, credential, environment, egress, and sandbox enforcement is W6; generated-code sandboxing and preview isolation are R5.                 |
-| Repo Review Phase 1                 | Many foundation items shipped; all claims are re-audited and remaining correctness/security work closes in R1/R5/R8.                                             |
-| Repo Review Phase 2                 | Lint/format/docs work began in PA0; baseline closure and configuration cleanup are R1.                                                                           |
-| Repo Review Phase 3                 | Persistence end-state and module decomposition require current evidence; they are R1/R7, not license for a rewrite.                                              |
-| Repo Review Phase 4                 | Runtime policy blockers are W6; remaining production/container/backup/e2e work is R1/R5/R8.                                                                      |
-| Agent playbook sprints              | Historical feature plan is substantially shipped; Worker observability/control integration continues in W7/W8/R6.                                                |
-| High-numbered `PhaseNN` code labels | Historical implementation labels only. Re-audit in R1 before renaming or deleting; they do not create roadmap work by themselves.                                |
+| Phase 3 Track B, file tree          | Completed in R3: canonical generation/iteration, bounded repair, progress, review, targeted regeneration, package planning, and export.                          |
+| Phase 3 Track C, app runtime        | Completed in R4/R5: per-app SQLite/runtime, health, publish integrity, self-host packaging, backup, and preview isolation.                                       |
+| Phase 3 Track D, agent path         | Completed in W6/R6: resource-scoped enforcement, SMTP, templates, readiness, evaluation, portability, and canonical-only execution.                              |
+| Phase 3 Track E and Security        | Completed in W6/R5: Worker capabilities/credentials/network/process enforcement plus generated-code sandboxing and preview isolation.                            |
+| Repo Review Phase 1                 | Re-audited and closed through R1/R5/R8; historical entries do not reopen work.                                                                                   |
+| Repo Review Phase 2                 | Completed in PA0/R1: zero-warning lint, repository formatting, documentation, configuration cleanup, and dependency ownership.                                   |
+| Repo Review Phase 3                 | Completed in R1/R7: persistence authority and bounded frontend/route ownership are documented and gated without a rewrite.                                       |
+| Repo Review Phase 4                 | Completed in W6/R1/R5/R8: runtime policy, production packaging, container hardening, backup, focused paths, and release evidence.                                |
+| Agent playbook sprints              | Reconciled into W7/W8/R6; archived sprint labels do not create follow-on work.                                                                                   |
+| High-numbered `PhaseNN` code labels | Historical implementation labels only; they do not create roadmap work by themselves.                                                                            |
 
 ## Verification matrix
 
@@ -1337,10 +1342,13 @@ Every completed W or R loop:
 npm run typecheck
 npm run lint
 npm run build:web
+npm run build:server
 npm run test:api
 npm run test:web
 git diff --check
 ```
 
 Repo-wide `npm run format:check` is mandatory now that R1 has closed the
-inherited baseline.
+inherited baseline. The completed R8 release additionally runs
+`npm run verify:release` and, with Docker available,
+`npm run verify:production-image`.

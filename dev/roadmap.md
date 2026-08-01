@@ -5,10 +5,11 @@ live in [`../BACKLOG.md`](../BACKLOG.md); executable slices and autonomous
 continuation order live in
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
 
-Current active loop: **R7 - Builder and frontend maintainability**. The short
-repository/session resume point lives in [`../HANDOFF.md`](../HANDOFF.md);
-the detailed implementation ledger is
-[`CODEX-HANDOFF.md`](CODEX-HANDOFF.md).
+The automatic self-host MVP sequence **PA0, W1-W10, and R1-R8 is complete**.
+No R9 is implied. The short repository/session resume point lives in
+[`../HANDOFF.md`](../HANDOFF.md); the implementation and gate ledger is
+[`../BACKLOG.md`](../BACKLOG.md). Starting later work requires an explicit
+owner decision.
 W6.1 capability compilation, W6.2 immediate tool-boundary enforcement,
 W6.3 credential/network/process hardening, and W6.4 atomic rolling budgets are
 complete. W6.5 closes the adversarial bypass gate across every registered tool.
@@ -98,17 +99,15 @@ exclusion, reviewed preflight, and idempotent paused import. R6.6 then routes
 every accepted legacy Agent launch and active schedule through deterministic
 Worker materialization, canonical activation, the fenced supervisor, W7
 control, and a linked compatibility read model with JSON, SQLite, and managed
-Postgres parity. R6 is complete. R7.1a splits the Agent editor into a bounded
-view, controller, and feature-owned controlled components. R7.1b splits the
-Builder route surface into bounded feature modules behind a compatibility
-facade. R7.1c moves App Builder state, streaming, and mutations into a bounded
-controller hook behind the existing feature-owned thread and tab components.
-R7.1d keeps one parent-owned Agent draft while separating its controller,
-readiness/review, configuration/sample-input, and approval/first-run surfaces.
-R7.1e splits Settings into bounded access, credentials/workspace, and
-audit/advanced modules and closes the five-module ownership audit. Resume at
-R7.2 accessible state boundaries and keyboard-safe interactions in
-[`worker-implementation-loops.md`](worker-implementation-loops.md#r7---builder-and-frontend-maintainability).
+Postgres parity. R6 is complete. R7 decomposes the five audited frontend/route
+modules, adds shared accessible async-state and keyboard tab primitives,
+centralizes browser formatting, fixes the incremental styling direction, and
+passes component plus real-browser Builder/Worker coverage. R8 binds quality
+transcripts to generated-app checkpoints and closes focused app/Worker release
+paths, regressions, claim audit, cleanup, built-JavaScript startup, and actual
+production-image boot. Exact evidence lives in
+[`r7-frontend-maintainability.md`](r7-frontend-maintainability.md) and
+[`r8-release-reliability.md`](r8-release-reliability.md).
 
 R1 is complete. Its persistence slice reuses managed Postgres pools,
 validates SQLite migration/restore integrity and foreign keys, rejects corrupt

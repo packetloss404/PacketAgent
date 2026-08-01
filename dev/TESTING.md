@@ -35,7 +35,34 @@ fake-endpoint contracts, race orderings, credential rotation, restart,
 replay, and audited dead-letter redrive. Live interoperability remains
 conditionally skipped.
 
-Last automated W10.4 baseline (2026-07-28):
+R7 then closes bounded frontend ownership, shared accessible async/tab
+primitives, client formatting, incremental styling, and real-browser
+Builder/Worker coverage. R8 adds checkpoint-bound generated-app quality
+transcripts, the focused release path, claim audit, built Node 22 server, and
+actual production-image proof. See
+[`r8-release-reliability.md`](r8-release-reliability.md) for the evidence
+matrix.
+
+Current R8 release checks (2026-08-01):
+
+- `npm run verify:release`: 12 deterministic groups passed, including 5 app
+  happy-path cases, the serialized Worker disconnect/reconnect/revoke case, 39
+  path/preview/artifact/rollback regressions, 2 backup/restore regressions,
+  tenant isolation, claim audit, built-server boot, and authenticated browser
+  verification. The one live PacketADE network case is intentionally skipped
+  without configuration.
+- `npm run verify:production-image`: built the Dockerfile, inspected the exact
+  `node --enable-source-maps dist/server.js` command, and booted the image as a
+  non-root process with a read-only root filesystem.
+- Browser evidence is generated under ignored `tmp/release-verification/` for
+  Builder app and canonical Worker operations modes. Arrow-key focus and
+  selected-tab state are asserted.
+- Typecheck, zero-warning lint, and repository formatting pass.
+- Full API suite: 1,662 total; 1,659 passed, 3 intentionally skipped live
+  probes, 0 failed.
+- Full web suite: 58 passed, 0 skipped, 0 failed.
+
+Historical W10.4 baseline (2026-07-28):
 
 - API: 1,509 passed, 4 skipped, 0 failed
 - Web: 28 passed, 0 failed
@@ -164,7 +191,8 @@ Boot the app:
 npm run dev
 ```
 
-Open `http://localhost:7341/` in development, or `http://localhost:8484/` after `npm run build:web && npm start`.
+Open `http://localhost:7341/` in development, or `http://localhost:8484/`
+after `npm run build:web && npm run build:server && npm start`.
 
 ## W2 Worker Lifecycle Smoke
 
@@ -899,7 +927,9 @@ Use this as the short confidence pass when time is tight.
    the checkpoint-bound export manifest. Confirm the plan says
    `executed: false`; an unapproved package or URL/git/local dependency must
    block installation without blocking source export.
-9. Optional single-port serve: run `npm run build:web && npm start`, then open `http://localhost:8484`.
+9. Optional single-port serve: run
+   `npm run build:web && npm run build:server && npm start`, then open
+   `http://localhost:8484`.
 
 ## Golden Path: Build An App
 
@@ -1186,13 +1216,22 @@ npm run typecheck
 npm run test:api
 npm run test:web
 npm run build
+npm run verify:release
+npm run verify:production-image  # Docker required
 ```
 
 Acceptance:
 
 - Each command exits `0`.
 - No new TypeScript errors.
-- A production bundle exists under `web/dist/` after `npm run build:web` or `npm run build`. Do not commit it.
+- Production bundles exist under `web/dist/` and `dist/` after `npm run build`.
+  Do not commit them.
+- The focused release gate and production-image verifier pass.
+
+To remove generated build, runtime, export, and browser evidence without
+removing databases or environment files, run `npm run clean:generated`.
+`store:reset` and `db:reset` are separate state-destructive operations; stop
+the service and back up state first.
 
 ## Public Share And 404
 

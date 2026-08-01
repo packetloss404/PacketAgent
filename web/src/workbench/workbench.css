@@ -563,6 +563,56 @@
   border-bottom-color: var(--green);
 }
 
+.wb-root.wb-root.wb-root .tab:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -3px;
+}
+
+.wb-root.wb-root.wb-root .builder-tab-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.wb-root.wb-root.wb-root .admin-tabbar {
+  height: 48px;
+  flex-shrink: 0;
+  align-items: stretch;
+  overflow-x: auto;
+}
+
+.wb-root.wb-root.wb-root .admin-tab-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.wb-root.wb-root.wb-root .async-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 0 0 12px;
+  color: var(--silver-300);
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+}
+
+.wb-root.wb-root.wb-root .async-state--error {
+  color: var(--danger);
+  border-color: rgba(242, 107, 92, 0.3);
+}
+
+.wb-root.wb-root.wb-root .async-state--inline {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
 .wb-root.wb-root.wb-root .grid-bg {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),

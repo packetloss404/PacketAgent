@@ -29,6 +29,7 @@ import { loadStoreAsync, mutateStoreAsync, recordActivity } from "../../packetag
 import { previewUrlForDraft } from "./smoke.js";
 import { requireAuthenticatedContextAsync } from "../../packetagent-services.js";
 import { type Context } from "hono";
+import { buildGeneratedAppSmokeTranscript } from "../../generated-app-smoke-transcript.js";
 
 export async function listAppCheckpoints(c: Context) {
   try {
@@ -72,6 +73,7 @@ export async function listAppCheckpoints(c: Context) {
           previewUrl: checkpoint.previewUrl,
           buildStatus: checkpoint.buildStatus,
           smokeStatus: checkpoint.smokeStatus,
+          smokeTranscript: checkpoint.smokeTranscript,
           previousCheckpointId: checkpoint.previousCheckpointId,
           createdAt: checkpoint.createdAt,
         }))
@@ -143,6 +145,15 @@ export async function rollbackAppCheckpoint(c: Context) {
         sourceFiles: runtimeArtifact.files,
         source: "rollback" as const,
         previousCheckpointId: app.checkpointId,
+        smokeTranscript: buildDerivedSmokeTranscript({
+          workspaceId: context.workspace.id,
+          appId: app.id,
+          checkpointId: restoredCheckpointId,
+          source: "rollback",
+          transcript: target.smokeTranscript,
+          fallbackStatus: target.smokeStatus,
+          recordedAt: timestamp,
+        }),
         createdByUserId: context.user.id,
         createdAt: timestamp,
       };
@@ -291,6 +302,15 @@ export async function branchAppCheckpoint(c: Context) {
         ),
         buildStatus: sourceCheckpoint.buildStatus,
         smokeStatus: sourceCheckpoint.smokeStatus,
+        smokeTranscript: buildDerivedSmokeTranscript({
+          workspaceId: context.workspace.id,
+          appId: newAppId,
+          checkpointId: newCheckpointId,
+          source: "branch",
+          transcript: sourceCheckpoint.smokeTranscript,
+          fallbackStatus: sourceCheckpoint.smokeStatus,
+          recordedAt: timestamp,
+        }),
         source: "branch",
         previousCheckpointId: sourceCheckpoint.id,
         createdByUserId: context.user.id,
@@ -362,4 +382,44 @@ export async function branchAppCheckpoint(c: Context) {
   } catch (error) {
     return errorResponse(c, error);
   }
+}
+
+function buildDerivedSmokeTranscript(input: {
+  workspaceId: string;
+  appId: string;
+  checkpointId: string;
+  source: "rollback" | "branch";
+  transcript: GeneratedAppCheckpointWithRuntime["smokeTranscript"];
+  fallbackStatus?: string;
+  recordedAt: string;
+}) {
+  const prior = input.transcript;
+  return buildGeneratedAppSmokeTranscript({
+    workspaceId: input.workspaceId,
+    appId: input.appId,
+    checkpointId: input.checkpointId,
+    source: input.source,
+    recordedAt: input.recordedAt,
+    ...(prior ? { derivedFromTranscriptId: prior.id } : {}),
+    result: prior
+      ? {
+          status: prior.status,
+          message: prior.summary,
+          checks: prior.checks,
+          blockers: prior.blockers,
+          execution: {
+            startedAt: prior.startedAt,
+            completedAt: prior.completedAt,
+            durationMs: prior.durationMs,
+            runner: prior.runner,
+            ...(prior.validatorSource ? { validatorSource: prior.validatorSource } : {}),
+          },
+        }
+      : {
+          status: input.fallbackStatus ?? "pending",
+          message: "This checkpoint predates persisted smoke transcripts.",
+          checks: [],
+          blockers: [],
+        },
+  });
 }

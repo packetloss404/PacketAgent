@@ -11,11 +11,13 @@ import {
   mutateStoreAsync,
   resetStoreForTests,
   setManagedPostgresStoreClientFactoryForTests,
+  type GeneratedAppRecord,
   type ManagedPostgresStoreClientConfig,
   type ManagedPostgresStoreQueryClient,
   type ManagedPostgresStoreQueryResult,
   type PacketAgentData,
 } from "../../packetagent-store.js";
+import { buildGeneratedAppSmokeTranscript } from "../../generated-app-smoke-transcript.js";
 import { WorkerLifecycleError } from "../errors.js";
 import {
   createWorkerLifecycleService,
@@ -133,9 +135,11 @@ interface BackendScenarioResult {
   readonly exportedWorkerPackageDeploymentCount: number;
   readonly packetProductEventAcknowledgementProjection: readonly string[];
   readonly exportedPacketProductEventAcknowledgementCount: number;
+  readonly generatedAppSmokeTranscripts: readonly string[];
 }
 
 async function runBackendScenario(): Promise<BackendScenarioResult> {
+  await persistGeneratedAppSmokeTranscriptFixture();
   const credentialService = createWorkerCredentialService();
   await credentialService.upsert({
     workspaceId: "alpha",
@@ -341,7 +345,77 @@ async function runBackendScenario(): Promise<BackendScenarioResult> {
       .sort(),
     exportedPacketProductEventAcknowledgementCount:
       exported.data.packetProductEventAcknowledgements.length,
+    generatedAppSmokeTranscripts: (stored.generatedApps ?? [])
+      .flatMap((app) => app.checkpoints ?? [])
+      .flatMap((checkpoint) =>
+        checkpoint.smokeTranscript
+          ? [
+              `${checkpoint.smokeTranscript.schemaVersion}:${checkpoint.smokeTranscript.checkpointId}:${checkpoint.smokeTranscript.status}:${checkpoint.smokeTranscript.runner}`,
+            ]
+          : [],
+      )
+      .sort(),
   };
+}
+
+async function persistGeneratedAppSmokeTranscriptFixture(): Promise<void> {
+  const recordedAt = "2026-08-01T12:00:01.000Z";
+  const smokeTranscript = buildGeneratedAppSmokeTranscript({
+    workspaceId: "alpha",
+    appId: "generated-app-parity",
+    checkpointId: "generated-app-parity-checkpoint",
+    source: "approval",
+    recordedAt,
+    result: {
+      status: "pass",
+      message: "Isolated TypeScript and Vite validation passed.",
+      checks: [{ name: "build", status: "pass", detail: "vite build passed" }],
+      blockers: [],
+      execution: {
+        startedAt: "2026-08-01T12:00:00.000Z",
+        completedAt: recordedAt,
+        durationMs: 1_000,
+        runner: "isolated-sandbox",
+        validatorSource: "real",
+      },
+    },
+  });
+  const generatedApp: GeneratedAppRecord = {
+    id: "generated-app-parity",
+    workspaceId: "alpha",
+    slug: "generated-app-parity",
+    name: "Generated app parity",
+    description: "Persistence fixture",
+    prompt: "Build a persistence fixture",
+    templateId: "fixture",
+    status: "built",
+    draft: {},
+    checkpointId: "generated-app-parity-checkpoint",
+    buildStatus: "passed",
+    smokeStatus: "pass",
+    checkpoints: [
+      {
+        id: "generated-app-parity-checkpoint",
+        appId: "generated-app-parity",
+        workspaceId: "alpha",
+        label: "Initial approval",
+        draft: {},
+        buildStatus: "passed",
+        smokeStatus: "pass",
+        smokeTranscript,
+        source: "initial",
+        createdByUserId: "user_alpha",
+        createdAt: recordedAt,
+      },
+    ],
+    createdByUserId: "user_alpha",
+    createdAt: recordedAt,
+    updatedAt: recordedAt,
+  };
+  await mutateStoreAsync((data) => {
+    data.generatedApps ??= [];
+    data.generatedApps.push(generatedApp);
+  });
 }
 
 async function runPacketProductTrustPersistence(): Promise<string> {

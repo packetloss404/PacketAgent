@@ -878,10 +878,33 @@ test("builder app draft can be generated and applied with smoke metadata", async
   assert.ok(applyBody.checkpoint?.id);
   assert.equal(applyBody.smokeBuild?.status, "pass");
   assert.ok((applyBody.smokeBuild?.checks?.length ?? 0) > 0);
-  assert.ok(
-    loadStore().generatedApps?.some(
-      (entry) => entry.id === applyBody.app?.id && entry.checkpointId === applyBody.checkpoint?.id,
-    ),
+  const storedApp = loadStore().generatedApps?.find(
+    (entry) => entry.id === applyBody.app?.id && entry.checkpointId === applyBody.checkpoint?.id,
+  );
+  const storedCheckpoint = storedApp?.checkpoints?.find(
+    (checkpoint) => checkpoint.id === applyBody.checkpoint?.id,
+  );
+  assert.ok(storedApp);
+  assert.equal(storedCheckpoint?.smokeTranscript?.checkpointId, applyBody.checkpoint?.id);
+  assert.equal(storedCheckpoint?.smokeTranscript?.source, "approval");
+  assert.equal(storedCheckpoint?.smokeTranscript?.status, "pass");
+  assert.equal(storedCheckpoint?.smokeTranscript?.runner, "isolated-sandbox");
+  assert.ok((storedCheckpoint?.smokeTranscript?.checks.length ?? 0) > 0);
+
+  const checkpointResponse = await app.request(
+    `/api/app/builder/checkpoints?appId=${applyBody.app?.id}`,
+    { headers },
+  );
+  const checkpointBody = (await checkpointResponse.json()) as {
+    checkpoints?: Array<{
+      id: string;
+      smokeTranscript?: { checkpointId?: string; status?: string };
+    }>;
+  };
+  assert.equal(checkpointResponse.status, 200);
+  assert.equal(
+    checkpointBody.checkpoints?.[0]?.smokeTranscript?.checkpointId,
+    applyBody.checkpoint?.id,
   );
 });
 
@@ -1512,6 +1535,8 @@ test("builder app-draft/apply fails closed when required sandbox validation is b
       body: JSON.stringify({ draft: draftBody.draft, runSmoke: true }),
     });
     const applyBody = (await applyResponse.json()) as {
+      app?: { id?: string };
+      checkpoint?: { id?: string };
       smokeBuild?: {
         status?: string;
         message?: string;
@@ -1525,6 +1550,28 @@ test("builder app-draft/apply fails closed when required sandbox validation is b
     assert.ok(
       applyBody.smokeBuild?.blockers?.some((blocker) => blocker.includes("Docker unavailable")),
     );
+    assert.ok(applyBody.app?.id);
+    assert.ok(applyBody.checkpoint?.id);
+
+    const refreshResponse = await app.request("/api/app/builder/preview/refresh", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        appId: applyBody.app.id,
+        checkpointId: applyBody.checkpoint.id,
+        runSmoke: true,
+      }),
+    });
+    const refreshBody = (await refreshResponse.json()) as {
+      preview?: { buildPhase?: string; status?: string; reason?: string };
+      smokeTranscript?: { status?: string; checkpointId?: string };
+    };
+    assert.equal(refreshResponse.status, 200);
+    assert.equal(refreshBody.preview?.buildPhase, "failed");
+    assert.equal(refreshBody.preview?.status, "blocked");
+    assert.match(refreshBody.preview?.reason ?? "", /0\//);
+    assert.equal(refreshBody.smokeTranscript?.status, "fail");
+    assert.equal(refreshBody.smokeTranscript?.checkpointId, applyBody.checkpoint.id);
   } finally {
     setGeneratedAppFileTreeValidatorForTests(passingGeneratedAppValidator);
   }
@@ -1696,6 +1743,8 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
     (checkpoint) => checkpoint.id === appliedIteration.checkpoint?.id,
   );
   assert.equal(convertedCheckpoint?.codegenSource, "llm-filetree");
+  assert.equal(convertedCheckpoint?.smokeTranscript?.source, "iteration");
+  assert.equal(convertedCheckpoint?.smokeTranscript?.checkpointId, appliedIteration.checkpoint?.id);
   assert.ok(appliedIteration.workspace?.manifest?.path);
   assert.ok(existsSync(appliedIteration.workspace.manifest.path));
 
@@ -1758,6 +1807,12 @@ test("builder app iteration can generate a diff, apply it, and rollback checkpoi
     ?.sourceFiles?.find((file) => file.path === "src/App.tsx")?.sha256;
   assert.equal(rollbackSourceSha, initialSourceSha);
   assert.notEqual(rollbackSourceSha, iteratedSourceSha);
+  const rollbackCheckpoint = rolledBackRecord?.checkpoints?.find(
+    (checkpoint) => checkpoint.id === rollbackBody.checkpoint?.id,
+  );
+  assert.equal(rollbackCheckpoint?.smokeTranscript?.source, "rollback");
+  assert.equal(rollbackCheckpoint?.smokeTranscript?.checkpointId, rollbackBody.checkpoint?.id);
+  assert.ok(rollbackCheckpoint?.smokeTranscript?.derivedFromTranscriptId);
 });
 
 test("builder canonical changes routes validate target app and expose preview, fix, and agent checkpoint contracts", async () => {
@@ -1921,11 +1976,21 @@ test("builder canonical changes routes validate target app and expose preview, f
   const refreshBody = (await refreshResponse.json()) as {
     preview?: { status?: string };
     smoke?: { status?: string };
+    smokeTranscript?: { id?: string; checkpointId?: string; source?: string; status?: string };
   };
 
   assert.equal(refreshResponse.status, 200);
   assert.equal(refreshBody.preview?.status, "ready");
   assert.equal(refreshBody.smoke?.status, "pass");
+  assert.equal(refreshBody.smokeTranscript?.checkpointId, changeApply.checkpoint?.id);
+  assert.equal(refreshBody.smokeTranscript?.source, "preview-refresh");
+  assert.equal(
+    loadStore()
+      .generatedApps?.find((entry) => entry.id === applied.app.id)
+      ?.checkpoints?.find((checkpoint) => checkpoint.id === changeApply.checkpoint?.id)
+      ?.smokeTranscript?.id,
+    refreshBody.smokeTranscript?.id,
+  );
 
   const fixResponse = await app.request("/api/app/builder/fix-prompt", {
     method: "POST",

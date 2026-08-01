@@ -13,6 +13,7 @@ import { SecretsView } from "./secrets";
 import { SSOView } from "./sso";
 import { WebhooksView } from "./webhooks";
 import { WorkflowsView } from "./workflows";
+import { AccessibleTabPanel, AccessibleTabs } from "@/components/AccessibleTabs";
 
 interface AdminTab {
   id: string;
@@ -55,47 +56,20 @@ export function AdminPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      <div
-        role="tablist"
-        aria-label="Admin sections"
-        style={{
-          display: "flex",
-          gap: 4,
-          padding: "0 16px",
-          borderBottom: "1px solid var(--line)",
-          height: 48,
-          alignItems: "stretch",
-          flexShrink: 0,
-          overflowX: "auto",
-        }}
-      >
-        {ADMIN_TABS.map((t) => {
-          const isActive = t.id === activeTab.id;
-          return (
-            <button
-              type="button"
-              key={t.id}
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => navigate(`/admin/${t.id}`)}
-              style={{
-                padding: "0 14px",
-                fontSize: 13,
-                color: isActive ? "var(--silver-50)" : "var(--silver-300)",
-                background: "transparent",
-                border: "none",
-                borderBottom: `2px solid ${isActive ? "var(--green)" : "transparent"}`,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-      <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+      <AccessibleTabs
+        id="admin"
+        label="Admin sections"
+        tabs={ADMIN_TABS.map((tabDefinition) => ({
+          id: tabDefinition.id,
+          label: tabDefinition.label,
+        }))}
+        activeId={activeTab.id}
+        onSelect={(id) => navigate(`/admin/${id}`)}
+        className="tabbar admin-tabbar"
+      />
+      <AccessibleTabPanel id="admin" tabId={activeTab.id} className="admin-tab-panel">
         <ActiveComponent />
-      </div>
+      </AccessibleTabPanel>
     </div>
   );
 }

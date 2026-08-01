@@ -8,6 +8,13 @@ The inherited TaskLoom implementation supplied substantial parts of that runtime
 
 The existing full-bleed builder at `/builder` remains useful, but its role changes: it becomes the worker creation studio. Existing prompt-to-app functionality remains supported as an inherited capability rather than the product's organizing principle.
 
+The automatic self-host MVP implementation sequence (PA0, W1-W10, and
+inherited R1-R8) is complete. That statement covers the local runtime,
+production packaging, and deterministic gates; it does not certify the
+external PacketChat or PacketPhone products without their live endpoint
+configuration. Later hosted or expanded-runtime work remains explicitly
+decision-gated in [`BACKLOG.md`](BACKLOG.md).
+
 ## Packet suite
 
 - **PacketADE** is where development work is planned, built, and supervised.
@@ -28,7 +35,7 @@ The following implemented subsystems are exercised by tests. Most are inherited 
 
 - **Canonical Worker control plane and supervisor** (`src/workers/`). W1-W5 provide versioned records and runtime validators; immutable definitions, versions, and deployments; lifecycle commands and audit events; a durable activation envelope/inbox; encrypted expiring references for large or sensitive inputs; atomic admission of one version-pinned queued run and execution job; and a port-isolated plan-act-evaluate-checkpoint-decide supervisor. Immutable digest-chained snapshots preserve the complete phase cursor, working memory, artifacts, effect receipts, trace, and remaining budget. Startup and periodic recovery requeue safe expired work and quarantine corrupt or uncertain replay. Mutating tools prepare and complete redacted effect receipts around the external call. W6 adds normalized tool/verb/resource capability compilation, deployment-only narrowing, deterministic policies tied to the immutable version digest, typed operation descriptors for every production tool, fail-closed authorization in `executeTool`, redacted allow/deny events, workspace-scoped encrypted credential references, pinned public DNS/connection validation, redirect denial, Docker-only no-network Worker command execution, atomic workspace/deployment rolling reservations for provider cost and externally billable actions, and a one-shot registry guard that prevents direct Worker handler bypass. W7 adds durable version-bound attention, approval, operator-command, and notification-delivery records; atomic pause, resume, stop, revoke, approve-once, approve-for-run, and reject; exact checkpointed attention with deadline enforcement and final-boundary grant rechecks; independent, workspace-scoped operator routes with separate inspect, run-control, deployment-control, and approval permissions; and adversarial restart, callback replay, approve/reject, phase-stop, and activation/revoke race coverage. W8.1 adds digest-bound v2 event envelopes with monotonic workspace/deployment/run sequences, W3C trace and durable-source correlations, atomically paired evidence entries, optional opaque raw-payload references, and content/provenance-bound artifact manifests while retaining legacy v1 reads. W8.2 rebuilds cumulative version/deployment/run views for provider/tool/effect calls, retries, queue duration, approvals, checkpoints, budgets, artifacts, outcomes, exit-predicate matches, and explained missing-source gaps. W8.3 adds separate metadata, summary, prompt, tool-payload, and artifact windows; central persistence plus read-boundary redaction; terminal-only payload compaction; digest-only deletion events; retention-explained source gaps; and bounded, dry-runnable, workspace-scoped cleanup jobs. W8.4-W8.5 expose independently authorized health/list/detail/evidence APIs, stable workspace/filter-bound cursors, bounded resumable SSE, and a canonical accessible Worker list/detail workbench whose required answers come from one server-side read model. Manual, timezone-aware cron, opaque webhook, alert, and queue deliveries share this path across JSON, SQLite, and managed Postgres.
 - **Two-phase LLM file-tree codegen** (`src/codegen/llm-author.ts`). The LLM authors whole React/Vite file trees via `write_file` tool calls: JSON plan parsing (fenced + bracket-scan fallback, one retry), token-budgeted chunked write rounds (`MAX_FILES_PER_WRITE_CHUNK=8`, `CHUNK_WRITE_THRESHOLD=10`), partial-result tolerance, and a workspace-escape `isSafePath` guard. `AppBuilderDraft` is a derived view; generated files land under `data/generated-apps/.../workspace` with sha256 manifests.
-- **Provider-agnostic router** (`src/providers/router.ts`). Route-key -> provider/model dispatch, six real BYOK clients, one canonical provider/model/policy catalog, workspace-vault-aware readiness, native or conditional structured responses, bounded malformed-tool correction, `ledger.ts` cost recording, and an always-present `stub` fallback so the loop runs without keys.
+- **Provider-agnostic router** (`src/providers/router.ts`). Route-key -> provider/model dispatch, six real BYOK clients, one canonical provider/model/policy catalog, workspace-vault-aware readiness, native or conditional structured responses, bounded malformed-tool correction, `ledger.ts` cost recording, and a deterministic template-authoring fallback when no provider is ready. That fallback never reports provider readiness or external execution success.
 - **Tool-using agent loop** (`src/tools/agent-loop.ts`). Provider-routed, cost-ledger-wrapped, registered tool execution with tool-result feedback, abort signals, and capped turns. Tool registry/executor and read/write/browser builtins under `src/tools/`.
 - **Real Playwright browser runtime** (`src/tools/browser-runtime.ts`). Headless chromium, per-run page sessions, screenshot artifacts to `data/artifacts/<runId>`, graceful shutdown on SIGINT/SIGTERM.
 - **Command sandbox** (`src/sandbox/`). A driver abstraction with a Docker driver (`--network=none`, CPU/memory/PID caps, dropped capabilities, no-new-privileges, non-root user, read-only rootfs). Docker is the only supported untrusted-code driver. The native child process is a separately gated owner/admin trusted-host diagnostic path, not a sandbox or fallback; generated apps and autonomous Workers refuse it.
@@ -44,7 +51,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 
 - **What self-host gives up.** No free public subdomain with auto TLS (you bring your own DNS and certificate). No pre-wired OAuth connectors (you register your own OAuth clients with each provider). No one-click App Store / Play Store submission (no managed macOS build farm). No cross-tenant user memory. No vendor-hosted credit meter. No vendor-amortized LLM key - you bring your own across any of six providers (Anthropic, OpenAI, Gemini, OpenRouter, MiniMax, or a local Ollama / vLLM / LM Studio / llama.cpp endpoint).
 - **What self-host gains.** Your data, your source code, your LLM key, and your deploy target - all on infrastructure you own. No vendor in the path between you and your customers. No per-seat pricing. No rate limits beyond what your own LLM provider imposes on your own key. The local-LLM provider can be pointed at a separate GPU box on your LAN, so the workbench laptop stays cheap while inference runs where the silicon is. Single MIT-licensed binary that runs anywhere Node 22 runs - laptop, container, VPS, homelab, behind a VPN.
-- **Honest about what is not built yet.** Trigger delivery creates durable canonical queued Worker runs, and `worker.run` executes them through a bounded, checkpointed, restart-recoverable supervisor with external-effect receipts, fine-grained runtime policy, durable rolling budgets, a closed adversarial permission gate, automatic approval attention, and independent operator controls whose restart/kill race gate passes. The W8 answerability gate covers the versioned evidence substrate, deterministic rollups, bounded retention cleanup, consolidated Worker health/cost/evidence API, bounded resumable event stream, and accessible canonical Worker list/detail workbench. W9's PacketADE handoff and W10's PacketChat/PacketPhone adapters and remote-control gate pass locally. This does not certify the external PacketChat or PacketPhone products: the two live probes are conditionally skipped until operators supply their endpoints and credentials. Artifact bytes are deleted only when a storage adapter implements the digest-checked retention port; no generic path deletion is attempted. Worker SMTP is now TLS-only, vault-backed, and public-address-pinned; Worker browser and SQL paths still fail closed until equally hardened drivers exist. Other remaining limits include opt-in real sandbox validation for non-Worker app flows and legacy template artifacts that may still use browser-side sql.js.
+- **Honest about what is not built yet.** Trigger delivery creates durable canonical queued Worker runs, and `worker.run` executes them through a bounded, checkpointed, restart-recoverable supervisor with external-effect receipts, fine-grained runtime policy, durable rolling budgets, a closed adversarial permission gate, automatic approval attention, and independent operator controls whose restart/kill race gate passes. The W8 answerability gate covers the versioned evidence substrate, deterministic rollups, bounded retention cleanup, consolidated Worker health/cost/evidence API, bounded resumable event stream, and accessible canonical Worker list/detail workbench. W9's PacketADE handoff and W10's PacketChat/PacketPhone adapters and remote-control gate pass locally. This does not certify the external PacketChat or PacketPhone products: the two live probes are conditionally skipped until operators supply their endpoints and credentials. Artifact bytes are deleted only when a storage adapter implements the digest-checked retention port; no generic path deletion is attempted. Worker SMTP is TLS-only, vault-backed, and public-address-pinned; Worker browser and SQL paths still fail closed until equally hardened drivers exist. Real generated-source validation requires Docker and fails closed when isolation is unavailable; legacy template artifacts may still use browser-side sql.js for migration compatibility.
 - **Honest about the gap with hosted.** The deferred hosted-only capabilities and what a future "PacketAgent Cloud" product would need to ship them are inventoried in [CLOUD.md](CLOUD.md). That document is for strategic reference, not a roadmap commitment - self-host stays the default.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
@@ -62,7 +69,9 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [docs/SELF_HOST.md](docs/SELF_HOST.md) is the canonical setup guide: prerequisites, 5-minute quick start, BYO-LLM-key configuration, and Docker-Compose deploy.
 - [CLOUD.md](CLOUD.md) inventories the hosted-only capabilities PacketAgent intentionally does not ship as self-host, and what a hypothetical PacketAgent Cloud product would need to ship them.
 - [CHANGELOG.md](CHANGELOG.md) records notable product and platform changes.
-- [BACKLOG.md](BACKLOG.md) is the single implementation ledger for all remaining autonomous-worker and inherited platform work.
+- [BACKLOG.md](BACKLOG.md) is the single implementation ledger and completed
+  loop history. Its decision-gated section is the only source of potential
+  follow-on work; no automatic R9 exists.
 - [HANDOFF.md](HANDOFF.md) is the short, exact resume point for a new working session.
 - [dev/CODEX-HANDOFF.md](dev/CODEX-HANDOFF.md) retains the detailed implementation inventory and verification history.
 - [dev/worker-implementation-loops.md](dev/worker-implementation-loops.md) turns W2-W10 and the inherited backlog into dependency-ordered implementation and verification loops.
@@ -74,6 +83,7 @@ PacketAgent is not trying to match hosted AI app builders feature-for-feature. I
 - [dev/r2-provider-policy.md](dev/r2-provider-policy.md) records the researched provider capability, structured-output, correction, vault, and readiness contract.
 - [dev/r6-smtp-transport.md](dev/r6-smtp-transport.md) records the vault-backed SMTP trust boundary, configuration contract, research, and executable verification.
 - [dev/r7-frontend-maintainability.md](dev/r7-frontend-maintainability.md) records the measured frontend/route decomposition audit and executable R7.1 subloops.
+- [dev/r8-release-reliability.md](dev/r8-release-reliability.md) maps every R8 release requirement to its automated evidence and records the built-JavaScript/image decision.
 - [dev/roadmap.md](dev/roadmap.md) captures the broader roadmap after the MVP path is reliable.
 - [Canonical Worker implementation report](output/pdf/packetagent-worker-implementation-report.pdf) is the committed pre-W10.3 pause snapshot summarizing W1-W10.2 and its verification.
 - [Packet suite integration reality check](output/pdf/packet-suite-integration-reality-check.pdf) is the matching pre-W10.3 snapshot separating PacketAgent-side work from changes required in the other Packet repositories.
@@ -108,6 +118,7 @@ For a built-and-served run on a single port (`8484`):
 
 ```bash
 npm run build:web
+npm run build:server
 npm start
 ```
 
@@ -161,7 +172,9 @@ You can also register a new account from the sign-up page. To reset local data b
 - **Draft, preview, iterate, export, publish handoff.** Review live
   plan/write/validate progress and every changed or unchanged file before
   applying. Each apply creates a checkpoint with source files on disk, a
-  PacketAgent-served local preview, smoke checks, and rollback metadata. The
+  PacketAgent-served local preview, a versioned checkpoint-bound quality
+  transcript, smoke checks, and rollback metadata. Preview refresh, rollback,
+  and branch keep their evidence bound to the exact resulting checkpoint. The
   Source view exports that immutable checkpoint as a git-ready ZIP with
   SHA-256 provenance and a plan-only, never-executed package-install review.
 - **Template gallery.** Six ready-to-edit agent templates ship in the box (see below). Use them as starting points or compose from scratch.
@@ -406,7 +419,7 @@ returned by these routes.
 
 - **Frontend.** React 19 + react-router 7 + Vite 7, mounted at `/`. Tailwind CSS, Geist fonts, a silver / grey / green-light theme. `/builder` is a full-bleed route outside the workbench Shell (chat thread, streamed prose, split preview). The rest of the workbench lives behind a four-item sidebar (Build, Projects, Runs, Admin); twelve live operator surfaces are tabbed under `/admin/:tab`.
 - **Backend.** Hono on `@hono/node-server`. `src/server.ts` mounts ~20 route groups (`app-routes`, `workflow-routes`, `webhook-routes`, `share-routes`, `sandbox-routes`, four `operations-*-routes`, and more) with access-log middleware, redacted error envelopes, baseline security headers/CSP, `enforcePrivateAppMutationSecurity` on `/api/app/*`, cross-origin/CSRF enforcement, a fail-closed primary/preview host split, public webhooks, and static serving of the built web plus explicitly enabled, authenticated, workspace-scoped run artifacts.
-- **LLM layer.** `ProviderRouter` route-key dispatch over six BYOK clients, a canonical capability/model/generation catalog, vault-aware preset resolution and readiness, native/conditional structured response mapping, one bounded malformed-tool correction, and a cost `ledger`. A `stub` provider keeps the loop runnable with zero keys.
+- **LLM layer.** `ProviderRouter` route-key dispatch over six BYOK clients, a canonical capability/model/generation catalog, vault-aware preset resolution and readiness, native/conditional structured response mapping, one bounded malformed-tool correction, and a cost `ledger`. With zero ready providers, only deterministic template authoring remains available; the UI does not present that path as model readiness or external execution success.
 - **Codegen + agents.** `src/codegen/` (plan/write/chunk orchestrator, path validator, derived-draft, app-builder/iteration services, generated-app runtime/workspace, preview/snapshot/publish-readiness) and `src/tools/` (agent loop, registry/executor, read/write/browser builtins, Playwright runtime) plus `src/sandbox/`.
 - **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, `busy_timeout`) for single-node; and an advisory-lock-serialized managed-Postgres document adapter for shared app processes. SQLite has 27 ordered SQL migrations.
 - **Jobs / ops.** Persisted queue with five-field cron, exponential retry, dead-letter, three-way scheduler leader election, an alert engine, and metrics snapshots.
@@ -415,7 +428,14 @@ returned by these routes.
 
 PacketAgent is TypeScript ESM on Node >=22.5 with a React/Vite frontend. The code uses strict typechecking, dependency injection in many runtime boundaries, and feature directories for providers, tools, jobs, sandboxing, repositories, activation, codegen, and security. The repository lint gate currently passes with zero warnings.
 
-The W8.3 validation ran **1,452 API tests** (1,451 passed, 1 skipped) plus **25 web tests** with no failures, covering separate retention windows, pre-persistence and read-boundary redaction, read-only dry runs, bounded tenant cleanup, terminal-only compaction, artifact deletion ports, idempotent tombstones, retention-explained gaps, and stable JSON/SQLite/managed-Postgres parity in addition to the W8.2 and prior Worker gates.
+The R8 release command runs 12 deterministic groups covering the built web and
+server, sign-in browser path, app build/approval/iteration/preview/publish,
+Worker deploy/run/inspect/reconnect/revoke, checkpoint transcripts, traversal,
+preview isolation, artifact integrity, rollback, backup/restore, tenant
+isolation, and public-claim audit. The separate production-image verifier
+builds and boots the actual non-root/read-only image. Exact current full-suite
+counts and conditional live skips are recorded in `HANDOFF.md` and
+`dev/CODEX-HANDOFF.md`.
 
 ## Development
 
@@ -434,6 +454,13 @@ npm run typecheck
 npm run test       # API + web
 npm run test:api
 npm run test:web
+
+# Focused R8 release path and actual Docker image proof
+npm run verify:release
+npm run verify:production-image
+
+# Remove only ignored build/runtime evidence, not databases or env files
+npm run clean:generated
 
 # Full release gate (build + typecheck + tests)
 npm run build
@@ -539,13 +566,11 @@ execution. Agent run APIs now read a linked compatibility projection over the
 Worker run, while checkpoints, action approvals, effects, budgets, events,
 evidence, control, and terminal state remain canonical Worker authority.
 
-The exact resume point is R7.2 in [HANDOFF.md](HANDOFF.md): R7.1's Agent editor,
-Builder route, App Builder, Agent Builder, and Settings ownership audit is
-complete with every named production module below 1,000 lines. Shared
-accessible state boundaries and keyboard-safe interactions are next.
-[BACKLOG.md](BACKLOG.md) remains the sole ledger for the conditional live W10
-check and all remaining R7-R8 work. New working sessions should begin with the
-root handoff, not the archived Phase 3 or legacy handoff documents.
+The automatic PA0, W1-W10, and inherited R1-R8 sequence is complete. The exact
+resume boundary is in [HANDOFF.md](HANDOFF.md): select new work only from the
+explicitly decision-gated section of [BACKLOG.md](BACKLOG.md), and do not
+invent R9 or resume archived Phase 3/legacy handoff documents. Conditional live
+Packet product probes remain registered but are not external certifications.
 
 For current product changes, see [CHANGELOG.md](CHANGELOG.md). The repository is
 published at `git@github.com:packetloss404/PacketAgent.git`; a website, issue
@@ -555,8 +580,9 @@ tracker policy, and release feed have not yet been established.
 
 Make changes on local `codex/*` branches and publish PacketAgent work to
 `origin`, never to the historical `taskloom-source` remote. Run `npm run build`
-before publishing work; it runs the web build, full TypeScript typecheck, API
-tests, and frontend tests.
+before publishing work; it runs the web and server builds, full TypeScript
+typecheck, API tests, and frontend tests. Production releases also run
+`npm run verify:release` and Docker-backed `npm run verify:production-image`.
 
 ## License
 

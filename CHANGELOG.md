@@ -6,6 +6,32 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-08-01 - R7/R8 frontend and release reliability
+
+- Closed R7's five-module ownership audit and added shared accessible tabs,
+  tab panels, loading/error/empty announcements, retry semantics, keyboard
+  focus navigation, centralized client formatting, and an explicit
+  token-driven incremental styling direction.
+- Added stable component coverage and an authenticated Playwright gate for the
+  real Builder app, canonical Worker operations, and Admin keyboard-tab paths;
+  its review screenshots remain in ignored generated output.
+- Added versioned, bounded smoke transcripts bound to each new generated-app
+  checkpoint. Approval, iteration, exact-checkpoint preview refresh, rollback,
+  and branch preserve honest execution or derived-evidence provenance.
+- Added one focused release gate for sign-in, app build/approval/iteration/
+  preview/publish, Worker deploy/run/inspect/reconnect/revoke, traversal,
+  preview isolation, artifact integrity, rollback, backup/restore, tenant
+  isolation, public-claim audit, plain-Node boot, and browser coverage.
+- Production now builds split Node 22 ESM server/runtime-worker artifacts with
+  source maps, keeps Playwright dynamically optional, and starts
+  `dist/server.js`. The Docker image gate proves the exact command and a
+  non-root, read-only ready runtime.
+- Removed the inert future-options Builder control and public stub-success
+  wording. Added narrowly scoped generated-output cleanup without deleting
+  databases or environment files.
+- PA0, W1-W10, and R1-R8 are complete. The automatic loop stops before the
+  explicitly decision-gated backlog.
+
 ### 2026-07-29 - R6.6 canonical Agent execution
 
 - Removed the legacy Agent execution choice. Accepted manual, retry, webhook,

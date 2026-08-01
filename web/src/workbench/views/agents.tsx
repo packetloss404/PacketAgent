@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { I } from "../icons";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
+import { AccessibleTabPanel, AccessibleTabs } from "@/components/AccessibleTabs";
 import { useWorkbench } from "../workbench-state";
 import { api } from "@/lib/api";
 import { canManageWorkspaceRole } from "@/lib/roles";
@@ -122,27 +123,21 @@ export function AgentsView() {
         }
       />
 
-      <div className="tabbar">
-        {(
-          [
-            { id: "projects", label: "Projects" },
-            { id: "templates", label: "Agent templates" },
-          ] as const
-        ).map((t) => (
-          <button
-            type="button"
-            key={t.id}
-            className={`tab ${tab === t.id ? "active" : ""}`}
-            onClick={() => setTab(t.id)}
-            aria-pressed={tab === t.id}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <AccessibleTabs
+        id="projects"
+        label="Project views"
+        tabs={[
+          { id: "projects", label: "Projects" },
+          { id: "templates", label: "Agent templates" },
+        ]}
+        activeId={tab}
+        onSelect={setTab}
+      />
 
-      {tab === "projects" && <ProjectsCatalog onOpenAgent={(a) => navigate(`/agents/${a.id}`)} />}
-      {tab === "templates" && <AgentTemplates onCreated={(a) => navigate(`/agents/${a.id}`)} />}
+      <AccessibleTabPanel id="projects" tabId={tab}>
+        {tab === "projects" && <ProjectsCatalog onOpenAgent={(a) => navigate(`/agents/${a.id}`)} />}
+        {tab === "templates" && <AgentTemplates onCreated={(a) => navigate(`/agents/${a.id}`)} />}
+      </AccessibleTabPanel>
       {(importPreview || importError) && (
         <AgentImportDialog
           preview={importPreview}

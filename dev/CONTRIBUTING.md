@@ -67,22 +67,31 @@ npm run test:web   # Web tests only
 npm run typecheck  # tsc --noEmit for both tsconfigs
 ```
 
-For the full release gate (web bundle + typecheck + tests), run:
+For the full repository gate (web/server bundles + typecheck + tests), run:
 
 ```bash
 npm run build
 ```
 
-`npm run build` is the intended release gate. The current repository-wide
-Prettier and ESLint warning baselines are tracked separately in `BACKLOG.md`;
-do not hide new failures inside those baselines.
+R8 also provides a focused release-path gate and actual image proof:
+
+```bash
+npm run verify:release
+npm run verify:production-image  # requires Docker
+```
+
+Prettier and ESLint are clean gates. Do not introduce or hide a new baseline.
 
 ## Building
 
-`npm run build:web` produces a static bundle at `web/dist/` that the API serves when you run `npm start`. The `web/dist/` directory is gitignored - rebuild locally rather than committing it.
+`npm run build:web` produces the static workbench at `web/dist/`, and
+`npm run build:server` produces Node 22 ESM plus source maps at `dist/`.
+`npm start` runs the built server. Both output directories are gitignored;
+rebuild locally rather than committing them.
 
 ```bash
 npm run build:web
+npm run build:server
 npm start          # serves API + bundled web on :8484
 ```
 
@@ -104,17 +113,18 @@ npm start          # serves API + bundled web on :8484
 
 ## Publishing changes
 
-1. Create a local `codex/*` topic branch from the intended base.
+1. Create a local `codex/*` topic branch from the intended base unless the
+   repository owner explicitly requests direct integration on `main`.
 2. Make the change and add or update tests.
 3. Run the proportional gates, then `npm run build` before publication.
-4. After the PacketAgent remote exists, confirm it is named `origin` before
-   pushing or opening a PR.
+4. Confirm `origin` is `git@github.com:packetloss404/PacketAgent.git` before
+   pushing or opening a PR. Never force-push `main`.
 
 Commit messages: subject in imperative mood, under 70 characters; body explains the _why_ (what problem this solves, what alternatives were considered) rather than restating the diff. Squash trivial fixups before opening the PR.
 
 ## Reporting issues
 
-There is no PacketAgent issue tracker yet. Record work in `BACKLOG.md` until the
-remote is created. When filing a future bug, include the PacketAgent version,
-Node version, OS, and reproduction steps. Follow `SECURITY.md` for
+Use the PacketAgent GitHub issue tracker when it is enabled. Until then, record
+only owner-approved follow-on work in `BACKLOG.md`. Include the PacketAgent
+version, Node version, OS, and reproduction steps. Follow `SECURITY.md` for
 vulnerabilities.

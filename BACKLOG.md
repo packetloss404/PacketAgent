@@ -4,13 +4,15 @@ This backlog keeps PacketAgent aimed at one thing first: **create a bounded work
 
 It is intentionally not a phase list. Items are grouped by product outcome so we can ship useful vertical slices.
 
-This file is the single implementation ledger for all remaining work.
+This file is the single implementation ledger for all remaining work and the
+completed PA0/W/R gate history.
 Dependency rationale, repository seams, verification mechanics, and
 historical-plan reconciliation are supporting context in
 [`dev/worker-implementation-loops.md`](dev/worker-implementation-loops.md);
 that document must not introduce active work absent from this backlog. After a
-gate passes, continue with the next dependency-ready unchecked loop here.
-"Later, not MVP" remains decision-gated.
+gate passes, continue with the next dependency-ready unchecked loop here. All
+automatic PA0, W1-W10, and R1-R8 loops have passed; no next automatic loop is
+currently defined. "Later, not MVP" remains decision-gated.
 
 ## PacketAgent autonomous-worker flagship
 
@@ -18,7 +20,8 @@ These loops supersede the old builder-first priority order. Existing builder, ag
 
 ### PA0 - Brand and repository foundation
 
-Status: foundation complete on `codex/packetagent-foundation`; inherited quality debt remains tracked below.
+Status: complete. The historical foundation branch was merged; `main` is the
+current integration branch.
 
 - [x] Clone TaskLoom history into an independent `PacketAgent` working directory without altering the source checkout.
 - [x] Rename product, package, environment, storage, UI, Docker, documentation, and source identifiers.
@@ -135,8 +138,7 @@ Status: complete.
 
 Dependencies: W2-W7.
 
-Status: complete. Resume at
-[`W10.3 - Implement PacketPhone controls`](dev/worker-implementation-loops.md#w103---implement-packetphone-controls).
+Status: complete. The later W9/W10 and R1-R8 loops are also complete.
 
 - [x] Add one Worker health/attention summary.
 - [x] Roll provider calls, tool calls, effects, retries, queue time, approvals,
@@ -158,8 +160,7 @@ Status: complete. Resume at
 
 Dependencies: W1-W7. Contract design may proceed earlier.
 
-Status: complete. Resume at
-[`W10.3 - Implement PacketPhone controls`](dev/worker-implementation-loops.md#w103---implement-packetphone-controls).
+Status: complete. The later W10 and R1-R8 loops are also complete.
 
 - [x] Implement the WorkerPackage contract in [`dev/packetade-packetagent-handoff.md`](dev/packetade-packetagent-handoff.md).
 - [x] Add validate, deploy, update, activate, inspect, list-runs, pause, resume,
@@ -183,10 +184,9 @@ Status: complete. Resume at
 
 Dependencies: W7-W9.
 
-Status: local gate complete. Resume at
-[`R1 - Repository health and historical finding re-audit`](dev/worker-implementation-loops.md#r1---repository-health-and-historical-finding-re-audit).
-Live PacketChat/PacketPhone interoperability remains conditional on external
-endpoints and credentials.
+Status: local gate complete. R1-R8 are also complete. Live
+PacketChat/PacketPhone interoperability remains conditional on external
+endpoints and credentials and is not an automatic implementation loop.
 
 - [x] Add a versioned channel-neutral notification outbox with atomic
       event/evidence binding, stable idempotency, bounded retry/expiry,
@@ -220,9 +220,8 @@ endpoints and credentials.
 
 ## Post-W10 execution ledger
 
-These are the only autonomous continuation loops after W10. The detailed
-inventory later in this file supplies additional context, but completion state
-is recorded in these checklists.
+These were the only autonomous continuation loops after W10. Their completed
+checklists are retained as gate history. No automatic loop follows R8.
 
 ### R1 - Repository health and historical finding re-audit
 
@@ -277,7 +276,7 @@ Status: complete as of 2026-07-29.
 
 ### R3 - File-tree generation depth
 
-Status: complete as of 2026-07-29. Resume at R4.
+Status: complete as of 2026-07-29.
 
 - [x] Add targeted bounded repair prompts from real failure clusters.
 - [x] Move legacy-template iteration to the file-tree path or a deterministic
@@ -297,7 +296,7 @@ Status: complete as of 2026-07-29. Resume at R4.
 
 ### R4 - Generated-app runtime and self-host publish
 
-Status: complete as of 2026-07-29. Resume at R5.
+Status: complete as of 2026-07-29.
 
 - [x] Add runtime health, metrics, crash visibility, and documented pool
       limits.
@@ -312,8 +311,9 @@ Status: complete as of 2026-07-29. Resume at R5.
   Node/Vite/SQLite package with sealed build/runtime inputs, runtime validation
   of Vite's emitted asset manifest, a non-root read-only bounded Compose
   service, and a CLI that proves health, static delivery, CRUD, restart
-  persistence, and cleanup against Docker. Resume at reverse-proxy/VPN
-  examples and public reachability verification. Typecheck, zero-warning lint,
+  persistence, and cleanup against Docker. The subsequently completed R4.4
+  added reverse-proxy/VPN examples and public reachability verification.
+  Typecheck, zero-warning lint,
   formatting, production web build, 32 web tests, and 1,577 API tests pass
   (1,573 passed with four intentional live interoperability skips).
 - R4.4 result: generated packages bind to loopback by default and seal current
@@ -322,7 +322,8 @@ Status: complete as of 2026-07-29. Resume at R5.
   content types and certificates, and binds readiness to exact app/checkpoint
   identity. Typecheck, zero-warning lint, formatting, production web build,
   32 web tests, and 1,581 API tests pass (1,577 passed with four intentional
-  live interoperability skips). Resume at migration-truth reconciliation.
+  live interoperability skips). The subsequently completed R4.5 reconciled
+  migration truth.
 - R4.5 result: preview health, sealed runtime config, standalone readiness/meta,
   publish guidance, and reachability all declare the exact
   `reset-and-reseed` schema policy. Same-schema persistence and destructive
@@ -337,11 +338,10 @@ Status: complete as of 2026-07-29. Resume at R5.
   web build, 32 web tests, 34 focused backend tests, the publish
   materialization route, a real 20-step Docker certification, and 1,583 API
   tests pass (1,579 passed with four intentional live interoperability skips).
-  Resume at R5.1 real sandboxed TypeScript/Vite validation.
 
 ### R5 - Sandbox, egress, and preview isolation
 
-Status: complete as of 2026-07-29. Resume at R6.
+Status: complete as of 2026-07-29.
 
 - [x] Make real sandboxed TypeScript and Vite validation the default and remove
       synthetic success.
@@ -367,9 +367,9 @@ Status: complete as of 2026-07-29. Resume at R6.
   [`dev/r5-sandbox-isolation.md`](dev/r5-sandbox-isolation.md). Typecheck,
   zero-warning lint, formatting, production web build, 32 web tests, 62
   focused tests, the real Docker verifier, and 1,583 API tests pass (1,580
-  passed with three intentional live interoperability skips). Resume at R5.2
-  fail-closed non-Docker behavior and removal of `node:vm` as a security
-  boundary.
+  passed with three intentional live interoperability skips). The subsequently
+  completed R5.2 removed `node:vm` as a security boundary and made non-Docker
+  untrusted execution fail closed.
 - R5.2 result: Docker is the only supported untrusted-code driver. Official
   Node guidance forbids `node:vm` for untrusted code, and official Deno
   guidance recommends an additional OS sandbox/VM for arbitrary untrusted
@@ -382,8 +382,9 @@ Status: complete as of 2026-07-29. Resume at R6.
   generated validation continue to require Docker. Typecheck, zero-warning
   lint, formatting, production web build, 32 web tests, 25 focused tests, the
   real Docker validator, and 1,586 API tests pass (1,583 passed with three
-  intentional live interoperability skips). Resume at R5.3 consolidated
-  resource, filesystem, environment, timeout, and egress enforcement.
+  intentional live interoperability skips). The subsequently completed R5.3
+  consolidated resource, filesystem, environment, timeout, and egress
+  enforcement.
 - R5.3 result: one fail-closed policy resolver now validates command/stdin
   size, Docker working directories, explicit environment names and values, and
   requested wall-clock deadlines before driver start. Docker execution applies
@@ -399,8 +400,8 @@ Status: complete as of 2026-07-29. Resume at R6.
   deadline. Typecheck, zero-warning lint, formatting, production web build, 32
   web tests, 51 focused tests, both uninjected Docker verifiers, and 1,598 API
   tests pass (1,595 passed with three intentional live interoperability
-  skips). Resume at R5.4 reuse of W6 hardened network protections for any
-  future declared sandbox egress.
+  skips). The subsequently completed R5.4 reused W6 hardened network
+  protections for declared sandbox egress.
 - R5.4 result: optional sandbox egress is an operator-allowlisted, bounded,
   GET-only prefetch performed by PacketAgent through the existing W6
   pinned-network client before command start. Exact origins, every A/AAAA
@@ -415,9 +416,9 @@ Status: complete as of 2026-07-29. Resume at R6.
   materialization, query redaction, and continued real-container network
   denial. Typecheck, zero-warning lint, formatting, production web build, 32
   web tests, 66 focused tests, the real Docker verifier, and 1,608 API tests
-  pass (1,605 passed with three intentional live interoperability skips).
-  Resume at R5.5 generated-preview origin, cookie, CSP, messaging, and proxy
-  isolation.
+  pass (1,605 passed with three intentional live interoperability skips). The
+  subsequently completed R5.5 added generated-preview origin, cookie, CSP,
+  messaging, and proxy isolation.
 - R5.5 result: the workbench and generated previews now have different browser
   authorities. Production requires exact, different HTTPS hostnames; a
   different port on one hostname is refused because it does not isolate
@@ -435,8 +436,8 @@ Status: complete as of 2026-07-29. Resume at R6.
   zero-warning lint, formatting, the production web build, 33 web tests, 62
   focused preview/security tests, all four cumulative R5 executable verifiers,
   and 1,617 API tests pass (1,614 passed with three intentional live
-  interoperability skips). Resume at R5.6 final container-hardening closure
-  and the cumulative R5 gate.
+  interoperability skips). The subsequently completed R5.6 closed container
+  hardening and the cumulative R5 gate.
 - R5.6 result: the validator image now defaults to numeric non-root even when
   launched outside the sandbox driver. The PacketAgent control-plane Compose
   service, standalone generated-app Compose package, and untrusted sandbox
@@ -451,7 +452,7 @@ Status: complete as of 2026-07-29. Resume at R6.
   build, 33 web tests, 16 focused container/publish tests, all five cumulative
   R5 executable verifiers, and 1,620 API tests pass (1,617 passed with three
   intentional live interoperability skips). R5's untrusted-code containment
-  gate is complete. Resume at R6.1 vault-backed default SMTP transport.
+  gate is complete.
 
 ### R6 - Agent authoring and execution depth
 
@@ -499,8 +500,8 @@ Status: complete. R6.1-R6.6 passed their gates on 2026-07-29.
   Typecheck, zero-warning lint, repository formatting, production web build,
   34 web tests, 79 focused backend tests, the seven-assertion verifier, and
   1,632 API tests pass (1,629 passed with three intentional live
-  interoperability skips).
-  Resume at R6.3 provider/model/key/capability readiness.
+  interoperability skips). The subsequently completed R6.3 added
+  provider/model/key/capability readiness.
 - R6.3 result: Agent authoring, pre-run readiness, saved model, and restart-safe
   execution route now share one canonical preset resolution. The Builder shows
   the exact provider/model, secret-free environment/workspace-vault/local key
@@ -515,8 +516,8 @@ Status: complete. R6.1-R6.6 passed their gates on 2026-07-29.
   Typecheck, zero-warning lint, repository formatting, the production web
   build, 35 web tests, 83 focused backend tests, the seven-assertion verifier,
   and 1,635 API tests pass (1,632 passed with three intentional live
-  interoperability skips).
-  Resume at R6.4 editable memory/input examples and first-run evaluation.
+  interoperability skips). The subsequently completed R6.4 added editable
+  memory/input examples and first-run evaluation.
 - R6.4 result: the Builder and Agent editor now persist bounded non-secret
   memory, typed input examples, expected-output review context, and required
   evaluation tools. Builder approval saves examples before readiness or
@@ -534,8 +535,8 @@ Status: complete. R6.1-R6.6 passed their gates on 2026-07-29.
   Typecheck, zero-warning lint, repository formatting, the production web
   build, 37 web tests, 81 focused backend tests, the seven-assertion verifier,
   and 1,642 API tests pass (1,639 passed with three intentional live
-  interoperability skips).
-  Resume at R6.5 signed, versioned agent/Worker import and export.
+  interoperability skips). The subsequently completed R6.5 added signed,
+  versioned Agent/Worker import and export.
 - R6.5 result: `packetagent.agent-worker-bundle/v1` now carries the complete
   portable authored Agent configuration plus its deterministic canonical
   Worker draft projection. RFC 8785 canonical bytes, SHA-256 digests, exact
@@ -558,8 +559,8 @@ Status: complete. R6.1-R6.6 passed their gates on 2026-07-29.
   Typecheck, zero-warning lint, repository formatting, the production web
   build, 39 web tests, 11 focused portability/package tests, the
   eight-assertion verifier, and 1,647 API tests pass (1,644 passed with three
-  intentional live interoperability skips). Resume at R6.6 canonical-only
-  legacy Agent execution after compatibility and migration tests.
+  intentional live interoperability skips). The subsequently completed R6.6
+  consolidated legacy Agent execution onto canonical Workers.
 - R6.6 result: every accepted legacy Agent launch now materializes one
   deterministic canonical Worker definition, immutable content-derived
   version, compiled deployment, idempotently admitted Worker run, and
@@ -578,38 +579,42 @@ verify:agent-canonical-execution` certifies the eight-part boundary without
   Typecheck, zero-warning lint, repository formatting, the production web
   build, 39 web tests, focused execution/migration/persistence coverage, and
   the eight-assertion verifier pass. The 1,660-test API suite passes with 1,657
-  passed and three intentional live interoperability skips. R6 is complete.
-  Resume at R7.1 view and route decomposition.
+  passed and three intentional live interoperability skips. R6 is complete;
+  the now-completed R7 and R8 gates are recorded below.
 
 ### R7 - Builder and frontend maintainability
 
-Status: in progress. R7.1's five-module ownership audit is complete; resume at
-R7.2 accessible state boundaries and keyboard-safe primitives in
-[`dev/r7-frontend-maintainability.md`](dev/r7-frontend-maintainability.md).
+Status: complete. R7.1-R7.5 and the gate passed on 2026-08-01; evidence lives
+in [`dev/r7-frontend-maintainability.md`](dev/r7-frontend-maintainability.md).
 
 - [x] Split remaining oversized views and routes along established seams.
-- [ ] Add shared accessible loading/error/empty boundaries and keyboard-safe
+- [x] Add shared accessible loading/error/empty boundaries and keyboard-safe
       primitives.
-- [ ] Remove duplicate client fetch/format utilities after characterization.
-- [ ] Make styling direction explicit and migrate incrementally.
-- [ ] Add stable component/browser coverage for Builder app and Worker modes.
-- Gate: critical views have accessible state handling, bounded ownership, and
-  regression coverage.
+- [x] Remove duplicate client fetch/format utilities after characterization.
+- [x] Make styling direction explicit and migrate incrementally.
+- [x] Add stable component/browser coverage for Builder app and Worker modes.
+- Gate: passed 2026-08-01. Critical views have accessible state handling,
+  bounded ownership, component regressions, and an authenticated real-browser
+  Builder/Worker/keyboard pass.
 
 ### R8 - Release reliability and production packaging
 
-- [ ] Persist smoke transcripts per generated-app checkpoint.
-- [ ] Add focused app and Worker happy paths through build, approval, run,
+Status: complete. The requirement/evidence matrix and packaging decision live
+in [`dev/r8-release-reliability.md`](dev/r8-release-reliability.md).
+
+- [x] Persist smoke transcripts per generated-app checkpoint.
+- [x] Add focused app and Worker happy paths through build, approval, run,
       inspect, reconnect, publish/deploy, and stop.
-- [ ] Add path-traversal, preview, artifact, rollback, backup/restore, and
+- [x] Add path-traversal, preview, artifact, rollback, backup/restore, and
       tenant-isolation regression tests.
-- [ ] Decide whether production images should run built JavaScript and prove
+- [x] Decide whether production images should run built JavaScript and prove
       source-map/Playwright compatibility.
-- [ ] Remove placeholder, demo-only, fake-success, and unsupported coming-soon
+- [x] Remove placeholder, demo-only, fake-success, and unsupported coming-soon
       claims from release surfaces.
-- [ ] Keep generated artifacts out of Git and document cleanup/reset.
-- Gate: release checks, production image, backup round-trip, automated paths,
-  and public claims describe the same tested product.
+- [x] Keep generated artifacts out of Git and document cleanup/reset.
+- Gate: passed 2026-08-01. Twelve deterministic release groups, the built
+  plain-Node server, actual non-root/read-only production image, backup round
+  trip, browser/app/Worker paths, claim audit, and public documentation agree.
 
 ## Inherited capabilities already present
 
@@ -649,32 +654,30 @@ These capabilities were implemented before or during the TaskLoom foundation and
 - **Run trace inspector.** Agent run detail now returns derived trace spans from run metadata, inputs, transcript, tool calls, logs, output, error, model, and cost. The run detail view renders the trace timeline with legacy fallbacks plus retry/cancel/diagnose actions.
 - **Playbook authoring polish.** The agent editor validates playbook steps, trims saved instructions, improves reorder/remove controls, and requires a review step before replacing a playbook from a prior run.
 
-## Inherited lower-priority backlog
+## Completed inherited platform reconciliation
 
-These items are not yet done, but W1-W10 take precedence unless one directly blocks the autonomous-worker runtime. The old Phase 3 labels survive only in the archived [`docs/PHASE3_SCOPE.md`](docs/PHASE3_SCOPE.md).
-
-After W10, execute these items as R1-R8 in
-[`dev/worker-implementation-loops.md`](dev/worker-implementation-loops.md#r1-r8---inherited-continuation-after-w10).
-A direct Worker blocker may be pulled forward only when the map names that
-dependency.
+The former lower-priority inventory was executed as R1-R8. The dispositions
+below are retained to prevent archived Phase 3 documents from recreating work
+that has already shipped. The old Phase 3 labels survive only in the archived
+[`docs/PHASE3_SCOPE.md`](docs/PHASE3_SCOPE.md).
 
 ### Provider policy
 
-The router, preset resolver, and six adapters are present. What remains:
+Completed in R2:
 
-- Per-provider policy layer: local providers default to single-file tool calls + multi-turn iteration; hosted providers default to multi-file per turn.
-- XGrammar / structured-decoding support when the provider is vLLM; best-effort JSON parsing fallback elsewhere.
-- One-shot retry-with-correction loop for malformed tool_use input.
-- Vault-storage support for Gemini and OpenRouter keys (today they are env-only; see the `VAULT_PROVIDERS` guard in `src/providers/bootstrap.ts`).
+- per-provider generation policy and capability metadata;
+- vLLM structured decoding/XGrammar with bounded best-effort fallback;
+- one bounded malformed-tool-input correction; and
+- encrypted workspace-vault parity for Gemini and OpenRouter.
 
 ### File-tree codegen
 
 The orchestrator, default-on flip, path validator, derived-draft projection,
 canonical legacy conversion, targeted bounded repair, per-file
 plan/write/validate streaming, iteration parity, chunked planning, Vite-build
-validation, file-level changed/unchanged review, targeted regeneration, and
-inline error UX are present. The remaining R3 work is sandboxed package
-planning plus zip/git-ready export.
+validation, file-level changed/unchanged review, targeted regeneration,
+sandboxed package planning, zip/git-ready export, and inline error UX are
+complete.
 
 ### Generated-app persistence and runtime
 
@@ -689,8 +692,8 @@ planning plus zip/git-ready export.
   manifest digest with optional HMAC authenticity. Authenticated
   re-verification rejects tampering, substitution, unexpected files, unsafe
   paths, and symlinks.
-- Remaining: carry the separate-origin preview/CSRF hardening item from the
-  security backlog.
+- Shipped in R5.5: generated previews use a separate browser authority,
+  scoped capabilities/cookies, CSP, and a bounded exact-origin message bridge.
 
 ### Existing agent path
 
@@ -701,8 +704,10 @@ planning plus zip/git-ready export.
   memory/input examples, deterministic first-run evaluation,
   resource-scoped runtime enforcement, and the default hardened SMTP adapter
   are also complete.
-- Remaining depth: broader end-to-end Agent/Worker happy paths are tracked in
-  R8, after the R7 frontend maintainability gate.
+- Shipped in R8: the focused canonical Worker happy path covers deployment,
+  execution, inspection, reconnect, and revocation. Agent authoring and
+  canonical execution are covered by the R6 characterization and executable
+  gates; a real provider run remains operator-conditional.
 
 ### Sandbox and execution farm
 
@@ -712,8 +717,9 @@ planning plus zip/git-ready export.
 - Shipped in R5.2: Docker is the only untrusted-code driver. Without Docker,
   untrusted execution fails closed; the native host process is explicit
   owner/admin trusted diagnostics only.
-- Egress allowlist enforced at the sandbox boundary, not just documented.
-- Per-build CPU + memory caps so a runaway build cannot take down the farm.
+- Shipped in R5.3-R5.4: resource limits are enforced at the Docker boundary;
+  optional egress is a bounded, allowlisted PacketAgent prefetch whose output
+  is mounted read-only while the untrusted container remains networkless.
 
 ### Cross-cutting security
 
@@ -721,26 +727,35 @@ planning plus zip/git-ready export.
   subprocess is deliberately not claimed as a secure fallback because Deno's
   own untrusted-code guidance requires layered OS or VM isolation; no Docker
   means no supported untrusted execution.
-- `process.env` scrubbing on every spawned process (sandbox build, per-app runtime, agent tool execution).
-- Network egress deny-by-default + SSRF blocklist (`169.254.169.254`, RFC1918, loopback, IPv6 link-local) + DNS pinning at allowlist-check time.
-- Same-origin CSRF fix for generated app preview: serve preview on a different port (or strict CSP) so LLM-authored `fetch('/api/internal-admin')` calls do not carry the user's PacketAgent session cookie.
-- Typed agent capabilities per resource (`http.fetch:GET:api.github.com`, `fs.write:/workspace/agent-id/`) instead of per-tool global; runtime enforcer wraps every tool call.
+- Resolved in R5/W6: spawned untrusted processes receive only validated
+  environment entries; Worker networking is deny-by-default with public-address
+  validation, DNS pinning, connected-address checks, and redirect denial.
+- Resolved in R5.5: generated previews cannot inherit the workbench session and
+  are constrained by scoped cookies, CSP, and exact-origin messaging.
+- Resolved in W6: typed verb/resource capabilities are compiled against the
+  immutable Worker version and rechecked immediately before every tool handler.
 
-### MVP reliability (continuing)
+### MVP reliability
 
-- Add a smoke-test transcript per generated app checkpoint: what ran, what passed, what failed, and how to rerun it.
-- Tighten generated app empty/error/loading states so CRUD output feels deliberate, not template-ish.
-- Add a focused end-to-end happy path: sign in, build app, approve, preview, iterate, publish handoff.
-- Add a focused agent happy path: sign in, build agent, approve, run once with configured provider/tools, inspect result.
+- Shipped in R8: every new generated-app checkpoint and each refresh,
+  rollback, or branch carries a bounded versioned smoke transcript.
+- Shipped across R7/R8: critical Builder and Worker states use explicit
+  accessible loading/error/empty behavior, and the authenticated browser gate
+  covers Builder app mode, canonical Worker operations, and keyboard tabs.
+- Shipped in R8: the focused app path covers sign-in, build, approval,
+  iteration, preview, and publish handoff; the focused canonical Worker path
+  covers deploy, run, inspect, reconnect, and revoke.
+- Conditional verification only: live provider/tool Agent execution requires
+  operator-supplied provider credentials. Deterministic R6 gates cover its
+  authored-to-canonical path without claiming external-provider certification.
 
-### Builder depth (continuing)
+### Builder depth
 
-- Add file-level review UI for generated source files, with changed/unchanged/new/deleted grouping.
-- Let users regenerate a single route, entity, or component instead of rerunning the whole app draft.
-- Add export/download of the generated app workspace as a zip or git-ready folder.
-- Add optional package-install planning for generated apps while keeping execution sandboxed.
+- Shipped in R3: file-level changed/unchanged/new/deleted review, targeted
+  route/entity/component regeneration, zip/git-ready export, and
+  never-executed package-install planning with sandboxed validation.
 
-### Agent depth (continuing)
+### Agent depth
 
 - Shipped: provider/model/key/capability readiness before first run.
 - Shipped: deterministic first-run evidence with expected inputs, actual
@@ -763,17 +778,29 @@ planning plus zip/git-ready export.
 - Shipped: one visible `reset-and-reseed` policy, same-schema and
   schema-change characterization, reference-only generated DDL, and a verified
   stopped-service SQLite backup/restore round trip.
-- Remaining self-host work is tracked under R5 isolation and R8 release gates.
+- R5 isolation and R8 release/production-packaging gates are complete.
 
 ### Quality bar
 
-- Search for placeholders, demo-only text, fake success language, and vague "coming soon" states before every release.
-- Keep `npm run typecheck`, `npm test`, `npm run build:web`, and `npm audit --omit=dev` green.
-- Add regression tests for generated workspace path traversal, preview route serving, publish artifact validation, and rollback.
-- Add browser-level screenshots for Builder app mode and agent mode once a stable local browser test path exists.
+- Run `npm run audit:release-claims` before every release; it rejects
+  unsupported future, demo-only, fake-success, old phase-TODO, and public
+  stub-provider wording.
+- Keep `npm run typecheck`, `npm test`, `npm run build:web`, and the documented
+  dependency-audit policy green. R1 owns the recorded advisory exception.
+- Shipped in R8: regression tests cover generated workspace path traversal,
+  preview route serving, publish artifact validation, and rollback.
+- `npm run verify:workbench-browser` now captures ignored Builder app and
+  canonical Worker operations screenshots while testing real sign-in and
+  keyboard tab focus. Agent authoring remains covered by the stable component
+  characterization suite.
 - Keep generated artifacts out of git and document cleanup / reset commands.
 
-## Later, not MVP
+## Decision-gated work
+
+These are the only remaining product-expansion candidates recorded in this
+ledger. They are not an R9 and must not start without an explicit owner choice.
+
+### Later, not MVP
 
 > Hosted-only capabilities (managed deploy with free public subdomain, hosted browser-agent farm, one-click App Store / Play submission, hosted OAuth proxy with pre-wired connectors, cross-tenant user memory, shareable / remixable conversation URLs, managed credit meter) are intentionally out of scope for self-host. See [CLOUD.md](CLOUD.md) for the inventory and what a hypothetical PacketAgent Cloud product would need to ship them.
 
@@ -786,14 +813,16 @@ planning plus zip/git-ready export.
 - Visual click-to-edit with direct DOM edits that bypass the LLM (Replit Element Editor pattern) - possible Phase 4.
 - Conversation forking / shareable build URLs - overhyped per the 2026-norms review; skipped.
 
-## Portfolio audit backlog - 2026-07-17
+## Historical portfolio audit dispositions - 2026-07-17
 
-_Findings from a 2026-07-17 code audit, preserved for later._
+_Findings from a 2026-07-17 code audit, retained with their current
+dispositions. They do not form a second active backlog._
 
-### Later / deferred
+### Dispositions
 
-- **[med/M]** server.ts:436 /data/artifacts/\* is not tenant-scoped: when serving is enabled, any reachable caller can read any workspace's artifacts
-  - Fix: In the `/data/artifacts/*` middleware in src/server.ts (~L430-440), before serveStatic require a valid session/preview token and resolve the on-disk path against the requesting workspace's artifact subdir (scope root to ./data/artifacts/<workspaceId>), rejecting cross-workspace reads. Route is default-OFF (artifactServingEnabled()), so only bites multi-user deploys that opt in.
+- **[resolved R1]** `/data/artifacts/*` is explicit-opt-in, requires a private
+  viewer session, extracts a safe run ID, and verifies that the Agent or Worker
+  run belongs to the active workspace before the scoped static handler runs.
 - **[resolved R5.1]** Generated `tsc` plus Vite validation previously returned a
   synthetic pass unless `PACKETAGENT_SANDBOX_SMOKE_ENABLED=1`.
   - Resolution: the flag is retired. A lockfile-addressed Docker validator now
@@ -801,7 +830,11 @@ _Findings from a 2026-07-17 code audit, preserved for later._
     with `ok: false`.
 - **[resolved R6.1]** `email_send` previously had no default SMTP transport.
   - Resolution: the default path is now Nodemailer-backed, TLS-only, public-address-pinned, bounded, and abortable. Autonomous Workers resolve strict encrypted `smtp_config` values only after recipient policy approval; legacy Agents retain `SMTP_*` environment compatibility.
-- **[low/L]** Tool approval tokens are whole-tool-scoped; resource/verb-scoped approvals (e.g. http.fetch:GET:api.github.com) not supported
-  - Fix: src/tools/approval.ts keys tokens purely by uniqueSortedToolNames (L131,190,283) - no resource/verb dimension. Current coarse approval is safe, just not granular. Closing requires designing resource-scoped token keys + matching call-site enforcement. Disclosed future work.
-- **[med/L]** Generated-app previews are not origin-isolated: preview served same-origin, so CSRF/separate-origin hardening for previews remains open
-  - Fix: Same-origin CSRF is solid (src/route-security.ts: origin-host check + token). Gap is defense-in-depth: serve generated-app previews from a distinct origin/subdomain so preview JS can't reach the main app's session cookies. Real architectural work (separate serving origin + cookie scoping). Disclosed roadmap item.
+- **[resolved W6/R6.6]** Legacy Agent Launch approval may still present a
+  whole-tool authoring choice, but accepted execution materializes a canonical
+  Worker and uses immutable-version-bound verb/resource policy plus an exact
+  approval-bound resource at the runtime boundary. The authoring token is not
+  execution authority.
+- **[resolved R5.5]** Generated-app previews run on a distinct browser
+  authority with host-isolated sessions, checkpoint-bound capability exchange,
+  scoped cookies, CSP, exact-origin messaging, and proxy examples.

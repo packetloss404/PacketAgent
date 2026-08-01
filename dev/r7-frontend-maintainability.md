@@ -1,6 +1,6 @@
 # R7 frontend maintainability
 
-Status: R7.1 complete. R7.2 is active; `BACKLOG.md` remains the sole
+Status: complete. R7.1-R7.5 passed on 2026-08-01; `BACKLOG.md` remains the sole
 implementation ledger.
 
 ## Goal
@@ -165,9 +165,51 @@ The final R7.1 audit is closed:
 | `web/src/workbench/views/settings.tsx`      |    1,041 | 105-line view; feature modules at or below 340  |
 
 Typecheck, zero-warning lint, formatting, production web build, and all 53 web
-tests pass. Resume R7.2 by inventorying shared accessible loading/error/empty
-boundaries and keyboard-unsafe interactions in critical Builder and Worker
-surfaces.
+tests passed at the R7.1 checkpoint.
+
+## R7.2-R7.5 completion
+
+R7.2 introduced two small shared accessibility boundaries:
+
+- `AccessibleTabs` and `AccessibleTabPanel` provide native button semantics,
+  `tablist`/`tab`/`tabpanel` relationships, one roving tab stop, selected state,
+  focus transfer, ArrowLeft/ArrowRight wrapping, and Home/End navigation;
+- `AsyncStateBoundary` gives loading and empty states polite status
+  announcements, errors assertive alerts, and retry actions real buttons; and
+- Builder, Projects/Templates, Admin, canonical Worker list, and canonical
+  Worker detail use those primitives. Focus-visible styling is explicit.
+
+R7.3 characterized the client boundary before deduplicating it. Browser HTTP
+was already centralized in `web/src/lib/api.ts`: its JSON request, binary
+download, and SSE helpers are the only production `fetch()` call sites under
+`web/src`. Repeated relative-time, duration, currency, byte, timestamp, digest,
+and status-label logic moved to `web/src/lib/format.ts`, with deterministic
+coverage and call sites shared across Builder and operations views.
+
+R7.4 keeps the existing visual identity and makes its direction explicit:
+
+- use the established dark industrial workbench and the CSS variables in
+  `web/src/index.css` as design tokens;
+- prefer semantic shared components and state classes for accessibility and
+  behavior, with feature-scoped layout rules in `workbench.css`;
+- preserve the Builder's existing Tailwind utility composition where it is
+  already clear; and
+- migrate touched critical surfaces incrementally. R7 does not authorize a
+  repo-wide CSS framework or visual rewrite.
+
+R7.5 combines stable component and actual browser evidence. The component
+suite characterizes keyboard index calculation, accessible tab markup, async
+announcement roles, formatting, Builder cold state, and Worker state
+projection. `npm run verify:workbench-browser` boots the built server against a
+temporary SQLite store, signs in through the real UI, captures Builder app and
+Worker operations screenshots under ignored `tmp/release-verification/`, and
+checks selected/focus behavior after keyboard navigation through Admin tabs.
+
+Gate result: critical authoring and operations views have bounded ownership,
+shared accessible state handling, keyboard-safe tabs, centralized browser
+transport/formatting, an explicit incremental styling rule, component
+regressions, and a passing real-browser path. The completed R7/R8 repository
+gate has 58 passing web tests, 0 skipped, and 0 failed. R7 is complete.
 
 ## Out of scope for R7.1
 

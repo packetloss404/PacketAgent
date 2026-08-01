@@ -1,17 +1,13 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 const MAX_DOCKER_OUTPUT_BYTES = 64 * 1024;
 const IMAGE_BUILD_TIMEOUT_MS = 5 * 60_000;
 const IMAGE_INSPECT_TIMEOUT_MS = 15_000;
-const DOCKERFILE_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../sandbox/codegen-validator.Dockerfile",
-);
-const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const REPOSITORY_ROOT = resolve(process.cwd());
+const DOCKERFILE_PATH = resolve(REPOSITORY_ROOT, "src", "sandbox", "codegen-validator.Dockerfile");
 const PACKAGE_LOCK_PATH = resolve(REPOSITORY_ROOT, "package-lock.json");
 
 let preparedImage: Promise<string> | null = null;

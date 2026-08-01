@@ -5,6 +5,7 @@ import { Topbar, Stat, PanelHeader } from "../Shell";
 import { useApiData } from "../useApiData";
 import { useUser, useWorkbench } from "../workbench-state";
 import { api } from "@/lib/api";
+import { formatRelativeTime } from "@/lib/format";
 
 export function DashboardView() {
   const navigate = useNavigate();
@@ -176,7 +177,7 @@ export function DashboardView() {
                   {a.status}
                 </span>
                 <span className="mono muted" style={{ fontSize: 11 }}>
-                  {formatRelative(a.updatedAt)}
+                  {formatRelativeTime(a.updatedAt)}
                 </span>
               </div>
             ))}
@@ -252,7 +253,7 @@ export function DashboardView() {
                           paddingTop: 2,
                         }}
                       >
-                        {formatRelative(a.occurredAt)}
+                        {formatRelativeTime(a.occurredAt)}
                       </span>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5 }}>{a.event}</div>
@@ -277,19 +278,4 @@ export function DashboardView() {
       </div>
     </>
   );
-}
-
-function formatRelative(iso: string | undefined | null): string {
-  if (!iso) return "—";
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return iso;
-  const diff = Date.now() - t;
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
 }

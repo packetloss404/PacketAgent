@@ -4,6 +4,7 @@ import { useApiData } from "../useApiData";
 import { api, streamSandboxExec } from "@/lib/api";
 import { useAuth } from "@/context/auth-state";
 import type { SandboxExecRecord, SandboxExecStatus, SandboxRuntimeInfo } from "@/lib/types";
+import { formatDuration as formatSharedDuration, formatRelativeTime } from "@/lib/format";
 
 const STATUS_FILTERS: Array<"all" | SandboxExecStatus> = [
   "all",
@@ -35,24 +36,11 @@ function statusPillClass(status: SandboxExecStatus): string {
 }
 
 function formatDuration(ms?: number): string {
-  if (typeof ms !== "number" || ms <= 0) return "—";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
+  return formatSharedDuration(ms, { secondsDecimals: 2 });
 }
 
 function formatRelative(iso?: string): string {
-  if (!iso) return "—";
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return iso;
-  const diff = Date.now() - t;
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return formatRelativeTime(iso);
 }
 
 function parseEgressDeclarations(value: string): Array<{ id: string; url: string }> {

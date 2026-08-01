@@ -5,6 +5,8 @@ import type { WorkerOperationsHealth, WorkerRunStatus, WorkerRunSummary } from "
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
 import { workerRunListAccessibleState } from "../worker-operations-state";
+import { AsyncStateBoundary } from "@/components/AsyncStateBoundary";
+import { formatMoney, formatRelativeTime, formatStatusLabel } from "@/lib/format";
 
 const WORKER_STATUS_FILTERS: Array<"all" | WorkerRunStatus> = [
   "all",
@@ -179,25 +181,12 @@ export function WorkerRunsView() {
           </button>
         </div>
 
-        {accessibleState.kind === "error" && (
-          <div
-            className="card"
-            role={accessibleState.role}
-            aria-live={accessibleState.ariaLive}
-            style={{ padding: 16, marginBottom: 12, color: "var(--danger)" }}
-          >
-            {accessibleState.message}
-          </div>
-        )}
-        {accessibleState.kind === "loading" && (
-          <div
-            className="muted"
-            role={accessibleState.role}
-            aria-live={accessibleState.ariaLive}
-            style={{ padding: 16 }}
-          >
-            {accessibleState.message}
-          </div>
+        {(accessibleState.kind === "error" || accessibleState.kind === "loading") && (
+          <AsyncStateBoundary
+            state={accessibleState}
+            onRetry={refresh}
+            retryLabel="Retry Workers"
+          />
         )}
 
         <div className="card" style={{ overflowX: "auto" }}>
@@ -260,7 +249,7 @@ export function WorkerRunsView() {
                       <span className="muted">clear</span>
                     )}
                   </td>
-                  <td className="mono">{formatRelative(run.updatedAt)}</td>
+                  <td className="mono">{formatRelativeTime(run.updatedAt)}</td>
                   <td>
                     <button
                       type="button"
@@ -276,9 +265,7 @@ export function WorkerRunsView() {
               {accessibleState.kind === "empty" && (
                 <tr>
                   <td colSpan={8} className="muted" style={{ padding: 22, textAlign: "center" }}>
-                    <span role={accessibleState.role} aria-live={accessibleState.ariaLive}>
-                      {accessibleState.message}
-                    </span>
+                    <AsyncStateBoundary state={accessibleState} inline />
                   </td>
                 </tr>
               )}
@@ -448,11 +435,7 @@ function budgetPercent(value: number, maximum: number): number {
 }
 
 function workerStatusLabel(status: "all" | WorkerRunStatus): string {
-  return status.replaceAll("_", " ");
-}
-
-function formatMoney(value: number): string {
-  return `$${value.toFixed(value < 0.1 ? 3 : 2)}`;
+  return formatStatusLabel(status);
 }
 
 function Card({
@@ -491,18 +474,4 @@ function Card({
       )}
     </div>
   );
-}
-
-function formatRelative(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return iso;
-  const diff = Date.now() - t;
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
 }

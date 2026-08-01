@@ -130,6 +130,8 @@ export type {
   GeneratedAppRecord,
   GeneratedAppRuntimeArtifactRecord,
   GeneratedAppSourceFileRecord,
+  GeneratedAppSmokeTranscriptRecord,
+  GeneratedAppSmokeTranscriptSource,
   GeneratedAppStatus,
   ImplementationPlanItemRecord,
   ImplementationPlanItemStatus,

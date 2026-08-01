@@ -1,6 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { PACKETAGENT_MIGRATIONS_DIR } from "../db/migrations-path.js";
 import { DatabaseSync } from "node:sqlite";
 import type {
   AgentRunLogEntry,
@@ -19,7 +19,7 @@ import {
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
 const DEFAULT_DB_FILE = "data/packetagent.sqlite";
-const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
+const MIGRATIONS_DIR = PACKETAGENT_MIGRATIONS_DIR;
 
 export interface AgentRunsRepository {
   list(workspaceId: string, limit?: number): AgentRunRecord[];

@@ -6,6 +6,7 @@ import type {
 } from "@/lib/types";
 import { SMARTER_TIER_LADDER } from "./constants";
 import type { ChatMessage, IterationTargetOption } from "./types";
+import { formatRelativeTime } from "@/lib/format";
 
 export function buildFixErrorsPrompt(errors: string[]): string {
   return `Fix these TypeScript errors:\n${errors.join("\n")}`;
@@ -137,13 +138,7 @@ export function newId(): string {
 }
 
 export function formatRelative(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diffMs / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
+  return formatRelativeTime(iso, { underMinute: "just-now" });
 }
 
 export function stableTargetKey(value: string): string {

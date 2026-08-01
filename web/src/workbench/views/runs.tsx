@@ -4,6 +4,7 @@ import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
 import { api } from "@/lib/api";
 import type { AgentRunStatus } from "@/lib/types";
+import { formatRelativeTime } from "@/lib/format";
 
 const STATUS_FILTERS: Array<"all" | AgentRunStatus> = [
   "all",
@@ -226,7 +227,7 @@ export function RunsView() {
                     {r.id.slice(0, 16)}
                   </td>
                   <td>{r.title}</td>
-                  <td>{r.startedAt ? formatRelative(r.startedAt) : "—"}</td>
+                  <td>{formatRelativeTime(r.startedAt)}</td>
                   <td className="mono">
                     {r.durationMs ? `${(r.durationMs / 1000).toFixed(1)}s` : "—"}
                   </td>
@@ -364,18 +365,4 @@ function Sparkline({ buckets }: { buckets: { ok: number; fail: number }[] }) {
       <line x1="0" y1={h - 0.5} x2={w} y2={h - 0.5} stroke="var(--line-2)" />
     </svg>
   );
-}
-
-function formatRelative(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return iso;
-  const diff = Date.now() - t;
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
 }

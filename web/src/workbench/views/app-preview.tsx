@@ -3,6 +3,7 @@ import { I } from "../icons";
 import { api } from "@/lib/api";
 import { useApiData } from "../useApiData";
 import { CHECKS, PREVIEW_TRUTH_COPY } from "./preview-copy";
+import { formatRelativeTime } from "@/lib/format";
 
 export function AppPreviewView() {
   const { workspaceId = "workspace", appId = "generated-app" } = useParams();
@@ -68,7 +69,8 @@ export function AppPreviewView() {
                 </p>
                 <details>
                   <summary style={{ fontSize: 12, color: "var(--silver-200)", cursor: "pointer" }}>
-                    Active save · {formatRelative(currentCheckpoint.createdAt)}
+                    Active save ·{" "}
+                    {formatRelativeTime(currentCheckpoint.createdAt, { underMinute: "just-now" })}
                   </summary>
                   <p className="mono muted" style={{ fontSize: 11, marginTop: 4 }}>
                     {currentCheckpoint.id}
@@ -121,14 +123,4 @@ function titleFromSlug(slug: string) {
       .map((w) => w[0]?.toUpperCase() + w.slice(1))
       .join(" ") || "Generated App"
   );
-}
-
-function formatRelative(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diffMs / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
 }

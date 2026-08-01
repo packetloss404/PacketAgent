@@ -559,6 +559,37 @@ export interface GeneratedAppRuntimeArtifactRecord {
   renderedAt: string;
 }
 
+export type GeneratedAppSmokeTranscriptSource =
+  | "approval"
+  | "iteration"
+  | "preview-refresh"
+  | "rollback"
+  | "branch";
+
+export interface GeneratedAppSmokeTranscriptRecord {
+  schemaVersion: "packetagent.generated-app-smoke-transcript/v1";
+  id: string;
+  workspaceId: string;
+  appId: string;
+  checkpointId: string;
+  source: GeneratedAppSmokeTranscriptSource;
+  status: "pending" | "pass" | "warn" | "fail";
+  summary: string;
+  checks: Array<{
+    name: string;
+    status: "pending" | "pass" | "warn" | "fail";
+    detail: string;
+  }>;
+  blockers: string[];
+  runner: "isolated-sandbox" | "not-run";
+  validatorSource?: string;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  recordedAt: string;
+  derivedFromTranscriptId?: string;
+}
+
 export interface GeneratedAppCheckpointRecord {
   id: string;
   appId: string;
@@ -570,6 +601,7 @@ export interface GeneratedAppCheckpointRecord {
   previewUrl?: string;
   buildStatus?: string;
   smokeStatus?: string;
+  smokeTranscript?: GeneratedAppSmokeTranscriptRecord;
   source: "initial" | "iteration" | "rollback" | "branch";
   codegenSource?: "llm" | "template" | "llm-filetree";
   previousCheckpointId?: string;

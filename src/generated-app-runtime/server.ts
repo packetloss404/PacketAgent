@@ -419,7 +419,13 @@ export async function shutdownDefaultGeneratedAppRuntimeProcessPool(): Promise<v
 export async function spawnGeneratedAppRuntimeWorker(
   config: GeneratedAppRuntimeWorkerStartConfig,
 ): Promise<GeneratedAppRuntimeWorkerHandle> {
-  const workerPath = fileURLToPath(new URL("./server-worker.ts", import.meta.url));
+  const compiled = fileURLToPath(import.meta.url).endsWith(".js");
+  const workerPath = fileURLToPath(
+    new URL(
+      compiled ? "./generated-app-runtime/server-worker.js" : "./server-worker.ts",
+      import.meta.url,
+    ),
+  );
   const configDir = path.join(
     tmpdir(),
     `packetagent-generated-runtime-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -439,7 +445,7 @@ export async function spawnGeneratedAppRuntimeWorker(
   const child = fork(workerPath, [configPath], {
     cwd: process.cwd(),
     env: scrubRuntimeEnvironment(process.env),
-    execArgv: ["--import", "tsx"],
+    execArgv: compiled ? ["--enable-source-maps"] : ["--import", "tsx"],
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   const output = captureChildOutput(child);

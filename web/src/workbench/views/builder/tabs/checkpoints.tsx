@@ -1,6 +1,7 @@
 import { I } from "../../../icons";
 import type { AppBuilderCheckpointSummary } from "@/lib/types";
 import { formatRelative } from "../helpers";
+import { formatDuration, formatTimestamp } from "@/lib/format";
 
 export function CheckpointsTab({
   checkpoints,
@@ -55,6 +56,12 @@ export function CheckpointsTab({
                 <div className="muted" style={{ fontSize: 11 }}>
                   Save #{i + 1} · {formatRelative(c.createdAt)} · {c.source}
                 </div>
+                {c.smokeTranscript && (
+                  <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>
+                    Quality transcript: {c.smokeTranscript.status} · {c.smokeTranscript.runner} ·{" "}
+                    {formatDuration(c.smokeTranscript.durationMs, { allowZero: true })}
+                  </div>
+                )}
                 <details style={{ marginTop: 4 }}>
                   <summary className="muted" style={{ fontSize: 11, cursor: "pointer" }}>
                     Details
@@ -62,6 +69,9 @@ export function CheckpointsTab({
                   <div className="mono muted" style={{ fontSize: 11, marginTop: 4 }}>
                     {c.id}
                     {c.previousCheckpointId ? ` · ← ${c.previousCheckpointId}` : ""}
+                    {c.smokeTranscript
+                      ? ` · ${c.smokeTranscript.id} · ${formatTimestamp(c.smokeTranscript.recordedAt)}`
+                      : ""}
                   </div>
                 </details>
               </div>

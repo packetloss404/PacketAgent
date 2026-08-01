@@ -42,6 +42,8 @@ import {
   recordActivity,
 } from "../../packetagent-store.js";
 import { type GeneratedFile } from "../../codegen/llm-author.js";
+import { buildGeneratedAppSmokeTranscript } from "../../generated-app-smoke-transcript.js";
+import type { GeneratedAppSmokeTranscriptSource } from "../../store/types.js";
 
 const TEMPLATE_NARRATION_LABELS: Record<AppDraft["templateId"], string> = {
   crm: "CRM",
@@ -138,6 +140,8 @@ export async function applyAppBuilderDraft(c: Context) {
       buildStatus: runSmoke ? "passed" : "not_run",
       codegenSource: fileTreeFiles ? "llm-filetree" : body.source,
       fileTreeFiles,
+      smokeResult: smokeBuild,
+      smokeSource: "approval",
     });
     const checkpoint = checkpointForPublish(record, record.checkpointId);
     if (!checkpoint || !record.runtimeArtifact)
@@ -354,6 +358,8 @@ export async function persistGeneratedAppDraft(
     checkpointSource?: GeneratedAppCheckpointRecord["source"];
     codegenSource?: AppDraftSource;
     fileTreeFiles?: GeneratedFile[];
+    smokeResult: Awaited<ReturnType<typeof runAppSmokeViaSandbox>>;
+    smokeSource: GeneratedAppSmokeTranscriptSource;
   },
 ) {
   const timestamp = new Date().toISOString();
@@ -388,6 +394,14 @@ export async function persistGeneratedAppDraft(
       previewUrl: input.previewUrl,
       buildStatus: input.buildStatus,
       smokeStatus: input.smokeStatus,
+      smokeTranscript: buildGeneratedAppSmokeTranscript({
+        workspaceId: context.workspace.id,
+        appId,
+        checkpointId,
+        source: input.smokeSource,
+        result: input.smokeResult,
+        recordedAt: timestamp,
+      }),
       source: input.checkpointSource ?? "initial",
       codegenSource: input.codegenSource,
       previousCheckpointId,

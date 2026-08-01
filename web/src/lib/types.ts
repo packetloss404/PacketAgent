@@ -819,6 +819,26 @@ export interface AppBuilderSmokeBuildStatus {
   blockers: string[];
 }
 
+export interface AppBuilderSmokeTranscript {
+  schemaVersion: "packetagent.generated-app-smoke-transcript/v1";
+  id: string;
+  workspaceId: string;
+  appId: string;
+  checkpointId: string;
+  source: "approval" | "iteration" | "preview-refresh" | "rollback" | "branch";
+  status: AppBuilderCheckStatus;
+  summary: string;
+  checks: AppBuilderBuildCheck[];
+  blockers: string[];
+  runner: "isolated-sandbox" | "not-run";
+  validatorSource?: string;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  recordedAt: string;
+  derivedFromTranscriptId?: string;
+}
+
 export interface AppBuilderDraft {
   prompt: string;
   intent: string;
@@ -1122,6 +1142,7 @@ export interface AppBuilderCheckpointSummary {
   previewUrl?: string;
   buildStatus?: string;
   smokeStatus?: string;
+  smokeTranscript?: AppBuilderSmokeTranscript;
   previousCheckpointId?: string;
   createdAt: string;
 }

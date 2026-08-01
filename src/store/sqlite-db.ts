@@ -1,14 +1,14 @@
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { PACKETAGENT_MIGRATIONS_DIR } from "../db/migrations-path.js";
 
 // LEAF module: sqlite database open + migration runner. Imports only node
 // builtins — never a backend or the barrel. The migrations directory is
 // resolved relative to this file; this file lives in src/store/, so the
-// compiled location resolves "../db/migrations" to src/db/migrations.
+// source and bundled runtimes resolve the same root-owned migrations directory.
 export const DEFAULT_DB_FILE = resolve(process.cwd(), "data", "packetagent.sqlite");
-const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
+const MIGRATIONS_DIR = PACKETAGENT_MIGRATIONS_DIR;
 
 export function openStoreDatabase(dbPath: string): DatabaseSync {
   mkdirSync(dirname(dbPath), { recursive: true });

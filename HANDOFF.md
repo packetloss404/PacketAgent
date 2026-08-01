@@ -11,122 +11,67 @@ PacketAgent is the self-hosted, always-available control plane for durable
 autonomous Workers in the Packet suite. Workers are event-driven and bounded,
 not endless token loops.
 
-Every Worker must remain:
-
-- bounded by time, cost, iterations, failures, and permissions;
-- permissioned at the runtime tool boundary;
-- resumable from durable checkpoints;
-- safe against duplicate external effects;
-- auditable through events, evidence, and provenance; and
-- independently stoppable and revocable.
-
-Use `PacketAgent`, `packetagent`, and `PACKETAGENT_*` for new identifiers.
-TaskLoom naming is compatibility-only.
+Every Worker must remain bounded, permissioned at the runtime tool boundary,
+resumable from a durable checkpoint, duplicate-effect safe, auditable, and
+independently stoppable or revocable. Use `PacketAgent`, `packetagent`, and
+`PACKETAGENT_*` for new identifiers. TaskLoom naming is compatibility-only.
 
 ## Current status
 
-- R1-R6 are complete.
-- R7, Builder and frontend maintainability, is active.
-- R8, release reliability and production packaging, follows R7.
-- R7.1's five-module ownership audit is complete.
-- The exact active slice is **R7.2: add shared accessible loading, error, and
-  empty boundaries plus keyboard-safe interactive primitives**.
-
-R6.6 removed the legacy Agent execution choice. Accepted Agent launches and
-active schedules now materialize and enter the canonical Worker lifecycle
-before provider or tool work. `AgentRunRecord` is a compatibility read model
-linked to canonical definition, version, deployment, and run IDs. Worker
-checkpoints, approvals, effects, budgets, evidence, control, and terminal state
-remain authoritative.
-
-R7.1 is in progress:
-
-- [`dev/r7-frontend-maintainability.md`](dev/r7-frontend-maintainability.md)
-  records the measured five-module audit and bounded subloops.
-- R7.1a is complete. Agent editor loading, mutations, coordinated state, and
-  API actions live in `use-agent-editor-controller.ts`; controlled approval,
-  playbook, tool, memory, input, launcher, run-history, transcript, evaluation,
-  and tool-call UI live in feature-owned modules.
-- `agent-editor.tsx` fell from 2,443 to 548 lines. Its controller is 537 lines;
-  every extracted feature module is below 400 lines.
-- Nine focused characterization tests cover typed payloads, playbook
-  validation, approval risk, controlled empty/populated states, run history,
-  evaluation evidence, tool calls, and bounded serialization.
-- R7.1b is complete. The former 4,381-line Builder route module is now an
-  11-line compatibility facade over eleven feature-owned modules covering
-  contracts, draft/apply, generated-app lookup/export, iteration and its pure
-  transforms, checkpoints, publish handlers, publish artifacts, Agent publish,
-  smoke validation, and route registration.
-- Every Builder route feature module is below 800 lines. A 35-route inventory
-  characterization test and the existing 46-test focused route selection
-  preserve the registration, authorization, iteration/checkpoint,
-  source/export, preview/smoke, publish/integrity, rollback, and permission
-  boundaries.
-- R7.1c is complete. App Builder state, stream orchestration, mutations,
-  checkpoint/publish refresh, retry state, and coordinated selections live in
-  a 684-line controller hook; the existing thread and tab feature components
-  are composed by an 879-line controlled view.
-- The web suite now has 49 tests. Its App Builder cold-start characterization
-  locks the composer, starter chips, tour affordance, and the absence of
-  preview/approval surfaces before a draft exists.
-- R7.1d is complete. The Agent Builder parent-owned draft composition is 254
-  lines, its state/authoring/save/first-run controller hook is 215 lines, and
-  the controlled draft-readiness, configuration/sample-input, and
-  approval/first-run modules are each below 400 lines.
-- Two new rendering characterizations cover provider and capability truth,
-  authored plan review, editable memory/expected output and sample validation,
-  approval copy, and the empty first-run state. The web suite now has 51 tests.
-- R7.1e is complete. Settings fell from 1,041 to a 105-line tab controller;
-  access, credentials/workspace, audit/advanced presentation, and typed
-  advanced-entry data live in modules between 108 and 340 lines.
-- Two Settings characterizations cover viewer permission boundaries and the
-  controlled member, invitation, share, API-key, audit, and advanced empty
-  states. The full five-module re-audit has no named production view or route
-  module above 1,000 lines. The web suite now has 53 tests.
+- PA0, W1-W10, and inherited R1-R8 are complete.
+- R7 closed the five-module ownership audit; introduced shared accessible
+  async-state and tab primitives; centralized client formatting; documented a
+  token-driven, incrementally migrated styling direction; and added component
+  plus real-browser coverage for Builder app and Worker operations modes.
+- R8 persists bounded quality transcripts on every new generated-app
+  checkpoint and on refresh, rollback, and branch operations. The release gate
+  covers sign-in, app build/approval/iteration/preview/publish, Worker
+  deploy/run/inspect/reconnect/revoke, path traversal, preview isolation,
+  artifact integrity, rollback, backup/restore, and tenant isolation.
+- Production now builds ESM JavaScript for Node 22 with source maps and a
+  separately built generated-app runtime worker. `npm start` runs
+  `dist/server.js`; `npm run start:dev-server` retains the source/tsx path.
+- The production image was built and booted as a non-root, read-only container
+  with the expected plain-Node command. Optional Playwright remains a dynamic
+  runtime import.
+- No autonomous implementation loop remains. Work under
+  [`BACKLOG.md#decision-gated-work`](BACKLOG.md#decision-gated-work) requires an
+  explicit owner decision and must not start automatically.
 
 ## Exact resume point
 
-Continue R7.2 across the critical Builder and Worker workbench surfaces:
+Start by checking the repository and the decision-gated section of
+`BACKLOG.md`. Do not invent an R9 or resume an archived D/phase/track plan.
+Choose a new product objective only after the owner explicitly selects it.
 
-1. Inventory duplicated loading/error/empty markup and non-keyboard interactive
-   elements, starting with Builder tabs and canonical Worker list/detail.
-2. Add the smallest shared state-boundary and keyboard-safe primitives with
-   explicit live-region, focus, pressed/selected, and retry semantics.
-3. Migrate one critical surface at a time without changing data fetching or
-   visual direction.
-4. Add stable component coverage for keyboard activation, focus behavior, and
-   distinct loading/error/empty announcements.
-5. Run the standard R7 gate before moving to R7.3 client utility
-   deduplication.
+The highest-value known constraints, not automatic tasks, are:
 
-Do not mark R7.1 complete until every production view/route module named in the
-audit is below 1,000 lines or has an explicit ownership justification, and the
-repository gates pass.
+- live PacketChat and PacketPhone interoperability certification still needs
+  real external endpoints and credentials;
+- hardened Worker-specific browser and SQL drivers remain unshipped and fail
+  closed; and
+- hosted PacketAgent Cloud and the other items named in the decision-gated
+  list are outside the completed self-host MVP loops.
 
-## Last verified gates
+## Last verified R7/R8 gates
 
+- `npm run verify:release` — 12 deterministic gate groups passed. This includes
+  5 focused app happy-path tests, the serialized PacketADE Worker handoff gate
+  with its intentional live-network skip, 39 path/preview/artifact/rollback
+  regressions, 2 backup/restore cases, tenant isolation, claim audit, built
+  server boot, and the authenticated browser pass.
+- `npm run verify:production-image` — image built; command is
+  `node --enable-source-maps dist/server.js`; non-root read-only runtime became
+  ready.
 - `npm run typecheck` — passed.
 - `npm run lint` — passed with zero errors and zero warnings.
 - `npm run format:check` — passed.
-- `npm run build:web` — passed.
-- `npm run test:web` — 53 passed, 0 failed.
-- `npm run test:api` — 1,658 passed, 3 intentional live interoperability
-  skips, 0 failed (1,661 total).
-- `npm run verify:agent-canonical-execution` — all 8 assertions passed without
-  live provider, tool, or network calls.
+- `npm run test:api` — 1,662 total: 1,659 passed, 3 intentionally skipped
+  live-interoperability probes, 0 failed.
+- `npm run test:web` — 58 passed, 0 skipped, 0 failed.
 
-R7.1b additionally passed the 46-test focused Builder route selection and the
-full 1,661-test API regression suite.
-
-## Known conditional or unshipped work
-
-- Live PacketChat and PacketPhone interoperability certification remains
-  conditional on real endpoint credentials. Local adapter, replay, rotation,
-  race, and dead-letter gates pass.
-- Hardened Worker-specific browser and SQL drivers remain unshipped and fail
-  closed for Worker runs.
-- R8 still owns broader happy paths, release claims, backup/restore,
-  production-image, and packaging reliability.
+See [`dev/r8-release-reliability.md`](dev/r8-release-reliability.md) for the
+requirement-to-evidence matrix and reproducible commands.
 
 ## Resume commands
 
@@ -136,7 +81,7 @@ git branch --show-current
 git status --short
 git remote -v
 npm run typecheck
-npm run test:web
+npm run verify:release
 ```
 
 Expected branch after this handoff is merged: `main`.
@@ -151,18 +96,19 @@ Stop if the worktree is unexpectedly dirty, the active directory is
 
 ## Canonical references
 
-- Remaining work and gates: [`BACKLOG.md`](BACKLOG.md)
-- Public product truth and setup: [`README.md`](README.md)
+- Product truth and setup: [`README.md`](README.md)
+- Remaining decision-gated work and gate history: [`BACKLOG.md`](BACKLOG.md)
 - Detailed implementation handoff:
   [`dev/CODEX-HANDOFF.md`](dev/CODEX-HANDOFF.md)
 - Short direction: [`dev/roadmap.md`](dev/roadmap.md)
-- Executable loop map:
+- Completed loop map:
   [`dev/worker-implementation-loops.md`](dev/worker-implementation-loops.md)
-- R7 audit and subloops:
+- R7 evidence:
   [`dev/r7-frontend-maintainability.md`](dev/r7-frontend-maintainability.md)
+- R8 evidence: [`dev/r8-release-reliability.md`](dev/r8-release-reliability.md)
 - Verification: [`dev/TESTING.md`](dev/TESTING.md)
 - Shipped history: [`CHANGELOG.md`](CHANGELOG.md)
 
 Historical files under `docs/`, repo-review notes, and old phase documents are
-records only. They do not override this handoff or add active work outside
+records only. They do not override this handoff or create active work outside
 `BACKLOG.md`.

@@ -262,6 +262,27 @@ verify:agent-canonical-execution` is the offline executable gate. Design and
   empty-state characterizations bring the web suite to 53 passing tests. Every
   production module named by the audit is now below 1,000 lines; typecheck,
   zero-warning lint, formatting, and the production web build pass.
+- Completed R7.2-R7.5 and closed R7. Shared accessible tab/panel and
+  loading/error/empty boundaries now provide roving focus, Arrow/Home/End
+  navigation, live-region roles, and retry buttons across Builder, Admin,
+  Projects, and canonical Worker surfaces. Browser transport was already
+  centralized in `web/src/lib/api.ts`; repeated time/duration/currency/byte/
+  timestamp/digest/status formatting is now shared. The token-driven dark
+  workbench and incremental feature-scoped styling rule is explicit. Stable
+  component coverage plus `npm run verify:workbench-browser` prove real sign
+  in, Builder app mode, canonical Worker operations mode, screenshots, and
+  keyboard tab focus. Evidence lives in
+  `dev/r7-frontend-maintainability.md`.
+- Completed R8's release reliability and production packaging gate. New
+  generated-app checkpoints persist bounded v1 quality transcripts; exact
+  preview refresh, rollback, and branch evidence remains checkpoint-bound.
+  Twelve deterministic release groups cover app and Worker happy paths, named
+  regressions, backup/restore, tenant isolation, claim audit, plain-Node boot,
+  and the browser path. Production builds split Node 22 ESM with source maps,
+  keeps Playwright optional, and runs `dist/server.js`; the actual non-root,
+  read-only Docker image built and became ready. Cleanup is limited to named
+  ignored generated roots. The requirement/evidence matrix lives in
+  `dev/r8-release-reliability.md`.
 
 ## Current implementation truth
 
@@ -395,13 +416,10 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R7.2 - add shared accessible loading/error/empty boundaries and
-keyboard-safe interactive primitives across critical Builder and Worker
-surfaces** in
-[`../BACKLOG.md#r7---builder-and-frontend-maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability).
-`BACKLOG.md` is the single ledger for every remaining R7-R8 task.
-`worker-implementation-loops.md` provides execution mechanics but cannot add
-active work absent from the backlog.
+PA0, W1-W10, and R1-R8 are complete. No automatic loop remains. Start from
+[`../BACKLOG.md#decision-gated-work`](../BACKLOG.md#decision-gated-work) only
+after the owner explicitly selects a new objective; do not invent R9 or resume
+an archived D/phase/track document. `BACKLOG.md` remains the single ledger.
 
 R1's first persistence slice is implemented: production managed Postgres pools
 are reused per connection target and closed at server shutdown; migration and
@@ -569,8 +587,8 @@ Engine 29.5.3 and Compose 5.1.4. Exact decisions and caveats are in
 [`r4-generated-app-publish.md`](r4-generated-app-publish.md). Typecheck,
 zero-warning lint, formatting, production web build, 32 web tests, and 1,577
 API tests pass (1,573 passed with four intentional live interoperability
-skips). Resume at R4.4 reverse-proxy/VPN examples and public-URL reachability
-verification.
+skips). The next executed slice was R4.4 reverse-proxy/VPN examples and
+public-URL reachability verification.
 
 R4.4 is complete. Generated Compose packages bind to `127.0.0.1` by default
 and seal current Caddy automatic-HTTPS, nginx TLS, and Tailscale
@@ -599,8 +617,8 @@ already-built image copies `runtime.sqlite` between its named volume and an
 external directory. The real Docker certifier passes all 20
 health/CRUD/restart/backup/mutate/restore/cleanup steps. Exact research and
 decisions are in
-[`r4-generated-app-publish.md`](r4-generated-app-publish.md). Resume at R5.1
-real sandboxed TypeScript/Vite validation. The R4 closure gate passes
+[`r4-generated-app-publish.md`](r4-generated-app-publish.md). The next executed
+slice was R5.1 real sandboxed TypeScript/Vite validation. The R4 closure gate passes
 typecheck, zero-warning lint, formatting, production web build, 32 web tests,
 34 focused backend tests, the publish materialization route, real 20-step
 Docker certification, and 1,583 API tests (1,579 passed with four intentional
@@ -912,15 +930,11 @@ verify:agent-canonical-execution` certifies all eight assertions without a
 provider, tool, or network call. Research and decisions are recorded in
 [`r6-agent-canonical-execution.md`](r6-agent-canonical-execution.md).
 
-The exact next slice is R7.1 under
-[`R7 - Builder and frontend maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability):
-split the audited Builder route module, then continue through the app Builder,
-Agent Builder, and Settings
-seams in [`r7-frontend-maintainability.md`](r7-frontend-maintainability.md).
-After each gate passes, continue through R7-R8 using that backlog's unchecked
-checklists; use the loop document only for execution mechanics. Historical
-D/phase/track documents have been reconciled there and must not be resumed
-independently.
+R7 and R8 are complete. The automatic queue stops here. Use
+[`r7-frontend-maintainability.md`](r7-frontend-maintainability.md) and
+[`r8-release-reliability.md`](r8-release-reliability.md) as implementation
+evidence, not as new ledgers. Historical D/phase/track documents have been
+reconciled and must not be resumed independently.
 
 ## Canonical documents
 
@@ -931,6 +945,8 @@ independently.
 - PacketADE contract: [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md)
 - W1 contract plan and decisions: [`worker-contract-plan.md`](worker-contract-plan.md)
 - W8 observability/evidence decisions: [`worker-observability-plan.md`](worker-observability-plan.md)
+- R7 frontend evidence: [`r7-frontend-maintainability.md`](r7-frontend-maintainability.md)
+- R8 release and packaging evidence: [`r8-release-reliability.md`](r8-release-reliability.md)
 - R6.4 first-run evaluation decisions:
   [`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md)
 - R6.5 signed portability decisions:
@@ -954,9 +970,17 @@ handoff, the roadmap, or the backlog.
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
-- `npm run test:api` - 1,657 passed, 3 intentionally skipped live probes, 0
-  failed (1,660 total)
-- `npm run test:web` - 48 passed, 0 failed
+- `npm run build:server` - passed; Node 22 ESM output, source maps, generated-app
+  runtime worker, and asset manifest emitted
+- `npm run test:api` - 1,659 passed, 3 intentionally skipped live probes, 0
+  failed (1,662 total)
+- `npm run test:web` - 58 passed, 0 skipped, 0 failed
+- `npm run verify:release` - all 12 deterministic build, app, Worker,
+  transcript, persistence, regression, backup, isolation, claim, plain-Node,
+  and browser groups passed
+- `npm run verify:production-image` - actual Docker image built and became
+  ready with the expected plain-Node command, non-root user, and read-only root
+  filesystem
 - focused R6.6 canonical materialization, idempotent activation, compatibility
   read model, immutable rollover, schedule migration, W7 stop propagation,
   approval-bound resource enforcement, legacy-runner exclusion, and

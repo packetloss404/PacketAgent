@@ -9,6 +9,7 @@ FROM deps AS build
 WORKDIR /app
 COPY . .
 RUN npm run build:web
+RUN npm run build:server
 RUN npm run typecheck
 RUN npm prune --omit=dev
 
@@ -29,9 +30,10 @@ RUN groupadd --system packetagent \
 COPY --from=build --chown=packetagent:packetagent /app/package.json /app/package-lock.json ./
 COPY --from=build --chown=packetagent:packetagent /app/node_modules ./node_modules
 COPY --from=build --chown=packetagent:packetagent /app/src ./src
+COPY --from=build --chown=packetagent:packetagent /app/dist ./dist
 COPY --from=build --chown=packetagent:packetagent /app/web/dist ./web/dist
 
 USER packetagent
 EXPOSE 8484
 VOLUME ["/app/data"]
-CMD ["node", "--import", "tsx", "src/server.ts"]
+CMD ["node", "--enable-source-maps", "dist/server.js"]
