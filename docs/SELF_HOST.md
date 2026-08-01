@@ -2,9 +2,10 @@
 
 PacketAgent runs as a Node application. This guide takes an existing checkout
 through local startup, provider configuration, storage, sandboxing, and
-production serving. It documents the inherited workbench and canonical Worker
-runtime that exist today; remaining release work is tracked only in
-[`../BACKLOG.md`](../BACKLOG.md).
+production serving. It documents the workbench and completed canonical Worker
+runtime. The automatic PA0, W1-W10, and R1-R8 sequence is complete; only
+explicitly decision-gated expansion and conditional live interoperability
+checks remain in [`../BACKLOG.md`](../BACKLOG.md).
 
 If you want the strategic background on what self-host _intentionally_ gives up versus hosted competitors, see [CLOUD.md](../CLOUD.md).
 
@@ -608,6 +609,7 @@ Both stop short of deleting generated app workspaces under `data/generated-apps/
 - When moving to a new working session, start with [HANDOFF.md](../HANDOFF.md).
 - Read [dev/roadmap.md](../dev/roadmap.md) for current product direction.
 - Read [CLOUD.md](../CLOUD.md) to understand what self-host intentionally does not do, and what a hypothetical PacketAgent Cloud product would have to own.
-- Read [BACKLOG.md](../BACKLOG.md) for W1-W10 and the inherited lower-priority backlog.
+- Read [BACKLOG.md](../BACKLOG.md) for the completed PA0/W/R gate history and
+  the only decision-gated work that may be selected next.
 - Read [dev/TESTING.md](../dev/TESTING.md) for local verification and release checks.
 - [PHASE3_SCOPE.md](PHASE3_SCOPE.md) is an archived historical builder plan, not the resume point.

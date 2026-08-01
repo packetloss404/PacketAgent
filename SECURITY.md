@@ -2,12 +2,13 @@
 
 ## Reporting a Vulnerability
 
-PacketAgent does not yet have a configured public repository or Security
-Advisory channel. Report suspected vulnerabilities directly and privately to
-the project owner. Do not place exploit details, credentials, or reproduction
-artifacts in a public task or issue. Once an official PacketAgent repository is
-created, this section must be updated with its private reporting channel before
-public release.
+PacketAgent's public source repository is
+[packetloss404/PacketAgent](https://github.com/packetloss404/PacketAgent).
+Report suspected vulnerabilities privately through that repository's Security
+tab when private vulnerability reporting is available, or through an existing
+trusted private channel to the project owner. Do not place exploit details,
+credentials, or reproduction artifacts in a public task, discussion, or issue.
+Public GitHub issues are for non-sensitive defects only.
 
 Include the affected version or commit, a concise impact summary, reproduction steps, and any relevant deployment assumptions. We aim to acknowledge reports within 72 hours.
 

@@ -2,9 +2,13 @@
 
 Last updated: 2026-07-28.
 
-This is the design record for W8. The active implementation ledger remains
+Status: completed W8 design and implementation record.
+
+This is the design record for W8. The authoritative status ledger remains
 [`../BACKLOG.md`](../BACKLOG.md), and executable loop order remains
 [`worker-implementation-loops.md`](worker-implementation-loops.md).
+Imperative checklist language below records the execution plan used during W8;
+W8.1-W8.5 are complete and it does not create current work.
 
 ## Research basis
 

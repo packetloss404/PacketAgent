@@ -1,8 +1,9 @@
 # File-tree codegen
 
 > **Status: implemented inherited subsystem.** File-tree codegen supports the
-> secondary prompt-to-app capability. It is not the active PacketAgent product
-> track; Worker lifecycle work is tracked in [`../BACKLOG.md`](../BACKLOG.md).
+> secondary prompt-to-app capability. It is not an active PacketAgent product
+> track; the completed Worker lifecycle and remaining decision gates are
+> recorded in [`../BACKLOG.md`](../BACKLOG.md).
 
 File-tree codegen is the default path for app generation when a BYOK
 provider key is configured. The LLM authors the actual file tree via

@@ -157,7 +157,7 @@ The TaskLoom codebase brought forward a strong implementation substrate:
 
 These pieces now support the durable Worker lifecycle through crash-safe recovery. The existing builder remains supported and becomes the worker creation studio. Prompt-to-app generation remains an inherited secondary capability.
 
-## Now
+## Completed W1-W5 foundation
 
 ### 1. Durable Worker contract - complete
 
@@ -179,7 +179,7 @@ The canonical `worker.run` handler now executes a port-isolated plan-act-evaluat
 
 Digest-chained immutable snapshots persist the run cursor, full working memory, completed actions, pending approvals, artifacts, effect receipt IDs, trace, and remaining budgets. Startup and periodic reconciliation resume safe expired work from the exact action cursor. Prepared/completed receipts replay completed mutations, reconcile supported operations, and quarantine uncertain or corrupt recovery state.
 
-## Next
+## Completed W6-W10 flagship sequence
 
 ### 6. Permission and budget policy - complete
 
@@ -248,11 +248,12 @@ gate now certifies both adapters under local/remote races, credential rotation,
 restart, replay, and dead-letter recovery. Live probes remain conditionally
 skipped until external PacketChat and PacketPhone settings are supplied.
 
-### 11. Integrations and worker templates
+## Decision-gated candidates
 
-Expand connectors and ship useful worker starters only after the runtime can execute them safely and recoverably.
-
-## Later
+The runtime can now execute integrations and Worker templates within the
+completed safety model, but expanding the connector catalog or shipping new
+starters requires an explicit owner choice in `BACKLOG.md`. The same rule
+applies to:
 
 - App template gallery and deeper prompt-to-app builder polish.
 - Cross-node worker package sharing and a signed template marketplace.

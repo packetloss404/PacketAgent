@@ -2,7 +2,9 @@
 
 Date: 2026-07-29
 
-This note records the active R4 self-host publish contract. `BACKLOG.md`
+Status: completed R4 implementation record.
+
+This note records the shipped R4 self-host publish contract. `BACKLOG.md`
 remains the implementation ledger.
 
 ## Research basis

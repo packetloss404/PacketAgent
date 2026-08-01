@@ -63,6 +63,7 @@ and timestamp. Raw secrets are not accepted by or added to this schema.
 | Artifact validation                                | Generated-app manifest file/static-graph/digest/signature cases, including changed and unexpected files.                                                                                                                                                                                         |
 | Backup and restore                                 | Successful stopped-service SQLite round trip and corrupt-foreign-key backup refusal without replacing the current DB.                                                                                                                                                                            |
 | Tenant isolation                                   | Generated source-route workspace isolation and observability restart/rollup workspace isolation.                                                                                                                                                                                                 |
+| Documentation truth                                | `verify-documentation.mjs` checks all tracked Markdown files, local links and screenshots, documented npm commands, historical labels, completed-loop authority statements, and the single conditional unchecked backlog item.                                                                   |
 | Public claim truth                                 | `audit-release-claims.mjs` scans public setup and production source/UI files for unsupported future, fake-success, demo-only, old phase-TODO, and public stub-provider wording.                                                                                                                  |
 
 The PacketADE live-network test and PacketChat/PacketPhone live delivery probes
@@ -104,6 +105,11 @@ package and Chromium. It writes two review screenshots:
 - `tmp/release-verification/builder-app-mode.png`
 - `tmp/release-verification/worker-operations-mode.png`
 
+Reviewed copies are committed as `docs/assets/readme/builder-app-mode.png` and
+`docs/assets/readme/worker-operations-mode.png` for the README. The
+documentation gate verifies both targets exist, are nontrivial, and carry a
+PNG signature.
+
 `tmp/`, `dist/`, `web/dist/`, coverage, exported packages, runtime artifacts,
 generated-app workspaces, and published-app workspaces are ignored by Git.
 Use:
@@ -126,6 +132,7 @@ Stop PacketAgent and take a backup before using a state-reset command.
 ## Reproducible gates
 
 ```bash
+npm run verify:docs
 npm run verify:release
 npm run verify:production-image
 npm run typecheck
@@ -135,8 +142,8 @@ npm run test:api
 npm run test:web
 ```
 
-`verify:release` runs 12 deterministic groups: web/server builds, the focused
-app path, the Worker disconnect/reconnect path, smoke transcript unit coverage,
+`verify:release` runs 13 deterministic groups: documentation truth, web/server
+builds, the focused app path, the Worker disconnect/reconnect path, smoke transcript unit coverage,
 checkpoint storage parity, the named regression families, backup/restore,
 tenant isolation, release-claim audit, built-server boot, and the real-browser path. Docker image verification
 is separate so contributors without a daemon can still run deterministic

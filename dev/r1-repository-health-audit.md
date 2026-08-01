@@ -2,6 +2,9 @@
 
 Last updated: 2026-07-29.
 
+Status: completed point-in-time R1 evidence. Later R2-R8 work is also complete;
+current continuation rules live only in `BACKLOG.md`.
+
 This is supporting evidence for
 [`R1`](../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit).
 `BACKLOG.md` remains the only implementation ledger. Historical review files
@@ -86,4 +89,5 @@ are inputs to this re-audit, not active task lists.
 - `npm audit` and `npm audit --omit=dev`: two high package entries for the
   single accepted unreachable React Router RSC advisory; no critical,
   moderate, or low findings.
-- R1 closed on 2026-07-29. Resume at R2 in `BACKLOG.md`.
+- R1 closed on 2026-07-29. R2-R8 subsequently closed; no automatic loop
+  follows R8.

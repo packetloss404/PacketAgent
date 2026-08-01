@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 const root = resolve(process.cwd());
 const gates = [
+  ["documentation", process.execPath, ["scripts/verify-documentation.mjs"]],
   [
     "build web",
     process.execPath,

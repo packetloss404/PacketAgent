@@ -1,9 +1,12 @@
 # R6.3 Agent provider readiness
 
-R6.3 makes the provider execution contract visible before an authored Agent is
-saved or run. It does not perform a live provider call: R6.4 owns the bounded
-first-run evaluation that will turn configured metadata into observed
-availability.
+Status: complete as of 2026-07-29. R6.4-R6.6 and R7-R8 are also complete; no
+automatic loop follows R8.
+
+R6.3 made the provider execution contract visible before an authored Agent is
+saved or run. It deliberately does not perform a live provider call: the
+completed R6.4 gate owns bounded first-run evaluation and separates configured
+metadata from observed execution.
 
 ## Product contract
 
@@ -102,6 +105,6 @@ truthfulness, keyless-local semantics, fail-closed unresolved runtimes, and
 restart-safe provider routes. Unit, API-route, service-reload, and web utility
 tests cover the same boundary without a live provider.
 
-R6.3 is complete when the repository quality gate and the full API/web suites
-pass. The next loop is R6.4: editable memory/input examples and a bounded,
-persisted first-run evaluation.
+R6.3 closed after the repository quality gate and full API/web suites passed.
+R6.4 later shipped editable memory/input examples and a bounded, persisted
+first-run evaluation; R6.5-R6.6 and R7-R8 are also complete.

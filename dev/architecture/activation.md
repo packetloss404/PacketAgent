@@ -1,9 +1,9 @@
 # Activation Engine
 
 > **Scope note:** This inherited subsystem measures workspace onboarding and
-> release adoption. It is not the Worker deployment/trigger lifecycle planned
-> in W1-W3. New Worker activation code must use explicit Worker terminology and
-> must not overload this read model.
+> release adoption. It is not the canonical Worker deployment/trigger
+> lifecycle shipped through W1-W3. Worker activation code uses explicit Worker
+> terminology and must not overload this read model.
 
 Activation is the system that promotes a workspace from a fresh sign-up through the work that proves it is in real use, ending at a confirmed release. It is driven by observed signals such as workflow records, agent runs, completed plan items, and release confirmations rather than self-reported steps. The pure engine derives a status DTO from a normalized snapshot, and a small services layer maps the live store into that snapshot and persists the resulting read model.
 
@@ -210,7 +210,7 @@ The repository layer in `src/activation/repositories.ts` ships in-memory impleme
 
 `activationSignalRepository()` in `src/packetagent-store.ts` selects the JSON or SQLite implementation based on `process.env.PACKETAGENT_STORE`. Both implementations expose `listForWorkspace(workspaceId)` and `upsert(input, timestamp?)`.
 
-The SQL schema for the future normalized topology lives in `src/db/schema/activation.sql` and defines `activation_tracks`, `activation_milestones`, and `activation_checklist_items` with the same enum values used by the domain.
+The reference SQL schema for the normalized topology lives in `src/db/schema/activation.sql` and defines `activation_tracks`, `activation_milestones`, and `activation_checklist_items` with the same enum values used by the domain.
 
 ## API Surfaces
 

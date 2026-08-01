@@ -55,20 +55,24 @@ The highest-value known constraints, not automatic tasks, are:
 
 ## Last verified R7/R8 gates
 
-- `npm run verify:release` — 12 deterministic gate groups passed. This includes
+- `npm run verify:docs` - all 48 tracked Markdown files, local links,
+  documented npm commands, authority boundaries, backlog state, and README
+  screenshot assets passed.
+- `npm run verify:release` - 13 deterministic gate groups passed. This includes
+  the documentation gate,
   5 focused app happy-path tests, the serialized PacketADE Worker handoff gate
   with its intentional live-network skip, 39 path/preview/artifact/rollback
   regressions, 2 backup/restore cases, tenant isolation, claim audit, built
   server boot, and the authenticated browser pass.
-- `npm run verify:production-image` — image built; command is
+- `npm run verify:production-image` - image built; command is
   `node --enable-source-maps dist/server.js`; non-root read-only runtime became
   ready.
-- `npm run typecheck` — passed.
-- `npm run lint` — passed with zero errors and zero warnings.
-- `npm run format:check` — passed.
-- `npm run test:api` — 1,662 total: 1,659 passed, 3 intentionally skipped
+- `npm run typecheck` - passed.
+- `npm run lint` - passed with zero errors and zero warnings.
+- `npm run format:check` - passed.
+- `npm run test:api` - 1,662 total: 1,659 passed, 3 intentionally skipped
   live-interoperability probes, 0 failed.
-- `npm run test:web` — 58 passed, 0 skipped, 0 failed.
+- `npm run test:web` - 58 passed, 0 skipped, 0 failed.
 
 See [`dev/r8-release-reliability.md`](dev/r8-release-reliability.md) for the
 requirement-to-evidence matrix and reproducible commands.
@@ -84,15 +88,17 @@ npm run typecheck
 npm run verify:release
 ```
 
-Expected branch after this handoff is merged: `main`.
+Expected local branch: `main`. It may be ahead of `origin/main` when a session
+was asked to commit without pushing; inspect the divergence before publishing.
 
 Expected remotes:
 
-- `origin` — `git@github.com:packetloss404/PacketAgent.git`, writable;
-- `taskloom-source` — historical migration source, read-only by convention.
+- `origin` - `git@github.com:packetloss404/PacketAgent.git`, writable;
+- `taskloom-source` - historical migration source, read-only by convention.
 
 Stop if the worktree is unexpectedly dirty, the active directory is
-`D:\projects\taskloom`, or `origin/main` does not contain this handoff.
+`D:\projects\taskloom`, or the remote topology differs from the two entries
+above.
 
 ## Canonical references
 

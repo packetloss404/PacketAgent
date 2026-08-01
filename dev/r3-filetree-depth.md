@@ -2,6 +2,8 @@
 
 Date: 2026-07-29
 
+Status: completed R3 implementation record.
+
 `BACKLOG.md` remains the implementation ledger. This record captures the R3
 research and decisions that support the closed checklist.
 
@@ -21,8 +23,9 @@ research and decisions that support the closed checklist.
   model mutations outside the chosen scope before validating the candidate.
 - Package installation is a plan, not an effect. It allows only the generated
   React/Vite/TypeScript/Tailwind toolchain and conservative semver specs. Its
-  required future execution boundary is Docker, registry-only networking,
-  disabled lifecycle scripts, and bounded time/output.
+  execution boundary was assigned to Docker, registry-only networking,
+  disabled lifecycle scripts, and bounded time/output; R5 later shipped and
+  certified the Docker isolation boundary.
 - ZIP export is workspace-authorized and checkpoint-bound. It rejects unsafe
   paths, duplicate/reserved metadata paths, more than 500 files, or more than
   10 MiB of source. It includes git-ready source, a package plan, human

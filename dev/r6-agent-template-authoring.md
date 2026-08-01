@@ -1,6 +1,7 @@
 # R6.2 LLM-authored agent templates
 
-Status: complete as of 2026-07-29. Resume at R6.3.
+Status: complete as of 2026-07-29. R6.3-R6.6 and R7-R8 are also complete; no
+automatic loop follows R8.
 
 This record captures the research, trust boundary, implementation, and
 verification for the second R6 slice. `BACKLOG.md` remains the sole active

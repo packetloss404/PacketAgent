@@ -782,6 +782,10 @@ complete.
 
 ### Quality bar
 
+- Run `npm run verify:docs` before every release; it validates the tracked
+  Markdown corpus, local links and screenshot assets, documented npm commands,
+  authority boundaries, and the single conditional unchecked item in this
+  ledger.
 - Run `npm run audit:release-claims` before every release; it rejects
   unsupported future, demo-only, fake-success, old phase-TODO, and public
   stub-provider wording.

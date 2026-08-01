@@ -2,9 +2,9 @@
 
 > **Status: implemented historical feature brief.** The agent builder,
 > playbooks, launch approval flow, and derived run trace are present in the
-> inherited codebase. Remaining Worker lifecycle work is tracked in
-> [`../BACKLOG.md`](../BACKLOG.md). This file is design context, not an active
-> plan.
+> inherited codebase. The canonical Worker lifecycle later shipped through
+> W1-W10; [`../BACKLOG.md`](../BACKLOG.md) retains the closure evidence and
+> decision-gated work. This file is design context, not an active plan.
 
 This feature turns PacketAgent's agent path from a configuration form into a task-native agent studio: describe an agent, review the generated plan, save a reusable playbook, run it with typed inputs, approve risky tools, and inspect what happened afterward.
 

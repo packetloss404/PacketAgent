@@ -1,5 +1,8 @@
 # R6.4 Agent memory, examples, and first-run evaluation
 
+Status: complete as of 2026-07-29. R6.5-R6.6 and R7-R8 are also complete; no
+automatic loop follows R8.
+
 R6.4 turns the Agent Builder's first run from a local synthetic preview into a
 bounded real Agent execution with durable, inspectable evaluation evidence.
 It also gives operators editable non-secret memory, saved input examples, and
@@ -147,4 +150,5 @@ The R6.4 checkpoint passes:
 - 1,642 API tests: 1,639 passed and three intentional live interoperability
   probes skipped.
 
-The next loop is R6.5: signed, versioned Agent/Worker import and export.
+R6.5 later shipped signed, versioned Agent/Worker import and export. R6.6 and
+R7-R8 are also complete.

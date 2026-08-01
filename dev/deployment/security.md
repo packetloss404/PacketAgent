@@ -103,7 +103,7 @@ Production startup requires:
 The workbench session and CSRF cookies omit `Domain`, so they remain host-only
 and are not sent to the preview hostname. Preview authorization uses a
 versioned HMAC capability bound to one workspace, app, checkpoint, scope,
-expiry, and—when interactive—one parent origin. It arrives after `#` in the
+expiry, and - when interactive - one parent origin. It arrives after `#` in the
 URL, so it is absent from HTTP requests and access logs. A same-origin
 bootstrap exchanges it for a Secure, HttpOnly, `SameSite=None`, partitioned
 cookie scoped to `/api/app/generated-apps/<appId>/`, then removes the fragment.

@@ -7,8 +7,10 @@ Documentation for people working on PacketAgent - self-hosters running a node, c
 | Path                                                                   | Audience     | Purpose                                                                                                                      |
 | ---------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | [`../HANDOFF.md`](../HANDOFF.md)                                       | Contributors | Short, exact resume point for a new working session.                                                                         |
+| [`../BACKLOG.md`](../BACKLOG.md)                                       | Everyone     | Sole implementation ledger: completed PA0/W/R gates and explicitly decision-gated work.                                      |
 | [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md)                                 | Contributors | Detailed implementation inventory and verification history.                                                                  |
 | [`roadmap.md`](roadmap.md)                                             | Everyone     | Current state and what's next. No commitments - priority is set by issue activity.                                           |
+| [`worker-implementation-loops.md`](worker-implementation-loops.md)     | Contributors | Completed executable map for W2-W10 and R1-R8; not a second backlog.                                                         |
 | [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md) | Contributors | Versioned deployment and event contract between PacketADE and PacketAgent.                                                   |
 | [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)             | Operators    | Rename, repository, environment, and data-file compatibility notes.                                                          |
 | [`TESTING.md`](TESTING.md)                                             | Release      | Manual end-to-end smoke playbook run before tagging a release.                                                               |
@@ -31,6 +33,25 @@ conventions. Publish PacketAgent work only to
 `git@github.com:packetloss404/PacketAgent.git`; the `taskloom-source` remote is
 historical and read-only by convention. Use `BACKLOG.md` for implementation
 coordination.
+
+## Documentation authority and verification
+
+The automatic PA0, W1-W10, and R1-R8 sequence is complete. A planning or
+evidence document may explain a completed slice, but it cannot create a new
+loop or reopen a gate. Only unchecked work in [`../BACKLOG.md`](../BACKLOG.md)
+is actionable, and the sole unchecked item is the credential-dependent live
+PacketChat/PacketPhone interoperability check.
+
+The 2026-08-01 documentation audit covers all 48 tracked Markdown files. Run:
+
+```bash
+npm run verify:docs
+```
+
+The gate checks local Markdown and image targets, documented `npm run`
+commands, ASCII consistency, historical labels, completed-loop authority
+statements, the single unchecked backlog boundary, and the two committed README
+screenshots. It is also part of `npm run verify:release`.
 
 ## For releases
 

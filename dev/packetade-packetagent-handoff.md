@@ -1,8 +1,9 @@
 # PacketADE to PacketAgent handoff
 
 Status: W9 contract and completed handoff-gate record. W9.1-W9.5 are
-implemented; PacketChat/PacketPhone delivery continues in W10. The exact
-executable slices are in
+implemented. W10's PacketChat/PacketPhone routes and local certification are
+also complete; only credentialed live interoperability remains conditional.
+The exact completed slices are in
 [`worker-implementation-loops.md`](worker-implementation-loops.md#w9---packetade-deployment-handoff).
 
 The normative executable v1 contract is
@@ -341,13 +342,13 @@ test runs only when
 `PACKETAGENT_PACKETADE_INTEROP_TOKEN`, and
 `PACKETAGENT_PACKETADE_INTEROP_WORKSPACE_ID` are all explicitly configured.
 
-## Delivery order
+## Completed delivery order
 
-1. Reconcile and freeze the WorkerPackage schema against the completed W1
+1. Reconciled and froze the WorkerPackage schema against the completed W1
    Worker domain contract.
-2. Implement validation without activation.
-3. Implement deployment and inspection.
-4. Add manual activation with bounded policies.
-5. Add event streaming and PacketADE reconnection.
-6. Add update, rollback, pause, and revoke.
-7. Add PacketChat and PacketPhone notification routes after W7 is stable.
+2. Implemented validation without activation.
+3. Implemented deployment and inspection.
+4. Added manual activation with bounded policies.
+5. Added event streaming and PacketADE reconnection.
+6. Added update, rollback, pause, and revoke.
+7. Added PacketChat and PacketPhone notification routes after W7 stabilized.

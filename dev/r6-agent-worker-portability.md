@@ -1,7 +1,8 @@
-# R6.5 signed Agent–Worker portability
+# R6.5 signed Agent-Worker portability
 
 Status: implemented 2026-07-29. `BACKLOG.md` remains the implementation
-ledger. R6.6 remains the canonical-only execution and legacy migration gate.
+ledger. The later R6.6 canonical-only execution and legacy migration gate is
+also complete.
 
 ## Goal
 
@@ -152,11 +153,10 @@ rejection, signer substitution, API headers and RBAC path, preflight, paused
 import, fresh IDs, publisher acknowledgement, idempotent replay, changed-input
 conflict, and review-dialog gating.
 
-## R6.6 boundary
+## R6.6 boundary at this checkpoint
 
-R6.5 does not switch Agent runs to the canonical Worker supervisor, validate
-or deploy the imported Worker content, or retire the legacy Agent APIs. R6.6
-must characterize compatibility, persist the migration link, execute through
-canonical lifecycle records only, and prove that existing Agent endpoints and
-clients retain their promised behavior before the unified lifecycle can be
-called shipped.
+R6.5 did not switch Agent runs to the canonical Worker supervisor, validate or
+deploy the imported Worker content, or retire the legacy Agent APIs. The later,
+completed R6.6 gate characterized compatibility, persisted the migration link,
+executed through canonical lifecycle records only, and proved that existing
+Agent endpoints and clients retain their promised behavior.

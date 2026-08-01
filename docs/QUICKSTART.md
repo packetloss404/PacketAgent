@@ -2,8 +2,10 @@
 
 You don't need to know Node, npm, or anything technical. Just one command.
 
-This starts the inherited local workbench. It can build and run capped agents
-today; the durable autonomous Worker lifecycle is still under development.
+This starts the local workbench. It can build apps and Agents and operate the
+completed bounded, durable Worker lifecycle. Live integrations still require
+the operator to supply the relevant provider or Packet-product endpoints and
+credentials.
 
 ## Start it
 

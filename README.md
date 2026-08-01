@@ -401,7 +401,7 @@ Common environment variables:
 | `PACKETAGENT_GENERATED_APP_PORT`                  | `8787`                     | Host port used by a generated publish package. The container always listens on `8080`.                                                                                                                |
 | `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY`        | _unset_                    | Optional HMAC-SHA256 key for generated-app manifest authenticity; must be at least 32 bytes. Per-file and canonical-manifest SHA-256 verification is always enabled.                                  |
 | `PACKETAGENT_PUBLISH_MANIFEST_SIGNING_KEY_ID`     | `packetagent-local`        | Non-secret label recorded with an optional publish-manifest signature.                                                                                                                                |
-| `PACKETAGENT_AGENT_BUNDLE_TRUSTED_KEY_IDS`        | _unset_                    | Comma-separated SHA-256 SPKI fingerprints trusted for signed Agent–Worker imports. A cryptographically valid unlisted publisher requires explicit admin acknowledgement.                              |
+| `PACKETAGENT_AGENT_BUNDLE_TRUSTED_KEY_IDS`        | _unset_                    | Comma-separated SHA-256 SPKI fingerprints trusted for signed Agent-Worker imports. A cryptographically valid unlisted publisher requires explicit admin acknowledgement.                              |
 | `PACKETAGENT_ARTIFACT_SERVING_ENABLED`            | `false`                    | Opt in to artifact-file serving. Reads still require an authenticated viewer in the workspace that owns the exact run ID in the URL.                                                                  |
 | `PACKETAGENT_LEGACY_TEMPLATES`                    | _unset_                    | Set to `1` to force the legacy template path and skip the file-tree codegen orchestrator entirely. The previous opt-in flag `PACKETAGENT_FILETREE_CODEGEN=1` is preserved as a no-op for back-compat. |
 | `PACKETAGENT_PROVIDER_PRIORITY`                   | _unset_                    | Comma-separated provider override (e.g. `ollama,openrouter,anthropic`). Applied to every preset; first registered provider with a configured key wins.                                                |
@@ -439,15 +439,16 @@ returned by these routes.
 - **Backend.** Hono on `@hono/node-server`. `src/server.ts` mounts ~20 route groups (`app-routes`, `workflow-routes`, `webhook-routes`, `share-routes`, `sandbox-routes`, four `operations-*-routes`, and more) with access-log middleware, redacted error envelopes, baseline security headers/CSP, `enforcePrivateAppMutationSecurity` on `/api/app/*`, cross-origin/CSRF enforcement, a fail-closed primary/preview host split, public webhooks, and static serving of the built web plus explicitly enabled, authenticated, workspace-scoped run artifacts.
 - **LLM layer.** `ProviderRouter` route-key dispatch over six BYOK clients, a canonical capability/model/generation catalog, vault-aware preset resolution and readiness, native/conditional structured response mapping, one bounded malformed-tool correction, and a cost `ledger`. With zero ready providers, only deterministic template authoring remains available; the UI does not present that path as model readiness or external execution success.
 - **Codegen + agents.** `src/codegen/` (plan/write/chunk orchestrator, path validator, derived-draft, app-builder/iteration services, generated-app runtime/workspace, preview/snapshot/publish-readiness) and `src/tools/` (agent loop, registry/executor, read/write/browser builtins, Playwright runtime) plus `src/sandbox/`.
-- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, `busy_timeout`) for single-node; and an advisory-lock-serialized managed-Postgres document adapter for shared app processes. SQLite has 27 ordered SQL migrations.
+- **Persistence.** File-backed JSON for contributor flow; `node:sqlite` (WAL, foreign keys on, `busy_timeout`) for single-node; and an advisory-lock-serialized managed-Postgres document adapter for shared app processes. SQLite schema changes use ordered SQL migrations.
 - **Jobs / ops.** Persisted queue with five-field cron, exponential retry, dead-letter, three-way scheduler leader election, an alert engine, and metrics snapshots.
 
 ## Engineering & testing
 
 PacketAgent is TypeScript ESM on Node >=22.5 with a React/Vite frontend. The code uses strict typechecking, dependency injection in many runtime boundaries, and feature directories for providers, tools, jobs, sandboxing, repositories, activation, codegen, and security. The repository lint gate currently passes with zero warnings.
 
-The R8 release command runs 12 deterministic groups covering the built web and
-server, sign-in browser path, app build/approval/iteration/preview/publish,
+The R8 release command runs 13 deterministic groups covering documentation
+truth, the built web and server, sign-in browser path, app
+build/approval/iteration/preview/publish,
 Worker deploy/run/inspect/reconnect/revoke, checkpoint transcripts, traversal,
 preview isolation, artifact integrity, rollback, backup/restore, tenant
 isolation, and public-claim audit. The separate production-image verifier
@@ -600,7 +601,8 @@ Make changes on local `codex/*` branches and publish PacketAgent work to
 `origin`, never to the historical `taskloom-source` remote. Run `npm run build`
 before publishing work; it runs the web and server builds, full TypeScript
 typecheck, API tests, and frontend tests. Production releases also run
-`npm run verify:release` and Docker-backed `npm run verify:production-image`.
+`npm run verify:release` (including the 48-file documentation truth gate) and
+Docker-backed `npm run verify:production-image`.
 
 ## License
 

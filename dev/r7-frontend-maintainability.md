@@ -5,8 +5,8 @@ implementation ledger.
 
 ## Goal
 
-Reduce the remaining oversized workbench views and route modules along the
-feature seams that already exist in the repository. R7 is a behavior-preserving
+R7 reduced the oversized workbench views and route modules named by its audit
+along the repository's established feature seams. It was a behavior-preserving
 maintainability loop, not a frontend rewrite.
 
 The decomposition rules are:
@@ -204,6 +204,8 @@ projection. `npm run verify:workbench-browser` boots the built server against a
 temporary SQLite store, signs in through the real UI, captures Builder app and
 Worker operations screenshots under ignored `tmp/release-verification/`, and
 checks selected/focus behavior after keyboard navigation through Admin tabs.
+Reviewed copies of those two real captures are committed under
+`docs/assets/readme/` and rendered in the public README.
 
 Gate result: critical authoring and operations views have bounded ownership,
 shared accessible state handling, keyboard-safe tabs, centralized browser

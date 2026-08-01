@@ -53,7 +53,8 @@ Prompt-to-app generation remains a supported secondary capability.
 - Added `src/brand.ts` and tests for temporary `TASKLOOM_*` environment aliases
   and non-destructive legacy default-data copying.
 - Reframed the roadmap and backlog around the W1-W10 autonomous-worker loops.
-- Defined the future PacketADE deployment package and event contract.
+- Defined and later implemented the PacketADE deployment package and event
+  contract.
 - Completed W1's storage-neutral canonical Worker schemas, runtime validators,
   lifecycle guards, immutable-version checks, and legacy read projections.
 - Completed W2's JSON, SQLite, and managed-Postgres Worker persistence,
@@ -206,7 +207,7 @@ Prompt-to-app generation remains a supported secondary capability.
   model identity, and operator-review notes without a second model judge call.
   JSON, SQLite, and managed Postgres plus Builder, Agent detail, and run traces
   preserve the evidence.
-- Completed R6.5's signed Agent–Worker portability boundary. The strict v1
+- Completed R6.5's signed Agent-Worker portability boundary. The strict v1
   envelope carries portable Agent authoring plus its deterministic canonical
   Worker draft, binds RFC 8785 bytes and media type with SHA-256 and Ed25519
   DSSE, and exposes local/configured/untrusted publisher fingerprints. Export
@@ -276,13 +277,13 @@ verify:agent-canonical-execution` is the offline executable gate. Design and
 - Completed R8's release reliability and production packaging gate. New
   generated-app checkpoints persist bounded v1 quality transcripts; exact
   preview refresh, rollback, and branch evidence remains checkpoint-bound.
-  Twelve deterministic release groups cover app and Worker happy paths, named
-  regressions, backup/restore, tenant isolation, claim audit, plain-Node boot,
-  and the browser path. Production builds split Node 22 ESM with source maps,
-  keeps Playwright optional, and runs `dist/server.js`; the actual non-root,
-  read-only Docker image built and became ready. Cleanup is limited to named
-  ignored generated roots. The requirement/evidence matrix lives in
-  `dev/r8-release-reliability.md`.
+  Thirteen deterministic release groups cover documentation truth, app and
+  Worker happy paths, named regressions, backup/restore, tenant isolation,
+  claim audit, plain-Node boot, and the browser path. Production builds split
+  Node 22 ESM with source maps, keeps Playwright optional, and runs
+  `dist/server.js`; the actual non-root, read-only Docker image built and
+  became ready. Cleanup is limited to named ignored generated roots. The
+  requirement/evidence matrix lives in `dev/r8-release-reliability.md`.
 
 ## Current implementation truth
 
@@ -425,8 +426,7 @@ R1's first persistence slice is implemented: production managed Postgres pools
 are reused per connection target and closed at server shutdown; migration and
 restore candidates must pass SQLite integrity and foreign-key checks; corrupt
 restore candidates leave the current database untouched; and managed backfill
-preserves target-only records. The current re-audit evidence and remaining
-open findings are in
+preserves target-only records. The completed finding dispositions are in
 [`r1-repository-health-audit.md`](r1-repository-health-audit.md).
 
 The jobs audit is also closed: the redundant SQLite post-commit upsert was
@@ -438,8 +438,9 @@ regressions. The focused job/scheduler gate passes 91 tests.
 The backend security/startup audit is also closed. `npm start` launches the
 single-process server without watch mode; legacy migration and provider/tool
 registration happen only inside explicit startup; restrictive workbench/API
-security headers are active while generated-app previews retain a deliberate
-CSP exception pending R5 origin isolation; and opt-in artifact reads require
+security headers are active. At that R1 checkpoint, generated-app previews
+retained a deliberate CSP exception that the completed R5 origin-isolation
+gate later closed. Opt-in artifact reads require
 an authenticated viewer whose workspace owns the exact legacy-agent or
 canonical-Worker run ID in the URL. The focused startup/security gate passes
 11 tests, typecheck passes, and the broader server/app/auth regression
@@ -909,7 +910,7 @@ second-model score. `npm run verify:agent-first-run` certifies seven assertions
 without network calls. Research and decisions are recorded in
 [`r6-agent-first-run-evaluation.md`](r6-agent-first-run-evaluation.md).
 
-R6.5 is complete. The strict signed Agent–Worker bundle carries portable Agent
+R6.5 is complete. The strict signed Agent-Worker bundle carries portable Agent
 authoring plus its deterministic Worker draft while excluding local IDs,
 credentials, network destinations, webhook authority, history, and active
 state. RFC 8785/SHA-256/Ed25519 DSSE verification and publisher-fingerprint
@@ -955,6 +956,7 @@ reconciled and must not be resumed independently.
   [`r6-agent-canonical-execution.md`](r6-agent-canonical-execution.md)
 - Rename compatibility: [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)
 - Verification: [`TESTING.md`](TESTING.md)
+- Documentation map and truth gate: [`README.md`](README.md)
 - Shipped history: [`../CHANGELOG.md`](../CHANGELOG.md)
 - Pre-W10.3 W1-W10.2 implementation-report snapshot:
   [`../output/pdf/packetagent-worker-implementation-report.pdf`](../output/pdf/packetagent-worker-implementation-report.pdf)
@@ -966,6 +968,9 @@ handoff, the roadmap, or the backlog.
 
 ## Last verified gates
 
+- `npm run verify:docs` - all 48 tracked Markdown files, local links,
+  documented npm commands, authority boundaries, backlog state, and README
+  screenshot assets passed
 - `npm run typecheck` - passed
 - `npm run lint` - passed with 0 errors and 0 warnings
 - `npm run format:check` - passed
@@ -975,7 +980,7 @@ handoff, the roadmap, or the backlog.
 - `npm run test:api` - 1,659 passed, 3 intentionally skipped live probes, 0
   failed (1,662 total)
 - `npm run test:web` - 58 passed, 0 skipped, 0 failed
-- `npm run verify:release` - all 12 deterministic build, app, Worker,
+- `npm run verify:release` - all 13 documentation, build, app, Worker,
   transcript, persistence, regression, backup, isolation, claim, plain-Node,
   and browser groups passed
 - `npm run verify:production-image` - actual Docker image built and became
@@ -990,7 +995,7 @@ handoff, the roadmap, or the backlog.
   stop, canonical-schedule-only, persistence, and single-engine assertions
   passed without a live provider, tool, or network call
 - focused R6.5 canonical JSON, WorkerPackage compatibility, strict
-  Agent–Worker bundle, Ed25519/DSSE, tamper and signer substitution,
+  Agent-Worker bundle, Ed25519/DSSE, tamper and signer substitution,
   export/preflight/import, paused safety, publisher acknowledgement,
   idempotency, secret-export refusal, and workbench review gate - 11 passed, 0
   failed

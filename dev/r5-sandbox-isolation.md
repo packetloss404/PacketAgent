@@ -1,5 +1,8 @@
 # R5 sandbox, egress, and preview isolation
 
+Status: complete. This is retained implementation and verification evidence;
+R6-R8 are also complete.
+
 This is the research and implementation evidence for R5. `BACKLOG.md` remains
 the only task ledger.
 
@@ -398,4 +401,4 @@ production web build, 33/33 web tests, 16/16 focused container/publish tests,
 all five cumulative R5 executable verifiers, and the complete 1,620-test API
 suite (1,617 passed with three intentional live interoperability skips).
 
-R5 is complete. Continue only from R6.1 in `BACKLOG.md`.
+R5 is complete. R6-R8 subsequently closed; no automatic loop follows R8.

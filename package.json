@@ -25,6 +25,7 @@
     "verify:production-build": "npm run build:web && npm run build:server && node scripts/verify-production-build.mjs",
     "verify:production-image": "node scripts/verify-production-image.mjs",
     "verify:workbench-browser": "npm run build:web && npm run build:server && node scripts/verify-workbench-browser.mjs",
+    "verify:docs": "node scripts/verify-documentation.mjs",
     "audit:release-claims": "node scripts/audit-release-claims.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "clean:generated": "node scripts/clean-generated.mjs",

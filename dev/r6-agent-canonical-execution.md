@@ -205,4 +205,5 @@ canonical lifecycle. Cancellation targets the linked Worker run.
 - The full API regression passes: 1,657 passed, three intentional live
   interoperability probes skipped, zero failed (1,660 total).
 
-The next executable slice is R7.1 in `BACKLOG.md`.
+R7 and R8 subsequently closed. No automatic implementation slice follows R8;
+new work requires an explicit decision from `BACKLOG.md`.

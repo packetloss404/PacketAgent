@@ -1,6 +1,15 @@
 # R1 dependency advisory audit
 
 Last updated: 2026-07-29.
+Rechecked: 2026-08-01.
+
+Status: completed point-in-time R1 evidence. Registry results below describe
+the recorded R1 checkpoint, not a permanent claim about future advisory data.
+
+The 2026-08-01 `npm audit` and `npm audit --omit=dev` recheck matched this
+disposition: 0 low, 0 moderate, 2 high package entries, and 0 critical in both
+trees. The two entries still resolve to the single React Router RSC advisory
+described below.
 
 This is the deliberate dependency disposition required by
 [`R1`](../BACKLOG.md#r1---repository-health-and-historical-finding-re-audit).

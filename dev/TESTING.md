@@ -43,9 +43,13 @@ actual production-image proof. See
 [`r8-release-reliability.md`](r8-release-reliability.md) for the evidence
 matrix.
 
-Current R8 release checks (2026-08-01):
+Current R8 release and documentation checks (2026-08-01):
 
-- `npm run verify:release`: 12 deterministic groups passed, including 5 app
+- `npm run verify:docs`: all 48 tracked Markdown files, local links, documented
+  npm commands, authority boundaries, backlog state, and README screenshots
+  passed.
+- `npm run verify:release`: 13 deterministic groups passed, including the
+  documentation gate, 5 app
   happy-path cases, the serialized Worker disconnect/reconnect/revoke case, 39
   path/preview/artifact/rollback regressions, 2 backup/restore regressions,
   tenant isolation, claim audit, built-server boot, and authenticated browser
@@ -56,7 +60,8 @@ Current R8 release checks (2026-08-01):
   non-root process with a read-only root filesystem.
 - Browser evidence is generated under ignored `tmp/release-verification/` for
   Builder app and canonical Worker operations modes. Arrow-key focus and
-  selected-tab state are asserted.
+  selected-tab state are asserted. Reviewed copies are committed under
+  `docs/assets/readme/` for the public README.
 - Typecheck, zero-warning lint, and repository formatting pass.
 - Full API suite: 1,662 total; 1,659 passed, 3 intentionally skipped live
   probes, 0 failed.
@@ -1078,7 +1083,7 @@ Required generated-preview isolation verification:
    `/api/app/generated-apps/:appId/preview` returns `404`, even with a valid
    `packetagent_session`, and a preview-origin request to `/api/health` also
    returns `404`.
-3. Confirm a minted preview URL has no query string and carries `#token=pt1…`.
+3. Confirm a minted preview URL has no query string and carries `#token=pt1...`.
    The bootstrap exchange must set a Secure, HttpOnly, `SameSite=None`,
    `Partitioned` cookie scoped to the one app path, then remove the fragment.
 4. Confirm shared/read HTML uses `frame-ancestors 'none'`, an interactive
@@ -1110,7 +1115,7 @@ Required container-hardening verification:
    `verify:sandbox-policy`, `verify:sandbox-egress`,
    `verify:preview-isolation`, and `verify:container-hardening`.
 
-Required Agent–Worker portability verification:
+Required Agent-Worker portability verification:
 
 1. Run `npm run verify:agent-portability`. Confirm all eight assertions and
    the top-level `ok` field are `true`. This gate makes no network call.

@@ -29,8 +29,9 @@ The Worker path preserves the runtime invariants:
   username, host, message body, or recipient plaintext beyond the already
   policy-authorized call record.
 
-Worker browser and SQL execution remain fail-closed pending their own hardened
-drivers. R6.1 does not broaden those boundaries.
+Worker browser and SQL execution remain fail-closed because hardened
+Worker-specific drivers are not shipped. R6.1 does not broaden those
+boundaries or create an automatic follow-on gate.
 
 ## Credential contract
 
