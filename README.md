@@ -15,6 +15,24 @@ external PacketChat or PacketPhone products without their live endpoint
 configuration. Later hosted or expanded-runtime work remains explicitly
 decision-gated in [`BACKLOG.md`](BACKLOG.md).
 
+## Screenshots
+
+These are captured from the real built workbench by the authenticated
+`npm run verify:workbench-browser` release gate.
+
+### Builder creation studio
+
+Start an app or agent from a prompt or one of the bounded starter flows.
+
+![PacketAgent Builder creation studio](docs/assets/readme/builder-app-mode.png)
+
+### Durable Worker operations
+
+Inspect workspace-scoped control-plane health, run state, budgets, attention,
+checkpoints, and evidence from the canonical Worker read model.
+
+![PacketAgent durable Worker operations](docs/assets/readme/worker-operations-mode.png)
+
 ## Packet suite
 
 - **PacketADE** is where development work is planned, built, and supervised.

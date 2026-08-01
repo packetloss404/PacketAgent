@@ -55,11 +55,14 @@ try {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL(`${origin}/builder`);
   await page.getByRole("heading", { name: "What do you want to build today?" }).waitFor();
+  const skipTour = page.getByRole("button", { name: "Skip tour" });
+  if (await skipTour.isVisible()) await skipTour.click();
   const builderScreenshot = resolve(evidenceRoot, "builder-app-mode.png");
   await page.screenshot({ path: builderScreenshot, fullPage: true });
 
   await page.goto(`${origin}/runs`);
   await page.getByRole("heading", { name: "Durable Workers" }).waitFor();
+  await page.getByText("Loading Worker operations…").waitFor({ state: "hidden" });
   assert.equal(
     await page.getByRole("button", { name: "Workers", exact: true }).getAttribute("aria-pressed"),
     "true",
