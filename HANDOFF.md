@@ -28,9 +28,8 @@ TaskLoom naming is compatibility-only.
 - R1-R6 are complete.
 - R7, Builder and frontend maintainability, is active.
 - R8, release reliability and production packaging, follows R7.
-- The exact active slice is **R7.1d: split the oversized Agent Builder view
-  along its controller, provider-readiness, review, save/evaluate, and
-  first-run-result seams**.
+- The exact active slice is **R7.1e: split the oversized Settings view along
+  its existing section and destructive-workspace-action seams**.
 
 R6.6 removed the legacy Agent execution choice. Accepted Agent launches and
 active schedules now materialize and enter the canonical Worker lifecycle
@@ -69,21 +68,28 @@ R7.1 is in progress:
 - The web suite now has 49 tests. Its App Builder cold-start characterization
   locks the composer, starter chips, tour affordance, and the absence of
   preview/approval surfaces before a draft exists.
+- R7.1d is complete. The Agent Builder parent-owned draft composition is 254
+  lines, its state/authoring/save/first-run controller hook is 215 lines, and
+  the controlled draft-readiness, configuration/sample-input, and
+  approval/first-run modules are each below 400 lines.
+- Two new rendering characterizations cover provider and capability truth,
+  authored plan review, editable memory/expected output and sample validation,
+  approval copy, and the empty first-run state. The web suite now has 51 tests.
 
 ## Exact resume point
 
-Continue R7.1d in `web/src/workbench/views/builder-agent.tsx`:
+Continue R7.1e in `web/src/workbench/views/settings.tsx`:
 
-1. Characterize provider readiness, authored-draft review, save/evaluate, and
-   first-run result states before moving behavior.
-2. Keep the authored draft as the single parent-owned state and extract the
-   stateful controller plus controlled feature surfaces with explicit props.
-3. Preserve preset resolution, streaming/fallback truth, approval, sample
-   input, first-run evaluation, and navigation behavior while reducing the
-   production view below 1,000 lines.
-4. Add focused component/controller coverage and run the standard R7 subloop
+1. Characterize the existing settings sections, permission gates, and
+   destructive workspace actions before moving behavior.
+2. Extract feature-owned sections with explicit values, permission flags, and
+   action callbacks while retaining one closest-common controller.
+3. Preserve API mutations, confirmation boundaries, navigation, and role
+   behavior while reducing the production view below 1,000 lines.
+4. Add focused controlled-section coverage and run the standard R7 subloop
    gate.
-5. Continue the audited R7.1 order with `settings.tsx`.
+5. Re-run the five-module line-count audit; if every module is bounded, close
+   R7.1 and continue R7.2's accessible state-boundary work.
 
 Do not mark R7.1 complete until every production view/route module named in the
 audit is below 1,000 lines or has an explicit ownership justification, and the
@@ -95,7 +101,7 @@ repository gates pass.
 - `npm run lint` — passed with zero errors and zero warnings.
 - `npm run format:check` — passed.
 - `npm run build:web` — passed.
-- `npm run test:web` — 49 passed, 0 failed.
+- `npm run test:web` — 51 passed, 0 failed.
 - `npm run test:api` — 1,658 passed, 3 intentional live interoperability
   skips, 0 failed (1,661 total).
 - `npm run verify:agent-canonical-execution` — all 8 assertions passed without

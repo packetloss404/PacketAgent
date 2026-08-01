@@ -122,8 +122,26 @@ R7.1c completed the App Builder view split:
   surfaces.
 
 Typecheck, zero-warning lint, formatting, production web build, and all 49 web
-tests pass. Resume R7.1d at the Agent Builder view's provider-readiness,
-review, save/evaluate, and first-run-result seams.
+tests pass.
+
+R7.1d completed the Agent Builder view split:
+
+- `web/src/workbench/views/builder-agent.tsx` fell from 1,397 to 254 lines and
+  remains the single parent-owned draft composition;
+- generation, auto-generation, authored draft/sample state, memory and
+  expected-output editing, approval/save, and approval-bound first-run launch
+  moved intact into the 215-line
+  `web/src/workbench/views/builder-agent/use-agent-builder-controller.ts` hook;
+- draft summary/readiness/plan, configuration/sample inputs, and
+  approval/first-run results live in controlled modules ranging from 289 to
+  381 lines; and
+- two rendering characterizations cover authoring/provider/capability truth,
+  plan review, memory and expected-output editing, sample validation, approval
+  copy, and the empty first-run state.
+
+Typecheck, zero-warning lint, formatting, production web build, and all 51 web
+tests pass. Resume R7.1e at the Settings view's section and destructive-action
+seams.
 
 ## Out of scope for R7.1
 

@@ -583,8 +583,8 @@ verify:agent-canonical-execution` certifies the eight-part boundary without
 
 ### R7 - Builder and frontend maintainability
 
-Status: in progress. R7.1a-R7.1c Agent editor, Builder route, and App Builder
-view decomposition are complete; resume at R7.1d Agent Builder view
+Status: in progress. R7.1a-R7.1d Agent editor, Builder route, App Builder, and
+Agent Builder decomposition are complete; resume at R7.1e Settings view
 decomposition in
 [`dev/r7-frontend-maintainability.md`](dev/r7-frontend-maintainability.md).
 

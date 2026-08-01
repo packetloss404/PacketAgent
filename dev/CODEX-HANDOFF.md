@@ -249,6 +249,13 @@ verify:agent-canonical-execution` is the offline executable gate. Design and
   controller hook. A cold-start composition characterization brings the web
   suite to 49 passing tests. Typecheck, zero-warning lint, formatting, and the
   production web build pass.
+- Completed R7.1d's Agent Builder decomposition. Its parent-owned draft
+  composition fell from 1,397 to 254 lines; a 215-line controller owns
+  generation, draft/sample state, editing, approval/save, and first-run launch;
+  and controlled readiness/review, configuration/sample-input, and
+  approval/first-run modules are each below 400 lines. Two rendering
+  characterizations bring the web suite to 51 passing tests. Typecheck,
+  zero-warning lint, formatting, and the production web build pass.
 
 ## Current implementation truth
 
@@ -382,9 +389,8 @@ Do not describe those missing Worker features as implemented.
 
 ## Exact resume point
 
-Continue **R7.1d - split the oversized Agent Builder view along its existing
-controller, provider-readiness, review, save/evaluate, and first-run-result
-seams** in
+Continue **R7.1e - split the oversized Settings view along its existing section
+and destructive-workspace-action seams** in
 [`../BACKLOG.md#r7---builder-and-frontend-maintainability`](../BACKLOG.md#r7---builder-and-frontend-maintainability).
 `BACKLOG.md` is the single ledger for every remaining R7-R8 task.
 `worker-implementation-loops.md` provides execution mechanics but cannot add
