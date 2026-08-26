@@ -25,6 +25,8 @@ export const PACKET_PRODUCT_OPERATIONS = [
   "deployment.revoke",
   "run.list_events",
   "run.ack_events",
+  "attention.list",
+  "attention.respond",
 ] as const;
 
 export type PacketProductOperation = (typeof PACKET_PRODUCT_OPERATIONS)[number];

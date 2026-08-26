@@ -1,13 +1,29 @@
+import { createHash } from "node:crypto";
 import { Hono, type Context } from "hono";
+import {
+  loadStoreAsync as defaultLoadStore,
+  type PacketAgentData,
+} from "./packetagent-store.js";
 import { redactedErrorMessage } from "./security/redaction.js";
+import { projectAttention, projectControlResult } from "./worker-operator-routes.js";
+import {
+  createWorkerControlService,
+  type WorkerControlService,
+} from "./workers/control-service.js";
+import type { WorkerAttentionRequestStatus } from "./workers/control-types.js";
 import {
   createPacketProductDeploymentService,
   type PacketProductDeploymentControlInput,
   type PacketProductDeploymentService,
   type PacketProductPackageInput,
 } from "./workers/package/deployment.js";
-import { PacketProductTrustError } from "./workers/package/trust.js";
+import {
+  createPacketProductTrustService,
+  PacketProductTrustError,
+  type PacketProductTrustService,
+} from "./workers/package/trust.js";
 import { WorkerLifecycleError } from "./workers/errors.js";
+import { validateWorkerPersistence } from "./workers/repository.js";
 import { workerTraceFromTraceparent } from "./workers/activation.js";
 import type {
   JsonObject,
@@ -15,10 +31,18 @@ import type {
   WorkerRunStatus,
 } from "./workers/types.js";
 
+type MaybePromise<T> = T | Promise<T>;
+
 const WORKSPACE_HEADER = "PacketAgent-Workspace-Id";
+
+const ATTENTION_DECISIONS = ["approve_once", "approve_for_run", "reject"] as const;
+type PacketProductAttentionDecision = (typeof ATTENTION_DECISIONS)[number];
 
 export interface WorkerPackageRoutesDependencies {
   readonly service?: PacketProductDeploymentService;
+  readonly trust?: PacketProductTrustService;
+  readonly control?: WorkerControlService;
+  readonly loadStore?: () => MaybePromise<PacketAgentData>;
 }
 
 export function createWorkerPackageRoutes(
@@ -26,6 +50,89 @@ export function createWorkerPackageRoutes(
 ): Hono {
   const routes = new Hono();
   const service = dependencies.service ?? createPacketProductDeploymentService();
+  const trust = dependencies.trust ?? createPacketProductTrustService();
+  const control = dependencies.control ?? createWorkerControlService();
+  const loadStore = dependencies.loadStore ?? defaultLoadStore;
+
+  routes.get("/worker-deployments/:workerDeploymentId/attention", async (c) => {
+    try {
+      const context = await trust.authenticate({
+        ...readContext(c),
+        operation: "attention.list",
+      });
+      const workerDeploymentId = requiredPathParameter(c, "workerDeploymentId");
+      const status = optionalAttentionStatus(c.req.query("status"));
+      const data = await loadStore();
+      validateWorkerPersistence(data);
+      requirePackageBoundDeployment(data, context.workspaceId, workerDeploymentId);
+      const attention = data.workerAttentionRequests
+        .filter(
+          (record) =>
+            record.workspaceId === context.workspaceId &&
+            record.workerDeploymentId === workerDeploymentId &&
+            (status === undefined || record.status === status),
+        )
+        .sort((left, right) => left.requestedAt.localeCompare(right.requestedAt))
+        .map((record) => projectAttention(data, record));
+      return c.json({ attention });
+    } catch (error) {
+      return packetProductRouteError(c, error);
+    }
+  });
+
+  routes.post("/worker-attention/:attentionRequestId/respond", async (c) => {
+    try {
+      const auth = await trust.authorizeWrite({
+        ...readContext(c),
+        operation: "attention.respond",
+      });
+      const body = await readObjectBody(c);
+      assertAllowedFields(body, ["decision", "expectedRevision"]);
+      const decision = requiredAttentionDecision(body.decision);
+      const expectedRevision = requiredRevision(body.expectedRevision);
+      const idempotencyKey = requireIdempotencyKey(c);
+      const attentionRequestId = requiredPathParameter(c, "attentionRequestId");
+      const data = await loadStore();
+      validateWorkerPersistence(data);
+      const attention = data.workerAttentionRequests.find(
+        (record) =>
+          record.workspaceId === auth.workspaceId && record.id === attentionRequestId,
+      );
+      if (!attention) {
+        throw new WorkerLifecycleError(
+          "not_found",
+          `Worker attention request ${attentionRequestId} was not found.`,
+        );
+      }
+      requirePackageBoundDeployment(data, auth.workspaceId, attention.workerDeploymentId);
+      const method =
+        decision === "approve_once"
+          ? control.approveOnce
+          : decision === "approve_for_run"
+            ? control.approveForRun
+            : control.rejectAttention;
+      const result = await method({
+        workspaceId: auth.workspaceId,
+        actor: auth.actor,
+        idempotencyKey: packetProductAttentionControlKey(idempotencyKey),
+        expectedRevision,
+        attentionRequestId,
+      });
+      const fresh = await loadStore();
+      validateWorkerPersistence(fresh);
+      const responseBody = projectControlResult(fresh, result);
+      if (result.approvalNonce) {
+        c.header("Cache-Control", "no-store");
+        c.header("Pragma", "no-cache");
+      }
+      if (result.command.status === "rejected") {
+        return c.json(responseBody, 409);
+      }
+      return c.json(responseBody);
+    } catch (error) {
+      return packetProductRouteError(c, error);
+    }
+  });
 
   routes.post("/worker-packages/validate", async (c) => {
     try {
@@ -406,6 +513,60 @@ function optionalRunStatus(value: string | undefined): WorkerRunStatus | undefin
     throw invalidField("$.query.status", "request.run_status", "is not a supported run status");
   }
   return value as WorkerRunStatus;
+}
+
+function requirePackageBoundDeployment(
+  data: PacketAgentData,
+  workspaceId: string,
+  workerDeploymentId: string,
+): void {
+  const bound = data.workerPackageDeployments.some(
+    (record) =>
+      record.workspaceId === workspaceId && record.workerDeploymentId === workerDeploymentId,
+  );
+  if (!bound) {
+    throw new WorkerLifecycleError(
+      "not_found",
+      `Packet-product WorkerDeployment ${workerDeploymentId} was not found.`,
+    );
+  }
+}
+
+function requiredAttentionDecision(value: unknown): PacketProductAttentionDecision {
+  if (
+    typeof value !== "string" ||
+    !ATTENTION_DECISIONS.includes(value as PacketProductAttentionDecision)
+  ) {
+    throw invalidField(
+      "$.decision",
+      "request.attention_decision",
+      "must be approve_once, approve_for_run, or reject",
+    );
+  }
+  return value as PacketProductAttentionDecision;
+}
+
+function optionalAttentionStatus(
+  value: string | undefined,
+): WorkerAttentionRequestStatus | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (!["open", "approved", "rejected", "expired", "cancelled"].includes(value)) {
+    throw invalidField(
+      "$.query.status",
+      "request.attention_status",
+      "must be open, approved, rejected, expired, or cancelled",
+    );
+  }
+  return value as WorkerAttentionRequestStatus;
+}
+
+function packetProductAttentionControlKey(key: string): string {
+  return `packetade:${createHash("sha256")
+    .update("packetagent.packet-product-command/v1\0")
+    .update(key)
+    .update("\0")
+    .update("attention.respond")
+    .digest("hex")}`;
 }
 
 function invalidField(path: string, code: string, message: string): PacketProductTrustError {

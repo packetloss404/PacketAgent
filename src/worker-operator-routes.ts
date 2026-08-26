@@ -268,7 +268,7 @@ async function controlResponse(
   return c.json(body);
 }
 
-function projectControlResult(data: PacketAgentData, result: WorkerControlResult) {
+export function projectControlResult(data: PacketAgentData, result: WorkerControlResult) {
   return {
     disposition: result.disposition,
     command: projectCommand(result.command),
@@ -322,7 +322,7 @@ function projectDeployment(deployment: WorkerDeployment) {
   };
 }
 
-function projectAttention(
+export function projectAttention(
   data: PacketAgentData,
   attention: WorkerAttentionRequest,
 ): WorkerOperatorAttentionView {
