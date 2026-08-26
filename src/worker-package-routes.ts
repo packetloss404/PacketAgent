@@ -12,16 +12,33 @@ import {
 } from "./workers/control-service.js";
 import type { WorkerAttentionRequestStatus } from "./workers/control-types.js";
 import {
+  WORKER_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+  WORKER_EVIDENCE_SCHEMA_VERSION,
+} from "./workers/observability/types.js";
+import {
   createPacketProductDeploymentService,
   type PacketProductDeploymentControlInput,
   type PacketProductDeploymentService,
   type PacketProductPackageInput,
 } from "./workers/package/deployment.js";
 import {
+  PACKET_PRODUCT_EVENT_ACKNOWLEDGEMENT_SCHEMA_VERSION,
+  PACKET_PRODUCT_EVENT_PAGE_SCHEMA_VERSION,
+  PACKET_PRODUCT_WORKER_EVENT_SCHEMA_VERSION,
+} from "./workers/package/event-types.js";
+import {
   createPacketProductTrustService,
   PacketProductTrustError,
   type PacketProductTrustService,
 } from "./workers/package/trust.js";
+import {
+  PACKET_PRODUCT_OPERATIONS,
+  packetProductCredentialMetadata,
+} from "./workers/package/trust-types.js";
+import {
+  WORKER_PACKAGE_CANONICALIZATION,
+  WORKER_PACKAGE_SCHEMA_VERSION,
+} from "./workers/package/types.js";
 import { WorkerLifecycleError } from "./workers/errors.js";
 import { validateWorkerPersistence } from "./workers/repository.js";
 import { workerTraceFromTraceparent } from "./workers/activation.js";
@@ -34,6 +51,9 @@ import type {
 type MaybePromise<T> = T | Promise<T>;
 
 const WORKSPACE_HEADER = "PacketAgent-Workspace-Id";
+
+export const WORKER_PACKAGE_CONTRACT_DESCRIPTOR_SCHEMA_VERSION =
+  "packetagent.worker-package-contract/v1" as const;
 
 const ATTENTION_DECISIONS = ["approve_once", "approve_for_run", "reject"] as const;
 type PacketProductAttentionDecision = (typeof ATTENTION_DECISIONS)[number];
@@ -53,6 +73,55 @@ export function createWorkerPackageRoutes(
   const trust = dependencies.trust ?? createPacketProductTrustService();
   const control = dependencies.control ?? createWorkerControlService();
   const loadStore = dependencies.loadStore ?? defaultLoadStore;
+
+  routes.get("/worker-packages/contract", async (c) => {
+    try {
+      const context = await trust.authenticate({
+        ...readContext(c),
+        operation: "deployment.inspect",
+      });
+      const data = await loadStore();
+      const credential = data.packetProductCredentials.find(
+        (record) =>
+          record.workspaceId === context.workspaceId && record.id === context.credentialId,
+      );
+      if (!credential) {
+        throw new PacketProductTrustError(
+          "unauthorized",
+          "Packet-product credentials are invalid or expired.",
+          401,
+        );
+      }
+      const metadata = packetProductCredentialMetadata(credential);
+      return c.json({
+        contractSchemaVersion: WORKER_PACKAGE_CONTRACT_DESCRIPTOR_SCHEMA_VERSION,
+        schemaVersion: WORKER_PACKAGE_SCHEMA_VERSION,
+        canonicalization: WORKER_PACKAGE_CANONICALIZATION,
+        supportedOperations: [...PACKET_PRODUCT_OPERATIONS],
+        credential: {
+          id: metadata.id,
+          subjectId: metadata.subjectId,
+          ...(metadata.displayName ? { displayName: metadata.displayName } : {}),
+          allowedOperations: [...metadata.allowedOperations],
+          requirePackageSignature: metadata.requirePackageSignature,
+          status: metadata.status,
+          ...(metadata.expiresAt ? { expiresAt: metadata.expiresAt } : {}),
+        },
+        events: {
+          eventSchemaVersion: PACKET_PRODUCT_WORKER_EVENT_SCHEMA_VERSION,
+          eventPageSchemaVersion: PACKET_PRODUCT_EVENT_PAGE_SCHEMA_VERSION,
+          eventAcknowledgementSchemaVersion:
+            PACKET_PRODUCT_EVENT_ACKNOWLEDGEMENT_SCHEMA_VERSION,
+        },
+        evidence: {
+          evidenceSchemaVersion: WORKER_EVIDENCE_SCHEMA_VERSION,
+          artifactManifestSchemaVersion: WORKER_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+        },
+      });
+    } catch (error) {
+      return packetProductRouteError(c, error);
+    }
+  });
 
   routes.get("/worker-deployments/:workerDeploymentId/attention", async (c) => {
     try {
