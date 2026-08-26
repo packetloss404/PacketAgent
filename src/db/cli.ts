@@ -49,6 +49,15 @@ import {
   snapshotForWorkspace,
   type PacketAgentData,
 } from "../packetagent-store";
+import {
+  createPacketProductTrustService,
+  type PacketProductTrustService,
+} from "../workers/package/trust.js";
+import {
+  PACKET_PRODUCT_OPERATIONS,
+  type PacketProductCredentialMetadata,
+  type PacketProductOperation,
+} from "../workers/package/trust-types.js";
 
 export interface DbCliOptions {
   dbPath?: string;
@@ -2657,6 +2666,137 @@ function activationSignalStableKey(record: ActivationSignalRecord): string | nul
   return record.stableKey ? `${record.workspaceId}:${record.stableKey}` : null;
 }
 
+export interface PacketProductCredentialIssueOptions {
+  readonly workspaceId: string;
+  readonly operations?: readonly PacketProductOperation[];
+  readonly subjectId?: string;
+  readonly displayName?: string;
+  readonly expiresAt?: string;
+  readonly requirePackageSignature?: boolean;
+}
+
+export interface PacketProductCredentialIssueResult {
+  command: "packet-product-credential-issue";
+  credential: PacketProductCredentialMetadata;
+  /**
+   * Printed exactly once. PacketAgent persists only the one-way token digest,
+   * so this value cannot be recovered after the CLI output is discarded.
+   */
+  token: string;
+}
+
+export interface PacketProductCredentialCliDependencies {
+  readonly trust?: PacketProductTrustService;
+}
+
+export async function issuePacketProductCredential(
+  options: PacketProductCredentialIssueOptions,
+  deps: PacketProductCredentialCliDependencies = {},
+): Promise<PacketProductCredentialIssueResult> {
+  const trust = deps.trust ?? createPacketProductTrustService();
+  const issued = await trust.issueCredential({
+    workspaceId: options.workspaceId,
+    subjectId: options.subjectId ?? `packetade:${options.workspaceId}`,
+    ...(options.displayName ? { displayName: options.displayName } : {}),
+    allowedOperations:
+      options.operations && options.operations.length > 0
+        ? options.operations
+        : PACKET_PRODUCT_OPERATIONS,
+    ...(options.requirePackageSignature ? { requirePackageSignature: true } : {}),
+    ...(options.expiresAt ? { expiresAt: options.expiresAt } : {}),
+    createdBy: { type: "system", id: "packetagent.db-cli" },
+  });
+  return {
+    command: "packet-product-credential-issue",
+    credential: issued.credential,
+    token: issued.token,
+  };
+}
+
+export function parsePacketProductCredentialIssueArgs(
+  args: readonly string[],
+): PacketProductCredentialIssueOptions {
+  const workspaceId = readFlagValue(args, "--workspace");
+  if (!workspaceId) {
+    throw new Error("packet-product-credential issue requires --workspace <id>.");
+  }
+  const operationsCsv = readFlagValue(args, "--operations");
+  const subjectId = readFlagValue(args, "--subject");
+  const displayName = readFlagValue(args, "--display-name");
+  const expiresAt = readFlagValue(args, "--expires-at");
+  return {
+    workspaceId,
+    ...(operationsCsv ? { operations: parsePacketProductOperationsCsv(operationsCsv) } : {}),
+    ...(subjectId ? { subjectId } : {}),
+    ...(displayName ? { displayName } : {}),
+    ...(expiresAt ? { expiresAt } : {}),
+    ...(args.includes("--require-signature") ? { requirePackageSignature: true } : {}),
+  };
+}
+
+export function parsePacketProductOperationsCsv(csv: string): readonly PacketProductOperation[] {
+  const operations = csv
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  const unsupported = operations.filter(
+    (operation) => !PACKET_PRODUCT_OPERATIONS.includes(operation as PacketProductOperation),
+  );
+  if (operations.length === 0 || unsupported.length > 0) {
+    throw new Error(
+      `--operations must be a comma-separated subset of: ${PACKET_PRODUCT_OPERATIONS.join(",")}` +
+        (unsupported.length > 0 ? ` (unsupported: ${unsupported.join(",")})` : ""),
+    );
+  }
+  return operations as PacketProductOperation[];
+}
+
+function readFlagValue(args: readonly string[], flag: string): string | undefined {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]!;
+    if (arg === flag) {
+      const value = args[index + 1]?.trim();
+      return value && !value.startsWith("--") ? value : undefined;
+    }
+    if (arg.startsWith(`${flag}=`)) {
+      const value = arg.slice(flag.length + 1).trim();
+      return value || undefined;
+    }
+  }
+  return undefined;
+}
+
+function writePacketProductCredentialUsage(): void {
+  console.error(
+    "Usage: node --import tsx src/db/cli.ts packet-product-credential issue --workspace <id> " +
+      "[--operations <csv>] [--subject <id>] [--display-name <name>] [--expires-at <iso-timestamp>] [--require-signature]\n" +
+      `Supported operations (default: all): ${PACKET_PRODUCT_OPERATIONS.join(",")}\n` +
+      "The pkade.<credentialId>.<secret> token is printed exactly once; PacketAgent stores only its digest.",
+  );
+}
+
+async function runPacketProductCredentialCommand(args: string[]): Promise<number> {
+  const [subcommand, ...rest] = args;
+  if (subcommand !== "issue") {
+    writePacketProductCredentialUsage();
+    return 1;
+  }
+  let options: PacketProductCredentialIssueOptions;
+  try {
+    options = parsePacketProductCredentialIssueArgs(rest);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    writePacketProductCredentialUsage();
+    return 1;
+  }
+  const result = await issuePacketProductCredential(options);
+  console.error(
+    "Store the token from this output now: PacketAgent keeps only its one-way digest and cannot show it again.",
+  );
+  console.log(JSON.stringify(result, null, 2));
+  return 0;
+}
+
 export async function runDbCli(argv = process.argv.slice(2)): Promise<number> {
   const [command, ...args] = argv;
   const options = parseOptions(args);
@@ -2807,6 +2947,9 @@ export async function runDbCli(argv = process.argv.slice(2)): Promise<number> {
       console.log(JSON.stringify(verifyActivationSignals(options), null, 2));
       return 0;
     }
+    if (command === "packet-product-credential") {
+      return await runPacketProductCredentialCommand(args);
+    }
     writeUsage();
     return 1;
   } catch (error) {
@@ -2842,7 +2985,7 @@ function parseManagedPostgresSource(args: string[]): ManagedPostgresSource | und
 
 function writeUsage(): void {
   console.error(
-    "Usage: node --import tsx src/db/cli.ts <migrate|status|backup|restore|seed-db|seed-app|backfill|backfill-managed-postgres|verify-managed-postgres|reset-db|reset-app|seed-store|reset-store|backfill-job-metric-snapshots|verify-job-metric-snapshots|backfill-alert-events|verify-alert-events|backfill-agent-runs|verify-agent-runs|backfill-jobs|verify-jobs|backfill-invitation-email-deliveries|verify-invitation-email-deliveries|backfill-activities|verify-activities|backfill-provider-calls|verify-provider-calls|backfill-activation-signals|verify-activation-signals> [--db-path=data/packetagent.sqlite] [--json-path=data/packetagent.json] [--backup-path=data/packetagent.sqlite.bak] [--source=json|sqlite|seed] [--dry-run] [--check-orphans]",
+    "Usage: node --import tsx src/db/cli.ts <migrate|status|backup|restore|seed-db|seed-app|backfill|backfill-managed-postgres|verify-managed-postgres|reset-db|reset-app|seed-store|reset-store|backfill-job-metric-snapshots|verify-job-metric-snapshots|backfill-alert-events|verify-alert-events|backfill-agent-runs|verify-agent-runs|backfill-jobs|verify-jobs|backfill-invitation-email-deliveries|verify-invitation-email-deliveries|backfill-activities|verify-activities|backfill-provider-calls|verify-provider-calls|backfill-activation-signals|verify-activation-signals|packet-product-credential issue> [--db-path=data/packetagent.sqlite] [--json-path=data/packetagent.json] [--backup-path=data/packetagent.sqlite.bak] [--source=json|sqlite|seed] [--dry-run] [--check-orphans]",
   );
 }
 
