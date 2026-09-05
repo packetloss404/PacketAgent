@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
+import { useMutation } from "../useMutation";
+import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
 import type { AgentRunStatus } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/format";
@@ -20,6 +22,11 @@ export function RunsView() {
   const runs = useApiData(() => api.listAgentRuns(), []);
   const usage = useApiData(() => api.getUsageSummary(), []);
   const [currentTime] = useState(Date.now);
+  const runAction = useMutation(
+    ({ kind, runId }: { kind: "cancel" | "retry"; runId: string }) =>
+      kind === "cancel" ? api.cancelAgentRun(runId) : api.retryAgentRun(runId),
+    { onSuccess: () => runs.refresh(), inlineError: true },
+  );
 
   const list = runs.data ?? [];
   const filtered = filter === "all" ? list : list.filter((r) => r.status === filter);
@@ -200,6 +207,7 @@ export function RunsView() {
           </div>
         )}
         <div className="card" style={{ overflow: "hidden" }}>
+          <MutationError error={runAction.error} />
           <table className="tbl">
             <thead>
               <tr>
@@ -248,9 +256,13 @@ export function RunsView() {
                         type="button"
                         className="btn btn-sm"
                         style={{ padding: "3px 8px" }}
-                        onClick={() => api.cancelAgentRun(r.id).then(() => runs.refresh())}
+                        disabled={runAction.pending}
+                        onClick={() => void runAction.run({ kind: "cancel", runId: r.id })}
                       >
-                        Cancel
+                        {runAction.activeInput?.runId === r.id &&
+                        runAction.activeInput.kind === "cancel"
+                          ? "Cancelling…"
+                          : "Cancel"}
                       </button>
                     )}
                     {r.canRetry && (
@@ -258,9 +270,13 @@ export function RunsView() {
                         type="button"
                         className="btn btn-sm"
                         style={{ padding: "3px 8px" }}
-                        onClick={() => api.retryAgentRun(r.id).then(() => runs.refresh())}
+                        disabled={runAction.pending}
+                        onClick={() => void runAction.run({ kind: "retry", runId: r.id })}
                       >
-                        Retry
+                        {runAction.activeInput?.runId === r.id &&
+                        runAction.activeInput.kind === "retry"
+                          ? "Retrying…"
+                          : "Retry"}
                       </button>
                     )}
                   </td>

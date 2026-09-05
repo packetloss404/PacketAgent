@@ -66,3 +66,51 @@ test("Settings audit and advanced sections preserve controlled empty states", ()
   assert.match(html, /Operations tools/);
   assert.match(html, /Admin-only settings are hidden for your role/);
 });
+
+test("Settings admin actions render idle mutation buttons without a stale alert region", () => {
+  const html = renderToStaticMarkup(
+    createElement(
+      Fragment,
+      null,
+      createElement(MembersTab, {
+        data: {
+          members: [
+            {
+              userId: "user-1",
+              email: "owner@example.test",
+              displayName: "Owner",
+              role: "owner",
+              joinedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+        loading: false,
+        refresh,
+        canManageWorkspace: true,
+      }),
+      createElement(KeysTab, {
+        data: [
+          {
+            id: "key-1",
+            provider: "openai",
+            label: "Default",
+            masked: "sk-****",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        loading: false,
+        refresh,
+        canManageWorkspace: true,
+      }),
+    ),
+  );
+
+  assert.match(html, /<button type="button" class="btn btn-sm"[^>]*>Remove<\/button>/);
+  assert.match(html, /<button type="button" class="btn btn-sm"[^>]*>Revoke<\/button>/);
+  assert.match(
+    html,
+    /<button type="submit" class="btn btn-primary" disabled="">Store key<\/button>/,
+  );
+  assert.doesNotMatch(html, /role="alert"/);
+  assert.doesNotMatch(html, /ERR[:·]/);
+});

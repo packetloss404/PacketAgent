@@ -61,6 +61,22 @@ export function useBuilderController() {
   );
   const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
+  // The draft / iteration SSE streams are long-lived fetches. Each stream owns
+  // an AbortController so navigating away (unmount) or starting a new stream
+  // cancels the previous one instead of leaving it to mutate stale state.
+  const streamAbortRef = useRef<AbortController | null>(null);
+  const beginStream = () => {
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+    return controller;
+  };
+  useEffect(() => {
+    return () => {
+      streamAbortRef.current?.abort();
+      streamAbortRef.current = null;
+    };
+  }, []);
   // Tracks the most recent user-submitted prompt across generate / iterate, so
   // the "Try again" button on a FriendlyErrorCard can re-seed the right
   // composer. We intentionally do not auto-resubmit — letting the user review
@@ -200,70 +216,77 @@ export function useBuilderController() {
       body: { kind: "steps", steps: [] },
       streaming: true,
     });
+    const stream = beginStream();
     try {
-      await api.streamAppBuilderDraft({ prompt: nextPrompt, preset: effectivePreset }, (event) => {
-        if (event.type === "step") {
-          updateMessage(assistantId, (m) => {
-            if (m.body.kind !== "steps") return m;
-            return { ...m, body: { kind: "steps", steps: [...m.body.steps, event.text] } };
-          });
-        } else if (event.type === "prose") {
-          updateMessage(assistantId, (m) => {
-            const next = m.body.kind === "prose" ? m.body.text + event.text : event.text;
-            return { ...m, body: { kind: "prose", text: next } };
-          });
-        } else if (event.type === "file-progress") {
-          setFileProgress((current) => upsertFileProgress(current, event.progress));
-        } else if (event.type === "draft") {
-          setFileProgress([]);
-          setPrompt(event.draft.prompt || nextPrompt);
-          setState({
-            draft: event.draft,
-            draftSource: event.source ?? null,
-            generatedFiles: event.files ?? [],
-            appId: null,
-            checkpointId: null,
-            previewUrl: null,
-            smoke: null,
-            iteration: null,
-            sourceFiles: event.sourceFiles ?? [],
-            workspace: null,
-          });
-          setCheckpoints([]);
-          setPublishState(null);
-          setTab("preview");
-          updateMessage(assistantId, (m) => ({
-            ...m,
-            body: { kind: "plan", draft: event.draft },
-            streaming: false,
-          }));
-          setMode("drafted");
-          if (event.validationErrors && event.validationErrors.length > 0) {
-            appendMessage({
-              id: newId(),
-              role: "assistant",
-              body: { kind: "validation-errors", errors: event.validationErrors, canFix: true },
+      await api.streamAppBuilderDraft(
+        { prompt: nextPrompt, preset: effectivePreset },
+        (event) => {
+          if (event.type === "step") {
+            updateMessage(assistantId, (m) => {
+              if (m.body.kind !== "steps") return m;
+              return { ...m, body: { kind: "steps", steps: [...m.body.steps, event.text] } };
             });
-          }
-        } else if (event.type === "validation") {
-          if (event.errors.length > 0) {
-            appendMessage({
-              id: newId(),
-              role: "assistant",
-              body: { kind: "validation-errors", errors: event.errors, canFix: true },
+          } else if (event.type === "prose") {
+            updateMessage(assistantId, (m) => {
+              const next = m.body.kind === "prose" ? m.body.text + event.text : event.text;
+              return { ...m, body: { kind: "prose", text: next } };
             });
+          } else if (event.type === "file-progress") {
+            setFileProgress((current) => upsertFileProgress(current, event.progress));
+          } else if (event.type === "draft") {
+            setFileProgress([]);
+            setPrompt(event.draft.prompt || nextPrompt);
+            setState({
+              draft: event.draft,
+              draftSource: event.source ?? null,
+              generatedFiles: event.files ?? [],
+              appId: null,
+              checkpointId: null,
+              previewUrl: null,
+              smoke: null,
+              iteration: null,
+              sourceFiles: event.sourceFiles ?? [],
+              workspace: null,
+            });
+            setCheckpoints([]);
+            setPublishState(null);
+            setTab("preview");
+            updateMessage(assistantId, (m) => ({
+              ...m,
+              body: { kind: "plan", draft: event.draft },
+              streaming: false,
+            }));
+            setMode("drafted");
+            if (event.validationErrors && event.validationErrors.length > 0) {
+              appendMessage({
+                id: newId(),
+                role: "assistant",
+                body: { kind: "validation-errors", errors: event.validationErrors, canFix: true },
+              });
+            }
+          } else if (event.type === "validation") {
+            if (event.errors.length > 0) {
+              appendMessage({
+                id: newId(),
+                role: "assistant",
+                body: { kind: "validation-errors", errors: event.errors, canFix: true },
+              });
+            }
+          } else if (event.type === "error") {
+            setError(event.error);
+            updateMessage(assistantId, (m) => ({
+              ...m,
+              body: { kind: "status", text: event.error, tone: "error" },
+              streaming: false,
+            }));
+            setMode(previousMode);
           }
-        } else if (event.type === "error") {
-          setError(event.error);
-          updateMessage(assistantId, (m) => ({
-            ...m,
-            body: { kind: "status", text: event.error, tone: "error" },
-            streaming: false,
-          }));
-          setMode(previousMode);
-        }
-      });
+        },
+        stream.signal,
+      );
     } catch (e) {
+      // An aborted stream (unmount or superseded) is not a failure to report.
+      if (stream.signal.aborted) return;
       const message = (e as Error).message;
       setError(message);
       updateMessage(assistantId, (m) => ({
@@ -273,7 +296,8 @@ export function useBuilderController() {
       }));
       setMode(previousMode);
     } finally {
-      setWorking(false);
+      if (streamAbortRef.current === stream) streamAbortRef.current = null;
+      if (!stream.signal.aborted) setWorking(false);
     }
   };
 
@@ -363,6 +387,7 @@ export function useBuilderController() {
     });
     setIterPrompt("");
     setSelectedElement(null);
+    const stream = beginStream();
     try {
       await api.streamAppBuilderIteration(
         {
@@ -415,8 +440,11 @@ export function useBuilderController() {
             setMode("applied");
           }
         },
+        stream.signal,
       );
     } catch (e) {
+      // An aborted stream (unmount or superseded) is not a failure to report.
+      if (stream.signal.aborted) return;
       const message = (e as Error).message;
       setError(message);
       updateMessage(assistantId, (m) => ({
@@ -426,7 +454,8 @@ export function useBuilderController() {
       }));
       setMode("applied");
     } finally {
-      setWorking(false);
+      if (streamAbortRef.current === stream) streamAbortRef.current = null;
+      if (!stream.signal.aborted) setWorking(false);
     }
   };
 

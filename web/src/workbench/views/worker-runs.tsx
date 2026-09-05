@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import type { WorkerOperationsHealth, WorkerRunStatus, WorkerRunSummary } from "@/lib/types";
@@ -74,7 +74,12 @@ export function WorkerRunsView() {
     visibleRuns: visibleRuns.length,
   });
 
+  // Bumped whenever the list is reset so an in-flight "load more" for the old
+  // filter cannot append stale rows or overwrite the new cursor.
+  const pagerGeneration = useRef(0);
+
   const refresh = () => {
+    pagerGeneration.current += 1;
     setAdditionalRuns([]);
     setPaginationCursor(null);
     setLoadMoreError(null);
@@ -83,6 +88,7 @@ export function WorkerRunsView() {
   };
 
   const selectStatus = (nextStatus: "all" | WorkerRunStatus) => {
+    pagerGeneration.current += 1;
     setStatus(nextStatus);
     setAdditionalRuns([]);
     setPaginationCursor(null);
@@ -93,18 +99,21 @@ export function WorkerRunsView() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     setLoadMoreError(null);
+    const generation = pagerGeneration.current;
     try {
       const page = await api.listWorkerRuns({
         ...(status === "all" ? {} : { status }),
         cursor: nextCursor,
         limit: 50,
       });
+      if (generation !== pagerGeneration.current) return;
       setAdditionalRuns((current) => [
         ...current,
         ...page.runs.filter((candidate) => !current.some((run) => run.id === candidate.id)),
       ]);
       setPaginationCursor(page.page.nextCursor ?? "");
     } catch (error) {
+      if (generation !== pagerGeneration.current) return;
       setLoadMoreError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoadingMore(false);

@@ -1,7 +1,9 @@
+import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
 import { canManageWorkspaceRole } from "@/lib/roles";
 import { type ApiKeyProviderName } from "@/lib/types";
 import { useState } from "react";
+import { useMutation } from "../../useMutation";
 import { useWorkbench } from "../../workbench-state";
 
 export function KeysTab({
@@ -26,23 +28,25 @@ export function KeysTab({
   const [provider, setProvider] = useState<ApiKeyProviderName>("openai");
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const saveKey = async () => {
-    if (!canManageWorkspace || !label.trim() || !value) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await api.createApiKey({ provider, label: label.trim(), value });
+  const storeKey = useMutation(() => api.createApiKey({ provider, label: label.trim(), value }), {
+    onSuccess: async () => {
       setLabel("");
       setValue("");
       await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
+    },
+    successToast: "API key stored.",
+    inlineError: true,
+  });
+  const revokeKey = useMutation((keyId: string) => api.deleteApiKey(keyId), {
+    onSuccess: () => refresh(),
+    successToast: "API key revoked.",
+    inlineError: true,
+  });
+  const saving = storeKey.pending;
+
+  const saveKey = () => {
+    if (!canManageWorkspace || !label.trim() || !value) return;
+    void storeKey.run();
   };
 
   return (
@@ -71,7 +75,7 @@ export function KeysTab({
           }}
           onSubmit={(event) => {
             event.preventDefault();
-            void saveKey();
+            saveKey();
           }}
         >
           <label>
@@ -118,22 +122,16 @@ export function KeysTab({
           >
             {saving ? "Saving…" : "Store key"}
           </button>
-          {error && (
-            <span
-              className="mono"
-              style={{
-                gridColumn: "1 / -1",
-                color: "var(--danger)",
-                fontSize: 11.5,
-              }}
-            >
-              ERR · {error}
-            </span>
+          {storeKey.error && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <MutationError inline error={storeKey.error} />
+            </div>
           )}
         </form>
       )}
       {loading && <div className="muted">Loading…</div>}
       <div className="card" style={{ overflow: "hidden" }}>
+        <MutationError error={revokeKey.error} />
         <table className="tbl">
           <thead>
             <tr>
@@ -167,16 +165,10 @@ export function KeysTab({
                       type="button"
                       className="btn btn-sm"
                       style={{ padding: "3px 8px", color: "var(--danger)" }}
-                      onClick={async () => {
-                        try {
-                          await api.deleteApiKey(k.id);
-                          await refresh();
-                        } catch (e) {
-                          console.error(e);
-                        }
-                      }}
+                      disabled={revokeKey.pending}
+                      onClick={() => void revokeKey.run(k.id)}
                     >
-                      Revoke
+                      {revokeKey.activeInput === k.id ? "Revoking…" : "Revoke"}
                     </button>
                   ) : (
                     <span className="mono muted" style={{ fontSize: 11 }}>
@@ -213,32 +205,30 @@ export function WorkspaceTab() {
   const [name, setName] = useState(ws.name);
   const [website, setWebsite] = useState(ws.website || "");
   const [goal, setGoal] = useState(ws.automationGoal || "");
-  const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const dirty =
     name !== savedWorkspace.name ||
     website !== savedWorkspace.website ||
     goal !== savedWorkspace.automationGoal;
+  const saveWorkspace = useMutation(
+    () => api.updateWorkspace({ name, website, automationGoal: goal }),
+    {
+      onSuccess: (updated) => {
+        const next = workspaceValues(updated);
+        setSavedWorkspace(next);
+        setName(next.name);
+        setWebsite(next.website);
+        setGoal(next.automationGoal);
+        setSavedAt(Date.now());
+      },
+      inlineError: true,
+    },
+  );
+  const saving = saveWorkspace.pending;
 
-  const save = async () => {
+  const save = () => {
     if (!canManageWorkspace || !dirty) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const updated = await api.updateWorkspace({ name, website, automationGoal: goal });
-      const next = workspaceValues(updated);
-      setSavedWorkspace(next);
-      setName(next.name);
-      setWebsite(next.website);
-      setGoal(next.automationGoal);
-      setSavedAt(Date.now());
-    } catch (e) {
-      console.error(e);
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
+    void saveWorkspace.run();
   };
 
   return (
@@ -256,22 +246,7 @@ export function WorkspaceTab() {
           </span>
         </div>
       )}
-      {error && (
-        <div
-          className="card"
-          style={{
-            padding: "10px 14px",
-            marginBottom: 14,
-            borderColor: "rgba(242,107,92,0.3)",
-            background: "rgba(242,107,92,0.06)",
-            color: "var(--danger)",
-          }}
-        >
-          <span className="mono" style={{ fontSize: 11.5 }}>
-            ERR · {error}
-          </span>
-        </div>
-      )}
+      <MutationError error={saveWorkspace.error} />
       <div className="card" style={{ padding: 20 }}>
         <div style={{ marginBottom: 18 }}>
           <label className="label">Name</label>
@@ -316,9 +291,7 @@ export function WorkspaceTab() {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => {
-              void save();
-            }}
+            onClick={save}
             disabled={saving || !canManageWorkspace || !dirty}
           >
             {saving ? "Saving…" : "Save changes"}

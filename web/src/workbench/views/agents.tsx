@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { I } from "../icons";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
+import { useMutation } from "../useMutation";
+import { MutationError } from "@/components/MutationError";
 import { AccessibleTabPanel, AccessibleTabs } from "@/components/AccessibleTabs";
 import { useWorkbench } from "../workbench-state";
 import { api } from "@/lib/api";
@@ -634,22 +636,11 @@ function formatShortDate(value: string) {
 
 function AgentTemplates({ onCreated }: { onCreated: (a: AgentRecord) => void }) {
   const templates = useApiData(() => api.listAgentTemplates(), []);
-  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  const createFromTemplate = async (templateId: string) => {
-    if (creatingTemplateId) return;
-    setCreatingTemplateId(templateId);
-    setCreateError(null);
-    try {
-      const created = await api.createAgentFromTemplate(templateId);
-      onCreated(created);
-    } catch (e) {
-      setCreateError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setCreatingTemplateId(null);
-    }
-  };
+  const createFromTemplate = useMutation(
+    (templateId: string) => api.createAgentFromTemplate(templateId),
+    { onSuccess: (created) => onCreated(created), inlineError: true },
+  );
+  const creatingTemplateId = createFromTemplate.activeInput;
 
   return (
     <div style={{ padding: "26px 28px" }}>
@@ -663,11 +654,7 @@ function AgentTemplates({ onCreated }: { onCreated: (a: AgentRecord) => void }) 
           {templates.error}
         </div>
       )}
-      {createError && (
-        <div className="card" style={{ padding: 16, color: "var(--danger)", marginBottom: 12 }}>
-          {createError}
-        </div>
-      )}
+      <MutationError error={createFromTemplate.error} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
         {(templates.data ?? []).map((t) => {
           const creating = creatingTemplateId === t.id;
@@ -688,7 +675,7 @@ function AgentTemplates({ onCreated }: { onCreated: (a: AgentRecord) => void }) 
                 style={{ marginTop: 8 }}
                 disabled={Boolean(creatingTemplateId)}
                 onClick={() => {
-                  void createFromTemplate(t.id);
+                  void createFromTemplate.run(t.id);
                 }}
               >
                 {creating ? (

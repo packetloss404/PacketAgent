@@ -147,18 +147,25 @@ export function BuilderTour(): ReactElement | null {
     setActive(false);
   }, []);
 
+  // Mirror of stepIndex readable from callbacks without making state
+  // updaters impure (updaters may run twice under StrictMode).
+  const stepIndexRef = useRef(stepIndex);
+  useEffect(() => {
+    stepIndexRef.current = stepIndex;
+  }, [stepIndex]);
+
   const advance = useCallback(() => {
-    setStepIndex((prev) => {
-      // Search forward for the next step whose anchor exists. If none, finish.
-      for (let i = prev + 1; i < visibleSteps.length; i++) {
-        const step = visibleSteps[i]!;
-        if (findAnchor(step.anchor)) return i;
+    // Search forward for the next step whose anchor exists. If none, finish.
+    for (let i = stepIndexRef.current + 1; i < visibleSteps.length; i++) {
+      const step = visibleSteps[i]!;
+      if (findAnchor(step.anchor)) {
+        setStepIndex(i);
+        return;
       }
-      // No further visible steps — mark complete.
-      markBuilderTourSeen();
-      setActive(false);
-      return prev;
-    });
+    }
+    // No further visible steps — mark complete.
+    markBuilderTourSeen();
+    setActive(false);
   }, [visibleSteps]);
 
   // On mount, advance past any leading steps whose anchor isn't present.
@@ -167,16 +174,16 @@ export function BuilderTour(): ReactElement | null {
   useEffect(() => {
     if (!active) return;
     const frame = window.requestAnimationFrame(() => {
-      setStepIndex((prev) => {
-        for (let i = prev; i < visibleSteps.length; i++) {
-          const step = visibleSteps[i]!;
-          if (findAnchor(step.anchor)) return i;
+      for (let i = stepIndexRef.current; i < visibleSteps.length; i++) {
+        const step = visibleSteps[i]!;
+        if (findAnchor(step.anchor)) {
+          setStepIndex(i);
+          return;
         }
-        // Nothing to point at right now — bail out gracefully without setting
-        // the seen flag, so the user gets another chance on a later visit.
-        setActive(false);
-        return prev;
-      });
+      }
+      // Nothing to point at right now — bail out gracefully without setting
+      // the seen flag, so the user gets another chance on a later visit.
+      setActive(false);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [active, visibleSteps]);

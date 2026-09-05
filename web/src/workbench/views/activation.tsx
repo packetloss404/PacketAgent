@@ -1,9 +1,13 @@
 import { I } from "../icons";
 import { useApiData } from "../useApiData";
+import { useMutation } from "../useMutation";
 import { api } from "@/lib/api";
 
 export function ActivationView() {
   const detail = useApiData(() => api.getActivationDetail(), []);
+  const completeStep = useMutation((key: string) => api.completeOnboardingStep(key), {
+    onSuccess: () => detail.refresh(),
+  });
   const summary = detail.data?.activation?.summary;
   const items = summary?.items ?? [];
   const completed = items.filter((s) => s.completed).length;
@@ -123,16 +127,11 @@ export function ActivationView() {
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  onClick={async () => {
-                    try {
-                      await api.completeOnboardingStep(s.key);
-                      await detail.refresh();
-                    } catch (e) {
-                      console.error(e);
-                    }
-                  }}
+                  disabled={completeStep.pending}
+                  onClick={() => void completeStep.run(s.key)}
                 >
-                  Mark done <I.arrow size={11} />
+                  {completeStep.activeInput === s.key ? "Saving…" : "Mark done"}{" "}
+                  <I.arrow size={11} />
                 </button>
               )}
             </div>

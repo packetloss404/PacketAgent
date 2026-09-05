@@ -1,9 +1,23 @@
 import { I } from "../icons";
 import { useApiData } from "../useApiData";
+import { useMutation } from "../useMutation";
+import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
 
 export function WebhooksView() {
   const agents = useApiData(() => api.listAgents(), []);
+  const webhookAction = useMutation(
+    async ({ kind, agentId }: { kind: "rotate" | "remove"; agentId: string }) => {
+      if (kind === "rotate") await api.rotateAgentWebhook(agentId);
+      else await api.removeAgentWebhook(agentId);
+    },
+    {
+      onSuccess: () => agents.refresh(),
+      successToast: (_result, { kind }) =>
+        kind === "rotate" ? "Webhook token rotated." : "Webhook removed.",
+      inlineError: true,
+    },
+  );
   const webhookAgents = (agents.data ?? []).filter((a) => a.triggerKind === "webhook");
 
   const events = [
@@ -31,6 +45,7 @@ export function WebhooksView() {
       </p>
 
       {agents.loading && <div className="muted">Loading…</div>}
+      <MutationError error={webhookAction.error} />
       <div style={{ display: "grid", gap: 10, marginBottom: 22 }}>
         {webhookAgents.map((a) => (
           <div key={a.id} className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -54,29 +69,22 @@ export function WebhooksView() {
               <button
                 type="button"
                 className="btn btn-sm"
-                onClick={async () => {
-                  try {
-                    await api.rotateAgentWebhook(a.id);
-                    await agents.refresh();
-                  } catch (e) {
-                    console.error(e);
-                  }
-                }}
+                disabled={webhookAction.pending}
+                onClick={() => void webhookAction.run({ kind: "rotate", agentId: a.id })}
               >
-                <I.refresh size={12} /> Rotate
+                <I.refresh size={12} />{" "}
+                {webhookAction.activeInput?.agentId === a.id &&
+                webhookAction.activeInput.kind === "rotate"
+                  ? "Rotating…"
+                  : "Rotate"}
               </button>
               <button
                 type="button"
                 className="btn btn-sm"
                 style={{ padding: "3px 8px", color: "var(--danger)" }}
-                onClick={async () => {
-                  try {
-                    await api.removeAgentWebhook(a.id);
-                    await agents.refresh();
-                  } catch (e) {
-                    console.error(e);
-                  }
-                }}
+                aria-label={`Remove webhook for ${a.name}`}
+                disabled={webhookAction.pending}
+                onClick={() => void webhookAction.run({ kind: "remove", agentId: a.id })}
               >
                 <I.trash size={12} />
               </button>
