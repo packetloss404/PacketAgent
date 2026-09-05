@@ -23,3 +23,17 @@ export function malformedToolCalls(
 ): ProviderToolCall[] {
   return toolCalls?.filter((toolCall) => toolCall.inputError !== undefined) ?? [];
 }
+
+/**
+ * Serialize assistant tool calls into the OpenAI-compatible `tool_calls`
+ * shape so later `tool` messages can reference them by id.
+ */
+export function openAiToolCalls(
+  toolCalls: readonly ProviderToolCall[],
+): { id: string; type: "function"; function: { name: string; arguments: string } }[] {
+  return toolCalls.map((toolCall) => ({
+    id: toolCall.id,
+    type: "function" as const,
+    function: { name: toolCall.name, arguments: JSON.stringify(toolCall.input ?? {}) },
+  }));
+}

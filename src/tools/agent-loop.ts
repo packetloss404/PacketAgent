@@ -4,6 +4,7 @@ import type {
   ProviderCallResult,
   ProviderMessage,
   ProviderName,
+  ProviderStopDetails,
   ProviderToolDef,
 } from "../providers/types.js";
 import { providerGenerationPolicy } from "../providers/catalog.js";
@@ -34,6 +35,8 @@ export interface AgentLoopResult {
   costUsd: number;
   turnsUsed: number;
   finishReason: ProviderCallResult["finishReason"] | "max_turns";
+  /** Present when the provider refused the turn (`finishReason: "refusal"`). */
+  stopDetails?: ProviderStopDetails;
 }
 
 const MAX_TURNS_DEFAULT = 8;
@@ -102,14 +105,48 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     totalCost += callResult.usage.costUsd;
     finishReason = callResult.finishReason;
 
-    if (callResult.content) {
-      messages.push({ role: "assistant", content: callResult.content });
+    const assistantToolCalls = callResult.toolCalls ?? [];
+    if (callResult.content || assistantToolCalls.length > 0) {
+      messages.push({
+        role: "assistant",
+        content: callResult.content,
+        ...(assistantToolCalls.length > 0 ? { toolCalls: assistantToolCalls } : {}),
+      });
+    }
+
+    if (callResult.finishReason === "refusal") {
+      // A refusal is a policy decision, not a transient failure: stop here
+      // rather than re-prompting, and surface the provider's explanation.
+      return {
+        finalContent: callResult.content,
+        toolCalls,
+        modelUsed,
+        costUsd: totalCost,
+        turnsUsed,
+        finishReason: "refusal",
+        ...(callResult.stopDetails ? { stopDetails: callResult.stopDetails } : {}),
+      };
     }
 
     const malformed = malformedToolCalls(callResult.toolCalls);
     if (malformed.length > 0) {
       if (malformedCorrections < generationPolicy.malformedToolInputCorrectionAttempts) {
         malformedCorrections++;
+        // Every replayed tool call needs a result before the next turn, even
+        // though none of them were executed.
+        const malformedIds = new Set(malformed.map((toolCall) => toolCall.id));
+        for (const toolCall of assistantToolCalls) {
+          messages.push({
+            role: "tool",
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: JSON.stringify({
+              error: malformedIds.has(toolCall.id)
+                ? "malformed JSON arguments; the tool was not executed"
+                : "not executed because another tool call in the same turn was malformed",
+            }),
+          });
+        }
         messages.push({
           role: "user",
           content: [

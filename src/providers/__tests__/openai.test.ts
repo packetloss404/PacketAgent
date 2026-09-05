@@ -329,3 +329,108 @@ test("signal abort short-circuits stream", async () => {
   }
   assert.equal(sawError, true);
 });
+
+test("call() replays assistant tool calls as tool_calls ahead of tool messages", async () => {
+  let receivedParams: { messages?: unknown[] } = {};
+  const provider = new OpenAIProvider({
+    apiKeyResolver: async () => "k",
+    clientFactory: () =>
+      fakeClient({
+        create: (async (params: { messages?: unknown[] }) => {
+          receivedParams = params;
+          return {
+            id: "c2",
+            model: "gpt-4o-mini",
+            choices: [
+              { index: 0, message: { role: "assistant", content: "done" }, finish_reason: "stop" },
+            ],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          };
+        }) as unknown as Create,
+      }),
+  });
+  await provider.call({
+    model: "gpt-4o-mini",
+    workspaceId: "ws-1",
+    routeKey: "agent.summary",
+    messages: [
+      { role: "user", content: "search please" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [{ id: "call_1", name: "search", input: { q: "x" } }],
+      },
+      { role: "tool", toolCallId: "call_1", toolName: "search", content: '{"result":1}' },
+    ],
+  });
+  assert.deepEqual(receivedParams.messages, [
+    { role: "user", content: "search please" },
+    {
+      role: "assistant",
+      content: null,
+      tool_calls: [
+        { id: "call_1", type: "function", function: { name: "search", arguments: '{"q":"x"}' } },
+      ],
+    },
+    { role: "tool", content: '{"result":1}', tool_call_id: "call_1" },
+  ]);
+});
+
+test("call() maps content_filter and refusal messages to a refusal finish reason", async () => {
+  const provider = new OpenAIProvider({
+    apiKeyResolver: async () => "k",
+    clientFactory: () =>
+      fakeClient({
+        create: (async () => ({
+          id: "c1",
+          model: "gpt-4o",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: null, refusal: "I can't help with that." },
+              finish_reason: "content_filter",
+            },
+          ],
+          usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+        })) as unknown as Create,
+      }),
+  });
+  const result = await provider.call({
+    model: "gpt-4o",
+    workspaceId: "ws-1",
+    routeKey: "agent.summary",
+    messages: [{ role: "user", content: "x" }],
+  });
+  assert.equal(result.finishReason, "refusal");
+  assert.equal(result.content, "");
+  assert.deepEqual(result.stopDetails, {
+    category: "content_filter",
+    explanation: "I can't help with that.",
+  });
+});
+
+test("stream() reports finishReason on the done chunk", async () => {
+  async function* events() {
+    yield {
+      id: "c",
+      model: "gpt-4o",
+      choices: [{ index: 0, delta: { content: "hi" }, finish_reason: null }],
+    };
+    yield { id: "c", model: "gpt-4o", choices: [{ index: 0, delta: {}, finish_reason: "length" }] };
+  }
+  const provider = new OpenAIProvider({
+    apiKeyResolver: async () => "k",
+    clientFactory: () => fakeClient({ create: (async () => events()) as unknown as Create }),
+  });
+  const chunks = [];
+  for await (const chunk of provider.stream({
+    model: "gpt-4o",
+    workspaceId: "ws-1",
+    routeKey: "agent.summary",
+    messages: [{ role: "user", content: "x" }],
+  })) {
+    chunks.push(chunk);
+  }
+  assert.equal(chunks.at(-1)?.done, true);
+  assert.equal(chunks.at(-1)?.finishReason, "length");
+});
