@@ -224,6 +224,35 @@ test("PacketADE provenance records supplied source coordinates", () => {
   assert.equal(version.source.revision, "abc123");
 });
 
+test("PacketBench provenance uses the current paired product identity", () => {
+  assert.doesNotThrow(() =>
+    assertValidWorkerVersion(
+      makeWorkerVersion({
+        source: {
+          product: "PacketBench",
+          kind: "packetbench",
+          sourceId: "flight-2",
+        },
+      }),
+    ),
+  );
+
+  const mismatched = validateWorkerVersion(
+    makeWorkerVersion({
+      source: {
+        product: "PacketBench",
+        kind: "packetade",
+        sourceId: "flight-2",
+      },
+    }),
+  );
+  assert.equal(mismatched.ok, false);
+  if (!mismatched.ok) {
+    assert.ok(mismatched.issues.some((issue) => issue.code === "provenance.packetade_product"));
+    assert.ok(mismatched.issues.some((issue) => issue.code === "provenance.packetbench_kind"));
+  }
+});
+
 test("source revision requires a repository identity", () => {
   const result = validateWorkerVersion(
     makeWorkerVersion({

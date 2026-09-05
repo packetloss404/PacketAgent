@@ -16,6 +16,10 @@ import {
 } from "./validation.js";
 
 const VALID_FIXTURE_URL = new URL("./fixtures/worker-package-v1.valid.json", import.meta.url);
+const PACKETBENCH_FIXTURE_URL = new URL(
+  "./fixtures/packetbench-worker-package-v1.valid.json",
+  import.meta.url,
+);
 const UNSUPPORTED_FIXTURE_URL = new URL(
   "./fixtures/worker-package-v2.unsupported.json",
   import.meta.url,
@@ -43,6 +47,35 @@ test("WorkerPackage v1 fixture is strict, digest-bound, and reproducible", async
 
   const sealed = sealWorkerPackage(rest as Omit<WorkerPackage, "integrity">);
   assert.equal(sealed.integrity.digest, EXPECTED_FIXTURE_DIGEST);
+});
+
+test("WorkerPackage v1 accepts current PacketBench identity and rejects mixed rename pairs", async () => {
+  const current = (await readFixture(PACKETBENCH_FIXTURE_URL)) as unknown as WorkerPackage;
+
+  const validation = validateWorkerPackage(current);
+  assert.equal(validation.ok, true);
+  assert.equal(
+    computeWorkerPackageDigest(current),
+    "sha256:ac38603045d9a4d2ae87685a7fe5aba4eba5b74dae4322735c92cd6b680ce719",
+  );
+  assert.equal(current.createdBy.product, "PacketBench");
+  assert.equal(current.source.product, "PacketBench");
+  assert.equal(current.source.kind, "packetbench");
+
+  const mixed = sealWorkerPackage({
+    ...withoutIntegrity(current),
+    source: {
+      ...current.source,
+      product: "PacketADE",
+      kind: "packetade",
+    },
+  });
+  const mixedValue = structuredClone(mixed) as unknown as Record<string, unknown>;
+  (mixedValue.source as Record<string, unknown>).product = "PacketBench";
+  const mixedResult = validateWorkerPackage(mixedValue);
+  assert.equal(mixedResult.ok, false);
+  if (mixedResult.ok) assert.fail("mixed Packet-product identity unexpectedly validated");
+  assert.ok(mixedResult.issues.some((issue) => issue.code === "package.source.identity"));
 });
 
 test("canonical package JSON uses deterministic code-unit ordering and strict I-JSON values", () => {
@@ -200,4 +233,9 @@ test("a DSSE envelope cannot substitute different package bytes", async () => {
 
 async function readFixture(url: URL): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(url, "utf8")) as Record<string, unknown>;
+}
+
+function withoutIntegrity(workerPackage: WorkerPackage): Omit<WorkerPackage, "integrity"> {
+  const { integrity: _integrity, ...subject } = workerPackage;
+  return subject;
 }

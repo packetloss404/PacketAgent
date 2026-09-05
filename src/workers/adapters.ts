@@ -13,6 +13,7 @@ import {
   type WorkerActivationService,
 } from "./activation.js";
 import { WorkerLifecycleError } from "./errors.js";
+import { legacyAgentIdFromWebhookRef, legacyAgentWebhookRef } from "./projections.js";
 import type {
   JsonObject,
   WorkerActorReference,
@@ -65,6 +66,17 @@ export async function activateWorkerWebhookDelivery(
   const data = await (dependencies.loadStore ?? defaultLoadStore)();
   const targets = activeTriggerTargets(data, (trigger) => {
     return trigger.kind === "webhook" && trigger.webhookRef === input.webhookRef;
+  }).filter((target) => {
+    // A projected legacy Agent trigger stays valid only while the Agent's
+    // current webhook token still derives this reference, so rotating or
+    // removing the token revokes the Worker webhook immediately.
+    const legacyAgentId = legacyAgentIdFromWebhookRef(input.webhookRef);
+    if (!legacyAgentId) return true;
+    const agent = data.agents.find(
+      (candidate) =>
+        candidate.workspaceId === target.deployment.workspaceId && candidate.id === legacyAgentId,
+    );
+    return agent !== undefined && legacyAgentWebhookRef(agent) === input.webhookRef;
   });
   if (targets.length === 0) {
     throw new WorkerLifecycleError("not_found", "Worker webhook was not found.");

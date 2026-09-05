@@ -15,7 +15,7 @@ import { createWorkerRepository } from "./workers/repository.js";
 import { createWorkerLifecycleService } from "./workers/service.js";
 
 const FIXTURE_URL = new URL(
-  "./workers/package/fixtures/worker-package-v1.valid.json",
+  "./workers/package/fixtures/packetbench-worker-package-v1.valid.json",
   import.meta.url,
 );
 const TEST_SECRET = "r".repeat(43);
@@ -89,7 +89,7 @@ test("Packet-product routes validate without lifecycle writes and return field-a
   assert.match(unauthorized.headers.get("www-authenticate") ?? "", /^Bearer /);
 });
 
-test("PacketADE deploy, activate, inspect, list, pause, resume, update, rollback, and revoke use canonical services", async () => {
+test("PacketBench deploy, activate, inspect, list, pause, resume, update, rollback, and revoke use canonical services", async () => {
   const harness = await createHarness();
   const deployedResponse = await requestJson(
     harness.routes,

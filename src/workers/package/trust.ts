@@ -14,7 +14,11 @@ import {
 import type { WorkerContractIssue } from "../validation.js";
 import { canonicalWorkerJson, computeWorkerVersionContentDigest } from "../validation.js";
 import type { WorkerActorReference, WorkerDeploymentCapabilityGrant } from "../types.js";
-import { verifyWorkerPackage, type VerifyWorkerPackageOptions } from "./validation.js";
+import { verifyWorkerPackage } from "./validation.js";
+import {
+  createStoreSignatureVerifier,
+  type PacketProductSignatureVerifier,
+} from "./signing-keys.js";
 import {
   PACKET_PRODUCT_CREDENTIAL_SCHEMA_VERSION,
   PACKET_PRODUCT_OPERATIONS,
@@ -146,7 +150,11 @@ export interface PacketProductTrustDependencies {
   readonly now?: () => string;
   readonly generateId?: (kind: "credential" | "receipt" | "activity") => string;
   readonly generateSecret?: () => string;
-  readonly verifySignature?: VerifyWorkerPackageOptions["verifySignature"];
+  /**
+   * DSSE signature verifier. Defaults to the workspace-scoped signing-key
+   * registry persisted in the store (`packetProductSigningKeys`).
+   */
+  readonly verifySignature?: PacketProductSignatureVerifier;
   readonly writeRateLimit?: Partial<PacketProductWriteRateLimit>;
 }
 
@@ -161,6 +169,8 @@ export function createPacketProductTrustService(
     ((kind: "credential" | "receipt" | "activity") => `${idPrefix(kind)}_${randomUUID()}`);
   const generateSecret =
     dependencies.generateSecret ?? (() => randomBytes(32).toString("base64url"));
+  const verifySignature =
+    dependencies.verifySignature ?? createStoreSignatureVerifier({ loadStore });
   const rateLimit = {
     ...DEFAULT_WRITE_RATE_LIMIT,
     ...dependencies.writeRateLimit,
@@ -233,7 +243,7 @@ export function createPacketProductTrustService(
         event: "packet_product.credential_issued",
         occurredAt: timestamp,
         data: {
-          title: "PacketADE service credential issued",
+          title: "Packet-product compatibility credential issued",
           product: record.product,
           credentialId: record.id,
           subjectId: record.subjectId,
@@ -282,7 +292,7 @@ export function createPacketProductTrustService(
         event: "packet_product.credential_revoked",
         occurredAt: timestamp,
         data: {
-          title: "PacketADE service credential revoked",
+          title: "Packet-product compatibility credential revoked",
           product: revoked.product,
           credentialId: revoked.id,
           subjectId: revoked.subjectId,
@@ -380,7 +390,8 @@ export function createPacketProductTrustService(
     });
     const verification = await verifyWorkerPackage(input.workerPackage, {
       requireSignature: context.requirePackageSignature,
-      verifySignature: dependencies.verifySignature,
+      verifySignature: (signature) =>
+        verifySignature({ ...signature, workspaceId: context.workspaceId }),
     });
     if (!verification.ok) {
       await recordPackageOutcome(
@@ -390,7 +401,7 @@ export function createPacketProductTrustService(
         now(),
         "worker_package.rejected",
         {
-          title: "PacketADE WorkerPackage rejected",
+          title: "Packet-product WorkerPackage rejected",
           reason: "integrity",
           issueCount: verification.issues.length,
           firstIssueCode: verification.issues[0]?.code ?? null,
@@ -439,7 +450,7 @@ export function createPacketProductTrustService(
         now(),
         "worker_package.rejected",
         {
-          title: "PacketADE WorkerPackage rejected",
+          title: "Packet-product WorkerPackage rejected",
           reason: "local_capability_policy",
           issueCount: issues.length,
           firstIssueCode: issues[0]?.code ?? null,
@@ -491,7 +502,7 @@ export function createPacketProductTrustService(
             "worker_package.idempotency_mismatch",
             workerPackage,
             {
-              title: "PacketADE WorkerPackage idempotency mismatch",
+              title: "Packet-product WorkerPackage idempotency mismatch",
               receiptId: existing.id,
             },
           );
@@ -511,7 +522,7 @@ export function createPacketProductTrustService(
           "worker_package.replayed",
           workerPackage,
           {
-            title: "PacketADE WorkerPackage receipt replayed",
+            title: "Packet-product WorkerPackage receipt replayed",
             receiptId: existing.id,
           },
         );
@@ -537,7 +548,7 @@ export function createPacketProductTrustService(
           "worker_package.coordinate_conflict",
           workerPackage,
           {
-            title: "PacketADE WorkerPackage coordinate conflict",
+            title: "Packet-product WorkerPackage coordinate conflict",
             receiptId: conflictingPackage.id,
           },
         );
@@ -593,7 +604,7 @@ export function createPacketProductTrustService(
         "worker_package.accepted",
         workerPackage,
         {
-          title: "PacketADE WorkerPackage accepted",
+          title: `${workerPackage.source.product} WorkerPackage accepted`,
           receiptId: receipt.id,
           packageDigest: receipt.packageDigest,
           signatureRequired: receipt.integrity.signatureRequired,
@@ -798,7 +809,7 @@ function recordAuthorizationActivity(
     event: `packet_product.write_${result}`,
     occurredAt,
     data: {
-      title: `PacketADE write ${result.replace("_", " ")}`,
+      title: `Packet-product write ${result.replace("_", " ")}`,
       product: context.product,
       credentialId: context.credentialId,
       operation: context.operation,

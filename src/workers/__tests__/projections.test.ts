@@ -69,8 +69,35 @@ test("legacy projection never carries a webhook token or credential value", () =
   assert.equal(projection.version.content.credentialRefs.length, 0);
   assert.equal(projection.version.content.triggers[0].kind, "webhook");
   if (projection.version.content.triggers[0].kind === "webhook") {
-    assert.equal(projection.version.content.triggers[0].webhookRef, "legacy-agent:agent-1:webhook");
+    const trigger = projection.version.content.triggers[0];
+    if (trigger.kind !== "webhook") throw new Error("expected a webhook trigger");
+    assert.equal(trigger.enabled, true);
+    assert.match(trigger.webhookRef, /^legacy-agent:agent-1:[0-9a-f]{32}$/);
+    assert.notEqual(trigger.webhookRef, "legacy-agent:agent-1:webhook");
+    assert.equal(
+      trigger.webhookRef,
+      legacyRef(projectLegacyAgentToWorker(makeAgent({ triggerKind: "webhook" }))),
+      "the reference is deterministic for the same token",
+    );
+    assert.notEqual(
+      trigger.webhookRef,
+      legacyRef(
+        projectLegacyAgentToWorker(makeAgent({ triggerKind: "webhook", webhookToken: "rotated" })),
+      ),
+      "rotating the token changes the reference",
+    );
   }
+});
+
+test("legacy webhook Agent without a token projects a disabled trigger", () => {
+  const projection = projectLegacyAgentToWorker(
+    makeAgent({ triggerKind: "webhook", webhookToken: undefined }),
+  );
+  const trigger = projection.version.content.triggers[0];
+  assert.equal(trigger.kind, "webhook");
+  if (trigger.kind !== "webhook") return;
+  assert.equal(trigger.enabled, false);
+  assert.ok(projection.warnings.some((entry) => entry.code === "projection.missing_webhook_token"));
 });
 
 test("legacy email Agent maps to an email-adapted webhook trigger", () => {
@@ -229,3 +256,8 @@ test("workspace workflow records project into manual tool-less authoring context
   assert.doesNotThrow(() => assertValidWorkerDefinition(projection.definition));
   assert.doesNotThrow(() => assertValidWorkerVersion(projection.version));
 });
+
+function legacyRef(projection: ReturnType<typeof projectLegacyAgentToWorker>): string | undefined {
+  const trigger = projection.version.content.triggers[0];
+  return trigger.kind === "webhook" ? trigger.webhookRef : undefined;
+}

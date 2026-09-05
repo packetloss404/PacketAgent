@@ -309,6 +309,15 @@ export function createPacketProductDeploymentService(
         input.workspaceId,
         existingBinding,
       );
+      // After a rollback the (packageId, version) pair is still bound to the
+      // retired deployment. Replaying that binding would report success while
+      // the live deployment keeps running the rolled-back version.
+      if (response.deployment?.status === "retired" || response.deployment?.status === "rejected") {
+        throw new WorkerLifecycleError(
+          "conflict",
+          "WorkerPackage version is bound to a retired deployment; publish a new package version to roll forward.",
+        );
+      }
       return projectResult(accepted.receipt, true, existingBinding, response);
     }
     const ids = packageWorkerIds(input.workspaceId, workerPackage);
@@ -529,7 +538,10 @@ export function createPacketProductDeploymentService(
       workerVersionId: target.binding.workerVersionId,
       workerDeploymentId: deployment.id,
       operation: "rollback",
-      actor: auth.actor,
+      // Persistence requires binding.actor to equal the authenticated actor on
+      // the receipt; the target receipt may have been accepted under a rotated
+      // credential, so using auth.actor here made rollback fail with 500.
+      actor: target.receipt.authenticatedActor,
     });
     return projectResult(target.receipt, false, binding, response);
   }

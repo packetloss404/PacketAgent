@@ -57,7 +57,14 @@ import {
   PACKET_PRODUCT_OPERATIONS,
   type PacketProductCredentialMetadata,
   type PacketProductOperation,
+  type PacketProductSigningKeyRecord,
+  type PacketProductSigningKeyStatus,
 } from "../workers/package/trust-types.js";
+import {
+  createPacketProductSigningKeyService,
+  type PacketProductSigningKeyService,
+} from "../workers/package/signing-keys.js";
+import { isPacketProductName, type PacketProductName } from "../workers/package/types.js";
 
 export interface DbCliOptions {
   dbPath?: string;
@@ -593,7 +600,7 @@ export function restoreDatabase(options: DbCliOptions = {}): RestoreResult {
         `restore validation failed: pending migrations ${validation.pending.join(", ")}`,
       );
     }
-    if (existsSync(dbPath)) rmSync(dbPath);
+    removeSqliteDatabaseFiles(dbPath);
     renameSync(tempPath, dbPath);
     return { command: "restore", dbPath, backupPath, applied: migrated.applied };
   } catch (error) {
@@ -722,7 +729,7 @@ export function resetAppDatabase(
   seedData: PacketAgentData = createSeedStore(),
 ): AppDataResult {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
-  if (existsSync(dbPath)) rmSync(dbPath);
+  removeSqliteDatabaseFiles(dbPath);
   return writeAppData(options, normalizeStore(seedData), "seed", "reset-app");
 }
 
@@ -754,7 +761,7 @@ function writeAppData(
 
 export function resetDatabase(options: DbCliOptions = {}): ResetResult {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
-  if (existsSync(dbPath)) rmSync(dbPath);
+  removeSqliteDatabaseFiles(dbPath);
   migrateDatabase(options);
   return { command: "reset-db", path: dbPath };
 }
@@ -769,7 +776,7 @@ export function resetLocalDataStore(): ResetResult {
   return { command: "reset-store", path: resolve(process.cwd(), "data", "packetagent.json") };
 }
 
-const STORE_COMPARISON_COLLECTIONS = [
+export const STORE_COMPARISON_COLLECTIONS = [
   "users",
   "sessions",
   "rateLimits",
@@ -818,6 +825,13 @@ const STORE_COMPARISON_COLLECTIONS = [
   "activationFacts",
   "activationMilestones",
   "activationReadModels",
+  "generatedApps",
+  "workerCredentials",
+  "packetProductCredentials",
+  "packetProductSigningKeys",
+  "workerPackageReceipts",
+  "workerPackageDeployments",
+  "packetProductEventAcknowledgements",
 ] as const satisfies readonly (keyof PacketAgentData)[];
 
 export async function backfillManagedPostgres(
@@ -2507,6 +2521,8 @@ export function verifyActivationSignals(options: DbCliOptions = {}): VerifyActiv
     command: "verify-activation-signals",
     dbPath,
     jsonOnly,
+    // Dedicated rows are authoritative after mirror retirement, so rows that
+    // exist only there are healthy by design.
     sqliteOnly: 0,
     contentDrift,
     matched,
@@ -2696,7 +2712,7 @@ export async function issuePacketProductCredential(
   const trust = deps.trust ?? createPacketProductTrustService();
   const issued = await trust.issueCredential({
     workspaceId: options.workspaceId,
-    subjectId: options.subjectId ?? `packetade:${options.workspaceId}`,
+    subjectId: options.subjectId ?? `packetbench:${options.workspaceId}`,
     ...(options.displayName ? { displayName: options.displayName } : {}),
     allowedOperations:
       options.operations && options.operations.length > 0
@@ -2756,11 +2772,18 @@ function readFlagValue(args: readonly string[], flag: string): string | undefine
     const arg = args[index]!;
     if (arg === flag) {
       const value = args[index + 1]?.trim();
-      return value && !value.startsWith("--") ? value : undefined;
+      // A present flag with no value must not fall through to the default:
+      // for --operations that would silently grant every operation and for
+      // --expires-at it would mint a non-expiring credential.
+      if (!value || value.startsWith("--")) {
+        throw new Error(`${flag} requires a value`);
+      }
+      return value;
     }
     if (arg.startsWith(`${flag}=`)) {
       const value = arg.slice(flag.length + 1).trim();
-      return value || undefined;
+      if (!value) throw new Error(`${flag} requires a value`);
+      return value;
     }
   }
   return undefined;
@@ -2769,7 +2792,8 @@ function readFlagValue(args: readonly string[], flag: string): string | undefine
 function writePacketProductCredentialUsage(): void {
   console.error(
     "Usage: node --import tsx src/db/cli.ts packet-product-credential issue --workspace <id> " +
-      "[--operations <csv>] [--subject <id>] [--display-name <name>] [--expires-at <iso-timestamp>] [--require-signature]\n" +
+      "[--operations <csv>] [--subject <id>] [--display-name <name>] " +
+      "[--expires-at <iso-timestamp>] [--require-signature]\n" +
       `Supported operations (default: all): ${PACKET_PRODUCT_OPERATIONS.join(",")}\n` +
       "The pkade.<credentialId>.<secret> token is printed exactly once; PacketAgent stores only its digest.",
   );
@@ -2795,6 +2819,186 @@ async function runPacketProductCredentialCommand(args: string[]): Promise<number
   );
   console.log(JSON.stringify(result, null, 2));
   return 0;
+}
+
+const DB_CLI_ACTOR = { type: "system", id: "packetagent.db-cli" } as const;
+
+export interface PacketProductSigningKeyAddOptions {
+  readonly workspaceId: string;
+  readonly keyid: string;
+  /** Path to an Ed25519 SubjectPublicKeyInfo PEM file. */
+  readonly publicKeyFile: string;
+  readonly product?: PacketProductName;
+  readonly description?: string;
+}
+
+export interface PacketProductSigningKeyRevokeOptions {
+  readonly workspaceId: string;
+  readonly keyid: string;
+}
+
+export interface PacketProductSigningKeyListOptions {
+  readonly workspaceId: string;
+  readonly status?: PacketProductSigningKeyStatus;
+}
+
+export interface PacketProductSigningKeyAddResult {
+  command: "packet-product-signing-key-add";
+  key: PacketProductSigningKeyRecord;
+}
+
+export interface PacketProductSigningKeyRevokeResult {
+  command: "packet-product-signing-key-revoke";
+  key: PacketProductSigningKeyRecord;
+}
+
+export interface PacketProductSigningKeyListResult {
+  command: "packet-product-signing-key-list";
+  workspaceId: string;
+  keys: PacketProductSigningKeyRecord[];
+}
+
+export interface PacketProductSigningKeyCliDependencies {
+  readonly signingKeys?: PacketProductSigningKeyService;
+  readonly readPublicKeyFile?: (path: string) => string;
+}
+
+export async function addPacketProductSigningKey(
+  options: PacketProductSigningKeyAddOptions,
+  deps: PacketProductSigningKeyCliDependencies = {},
+): Promise<PacketProductSigningKeyAddResult> {
+  const service = deps.signingKeys ?? createPacketProductSigningKeyService();
+  const readPublicKeyFile =
+    deps.readPublicKeyFile ?? ((path: string) => readFileSync(resolve(path), "utf8"));
+  let publicKey: string;
+  try {
+    publicKey = readPublicKeyFile(options.publicKeyFile);
+  } catch (error) {
+    throw new Error(
+      `--public-key-file could not be read: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const key = await service.register({
+    workspaceId: options.workspaceId,
+    keyid: options.keyid,
+    publicKey,
+    ...(options.product ? { product: options.product } : {}),
+    ...(options.description ? { description: options.description } : {}),
+    createdBy: DB_CLI_ACTOR,
+  });
+  return { command: "packet-product-signing-key-add", key };
+}
+
+export async function revokePacketProductSigningKey(
+  options: PacketProductSigningKeyRevokeOptions,
+  deps: PacketProductSigningKeyCliDependencies = {},
+): Promise<PacketProductSigningKeyRevokeResult> {
+  const service = deps.signingKeys ?? createPacketProductSigningKeyService();
+  const key = await service.revoke({
+    workspaceId: options.workspaceId,
+    keyid: options.keyid,
+    revokedBy: DB_CLI_ACTOR,
+  });
+  return { command: "packet-product-signing-key-revoke", key };
+}
+
+export async function listPacketProductSigningKeys(
+  options: PacketProductSigningKeyListOptions,
+  deps: PacketProductSigningKeyCliDependencies = {},
+): Promise<PacketProductSigningKeyListResult> {
+  const service = deps.signingKeys ?? createPacketProductSigningKeyService();
+  const keys = await service.list({
+    workspaceId: options.workspaceId,
+    ...(options.status ? { status: options.status } : {}),
+  });
+  return { command: "packet-product-signing-key-list", workspaceId: options.workspaceId, keys };
+}
+
+export function parsePacketProductSigningKeyAddArgs(
+  args: readonly string[],
+): PacketProductSigningKeyAddOptions {
+  const workspaceId = readFlagValue(args, "--workspace");
+  const keyid = readFlagValue(args, "--keyid");
+  const publicKeyFile = readFlagValue(args, "--public-key-file");
+  if (!workspaceId || !keyid || !publicKeyFile) {
+    throw new Error(
+      "packet-product-signing-key add requires --workspace <id> --keyid <id> --public-key-file <path>.",
+    );
+  }
+  const product = readFlagValue(args, "--product");
+  if (product !== undefined && !isPacketProductName(product)) {
+    throw new Error("--product must be PacketBench or the legacy PacketADE identity.");
+  }
+  const description = readFlagValue(args, "--description");
+  return {
+    workspaceId,
+    keyid,
+    publicKeyFile,
+    ...(product ? { product } : {}),
+    ...(description ? { description } : {}),
+  };
+}
+
+export function parsePacketProductSigningKeyRevokeArgs(
+  args: readonly string[],
+): PacketProductSigningKeyRevokeOptions {
+  const workspaceId = readFlagValue(args, "--workspace");
+  const keyid = readFlagValue(args, "--keyid");
+  if (!workspaceId || !keyid) {
+    throw new Error("packet-product-signing-key revoke requires --workspace <id> --keyid <id>.");
+  }
+  return { workspaceId, keyid };
+}
+
+export function parsePacketProductSigningKeyListArgs(
+  args: readonly string[],
+): PacketProductSigningKeyListOptions {
+  const workspaceId = readFlagValue(args, "--workspace");
+  if (!workspaceId) {
+    throw new Error("packet-product-signing-key list requires --workspace <id>.");
+  }
+  const status = readFlagValue(args, "--status");
+  if (status !== undefined && status !== "active" && status !== "revoked") {
+    throw new Error("--status must be active or revoked.");
+  }
+  return { workspaceId, ...(status ? { status } : {}) };
+}
+
+function writePacketProductSigningKeyUsage(): void {
+  console.error(
+    "Usage: node --import tsx src/db/cli.ts packet-product-signing-key add --workspace <id> --keyid <id> --public-key-file <spki.pem> [--product PacketBench|PacketADE] [--description <text>]\n" +
+      "       node --import tsx src/db/cli.ts packet-product-signing-key revoke --workspace <id> --keyid <id>\n" +
+      "       node --import tsx src/db/cli.ts packet-product-signing-key list --workspace <id> [--status active|revoked]\n" +
+      "Registers Ed25519 public keys (SubjectPublicKeyInfo PEM) that verify WorkerPackage DSSE envelopes for one workspace. Private keys are never accepted or stored.",
+  );
+}
+
+async function runPacketProductSigningKeyCommand(args: string[]): Promise<number> {
+  const [subcommand, ...rest] = args;
+  try {
+    if (subcommand === "add") {
+      const result = await addPacketProductSigningKey(parsePacketProductSigningKeyAddArgs(rest));
+      console.log(JSON.stringify(result, null, 2));
+      return 0;
+    }
+    if (subcommand === "revoke") {
+      const result = await revokePacketProductSigningKey(
+        parsePacketProductSigningKeyRevokeArgs(rest),
+      );
+      console.log(JSON.stringify(result, null, 2));
+      return 0;
+    }
+    if (subcommand === "list") {
+      const result = await listPacketProductSigningKeys(parsePacketProductSigningKeyListArgs(rest));
+      console.log(JSON.stringify(result, null, 2));
+      return 0;
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    return 1;
+  }
+  writePacketProductSigningKeyUsage();
+  return 1;
 }
 
 export async function runDbCli(argv = process.argv.slice(2)): Promise<number> {
@@ -2950,6 +3154,9 @@ export async function runDbCli(argv = process.argv.slice(2)): Promise<number> {
     if (command === "packet-product-credential") {
       return await runPacketProductCredentialCommand(args);
     }
+    if (command === "packet-product-signing-key") {
+      return await runPacketProductSigningKeyCommand(args);
+    }
     writeUsage();
     return 1;
   } catch (error) {
@@ -2985,7 +3192,7 @@ function parseManagedPostgresSource(args: string[]): ManagedPostgresSource | und
 
 function writeUsage(): void {
   console.error(
-    "Usage: node --import tsx src/db/cli.ts <migrate|status|backup|restore|seed-db|seed-app|backfill|backfill-managed-postgres|verify-managed-postgres|reset-db|reset-app|seed-store|reset-store|backfill-job-metric-snapshots|verify-job-metric-snapshots|backfill-alert-events|verify-alert-events|backfill-agent-runs|verify-agent-runs|backfill-jobs|verify-jobs|backfill-invitation-email-deliveries|verify-invitation-email-deliveries|backfill-activities|verify-activities|backfill-provider-calls|verify-provider-calls|backfill-activation-signals|verify-activation-signals|packet-product-credential issue> [--db-path=data/packetagent.sqlite] [--json-path=data/packetagent.json] [--backup-path=data/packetagent.sqlite.bak] [--source=json|sqlite|seed] [--dry-run] [--check-orphans]",
+    "Usage: node --import tsx src/db/cli.ts <migrate|status|backup|restore|seed-db|seed-app|backfill|backfill-managed-postgres|verify-managed-postgres|reset-db|reset-app|seed-store|reset-store|backfill-job-metric-snapshots|verify-job-metric-snapshots|backfill-alert-events|verify-alert-events|backfill-agent-runs|verify-agent-runs|backfill-jobs|verify-jobs|backfill-invitation-email-deliveries|verify-invitation-email-deliveries|backfill-activities|verify-activities|backfill-provider-calls|verify-provider-calls|backfill-activation-signals|verify-activation-signals|packet-product-credential issue|packet-product-signing-key add|revoke|list> [--db-path=data/packetagent.sqlite] [--json-path=data/packetagent.json] [--backup-path=data/packetagent.sqlite.bak] [--source=json|sqlite|seed] [--dry-run] [--check-orphans]",
   );
 }
 
@@ -3005,4 +3212,15 @@ if (isExecutedDirectly()) {
       console.error(error instanceof Error ? error.message : error);
       process.exitCode = 1;
     });
+}
+
+/**
+ * Remove a SQLite database together with its WAL/SHM sidecars. Leaving a stale
+ * `-wal` next to a restored or reset database makes the next open replay the
+ * previous database's frames over the new file.
+ */
+export function removeSqliteDatabaseFiles(dbPath: string): void {
+  for (const path of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`, `${dbPath}-journal`]) {
+    rmSync(path, { force: true });
+  }
 }

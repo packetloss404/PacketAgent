@@ -8,6 +8,7 @@ import type {
   WorkspaceBriefRecord,
   WorkspaceRecord,
 } from "../packetagent-store.js";
+import { createHash } from "node:crypto";
 import { parseCron } from "../jobs/cron.js";
 import {
   WORKER_CONTRACT_SCHEMA_VERSION,
@@ -25,6 +26,37 @@ import {
   assertValidWorkerVersion,
   computeWorkerVersionContentDigest,
 } from "./validation.js";
+
+const LEGACY_WEBHOOK_REF_DOMAIN = "packetagent.legacy-agent-webhook-ref/v1";
+
+/**
+ * Public webhook reference for a projected legacy Agent. The reference is the
+ * only credential on `/api/public/webhooks/workers/:webhookRef`, so it must be
+ * derived from the Agent's secret webhook token (and therefore rotate with it)
+ * rather than from the Agent id, which every workspace viewer can read.
+ * Returns undefined when the Agent has no token, in which case the projected
+ * trigger is disabled.
+ */
+export function legacyAgentWebhookRef(
+  agent: Pick<AgentRecord, "id" | "webhookToken">,
+): string | undefined {
+  if (!agent.webhookToken) return undefined;
+  const digest = createHash("sha256")
+    .update(LEGACY_WEBHOOK_REF_DOMAIN)
+    .update("\0")
+    .update(agent.id)
+    .update("\0")
+    .update(agent.webhookToken)
+    .digest("hex")
+    .slice(0, 32);
+  return `legacy-agent:${agent.id}:${digest}`;
+}
+
+/** Agent id encoded in a legacy webhook reference, if it is one. */
+export function legacyAgentIdFromWebhookRef(webhookRef: string): string | undefined {
+  const match = /^legacy-agent:(.+):[0-9a-f]{32}$/.exec(webhookRef);
+  return match?.[1];
+}
 
 export const LEGACY_PROJECTION_POLICY: WorkerPolicy = {
   budgets: {
@@ -207,20 +239,30 @@ function agentTrigger(
     };
   }
   if (agent.triggerKind === "webhook" || agent.triggerKind === "email") {
+    const webhookRef = legacyAgentWebhookRef(agent);
     return {
       trigger: {
         id: "legacy-trigger",
         kind: "webhook",
-        enabled: agent.status === "active",
+        enabled: agent.status === "active" && webhookRef !== undefined,
         adapter: agent.triggerKind === "email" ? "email" : "http",
         eventType:
           agent.triggerKind === "email"
             ? "packetagent.legacy.email.received"
             : "packetagent.legacy.agent.requested",
-        webhookRef: `legacy-agent:${agent.id}:webhook`,
+        webhookRef: webhookRef ?? `legacy-agent:${agent.id}:disabled`,
         description: `Projected from the legacy Agent ${agent.triggerKind} trigger.`,
       },
-      warnings: [],
+      warnings: webhookRef
+        ? []
+        : [
+            {
+              code: "projection.missing_webhook_token",
+              message:
+                "The legacy Agent has no webhook token, so its webhook trigger was projected disabled. Rotate the Agent webhook token to enable it.",
+              path: "version.content.triggers[0]",
+            },
+          ],
     };
   }
   return {

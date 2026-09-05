@@ -11,17 +11,29 @@ export interface WorkerActorReference {
   readonly type: "user" | "system" | "packet_product";
   readonly id: string;
   readonly displayName?: string;
-  readonly product?: "PacketADE" | "PacketAgent" | "PacketChat" | "PacketCode" | "PacketPhone";
+  readonly product?:
+    | "PacketBench"
+    | "PacketADE"
+    | "PacketAgent"
+    | "PacketChat"
+    | "PacketCode"
+    | "PacketPhone";
 }
 
 export type WorkerSourceProduct =
+  | "PacketBench"
   | "PacketADE"
   | "PacketAgent"
   | "PacketChat"
   | "PacketCode"
   | "PacketPhone";
 
-export type WorkerSourceKind = "native" | "packetade" | "legacy_agent" | "legacy_workflow";
+export type WorkerSourceKind =
+  | "native"
+  | "packetbench"
+  | "packetade"
+  | "legacy_agent"
+  | "legacy_workflow";
 
 export interface WorkerSourceProvenance {
   readonly product: WorkerSourceProduct;
