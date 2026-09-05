@@ -127,12 +127,21 @@ import {
 
 export const app = new Hono();
 
+/**
+ * The workbench loads Geist and Instrument Serif from Google Fonts (see
+ * `web/index.html`). The stylesheet is served from fonts.googleapis.com and the
+ * font files it references from fonts.gstatic.com, so both origins must be
+ * allowed or the browser blocks the stylesheet and falls back to system fonts.
+ */
+export const GOOGLE_FONTS_STYLE_ORIGIN = "https://fonts.googleapis.com";
+export const GOOGLE_FONTS_FILE_ORIGIN = "https://fonts.gstatic.com";
+
 const standardSecurityHeaders = secureHeaders({
   contentSecurityPolicy: {
     defaultSrc: ["'self'"],
     baseUri: ["'self'"],
     connectSrc: ["'self'"],
-    fontSrc: ["'self'", "data:"],
+    fontSrc: ["'self'", "data:", GOOGLE_FONTS_FILE_ORIGIN],
     formAction: ["'self'"],
     frameAncestors: ["'self'"],
     frameSrc: [
@@ -148,7 +157,7 @@ const standardSecurityHeaders = secureHeaders({
     imgSrc: ["'self'", "data:", "blob:"],
     objectSrc: ["'none'"],
     scriptSrc: ["'self'"],
-    styleSrc: ["'self'", "'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'", GOOGLE_FONTS_STYLE_ORIGIN],
     workerSrc: ["'self'", "blob:"],
   },
   permissionsPolicy: {
