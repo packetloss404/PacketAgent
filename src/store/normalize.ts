@@ -57,6 +57,7 @@ export function normalizeStore(data: Partial<PacketAgentData>): PacketAgentData 
     shareTokens: data.shareTokens ?? [],
     workerCredentials: data.workerCredentials ?? [],
     packetProductCredentials: data.packetProductCredentials ?? [],
+    packetProductSigningKeys: data.packetProductSigningKeys ?? [],
     workerPackageReceipts: data.workerPackageReceipts ?? [],
     workerPackageDeployments: data.workerPackageDeployments ?? [],
     packetProductEventAcknowledgements: data.packetProductEventAcknowledgements ?? [],

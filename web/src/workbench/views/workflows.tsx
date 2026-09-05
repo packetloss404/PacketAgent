@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { I } from "../icons";
 import { useApiData } from "../useApiData";
+import { useMutation } from "../useMutation";
+import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
 
 type WfTab = "brief" | "requirements" | "plan" | "blockers" | "validation" | "release";
@@ -423,12 +425,21 @@ function ValidationView({
 function ReleaseView() {
   const release = useApiData(() => api.getWorkflowReleaseConfirmation().catch(() => null), []);
   const r = release.data;
+  const confirmRelease = useMutation(
+    (summary: string) => api.confirmWorkflowRelease({ confirmed: true, summary }),
+    {
+      onSuccess: () => release.refresh(),
+      successToast: "Release confirmed.",
+      inlineError: true,
+    },
+  );
   return (
     <div>
       <h2 className="h2" style={{ fontSize: 20, marginBottom: 14 }}>
         Release readiness
       </h2>
       {release.loading && <div className="muted">Loading…</div>}
+      <MutationError error={confirmRelease.error} />
       {r && (
         <div className="card" style={{ padding: 22, marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -443,16 +454,10 @@ function ReleaseView() {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={async () => {
-                  try {
-                    await api.confirmWorkflowRelease({ confirmed: true, summary: r.summary ?? "" });
-                    await release.refresh();
-                  } catch (e) {
-                    console.error(e);
-                  }
-                }}
+                disabled={confirmRelease.pending}
+                onClick={() => void confirmRelease.run(r.summary ?? "")}
               >
-                <I.rocket size={13} /> Confirm release
+                <I.rocket size={13} /> {confirmRelease.pending ? "Confirming…" : "Confirm release"}
               </button>
             )}
           </div>

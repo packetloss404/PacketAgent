@@ -350,11 +350,7 @@ async function createHarness() {
   const setup = await trust.issueCredential({
     workspaceId: "alpha",
     subjectId: "packetade:attention-setup",
-    allowedOperations: [
-      "package.validate",
-      "package.deploy",
-      "deployment.activate",
-    ],
+    allowedOperations: ["package.validate", "package.deploy", "deployment.activate"],
     createdBy: { type: "user", id: "user_alpha" },
   });
   const v1 = JSON.parse(await readFile(FIXTURE_URL, "utf8")) as WorkerPackage;

@@ -15,6 +15,7 @@ import {
   WORKER_PACKAGE_DIGEST_ALGORITHM,
   WORKER_PACKAGE_DSSE_PAYLOAD_TYPE,
   WORKER_PACKAGE_SCHEMA_VERSION,
+  isPacketProductSourceIdentity,
   type WorkerPackage,
   type WorkerPackageDsseEnvelope,
   type WorkerPackageSignatureVerificationInput,
@@ -140,7 +141,7 @@ export function validateWorkerPackage(value: unknown): WorkerPackageValidation {
     "$.source",
     validateWorkerSourceProvenance(workerPackage.source).issues,
   );
-  validatePacketAdeSource(workerPackage.source, issues);
+  validatePacketProductSource(workerPackage.source, issues);
   validatePackageWorker(workerPackage.worker, issues);
   validateArtifacts(workerPackage.artifacts, issues);
   validateIntegrity(workerPackage.integrity, issues);
@@ -251,7 +252,7 @@ export async function verifyWorkerPackage(
   };
 }
 
-function validatePacketAdeSource(value: unknown, issues: WorkerContractIssue[]): void {
+function validatePacketProductSource(value: unknown, issues: WorkerContractIssue[]): void {
   if (!isRecord(value)) return;
   expectKeys(
     value,
@@ -268,11 +269,13 @@ function validatePacketAdeSource(value: unknown, issues: WorkerContractIssue[]):
     "$.source",
     issues,
   );
-  if (value.product !== "PacketADE") {
-    addIssue(issues, "$.source.product", "package.source.product", "must be PacketADE");
-  }
-  if (value.kind !== "packetade") {
-    addIssue(issues, "$.source.kind", "package.source.kind", "must be packetade");
+  if (!isPacketProductSourceIdentity(value.product, value.kind)) {
+    addIssue(
+      issues,
+      "$.source",
+      "package.source.identity",
+      "must use PacketBench/packetbench or the legacy PacketADE/packetade identity",
+    );
   }
 }
 
@@ -571,6 +574,20 @@ function validateDsseEnvelope(value: unknown, issues: WorkerContractIssue[]): vo
     expectKeys(signature, ["keyid", "sig"], path, issues);
     nonEmptyStringAt(signature, "keyid", path, issues, true);
     base64At(signature, "sig", path, issues);
+  });
+  const seen = new Set<string>();
+  envelope.signatures.forEach((entry, index) => {
+    if (!isRecord(entry) || typeof entry.sig !== "string") return;
+    const key = `${typeof entry.keyid === "string" ? entry.keyid : ""}|${entry.sig}`;
+    if (seen.has(key)) {
+      addIssue(
+        issues,
+        `$.integrity.dsseEnvelope.signatures[${index}]`,
+        "package.signature.duplicate",
+        "must not repeat a signature; the verified-signature count is persisted",
+      );
+    }
+    seen.add(key);
   });
 }
 

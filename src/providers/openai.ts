@@ -4,91 +4,51 @@ import type {
   LLMProvider,
   ProviderCallOptions,
   ProviderCallResult,
+  ProviderFinishReason,
   ProviderMessage,
+  ProviderStopDetails,
   ProviderStreamChunk,
   ProviderToolCall,
   ProviderToolDef,
   ProviderUsage,
 } from "./types.js";
-import { parseToolInput } from "./tool-input.js";
+import { openAiToolCalls, parseToolInput } from "./tool-input.js";
 
-interface OpenAIChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content?: string | null;
-  name?: string;
-  tool_call_id?: string;
-  tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[];
+type ChatCompletion = OpenAI.Chat.Completions.ChatCompletion;
+type ChatCompletionChunk = OpenAI.Chat.Completions.ChatCompletionChunk;
+type ChatCompletionMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+type ChatCompletionTool = OpenAI.Chat.Completions.ChatCompletionTool;
+type ChatCompletionCreateParamsNonStreaming =
+  OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+type ChatCompletionCreateParamsStreaming =
+  OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming;
+type ChatCompletionResponseFormat =
+  OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"];
+type ChatCompletionFinishReason = OpenAI.Chat.Completions.ChatCompletion.Choice["finish_reason"];
+
+/** Per-request options the provider forwards to the SDK client. */
+export interface OpenAIRequestOptions {
+  signal?: AbortSignal | null;
 }
 
-interface OpenAIToolDef {
-  type: "function";
-  function: { name: string; description?: string; parameters: Record<string, unknown> };
-}
+export type OpenAIChatStream = AsyncIterable<ChatCompletionChunk>;
 
-interface OpenAIChatParams {
-  model: string;
-  messages: OpenAIChatMessage[];
-  tools?: OpenAIToolDef[];
-  max_tokens?: number;
-  temperature?: number;
-  stream?: boolean;
-  response_format?: {
-    type: "json_schema";
-    json_schema: {
-      name: string;
-      description?: string;
-      schema: Record<string, unknown>;
-      strict: boolean;
-    };
-  };
-}
-
-interface OpenAIChatChoice {
-  index: number;
-  message: OpenAIChatMessage;
-  finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | "function_call" | null;
-}
-
-interface OpenAIChatResponse {
-  id: string;
-  model: string;
-  choices: OpenAIChatChoice[];
-  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
-}
-
-interface OpenAIChatStreamDelta {
-  role?: string;
-  content?: string;
-  tool_calls?: {
-    index: number;
-    id?: string;
-    type?: "function";
-    function?: { name?: string; arguments?: string };
-  }[];
-}
-
-interface OpenAIChatStreamChunk {
-  id: string;
-  model: string;
-  choices: {
-    index: number;
-    delta: OpenAIChatStreamDelta;
-    finish_reason: OpenAIChatChoice["finish_reason"];
-  }[];
-  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
-}
-
+/**
+ * Structural subset of the official `OpenAI` client that the provider depends
+ * on. A real `new OpenAI()` instance satisfies it; tests inject fakes or the
+ * strict fake server in `__tests__/`.
+ */
 export interface OpenAIClient {
   chat: {
     completions: {
       create(
-        params: OpenAIChatParams,
-        opts?: { signal?: AbortSignal },
-      ): Promise<OpenAIChatResponse>;
+        params: ChatCompletionCreateParamsNonStreaming,
+        options?: OpenAIRequestOptions,
+      ): Promise<ChatCompletion>;
       create(
-        params: OpenAIChatParams & { stream: true },
-        opts?: { signal?: AbortSignal },
-      ): Promise<AsyncIterable<OpenAIChatStreamChunk>>;
+        params: ChatCompletionCreateParamsStreaming,
+        options?: OpenAIRequestOptions,
+      ): Promise<OpenAIChatStream>;
     };
   };
 }
@@ -106,27 +66,42 @@ export const OPENAI_MODEL_PRICING: Record<string, { input: number; output: numbe
   "gpt-4.1-mini": { input: 0.15, output: 0.6 },
 };
 
-function mapMessages(messages: ProviderMessage[]): OpenAIChatMessage[] {
-  return messages.map((m) => {
-    if (m.role === "tool") {
-      return { role: "tool", content: m.content, tool_call_id: m.toolCallId };
+/**
+ * Maps provider messages onto Chat Completions messages, replaying assistant
+ * `tool_calls` so the `tool` messages that follow reference a known id.
+ */
+export function buildOpenAIChatMessages(messages: ProviderMessage[]): ChatCompletionMessageParam[] {
+  return messages.map((m): ChatCompletionMessageParam => {
+    switch (m.role) {
+      case "tool":
+        return { role: "tool", content: m.content, tool_call_id: m.toolCallId ?? "" };
+      case "assistant":
+        if (m.toolCalls && m.toolCalls.length > 0) {
+          return {
+            role: "assistant",
+            content: m.content.length > 0 ? m.content : null,
+            tool_calls: openAiToolCalls(m.toolCalls),
+          };
+        }
+        return { role: "assistant", content: m.content };
+      case "system":
+        return { role: "system", content: m.content };
+      default:
+        return { role: "user", content: m.content };
     }
-    return { role: m.role, content: m.content };
   });
 }
 
-function mapTools(tools: ProviderToolDef[] | undefined): OpenAIToolDef[] | undefined {
-  if (!tools || tools.length === 0) return undefined;
+function mapTools(tools: ProviderToolDef[]): ChatCompletionTool[] {
   return tools.map((t) => ({
-    type: "function" as const,
+    type: "function",
     function: { name: t.name, description: t.description, parameters: t.inputSchema },
   }));
 }
 
 function mapStructuredOutput(
-  structuredOutput: ProviderCallOptions["structuredOutput"],
-): OpenAIChatParams["response_format"] {
-  if (!structuredOutput) return undefined;
+  structuredOutput: NonNullable<ProviderCallOptions["structuredOutput"]>,
+): ChatCompletionResponseFormat {
   return {
     type: "json_schema",
     json_schema: {
@@ -138,9 +113,7 @@ function mapStructuredOutput(
   };
 }
 
-function mapFinishReason(
-  reason: OpenAIChatChoice["finish_reason"],
-): ProviderCallResult["finishReason"] {
+function mapFinishReason(reason: ChatCompletionFinishReason | null): ProviderFinishReason {
   switch (reason) {
     case "stop":
       return "stop";
@@ -149,9 +122,22 @@ function mapFinishReason(
     case "tool_calls":
     case "function_call":
       return "tool_use";
+    case "content_filter":
+      return "refusal";
     default:
       return "error";
   }
+}
+
+function refusalDetails(
+  finishReason: ChatCompletionFinishReason | null,
+  refusal: string | null | undefined,
+): ProviderStopDetails | undefined {
+  if (finishReason !== "content_filter" && !refusal) return undefined;
+  return {
+    category: finishReason === "content_filter" ? "content_filter" : null,
+    explanation: refusal ?? null,
+  };
 }
 
 function priceUsage(model: string, prompt: number, completion: number): ProviderUsage {
@@ -160,8 +146,21 @@ function priceUsage(model: string, prompt: number, completion: number): Provider
   return { promptTokens: prompt, completionTokens: completion, costUsd };
 }
 
+function buildRequest(opts: ProviderCallOptions): ChatCompletionCreateParamsNonStreaming {
+  return {
+    model: opts.model,
+    messages: buildOpenAIChatMessages(opts.messages),
+    ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
+    ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+    ...(opts.tools && opts.tools.length > 0 ? { tools: mapTools(opts.tools) } : {}),
+    ...(opts.structuredOutput
+      ? { response_format: mapStructuredOutput(opts.structuredOutput) }
+      : {}),
+  };
+}
+
 function defaultClientFactory(apiKey: string, baseURL?: string): OpenAIClient {
-  return new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) }) as OpenAIClient;
+  return new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 }
 
 export interface OpenAIProviderOptions {
@@ -197,33 +196,29 @@ export class OpenAIProvider implements LLMProvider {
   async call(opts: ProviderCallOptions): Promise<ProviderCallResult> {
     const apiKey = await this.resolveApiKey(opts.workspaceId);
     const client = this.clientFactory(apiKey, this.baseURL);
-    const params: OpenAIChatParams = {
-      model: opts.model,
-      messages: mapMessages(opts.messages),
-      ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
-      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
-      ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
-      ...(opts.structuredOutput
-        ? { response_format: mapStructuredOutput(opts.structuredOutput) }
-        : {}),
-    };
-    const response = await client.chat.completions.create(params, { signal: opts.signal });
+    const response = await client.chat.completions.create(buildRequest(opts), {
+      signal: opts.signal,
+    });
     const choice = response.choices[0];
+    const message = choice?.message;
     const toolCalls: ProviderToolCall[] = [];
-    if (choice?.message.tool_calls) {
-      for (const tc of choice.message.tool_calls) {
-        toolCalls.push({
-          id: tc.id,
-          name: tc.function.name,
-          ...parseToolInput(tc.function.arguments),
-        });
-      }
+    for (const tc of message?.tool_calls ?? []) {
+      if (tc.type !== "function") continue;
+      toolCalls.push({
+        id: tc.id,
+        name: tc.function.name,
+        ...parseToolInput(tc.function.arguments),
+      });
     }
+    const rawFinish = choice?.finish_reason ?? null;
+    const refusal = message?.refusal ?? null;
+    const stopDetails = refusalDetails(rawFinish, refusal);
     const usage = response.usage;
     return {
-      content: choice?.message.content ?? "",
+      content: message?.content ?? "",
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
-      finishReason: mapFinishReason(choice?.finish_reason ?? null),
+      finishReason: refusal ? "refusal" : mapFinishReason(rawFinish),
+      ...(stopDetails ? { stopDetails } : {}),
       usage: priceUsage(response.model, usage?.prompt_tokens ?? 0, usage?.completion_tokens ?? 0),
       model: response.model,
       providerName: "openai",
@@ -239,36 +234,22 @@ export class OpenAIProvider implements LLMProvider {
       return;
     }
     const client = this.clientFactory(apiKey, this.baseURL);
-    const params: OpenAIChatParams & { stream: true } = {
-      model: opts.model,
-      messages: mapMessages(opts.messages),
-      stream: true,
-      ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
-      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
-      ...(opts.tools ? { tools: mapTools(opts.tools) } : {}),
-      ...(opts.structuredOutput
-        ? { response_format: mapStructuredOutput(opts.structuredOutput) }
-        : {}),
-    };
+    const params: ChatCompletionCreateParamsStreaming = { ...buildRequest(opts), stream: true };
 
-    let stream: AsyncIterable<OpenAIChatStreamChunk>;
+    let stream: OpenAIChatStream;
     try {
-      const result = await (
-        client.chat.completions.create as unknown as (
-          p: OpenAIChatParams & { stream: true },
-          o?: { signal?: AbortSignal },
-        ) => Promise<AsyncIterable<OpenAIChatStreamChunk>>
-      )(params, { signal: opts.signal });
-      stream = result;
+      stream = await client.chat.completions.create(params, { signal: opts.signal });
     } catch (error) {
       yield { error: (error as Error).message };
       return;
     }
 
     const partials = new Map<number, { id?: string; name?: string; argsAccum: string }>();
-    let prompt = 0,
-      completion = 0,
-      model = opts.model;
+    let prompt = 0;
+    let completion = 0;
+    let model = opts.model;
+    let finishReason: ProviderFinishReason | undefined;
+    let refusal = "";
 
     try {
       for await (const chunk of stream) {
@@ -278,29 +259,26 @@ export class OpenAIProvider implements LLMProvider {
         }
         if (chunk.model) model = chunk.model;
         const choice = chunk.choices[0];
-        if (!choice) continue;
-        if (choice.delta.content) yield { delta: choice.delta.content };
-        if (choice.delta.tool_calls) {
-          for (const tc of choice.delta.tool_calls) {
+        if (choice) {
+          if (choice.delta.content) yield { delta: choice.delta.content };
+          if (choice.delta.refusal) refusal += choice.delta.refusal;
+          for (const tc of choice.delta.tool_calls ?? []) {
             const slot = partials.get(tc.index) ?? { argsAccum: "" };
             if (tc.id) slot.id = tc.id;
             if (tc.function?.name) slot.name = tc.function.name;
             if (tc.function?.arguments) slot.argsAccum += tc.function.arguments;
             partials.set(tc.index, slot);
           }
-        }
-        if (choice.finish_reason && partials.size > 0) {
-          for (const slot of partials.values()) {
-            if (!slot.id || !slot.name) continue;
-            yield {
-              toolCall: {
-                id: slot.id,
-                name: slot.name,
-                ...parseToolInput(slot.argsAccum),
-              },
-            };
+          if (choice.finish_reason) {
+            finishReason = refusal ? "refusal" : mapFinishReason(choice.finish_reason);
+            for (const slot of partials.values()) {
+              if (!slot.id || !slot.name) continue;
+              yield {
+                toolCall: { id: slot.id, name: slot.name, ...parseToolInput(slot.argsAccum) },
+              };
+            }
+            partials.clear();
           }
-          partials.clear();
         }
         if (chunk.usage) {
           prompt = chunk.usage.prompt_tokens;
@@ -312,7 +290,14 @@ export class OpenAIProvider implements LLMProvider {
       return;
     }
 
-    yield { done: true, usage: priceUsage(model, prompt, completion) };
+    yield {
+      done: true,
+      usage: priceUsage(model, prompt, completion),
+      ...(finishReason ? { finishReason } : {}),
+      ...(finishReason === "refusal"
+        ? { stopDetails: { category: null, explanation: refusal || null } }
+        : {}),
+    };
   }
 
   async models(): Promise<string[]> {

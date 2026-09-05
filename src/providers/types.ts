@@ -12,6 +12,11 @@ export interface ProviderMessage {
   content: string;
   toolCallId?: string;
   toolName?: string;
+  /**
+   * Tool calls the assistant made in this turn. Providers must replay these so
+   * the following `tool` messages reference a tool call the model can see.
+   */
+  toolCalls?: ProviderToolCall[];
 }
 
 export interface ProviderToolDef {
@@ -27,6 +32,12 @@ export interface ProviderStructuredOutput {
   strict?: boolean;
 }
 
+/**
+ * Reasoning effort. Providers map it onto their own control (Anthropic
+ * `output_config.effort`) and clamp or drop it for models that reject it.
+ */
+export type ProviderEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
 export interface ProviderCallOptions {
   model: string;
   messages: ProviderMessage[];
@@ -34,6 +45,7 @@ export interface ProviderCallOptions {
   structuredOutput?: ProviderStructuredOutput;
   maxTokens?: number;
   temperature?: number;
+  effort?: ProviderEffort;
   signal?: AbortSignal;
   workspaceId: string;
   routeKey: string;
@@ -52,10 +64,20 @@ export interface ProviderToolCall {
   inputError?: "malformed_json" | "not_an_object";
 }
 
+/** Structured detail attached to a `refusal` finish reason. */
+export interface ProviderStopDetails {
+  category: string | null;
+  explanation: string | null;
+}
+
+export type ProviderFinishReason = "stop" | "tool_use" | "length" | "refusal" | "error";
+
 export interface ProviderCallResult {
   content: string;
   toolCalls?: ProviderToolCall[];
-  finishReason: "stop" | "tool_use" | "length" | "error";
+  finishReason: ProviderFinishReason;
+  /** Present when `finishReason` is `refusal` and the provider explained it. */
+  stopDetails?: ProviderStopDetails;
   usage: ProviderUsage;
   model: string;
   providerName: ProviderName;
@@ -66,6 +88,9 @@ export interface ProviderStreamChunk {
   toolCall?: ProviderToolCall;
   done?: boolean;
   usage?: ProviderUsage;
+  /** Set on the `done` chunk when the provider reported why the turn ended. */
+  finishReason?: ProviderFinishReason;
+  stopDetails?: ProviderStopDetails;
   error?: string;
 }
 

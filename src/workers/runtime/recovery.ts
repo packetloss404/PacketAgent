@@ -224,7 +224,9 @@ function requeueExecutionJob(
   now: Date,
   id: (kind: "job" | "event") => string,
 ): void {
-  const job = jobs.find((record) => record.status === "running") ?? jobs[0];
+  // `jobs` is sorted oldest-first; fall back to the most recent job so a
+  // long-terminal job from a previous pause/resume cycle is not resurrected.
+  const job = jobs.find((record) => record.status === "running") ?? jobs.at(-1);
   if (job) {
     job.status = "queued";
     job.attempts = Math.max(0, job.attempts - 1);

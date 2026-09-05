@@ -225,12 +225,14 @@ evidence. One server-side read model now makes "what is running, why, at what
 cost, and what needs me" answerable from the accessible canonical Worker
 list/detail workbench without client-side raw-table joins.
 
-### 9. PacketADE handoff - complete
+### 9. PacketBench handoff - complete
 
 WorkerPackage v1 now freezes the strict W1-aligned envelope, canonical digest
 bytes, artifact references, compatibility fixtures, and optional DSSE
 verification seam. The Packet-product trust boundary now authenticates
-workspace-bound PacketADE service actors, narrows package capabilities through
+workspace-bound Packet-product service actors, accepts current
+`PacketBench`/`packetbench` and legacy `PacketADE`/`packetade` source pairs,
+narrows package capabilities through
 local policy, persists token-safe integrity/idempotency receipts, composes the
 canonical deployment/control services, and projects reconnectable progress,
 approval, completion, failure, and budget events with durable acknowledgements.

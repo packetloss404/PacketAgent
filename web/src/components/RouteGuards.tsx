@@ -1,3 +1,4 @@
+import { safeNextPath } from "../lib/safe-next-path";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/auth-state";
@@ -46,12 +47,7 @@ export function PublicOnly({ children }: { children: ReactNode }) {
 
   if (loading) return <FullScreenLoader />;
   if (session) {
-    return (
-      <Navigate
-        to={requestedNext && requestedNext.startsWith("/") ? requestedNext : "/builder"}
-        replace
-      />
-    );
+    return <Navigate to={safeNextPath(requestedNext, "/builder")} replace />;
   }
   return <>{children}</>;
 }
@@ -72,7 +68,7 @@ export function RequireOnboarding({ children }: { children: ReactNode }) {
     );
   }
   if (session.onboarding.completed) {
-    return <Navigate to={next && next.startsWith("/") ? next : "/builder"} replace />;
+    return <Navigate to={safeNextPath(next, "/builder")} replace />;
   }
   return <>{children}</>;
 }

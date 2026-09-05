@@ -1,4 +1,6 @@
 import { I } from "../../icons";
+import { useMutation } from "../../useMutation";
+import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
 
 export function MembersTab({
@@ -21,6 +23,10 @@ export function MembersTab({
   canManageWorkspace: boolean;
 }) {
   const list = data?.members ?? [];
+  const removeMember = useMutation((userId: string) => api.removeWorkspaceMember(userId), {
+    onSuccess: () => refresh(),
+    inlineError: true,
+  });
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", marginBottom: 14 }}>
@@ -38,6 +44,7 @@ export function MembersTab({
       </div>
       {loading && <div className="muted">Loading…</div>}
       <div className="card" style={{ overflow: "hidden" }}>
+        <MutationError error={removeMember.error} />
         <table className="tbl">
           <thead>
             <tr>
@@ -71,16 +78,10 @@ export function MembersTab({
                       type="button"
                       className="btn btn-sm"
                       style={{ padding: "3px 8px" }}
-                      onClick={async () => {
-                        try {
-                          await api.removeWorkspaceMember(m.userId);
-                          await refresh();
-                        } catch (e) {
-                          console.error(e);
-                        }
-                      }}
+                      disabled={removeMember.pending}
+                      onClick={() => void removeMember.run(m.userId)}
                     >
-                      Remove
+                      {removeMember.activeInput === m.userId ? "Removing…" : "Remove"}
                     </button>
                   ) : (
                     <span className="mono muted" style={{ fontSize: 11 }}>
@@ -125,6 +126,16 @@ export function InvitesTab({
   canManageWorkspace: boolean;
 }) {
   const list = data?.invitations ?? [];
+  const invitationAction = useMutation(
+    ({ kind, id }: { kind: "resend" | "revoke"; id: string }) =>
+      kind === "resend" ? api.resendWorkspaceInvitation(id) : api.revokeWorkspaceInvitation(id),
+    {
+      onSuccess: () => refresh(),
+      successToast: (_result, { kind }) =>
+        kind === "resend" ? "Invitation resent." : "Invitation revoked.",
+      inlineError: true,
+    },
+  );
   return (
     <div>
       <h1 className="h1" style={{ fontSize: 24, marginBottom: 14 }}>
@@ -132,6 +143,7 @@ export function InvitesTab({
       </h1>
       {loading && <div className="muted">Loading…</div>}
       <div className="card" style={{ overflow: "hidden" }}>
+        <MutationError error={invitationAction.error} />
         <table className="tbl">
           <thead>
             <tr>
@@ -173,31 +185,25 @@ export function InvitesTab({
                         type="button"
                         className="btn btn-sm"
                         style={{ padding: "3px 8px" }}
-                        onClick={async () => {
-                          try {
-                            await api.resendWorkspaceInvitation(i.id);
-                            await refresh();
-                          } catch (e) {
-                            console.error(e);
-                          }
-                        }}
+                        disabled={invitationAction.pending}
+                        onClick={() => void invitationAction.run({ kind: "resend", id: i.id })}
                       >
-                        Resend
+                        {invitationAction.activeInput?.id === i.id &&
+                        invitationAction.activeInput.kind === "resend"
+                          ? "Resending…"
+                          : "Resend"}
                       </button>
                       <button
                         type="button"
                         className="btn btn-sm"
                         style={{ padding: "3px 8px", marginLeft: 4, color: "var(--danger)" }}
-                        onClick={async () => {
-                          try {
-                            await api.revokeWorkspaceInvitation(i.id);
-                            await refresh();
-                          } catch (e) {
-                            console.error(e);
-                          }
-                        }}
+                        disabled={invitationAction.pending}
+                        onClick={() => void invitationAction.run({ kind: "revoke", id: i.id })}
                       >
-                        Revoke
+                        {invitationAction.activeInput?.id === i.id &&
+                        invitationAction.activeInput.kind === "revoke"
+                          ? "Revoking…"
+                          : "Revoke"}
                       </button>
                     </>
                   ) : (
@@ -241,6 +247,11 @@ export function SharesTab({
   canManageWorkspace: boolean;
 }) {
   const list = data ?? [];
+  const revokeToken = useMutation((tokenId: string) => api.deleteShareToken(tokenId), {
+    onSuccess: () => refresh(),
+    successToast: "Share token revoked.",
+    inlineError: true,
+  });
   return (
     <div>
       <h1 className="h1" style={{ fontSize: 24, marginBottom: 14 }}>
@@ -250,6 +261,7 @@ export function SharesTab({
         Read-only public links for previews and handoffs. Rotate a token to expire old URLs.
       </p>
       {loading && <div className="muted">Loading…</div>}
+      <MutationError error={revokeToken.error} />
       {list.map((s) => (
         <div
           key={s.id}
@@ -279,16 +291,10 @@ export function SharesTab({
               type="button"
               className="btn btn-sm"
               style={{ color: "var(--danger)" }}
-              onClick={async () => {
-                try {
-                  await api.deleteShareToken(s.id);
-                  await refresh();
-                } catch (e) {
-                  console.error(e);
-                }
-              }}
+              disabled={revokeToken.pending}
+              onClick={() => void revokeToken.run(s.id)}
             >
-              Revoke
+              {revokeToken.activeInput === s.id ? "Revoking…" : "Revoke"}
             </button>
           ) : (
             <span className="mono muted" style={{ fontSize: 11 }}>

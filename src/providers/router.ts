@@ -2,6 +2,7 @@ import type {
   LLMProvider,
   ProviderCallOptions,
   ProviderCallResult,
+  ProviderEffort,
   ProviderName,
   ProviderStreamChunk,
 } from "./types.js";
@@ -16,6 +17,11 @@ import {
 export interface ProviderRoute {
   provider: ProviderName;
   model: string;
+  /**
+   * Default reasoning effort for calls on this route. A caller-supplied
+   * `effort` wins; providers without an effort control ignore it.
+   */
+  effort?: ProviderEffort;
 }
 
 export const DEFAULT_ROUTES: Record<string, ProviderRoute> = {
@@ -129,6 +135,7 @@ export class ProviderRouter {
       route: {
         provider: provider.name,
         model: modelOverride && modelOverride.length > 0 ? modelOverride : route.model,
+        ...(route.effort ? { effort: route.effort } : {}),
       },
     };
   }
@@ -137,14 +144,26 @@ export class ProviderRouter {
     opts: Omit<ProviderCallOptions, "model"> & { model?: string; provider?: ProviderName },
   ): Promise<ProviderCallResult> {
     const { provider, route } = this.select(opts.routeKey, opts.model, opts.provider);
-    return provider.call({ ...opts, model: route.model });
+    return provider.call(this.withRoute(opts, route));
   }
 
   stream(
     opts: Omit<ProviderCallOptions, "model"> & { model?: string; provider?: ProviderName },
   ): AsyncIterable<ProviderStreamChunk> {
     const { provider, route } = this.select(opts.routeKey, opts.model, opts.provider);
-    return provider.stream({ ...opts, model: route.model });
+    return provider.stream(this.withRoute(opts, route));
+  }
+
+  private withRoute(
+    opts: Omit<ProviderCallOptions, "model"> & { model?: string; provider?: ProviderName },
+    route: ProviderRoute,
+  ): ProviderCallOptions {
+    const { provider: _provider, ...rest } = opts;
+    return {
+      ...rest,
+      model: route.model,
+      ...(rest.effort === undefined && route.effort ? { effort: route.effort } : {}),
+    };
   }
 
   has(name: ProviderName): boolean {

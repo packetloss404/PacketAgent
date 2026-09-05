@@ -1,10 +1,17 @@
 import { I } from "../icons";
 import { AdminToggle } from "./admin-controls";
 import { useApiData } from "../useApiData";
+import { useMutation } from "../useMutation";
+import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
 
 export function SecretsView() {
   const envVars = useApiData(() => api.listEnvVars(), []);
+  const deleteSecret = useMutation((id: string) => api.deleteEnvVar(id), {
+    onSuccess: () => envVars.refresh(),
+    successToast: "Secret deleted.",
+    inlineError: true,
+  });
   const list = envVars.data ?? [];
   const secrets = list.filter((e) => e.secret);
 
@@ -17,6 +24,7 @@ export function SecretsView() {
 
       {envVars.loading && <div className="muted">Loading…</div>}
       <div className="card" style={{ overflow: "hidden", marginBottom: 18 }}>
+        <MutationError error={deleteSecret.error} />
         <table className="tbl">
           <thead>
             <tr>
@@ -52,16 +60,10 @@ export function SecretsView() {
                     type="button"
                     className="btn btn-sm"
                     style={{ padding: "3px 8px", color: "var(--danger)" }}
-                    onClick={async () => {
-                      try {
-                        await api.deleteEnvVar(s.id);
-                        await envVars.refresh();
-                      } catch (e) {
-                        console.error(e);
-                      }
-                    }}
+                    disabled={deleteSecret.pending}
+                    onClick={() => void deleteSecret.run(s.id)}
                   >
-                    Delete
+                    {deleteSecret.activeInput === s.id ? "Deleting…" : "Delete"}
                   </button>
                 </td>
               </tr>

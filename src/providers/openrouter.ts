@@ -9,7 +9,7 @@ import type {
   ProviderToolDef,
   ProviderUsage,
 } from "./types.js";
-import { parseToolInput } from "./tool-input.js";
+import { openAiToolCalls, parseToolInput } from "./tool-input.js";
 
 // OpenRouter (https://openrouter.ai) is a meta-provider that proxies ~200 models
 // behind a single OpenAI-compatible Chat Completions API. We hit it over HTTP
@@ -106,6 +106,13 @@ function mapMessages(messages: ProviderMessage[]): OpenRouterChatMessage[] {
   return messages.map((m) => {
     if (m.role === "tool") {
       return { role: "tool", content: m.content, tool_call_id: m.toolCallId };
+    }
+    if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+      return {
+        role: "assistant",
+        content: m.content.length > 0 ? m.content : null,
+        tool_calls: openAiToolCalls(m.toolCalls),
+      };
     }
     return { role: m.role, content: m.content };
   });

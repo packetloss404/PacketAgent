@@ -10,8 +10,10 @@ import type {
 } from "@/lib/types";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
+import { useMutation } from "../useMutation";
 import { workerRunDetailAccessibleState } from "../worker-operations-state";
 import { AsyncStateBoundary } from "@/components/AsyncStateBoundary";
+import { MutationError } from "@/components/MutationError";
 import {
   formatBytes,
   formatDuration as formatSharedDuration,
@@ -23,6 +25,22 @@ import {
 
 type RunControlAction = "pause" | "resume" | "stop" | "revoke";
 type AttentionAction = "approve-once" | "approve-for-run" | "reject";
+type WorkerActionInput =
+  | { kind: "control"; action: RunControlAction }
+  | { kind: "attention"; attention: WorkerAttentionView; action: AttentionAction };
+
+function workerActionNotice(input: WorkerActionInput): string {
+  if (input.kind === "control") {
+    return input.action === "revoke"
+      ? "Deployment revocation was accepted."
+      : `Worker ${input.action} command was accepted.`;
+  }
+  return input.action === "reject"
+    ? "The requested operation was rejected."
+    : input.action === "approve-for-run"
+      ? "The capability was approved for this run."
+      : "The operation was approved once.";
+}
 
 export function WorkerRunDetailView() {
   const { id = "" } = useParams();
@@ -30,8 +48,6 @@ export function WorkerRunDetailView() {
   const detail = useApiData(() => api.getWorkerRunDetail(id), [id]);
   const refreshDetail = detail.refresh;
   const latestSequence = useRef(0);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,52 +97,47 @@ export function WorkerRunDetailView() {
   });
   const run = detail.data?.run;
 
-  const runControl = async (action: RunControlAction) => {
-    if (!run) return;
-    setBusy(action);
-    setActionError(null);
-    setActionNotice(null);
-    try {
-      if (action === "revoke") {
+  // One mutation for every operator control so a later action clears an
+  // earlier failure, and the read model is refreshed after either outcome.
+  const workerAction = useMutation(
+    async (input: WorkerActionInput) => {
+      if (input.kind === "attention") {
+        await api.resolveWorkerAttention(
+          input.attention.id,
+          input.action,
+          input.attention.runRevision,
+        );
+        return;
+      }
+      if (!run) throw new Error("Worker run is not loaded yet.");
+      if (input.action === "revoke") {
         await api.revokeWorkerDeployment(run.deployment.id, run.deployment.revision);
       } else {
-        await api.controlWorkerRun(run.id, action, run.revision);
+        await api.controlWorkerRun(run.id, input.action, run.revision);
       }
-      setActionNotice(
-        action === "revoke"
-          ? "Deployment revocation was accepted."
-          : `Worker ${action} command was accepted.`,
-      );
-      await detail.refresh();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
-      await detail.refresh();
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const resolveAttention = async (attention: WorkerAttentionView, action: AttentionAction) => {
-    setBusy(`${attention.id}:${action}`);
-    setActionError(null);
+    },
+    {
+      inlineError: true,
+      onSuccess: async (_result, input) => {
+        setActionNotice(workerActionNotice(input));
+        await refreshDetail();
+      },
+      onError: () => refreshDetail(),
+    },
+  );
+  const startWorkerAction = (input: WorkerActionInput) => {
     setActionNotice(null);
-    try {
-      await api.resolveWorkerAttention(attention.id, action, attention.runRevision);
-      setActionNotice(
-        action === "reject"
-          ? "The requested operation was rejected."
-          : action === "approve-for-run"
-            ? "The capability was approved for this run."
-            : "The operation was approved once.",
-      );
-      await detail.refresh();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
-      await detail.refresh();
-    } finally {
-      setBusy(null);
-    }
+    void workerAction.run(input);
   };
+  const runControl = (action: RunControlAction) => startWorkerAction({ kind: "control", action });
+  const resolveAttention = (attention: WorkerAttentionView, action: AttentionAction) =>
+    startWorkerAction({ kind: "attention", attention, action });
+  const active = workerAction.activeInput;
+  const busy: string | null = !active
+    ? null
+    : active.kind === "control"
+      ? active.action
+      : `${active.attention.id}:${active.action}`;
 
   if (accessibleState.kind === "loading") {
     return (
@@ -171,7 +182,7 @@ export function WorkerRunDetailView() {
                 label="Pause"
                 busy={busy === "pause"}
                 disabled={busy !== null}
-                onClick={() => void runControl("pause")}
+                onClick={() => runControl("pause")}
               />
             )}
             {run.controls.canResume && (
@@ -179,7 +190,7 @@ export function WorkerRunDetailView() {
                 label="Resume"
                 busy={busy === "resume"}
                 disabled={busy !== null}
-                onClick={() => void runControl("resume")}
+                onClick={() => runControl("resume")}
               />
             )}
             {run.controls.canStop && (
@@ -187,7 +198,7 @@ export function WorkerRunDetailView() {
                 label="Stop"
                 busy={busy === "stop"}
                 disabled={busy !== null}
-                onClick={() => void runControl("stop")}
+                onClick={() => runControl("stop")}
               />
             )}
             {run.controls.canRevokeDeployment && (
@@ -195,7 +206,7 @@ export function WorkerRunDetailView() {
                 label="Revoke deployment"
                 busy={busy === "revoke"}
                 disabled={busy !== null}
-                onClick={() => void runControl("revoke")}
+                onClick={() => runControl("revoke")}
               />
             )}
           </>
@@ -223,8 +234,8 @@ export function WorkerRunDetailView() {
           <span className="mono muted">event {run.rollup.computedThroughSequence}</span>
         </div>
 
-        {actionError && <Notice tone="danger">{actionError}</Notice>}
-        {actionNotice && <Notice tone="good">{actionNotice}</Notice>}
+        <MutationError error={workerAction.error} />
+        {actionNotice && <Notice>{actionNotice}</Notice>}
 
         <div
           style={{
@@ -474,7 +485,7 @@ function AttentionPanel({
 }: {
   attention: WorkerAttentionView[];
   busy: string | null;
-  onResolve: (attention: WorkerAttentionView, action: AttentionAction) => Promise<void>;
+  onResolve: (attention: WorkerAttentionView, action: AttentionAction) => void;
 }) {
   if (attention.length === 0) {
     return <EmptyState>No operator attention has been requested.</EmptyState>;
@@ -503,7 +514,7 @@ function AttentionPanel({
                 type="button"
                 className="btn btn-sm"
                 disabled={busy !== null}
-                onClick={() => void onResolve(item, "approve-once")}
+                onClick={() => onResolve(item, "approve-once")}
               >
                 {busy === `${item.id}:approve-once` ? "Approving…" : "Approve once"}
               </button>
@@ -511,7 +522,7 @@ function AttentionPanel({
                 type="button"
                 className="btn btn-sm"
                 disabled={busy !== null}
-                onClick={() => void onResolve(item, "approve-for-run")}
+                onClick={() => onResolve(item, "approve-for-run")}
               >
                 {busy === `${item.id}:approve-for-run` ? "Approving…" : "Approve for run"}
               </button>
@@ -519,7 +530,7 @@ function AttentionPanel({
                 type="button"
                 className="btn btn-sm"
                 disabled={busy !== null}
-                onClick={() => void onResolve(item, "reject")}
+                onClick={() => onResolve(item, "reject")}
               >
                 {busy === `${item.id}:reject` ? "Rejecting…" : "Reject"}
               </button>
@@ -638,16 +649,12 @@ function MetadataLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Notice({ tone, children }: { tone: "good" | "danger"; children: ReactNode }) {
+function Notice({ children }: { children: ReactNode }) {
   return (
     <div
       className="card"
-      role={tone === "danger" ? "alert" : "status"}
-      style={{
-        padding: "12px 14px",
-        marginBottom: 14,
-        color: tone === "danger" ? "var(--danger)" : "var(--green)",
-      }}
+      role="status"
+      style={{ padding: "12px 14px", marginBottom: 14, color: "var(--green)" }}
     >
       {children}
     </div>

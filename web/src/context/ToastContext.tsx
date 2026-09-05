@@ -70,13 +70,14 @@ function ToastViewport({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: str
       }}
     >
       {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
+        <ToastItem key={toast.id} toast={toast} dismiss={dismiss} />
       ))}
     </div>
   );
 }
 
-function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
+function ToastItem({ toast, dismiss }: { toast: Toast; dismiss: (id: string) => void }) {
+  const onDismiss = useCallback(() => dismiss(toast.id), [dismiss, toast.id]);
   useEffect(() => {
     if (toast.durationMs <= 0) return;
     const timer = window.setTimeout(onDismiss, toast.durationMs);

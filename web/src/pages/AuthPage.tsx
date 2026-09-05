@@ -1,3 +1,4 @@
+import { safeNextPath } from "../lib/safe-next-path";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/auth-state";
@@ -28,7 +29,7 @@ export default function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
       } else {
         await signIn({ email: email.trim(), password });
       }
-      navigate(next && next.startsWith("/") ? next : "/", { replace: true });
+      navigate(safeNextPath(next, "/"), { replace: true });
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);

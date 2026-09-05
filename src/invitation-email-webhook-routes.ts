@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { parseInvitationEmailReconciliationBody } from "./invitation-email-reconciliation.js";
 import { resolveInvitationEmailReconciliationConfig } from "./invitation-email.js";
@@ -37,7 +38,7 @@ invitationEmailWebhookRoutes.post("/", async (c) => {
     }
 
     const provided = c.req.header(config.secretHeader);
-    if (!provided || provided !== config.secret) {
+    if (!provided || !secretsMatch(provided, config.secret)) {
       return c.json({ error: "unauthorized" }, 401);
     }
 
@@ -88,3 +89,10 @@ invitationEmailWebhookRoutes.post("/", async (c) => {
     return errorResponse(c, error);
   }
 });
+
+/** Constant-time secret comparison; hashing first hides the length as well. */
+function secretsMatch(provided: string, expected: string): boolean {
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}

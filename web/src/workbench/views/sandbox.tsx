@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { I } from "../icons";
 import { useApiData } from "../useApiData";
+import { useMutation } from "../useMutation";
 import { api, streamSandboxExec } from "@/lib/api";
 import { useAuth } from "@/context/auth-state";
 import type { SandboxExecRecord, SandboxExecStatus, SandboxRuntimeInfo } from "@/lib/types";
@@ -129,14 +130,12 @@ export function SandboxView() {
     }
   };
 
-  const cancelSelected = async () => {
+  const cancelExec = useMutation((execId: string) => api.cancelSandboxExec(execId), {
+    onSuccess: () => execs.refresh(),
+  });
+  const cancelSelected = () => {
     if (!selectedExec) return;
-    try {
-      await api.cancelSandboxExec(selectedExec.id);
-      void execs.refresh();
-    } catch {
-      /* ignore */
-    }
+    void cancelExec.run(selectedExec.id);
   };
 
   return (
@@ -260,7 +259,7 @@ export function SandboxView() {
             key={selectedExec.id}
             exec={selectedExec}
             onCancel={() => {
-              void cancelSelected();
+              cancelSelected();
             }}
             onClose={() => setSelectedId(null)}
             onUpdate={() => {

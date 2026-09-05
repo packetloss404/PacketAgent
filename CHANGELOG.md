@@ -6,6 +6,42 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-09-03 - WorkerPackage signature verification
+
+- Added a workspace-scoped, public-key-only Ed25519 signing-key registry
+  (`packetProductSigningKeys`, `packetagent.packet-product-signing-key/v1`)
+  persisted across JSON, SQLite, and managed Postgres with repository
+  integrity checks and backfill/verify coverage.
+- Wired a store-backed DSSE verifier into the production trust service so
+  `--require-signature` credentials now verify `integrity.dsseEnvelope`
+  signatures over `PAE(payloadType, canonical subject bytes)` end to end.
+  Unsigned packages fail with `package.signature.required`; unknown, revoked,
+  cross-workspace, or invalid signatures fail with
+  `package.signature.untrusted`. The injectable verifier seam is unchanged.
+- Added `packet-product-signing-key add|revoke|list` to the db CLI with
+  audited registration/revocation activities, and advertised the signing
+  contract plus active workspace keyids from `GET /worker-packages/contract`.
+
+### 2026-09-01 - Packet suite compatibility refresh
+
+- Restored live PacketBench-to-PacketAgent handoff compatibility after the
+  PacketADE product rename. WorkerPackage v1 accepts the current paired
+  `PacketBench`/`packetbench` identity alongside the frozen
+  `PacketADE`/`packetade` identity, while mixed identities fail closed.
+- Added a current PacketBench golden fixture, advertised both source identities
+  from the authenticated contract descriptor, and exercised the current
+  package through validate, deploy, activate, inspect, update, rollback, and
+  revoke using an existing legacy-compatible credential.
+- Preserved frozen v1 digests, `pkade.*` bearer tokens, persisted credential
+  identity, and internal replay namespaces so existing deployments and
+  credentials remain valid.
+- Refreshed compatible npm dependencies. Full and production audits now report
+  zero vulnerabilities; major-version upgrades remain deliberately separate.
+- Re-audited PacketChat, PacketCode, PacketBench, and PacketRelay.
+  PacketChat still lacks the W10 ingestion/card and scoped service-auth
+  boundary, PacketCode's new headless runtime is unpublished and is not a
+  durable Worker contract, and PacketRelay requires no PacketAgent changes.
+
 ### 2026-08-01 - Documentation truth gate and workbench screenshots
 
 - Added committed README captures of Builder app mode and canonical Worker

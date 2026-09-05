@@ -24,7 +24,8 @@ test("packet-product-credential issue mints a workspace credential and returns t
   assert.match(result.token, /^pkade\.credential_cli_1\.[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.token, `pkade.${result.credential.id}.${TEST_SECRET}`);
   assert.equal(result.credential.workspaceId, "alpha");
-  assert.equal(result.credential.subjectId, "packetade:alpha");
+  assert.equal(result.credential.subjectId, "packetbench:alpha");
+  assert.equal(result.credential.product, "PacketADE");
   assert.deepEqual(result.credential.allowedOperations, [...PACKET_PRODUCT_OPERATIONS].sort());
   assert.equal(result.credential.allowedOperations.includes("attention.list"), true);
   assert.equal(result.credential.allowedOperations.includes("attention.respond"), true);
@@ -140,3 +141,24 @@ function createHarness() {
   });
   return { data, trust };
 }
+
+test("packet-product-credential issue rejects flags that are missing a value", () => {
+  assert.throws(
+    () => parsePacketProductCredentialIssueArgs(["--workspace", "alpha", "--operations"]),
+    /--operations requires a value/,
+  );
+  assert.throws(
+    () =>
+      parsePacketProductCredentialIssueArgs([
+        "--workspace",
+        "alpha",
+        "--operations",
+        "--require-signature",
+      ]),
+    /--operations requires a value/,
+  );
+  assert.throws(
+    () => parsePacketProductCredentialIssueArgs(["--workspace", "alpha", "--expires-at="]),
+    /--expires-at requires a value/,
+  );
+});

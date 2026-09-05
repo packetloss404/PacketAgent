@@ -3,7 +3,7 @@ import { streamSSE } from "hono/streaming";
 import { requirePrivateWorkspaceRole } from "./rbac.js";
 import { getDefaultRouter } from "./providers/router.js";
 import { recordedStream } from "./providers/ledger.js";
-import type { ProviderMessage, ProviderToolDef } from "./providers/types.js";
+import type { ProviderEffort, ProviderMessage, ProviderToolDef } from "./providers/types.js";
 import { redactedErrorMessage, redactSensitiveString } from "./security/redaction.js";
 
 interface StreamRequestBody {
@@ -13,11 +13,25 @@ interface StreamRequestBody {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  effort?: ProviderEffort;
 }
 
 const HEARTBEAT_MS = 15_000;
 
-const inflight = new Map<string, AbortController>();
+const EFFORT_LEVELS: ReadonlySet<string> = new Set(["low", "medium", "high", "xhigh", "max"]);
+
+function effortFromBody(value: unknown): ProviderEffort | undefined {
+  return typeof value === "string" && EFFORT_LEVELS.has(value)
+    ? (value as ProviderEffort)
+    : undefined;
+}
+
+interface InflightStream {
+  ctrl: AbortController;
+  workspaceId: string;
+}
+
+const inflight = new Map<string, InflightStream>();
 
 function errorResponse(c: Context, error: unknown) {
   c.status(((error as Error & { status?: number }).status ?? 500) as 500);
@@ -49,8 +63,19 @@ llmStreamRoutes.post("/stream", async (c) => {
   }
 
   const streamId = c.req.header("x-stream-id") ?? crypto.randomUUID();
+  const existing = inflight.get(streamId);
+  if (existing) {
+    // A client-chosen id must not let one caller hijack or orphan another
+    // workspace's in-flight stream.
+    return errorResponse(
+      c,
+      Object.assign(new Error("stream id is already in use"), {
+        status: existing.workspaceId === workspaceId ? 409 : 403,
+      }),
+    );
+  }
   const abortCtrl = new AbortController();
-  inflight.set(streamId, abortCtrl);
+  inflight.set(streamId, { ctrl: abortCtrl, workspaceId });
   const upstreamSignal = c.req.raw.signal;
   const onUpstreamAbort = () => abortCtrl.abort();
   upstreamSignal.addEventListener("abort", onUpstreamAbort);
@@ -66,6 +91,7 @@ llmStreamRoutes.post("/stream", async (c) => {
     ...(body.tools ? { tools: body.tools } : {}),
     ...(body.maxTokens !== undefined ? { maxTokens: body.maxTokens } : {}),
     ...(body.temperature !== undefined ? { temperature: body.temperature } : {}),
+    ...(effortFromBody(body.effort) ? { effort: effortFromBody(body.effort) } : {}),
   };
 
   c.header("x-stream-id", streamId);
@@ -102,11 +128,12 @@ llmStreamRoutes.post("/stream", async (c) => {
 
 llmStreamRoutes.post("/cancel/:streamId", (c) => {
   try {
-    requirePrivateWorkspaceRole(c, "member");
+    const workspaceId = requirePrivateWorkspaceRole(c, "member").workspace.id;
     const streamId = c.req.param("streamId");
-    const ctrl = inflight.get(streamId);
-    if (ctrl) {
-      ctrl.abort();
+    const entry = inflight.get(streamId);
+    // Streams owned by another workspace are indistinguishable from unknown ids.
+    if (entry && entry.workspaceId === workspaceId) {
+      entry.ctrl.abort();
       inflight.delete(streamId);
       return c.json({ canceled: true });
     }
@@ -116,8 +143,12 @@ llmStreamRoutes.post("/cancel/:streamId", (c) => {
   }
 });
 
-export function registerInflightForTests(streamId: string, ctrl: AbortController): void {
-  inflight.set(streamId, ctrl);
+export function registerInflightForTests(
+  streamId: string,
+  ctrl: AbortController,
+  workspaceId = "test",
+): void {
+  inflight.set(streamId, { ctrl, workspaceId });
 }
 
 export function clearInflightForTests(): void {

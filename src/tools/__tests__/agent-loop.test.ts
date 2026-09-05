@@ -295,3 +295,166 @@ test("unknown tool produces a synthetic error result and the loop continues", as
   assert.match(result.toolCalls[0].error ?? "", /not registered/);
   assert.equal(result.finishReason, "stop");
 });
+
+test("loop replays the assistant tool-call turn before tool results on the next call", async () => {
+  resetStoreForTests();
+  resetDefaultToolRegistryForTests();
+  resetDefaultRouterForTests();
+  getDefaultToolRegistry().register(echoTool);
+  const seen: ProviderCallOptions["messages"][] = [];
+  const scripts: ProviderCallResult[] = [
+    {
+      content: "",
+      finishReason: "tool_use",
+      toolCalls: [{ id: "call-1", name: "echo_tool", input: { text: "hello" } }],
+      usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
+      model: "claude-opus-4-7",
+      providerName: "anthropic",
+    },
+    {
+      content: "done",
+      finishReason: "stop",
+      usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
+      model: "claude-opus-4-7",
+      providerName: "anthropic",
+    },
+  ];
+  let cursor = 0;
+  const router = new ProviderRouter();
+  router.register("anthropic", {
+    name: "anthropic",
+    async call(opts) {
+      seen.push(opts.messages.map((message) => ({ ...message })));
+      return scripts[cursor++]!;
+    },
+    async *stream() {
+      yield { done: true, usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 } };
+    },
+    async models() {
+      return ["scripted"];
+    },
+  });
+  setDefaultRouter(router);
+  await runAgentLoop({
+    workspaceId: "alpha",
+    userId: "user-1",
+    routeKey: "agent.reasoning",
+    systemPrompt: "you are a helper",
+    userPrompt: "echo hello",
+    toolNames: ["echo_tool"],
+  });
+  assert.equal(seen.length, 2);
+  const second = seen[1];
+  const assistantIndex = second.findIndex((message) => message.role === "assistant");
+  const toolIndex = second.findIndex((message) => message.role === "tool");
+  assert.ok(assistantIndex >= 0, "assistant turn is replayed");
+  assert.ok(toolIndex > assistantIndex, "tool result follows the assistant turn");
+  assert.deepEqual(second[assistantIndex].toolCalls, [
+    { id: "call-1", name: "echo_tool", input: { text: "hello" } },
+  ]);
+  assert.equal(second[toolIndex].toolCallId, "call-1");
+});
+
+test("loop gives every replayed tool call a result during a malformed-input correction", async () => {
+  resetStoreForTests();
+  resetDefaultToolRegistryForTests();
+  resetDefaultRouterForTests();
+  getDefaultToolRegistry().register(echoTool);
+  const seen: ProviderCallOptions["messages"][] = [];
+  const scripts: ProviderCallResult[] = [
+    {
+      content: "",
+      finishReason: "tool_use",
+      toolCalls: [
+        { id: "bad-1", name: "echo_tool", input: {}, inputError: "malformed_json" },
+        { id: "ok-1", name: "echo_tool", input: { text: "fine" } },
+      ],
+      usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
+      model: "claude-opus-4-7",
+      providerName: "anthropic",
+    },
+    {
+      content: "done",
+      finishReason: "stop",
+      usage: { promptTokens: 5, completionTokens: 5, costUsd: 0 },
+      model: "claude-opus-4-7",
+      providerName: "anthropic",
+    },
+  ];
+  let cursor = 0;
+  const router = new ProviderRouter();
+  router.register("anthropic", {
+    name: "anthropic",
+    async call(opts) {
+      seen.push(opts.messages.map((message) => ({ ...message })));
+      return scripts[cursor++]!;
+    },
+    async *stream() {
+      yield { done: true, usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 } };
+    },
+    async models() {
+      return ["scripted"];
+    },
+  });
+  setDefaultRouter(router);
+  const result = await runAgentLoop({
+    workspaceId: "alpha",
+    userId: "user-1",
+    routeKey: "agent.reasoning",
+    systemPrompt: "you are a helper",
+    userPrompt: "echo",
+    toolNames: ["echo_tool"],
+  });
+  assert.equal(result.finishReason, "stop");
+  assert.equal(result.toolCalls.length, 0, "nothing executed during the correction turn");
+  const second = seen[1];
+  const toolResultIds = second
+    .filter((message) => message.role === "tool")
+    .map((message) => message.toolCallId);
+  assert.deepEqual(toolResultIds, ["bad-1", "ok-1"]);
+  assert.equal(second.at(-1)?.role, "user");
+});
+
+test("loop treats a refusal as terminal and records the stop details", async () => {
+  resetStoreForTests();
+  resetDefaultToolRegistryForTests();
+  resetDefaultRouterForTests();
+  getDefaultToolRegistry().register(echoTool);
+  let calls = 0;
+  const router = new ProviderRouter();
+  router.register("anthropic", {
+    name: "anthropic",
+    async call() {
+      calls++;
+      return {
+        content: "",
+        finishReason: "refusal",
+        stopDetails: { category: "cyber", explanation: "declined" },
+        usage: { promptTokens: 5, completionTokens: 0, costUsd: 0.0001 },
+        model: "claude-opus-5",
+        providerName: "anthropic",
+      };
+    },
+    async *stream() {
+      yield { done: true, usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 } };
+    },
+    async models() {
+      return [];
+    },
+  });
+  setDefaultRouter(router);
+  const result = await runAgentLoop({
+    workspaceId: "alpha",
+    userId: "user-1",
+    routeKey: "agent.reasoning",
+    systemPrompt: "you are a helper",
+    userPrompt: "do the thing",
+    toolNames: ["echo_tool"],
+    maxTurns: 4,
+  });
+  assert.equal(calls, 1, "no retry after a refusal");
+  assert.equal(result.finishReason, "refusal");
+  assert.equal(result.turnsUsed, 1);
+  assert.deepEqual(result.stopDetails, { category: "cyber", explanation: "declined" });
+  assert.equal(result.toolCalls.length, 0);
+});

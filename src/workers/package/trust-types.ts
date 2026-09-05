@@ -2,11 +2,19 @@ import type {
   WorkerActorReference,
   WorkerCompiledPolicy,
   WorkerDeploymentCapabilityGrant,
-  WorkerSourceProvenance,
 } from "../types.js";
+import {
+  isPacketProductName,
+  isPacketProductSourceIdentity,
+  type PacketProductName,
+  type WorkerPackageSourceProvenance,
+} from "./types.js";
 
 export const PACKET_PRODUCT_CREDENTIAL_SCHEMA_VERSION =
   "packetagent.packet-product-credential/v1" as const;
+export const PACKET_PRODUCT_SIGNING_KEY_SCHEMA_VERSION =
+  "packetagent.packet-product-signing-key/v1" as const;
+export const PACKET_PRODUCT_SIGNING_KEY_ALGORITHM = "ed25519" as const;
 export const WORKER_PACKAGE_RECEIPT_SCHEMA_VERSION =
   "packetagent.worker-package-receipt/v1" as const;
 export const WORKER_PACKAGE_DEPLOYMENT_SCHEMA_VERSION =
@@ -57,6 +65,31 @@ export interface PacketProductCredentialMetadata extends Omit<
   readonly tokenConfigured: true;
 }
 
+export type PacketProductSigningKeyStatus = "active" | "revoked";
+
+/**
+ * Workspace-scoped public verification key for WorkerPackage DSSE envelopes.
+ * Only public material is persisted; PacketAgent never holds a signing key.
+ */
+export interface PacketProductSigningKeyRecord {
+  readonly schemaVersion: typeof PACKET_PRODUCT_SIGNING_KEY_SCHEMA_VERSION;
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly keyid: string;
+  readonly algorithm: typeof PACKET_PRODUCT_SIGNING_KEY_ALGORITHM;
+  /** SubjectPublicKeyInfo PEM. */
+  readonly publicKey: string;
+  /** `sha256:<hex>` of the DER-encoded SubjectPublicKeyInfo. */
+  readonly fingerprint: string;
+  readonly product: PacketProductName;
+  readonly status: PacketProductSigningKeyStatus;
+  readonly description?: string;
+  readonly createdBy: WorkerActorReference;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly revokedAt?: string;
+}
+
 export interface WorkerPackageIntegrityReceipt {
   readonly digestVerified: true;
   readonly signatureRequired: boolean;
@@ -82,10 +115,7 @@ export interface WorkerPackageReceipt {
   readonly packageDigest: string;
   readonly requestDigest: string;
   readonly workerVersionContentDigest: string;
-  readonly source: WorkerSourceProvenance & {
-    readonly product: "PacketADE";
-    readonly kind: "packetade";
-  };
+  readonly source: WorkerPackageSourceProvenance;
   readonly packageCreatedBy: WorkerActorReference;
   readonly authenticatedActor: WorkerActorReference & {
     readonly type: "packet_product";
@@ -151,6 +181,39 @@ export function assertValidPacketProductCredentialRecord(
   }
 }
 
+const SIGNING_KEY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,255}$/;
+
+export function isValidPacketProductSigningKeyId(value: unknown): value is string {
+  return typeof value === "string" && SIGNING_KEY_ID_PATTERN.test(value);
+}
+
+export function assertValidPacketProductSigningKeyRecord(
+  record: PacketProductSigningKeyRecord,
+): void {
+  if (
+    record.schemaVersion !== PACKET_PRODUCT_SIGNING_KEY_SCHEMA_VERSION ||
+    !isNonEmpty(record.id) ||
+    !isNonEmpty(record.workspaceId) ||
+    !isValidPacketProductSigningKeyId(record.keyid) ||
+    record.algorithm !== PACKET_PRODUCT_SIGNING_KEY_ALGORITHM ||
+    typeof record.publicKey !== "string" ||
+    !isSpkiPem(record.publicKey) ||
+    !isSha256Digest(record.fingerprint) ||
+    !isPacketProductName(record.product) ||
+    !["active", "revoked"].includes(record.status) ||
+    (record.description !== undefined &&
+      (typeof record.description !== "string" || record.description.length > 512)) ||
+    !isWorkerActor(record.createdBy) ||
+    !isTimestamp(record.createdAt) ||
+    !isTimestamp(record.updatedAt) ||
+    (record.revokedAt !== undefined && !isTimestamp(record.revokedAt)) ||
+    (record.status === "revoked" && record.revokedAt === undefined) ||
+    (record.status === "active" && record.revokedAt !== undefined)
+  ) {
+    throw new Error("Packet-product signing key record is invalid.");
+  }
+}
+
 export function assertValidWorkerPackageReceipt(record: WorkerPackageReceipt): void {
   if (
     record.schemaVersion !== WORKER_PACKAGE_RECEIPT_SCHEMA_VERSION ||
@@ -163,8 +226,7 @@ export function assertValidWorkerPackageReceipt(record: WorkerPackageReceipt): v
     !isSha256Digest(record.packageDigest) ||
     !isSha256Digest(record.requestDigest) ||
     !isSha256Digest(record.workerVersionContentDigest) ||
-    record.source.product !== "PacketADE" ||
-    record.source.kind !== "packetade" ||
+    !isPacketProductSourceIdentity(record.source.product, record.source.kind) ||
     !isWorkerActor(record.packageCreatedBy) ||
     record.authenticatedActor.type !== "packet_product" ||
     record.authenticatedActor.product !== "PacketADE" ||
@@ -242,4 +304,8 @@ function isNonEmpty(value: string): boolean {
 
 function isSha256Digest(value: string): boolean {
   return /^sha256:[a-f0-9]{64}$/.test(value);
+}
+
+function isSpkiPem(value: string): boolean {
+  return /^-----BEGIN PUBLIC KEY-----\n[A-Za-z0-9+/=\n]+-----END PUBLIC KEY-----\n?$/.test(value);
 }

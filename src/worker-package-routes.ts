@@ -1,9 +1,6 @@
 import { createHash } from "node:crypto";
 import { Hono, type Context } from "hono";
-import {
-  loadStoreAsync as defaultLoadStore,
-  type PacketAgentData,
-} from "./packetagent-store.js";
+import { loadStoreAsync as defaultLoadStore, type PacketAgentData } from "./packetagent-store.js";
 import { redactedErrorMessage } from "./security/redaction.js";
 import { projectAttention, projectControlResult } from "./worker-operator-routes.js";
 import {
@@ -33,10 +30,15 @@ import {
 } from "./workers/package/trust.js";
 import {
   PACKET_PRODUCT_OPERATIONS,
+  PACKET_PRODUCT_SIGNING_KEY_ALGORITHM,
+  PACKET_PRODUCT_SIGNING_KEY_SCHEMA_VERSION,
   packetProductCredentialMetadata,
 } from "./workers/package/trust-types.js";
 import {
+  PACKET_PRODUCT_SOURCE_IDENTITIES,
   WORKER_PACKAGE_CANONICALIZATION,
+  WORKER_PACKAGE_DIGEST_ALGORITHM,
+  WORKER_PACKAGE_DSSE_PAYLOAD_TYPE,
   WORKER_PACKAGE_SCHEMA_VERSION,
 } from "./workers/package/types.js";
 import { WorkerLifecycleError } from "./workers/errors.js";
@@ -97,9 +99,11 @@ export function createWorkerPackageRoutes(
         contractSchemaVersion: WORKER_PACKAGE_CONTRACT_DESCRIPTOR_SCHEMA_VERSION,
         schemaVersion: WORKER_PACKAGE_SCHEMA_VERSION,
         canonicalization: WORKER_PACKAGE_CANONICALIZATION,
+        sourceIdentities: PACKET_PRODUCT_SOURCE_IDENTITIES.map((identity) => ({ ...identity })),
         supportedOperations: [...PACKET_PRODUCT_OPERATIONS],
         credential: {
           id: metadata.id,
+          product: metadata.product,
           subjectId: metadata.subjectId,
           ...(metadata.displayName ? { displayName: metadata.displayName } : {}),
           allowedOperations: [...metadata.allowedOperations],
@@ -107,11 +111,39 @@ export function createWorkerPackageRoutes(
           status: metadata.status,
           ...(metadata.expiresAt ? { expiresAt: metadata.expiresAt } : {}),
         },
+        signing: {
+          envelope: "dsse/v1",
+          payloadType: WORKER_PACKAGE_DSSE_PAYLOAD_TYPE,
+          payloadEncoding: "base64",
+          payloadSubject: `canonical package subject bytes (${WORKER_PACKAGE_CANONICALIZATION}, excluding integrity.digest and integrity.dsseEnvelope)`,
+          signedMessage: "PAE(UTF8(payloadType), payload)",
+          algorithm: PACKET_PRODUCT_SIGNING_KEY_ALGORITHM,
+          digestAlgorithm: WORKER_PACKAGE_DIGEST_ALGORITHM,
+          signatureEncoding: "base64",
+          keyRegistry: {
+            signingKeySchemaVersion: PACKET_PRODUCT_SIGNING_KEY_SCHEMA_VERSION,
+            scope: "workspace",
+            keyidBinding:
+              "integrity.dsseEnvelope.signatures[].keyid must equal the keyid of an active Ed25519 public key registered in this workspace",
+            registration:
+              "node --import tsx src/db/cli.ts packet-product-signing-key add --workspace <id> --keyid <id> --public-key-file <spki.pem>",
+          },
+          activeKeys: (data.packetProductSigningKeys ?? [])
+            .filter(
+              (record) => record.workspaceId === context.workspaceId && record.status === "active",
+            )
+            .sort((left, right) => left.keyid.localeCompare(right.keyid))
+            .map((record) => ({
+              keyid: record.keyid,
+              algorithm: record.algorithm,
+              fingerprint: record.fingerprint,
+              product: record.product,
+            })),
+        },
         events: {
           eventSchemaVersion: PACKET_PRODUCT_WORKER_EVENT_SCHEMA_VERSION,
           eventPageSchemaVersion: PACKET_PRODUCT_EVENT_PAGE_SCHEMA_VERSION,
-          eventAcknowledgementSchemaVersion:
-            PACKET_PRODUCT_EVENT_ACKNOWLEDGEMENT_SCHEMA_VERSION,
+          eventAcknowledgementSchemaVersion: PACKET_PRODUCT_EVENT_ACKNOWLEDGEMENT_SCHEMA_VERSION,
         },
         evidence: {
           evidenceSchemaVersion: WORKER_EVIDENCE_SCHEMA_VERSION,
@@ -164,8 +196,7 @@ export function createWorkerPackageRoutes(
       const data = await loadStore();
       validateWorkerPersistence(data);
       const attention = data.workerAttentionRequests.find(
-        (record) =>
-          record.workspaceId === auth.workspaceId && record.id === attentionRequestId,
+        (record) => record.workspaceId === auth.workspaceId && record.id === attentionRequestId,
       );
       if (!attention) {
         throw new WorkerLifecycleError(

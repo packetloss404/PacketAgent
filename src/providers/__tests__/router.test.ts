@@ -151,3 +151,37 @@ test("setRoute overrides a route in the table", () => {
   router.setRoute("workflow.draft", { provider: "ollama", model: "llama3.2" });
   assert.deepEqual(router.resolve("workflow.draft"), { provider: "ollama", model: "llama3.2" });
 });
+
+test("route-level effort reaches the provider unless the caller overrides it", async () => {
+  const seen: (string | undefined)[] = [];
+  const router = new ProviderRouter({
+    "agent.reasoning": { provider: "anthropic", model: "claude-opus-4-7", effort: "medium" },
+  });
+  router.register("anthropic", {
+    name: "anthropic",
+    async call(opts) {
+      seen.push(opts.effort);
+      return {
+        content: "",
+        finishReason: "stop",
+        usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 },
+        model: opts.model,
+        providerName: "anthropic",
+      };
+    },
+    async *stream(opts) {
+      seen.push(opts.effort);
+      yield { done: true, usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 } };
+    },
+    async models() {
+      return [];
+    },
+  });
+  const base = { workspaceId: "ws", routeKey: "agent.reasoning", messages: [] };
+  await router.call(base);
+  await router.call({ ...base, effort: "max" });
+  for await (const _chunk of router.stream(base)) {
+    // drain
+  }
+  assert.deepEqual(seen, ["medium", "max", "medium"]);
+});

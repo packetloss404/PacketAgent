@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { I } from "../icons";
 import { Topbar } from "../Shell";
+import { useMutation } from "../useMutation";
+import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
 import type {
   AgentRunDetailPayload,
@@ -21,6 +23,10 @@ import {
 
 type RunAction = "cancel" | "retry" | "diagnose";
 
+type RunActionResult =
+  | { action: "cancel" | "retry"; run: AgentRunRecord }
+  | { action: "diagnose"; diagnostic: Awaited<ReturnType<typeof api.diagnoseAgentRun>> };
+
 interface LoadedRunDetail extends AgentRunDetailPayload {
   agentName?: string;
   legacyFallback?: boolean;
@@ -38,9 +44,7 @@ function RunDeepContent({ id }: { id: string }) {
   const [agentName, setAgentName] = useState<string>("");
   const [legacyFallback, setLegacyFallback] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionBusy, setActionBusy] = useState<RunAction | null>(null);
   const [diagnostic, setDiagnostic] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,51 +70,32 @@ function RunDeepContent({ id }: { id: string }) {
 
   const traceSummary = useMemo(() => summarizeTrace(trace), [trace]);
 
-  const handleCancel = async () => {
-    if (!run) return;
-    setActionBusy("cancel");
-    setActionError(null);
-    try {
-      const next = await api.cancelAgentRun(run.id);
-      setRun(next);
-    } catch (e) {
-      setActionError((e as Error).message);
-    } finally {
-      setActionBusy(null);
-    }
-  };
-
-  const handleRetry = async () => {
-    if (!run) return;
-    setActionBusy("retry");
-    setActionError(null);
-    try {
-      const next = await api.retryAgentRun(run.id);
-      if (next.id !== run.id) {
-        navigate(`/runs/${next.id}`);
-      } else {
-        setRun(next);
+  const runAction = useMutation(
+    async (action: RunAction): Promise<RunActionResult> => {
+      if (!run) throw new Error("Run is not loaded yet.");
+      switch (action) {
+        case "cancel":
+          return { action, run: await api.cancelAgentRun(run.id) };
+        case "retry":
+          return { action, run: await api.retryAgentRun(run.id) };
+        case "diagnose":
+          return { action, diagnostic: await api.diagnoseAgentRun(run.id) };
       }
-    } catch (e) {
-      setActionError((e as Error).message);
-    } finally {
-      setActionBusy(null);
-    }
-  };
-
-  const handleDiagnose = async () => {
-    if (!run) return;
-    setActionBusy("diagnose");
-    setActionError(null);
-    try {
-      const d = await api.diagnoseAgentRun(run.id);
-      setDiagnostic(d?.summary ?? "No diagnostic available.");
-    } catch (e) {
-      setActionError((e as Error).message);
-    } finally {
-      setActionBusy(null);
-    }
-  };
+    },
+    {
+      inlineError: true,
+      onSuccess: (result) => {
+        if (result.action === "diagnose") {
+          setDiagnostic(result.diagnostic?.summary ?? "No diagnostic available.");
+        } else if (result.action === "retry" && run && result.run.id !== run.id) {
+          navigate(`/runs/${result.run.id}`);
+        } else {
+          setRun(result.run);
+        }
+      },
+    },
+  );
+  const actionBusy = runAction.activeInput;
 
   if (loading) {
     return (
@@ -154,10 +139,8 @@ function RunDeepContent({ id }: { id: string }) {
               <button
                 type="button"
                 className="top-btn"
-                disabled={Boolean(actionBusy)}
-                onClick={() => {
-                  void handleCancel();
-                }}
+                disabled={runAction.pending}
+                onClick={() => void runAction.run("cancel")}
               >
                 {actionBusy === "cancel" ? (
                   <span className="spin">
@@ -173,10 +156,8 @@ function RunDeepContent({ id }: { id: string }) {
               <button
                 type="button"
                 className="top-btn"
-                disabled={Boolean(actionBusy)}
-                onClick={() => {
-                  void handleRetry();
-                }}
+                disabled={runAction.pending}
+                onClick={() => void runAction.run("retry")}
               >
                 {actionBusy === "retry" ? (
                   <span className="spin">
@@ -191,10 +172,8 @@ function RunDeepContent({ id }: { id: string }) {
             <button
               type="button"
               className="top-btn"
-              disabled={Boolean(actionBusy)}
-              onClick={() => {
-                void handleDiagnose();
-              }}
+              disabled={runAction.pending}
+              onClick={() => void runAction.run("diagnose")}
             >
               {actionBusy === "diagnose" ? (
                 <span className="spin">
@@ -252,11 +231,7 @@ function RunDeepContent({ id }: { id: string }) {
           {legacyFallback && <span className="pill muted">legacy detail</span>}
         </div>
 
-        {actionError && (
-          <Notice tone="danger" label="Action error">
-            {actionError}
-          </Notice>
-        )}
+        <MutationError error={runAction.error} />
 
         {run.error && (
           <Notice tone="danger" label="Run error">

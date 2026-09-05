@@ -53,12 +53,18 @@ const RECORD_COLLECTIONS = [
   "apiKeys",
   "shareTokens",
   "workerCredentials",
+  "packetProductSigningKeys",
   "workerBudgetReservations",
   "workerAttentionRequests",
   "workerApprovalGrants",
   "workerControlCommands",
   "workerNotificationDeliveries",
 ] as const satisfies readonly StoreCollectionKey[];
+
+/** True when the collection is persisted in `app_records` and can be read there. */
+export function isSqliteRecordCollection(collection: string): boolean {
+  return (RECORD_COLLECTIONS as readonly string[]).includes(collection);
+}
 
 const MAP_COLLECTIONS = [
   "activationFacts",
@@ -490,7 +496,7 @@ function recordsForCollection(
   if (collection === "workspaceBriefs") return workspaceBriefEntries(data.workspaceBriefs);
   if (collection === "releaseConfirmations")
     return releaseConfirmationEntries(data.releaseConfirmations);
-  return data[collection] as unknown[];
+  return (data[collection] ?? []) as unknown[];
 }
 
 function recordId(collection: StoreCollectionKey, payload: unknown): string {

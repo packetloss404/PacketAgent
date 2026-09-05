@@ -159,6 +159,11 @@ export function assertCheckpointDigest(checkpoint: WorkerCheckpoint): void {
   }
 }
 
+/**
+ * The run ledger may have consumed more than the checkpoint recorded (lease
+ * heartbeats advance usage between checkpoints), but it can never have more
+ * remaining budget than the checkpoint it resumes from.
+ */
 function assertCheckpointBudget(
   checkpoint: WorkerCheckpoint,
   usage: WorkerBudgetUsage,
@@ -166,9 +171,9 @@ function assertCheckpointBudget(
 ): void {
   const expected = remainingWorkerBudget(limits, usage);
   for (const key of Object.keys(expected) as Array<keyof WorkerRemainingBudget>) {
-    if (Math.abs(expected[key] - checkpoint.remainingBudget[key]) > Number.EPSILON) {
+    if (expected[key] > checkpoint.remainingBudget[key] + Number.EPSILON) {
       throw new WorkerCheckpointRecoveryError(
-        `Checkpoint ${checkpoint.id} remaining ${key} does not match the run budget ledger.`,
+        `Checkpoint ${checkpoint.id} remaining ${key} is below the run budget ledger.`,
       );
     }
   }

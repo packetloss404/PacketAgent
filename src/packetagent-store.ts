@@ -85,6 +85,7 @@ import {
   sqliteIndexedRecords as sqliteIndexedRecordsImpl,
   sqliteStoreBackend,
   sqliteWorkspaceRecords as sqliteWorkspaceRecordsImpl,
+  isSqliteRecordCollection,
 } from "./store/backends/sqlite.js";
 import { managedDatabaseAsyncStoreBackend } from "./store/backends/managed-postgres.js";
 
@@ -243,9 +244,12 @@ export function mutateStore<T>(mutator: (data: PacketAgentData) => T): T {
     return mutateSqliteStore(resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE), mutator);
   }
 
-  const data = loadStore();
+  // Mutate a private snapshot so a throwing mutator cannot leak partial
+  // changes through the process cache (matches mutateStoreAsync).
+  const data = structuredClone(loadStore());
   const result = mutator(data);
   persistStore(data);
+  setCachedStore(data, currentStoreBackend().key);
   return result;
 }
 
@@ -384,6 +388,9 @@ function sqliteWorkspaceRecords<K extends WorkspaceRecordCollectionKey>(
   limit: number | undefined,
 ): WorkspaceRecordCollectionMap[K][] | null {
   if (process.env.PACKETAGENT_STORE !== "sqlite") return null;
+  // Collections promoted to dedicated tables are never written to app_records;
+  // an indexed read there would return [] instead of falling back.
+  if (!isSqliteRecordCollection(collection)) return null;
   const dbPath = resolve(process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
   return sqliteWorkspaceRecordsImpl(dbPath, collection, workspaceId, orderBy, limit);
 }

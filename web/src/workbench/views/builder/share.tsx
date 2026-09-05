@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../icons";
+import { useMutation } from "../../useMutation";
+import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
+
+const MINT_FAILED = "Could not mint a preview link. Apply the app and try again.";
 
 export function SharePopover({ appId }: { appId: string | null }) {
   const [open, setOpen] = useState(false);
@@ -31,16 +35,6 @@ export function SharePopover({ appId }: { appId: string | null }) {
     return () => window.clearTimeout(handle);
   }, [copiedKey]);
 
-  const mintTokenUrl = async (): Promise<string | null> => {
-    if (!appId) return null;
-    try {
-      const { previewUrl } = await api.createPreviewToken(appId, { scope: "read" });
-      return previewUrl;
-    } catch {
-      return null;
-    }
-  };
-
   const copyText = async (text: string) => {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
@@ -56,16 +50,21 @@ export function SharePopover({ appId }: { appId: string | null }) {
     document.body.removeChild(tmp);
   };
 
-  const copyLocal = async () => {
-    try {
-      const target =
-        (await mintTokenUrl()) ?? (typeof window !== "undefined" ? window.location.href : "");
-      await copyText(target);
-      setCopiedKey("local");
-    } catch {
-      setCopiedKey(null);
-    }
-  };
+  const copyLocal = useMutation(
+    async () => {
+      // Falling back to window.location.href would copy the authenticated
+      // workbench URL and report success for a link that cannot work.
+      if (!appId) throw new Error(MINT_FAILED);
+      const { previewUrl } = await api.createPreviewToken(appId, { scope: "read" });
+      if (!previewUrl) throw new Error(MINT_FAILED);
+      await copyText(previewUrl);
+    },
+    {
+      onSuccess: () => setCopiedKey("local"),
+      onError: () => setCopiedKey(null),
+      inlineError: true,
+    },
+  );
 
   const ShareIcon = I.share ?? I.link;
 
@@ -117,10 +116,12 @@ export function SharePopover({ appId }: { appId: string | null }) {
             label="Copy isolated preview link"
             hint="Read-only link expires in 1 hour · works wherever the configured preview hostname resolves"
             copied={copiedKey === "local"}
+            disabled={copyLocal.pending}
             onClick={() => {
-              void copyLocal();
+              void copyLocal.run();
             }}
           />
+          <MutationError inline error={copyLocal.error} />
           <div
             style={{
               borderTop: "1px solid var(--line)",
@@ -145,16 +146,19 @@ function ShareOptionButton({
   label,
   hint,
   copied,
+  disabled = false,
   onClick,
 }: {
   label: string;
   hint?: string;
   copied: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
       style={{
         textAlign: "left",

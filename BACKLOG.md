@@ -209,8 +209,11 @@ endpoints and credentials and is not an automatic implementation loop.
       PacketPhone adapters against fake endpoints; race local and remote
       actions; rotate credentials; restart with pending deliveries; replay
       callbacks; and verify dead-letter recovery.
-- [ ] Run live PacketChat and PacketPhone interoperability checks when those
-      endpoints and credentials are available.
+- [ ] Run live PacketChat and PacketPhone interoperability checks. As of
+      2026-08-31 PacketChat has no W10 ingestion/card route or durable scoped
+      service credential, so its live probe is product-blocked rather than
+      merely missing local configuration. PacketPhone still requires a real
+      endpoint and credential.
 - Gate: passed locally 2026-07-28. Fake-endpoint adapters, both local/remote
   race orderings, credential rotation, pending-delivery restart, read-only and
   single-use callback replay semantics, and bounded audited dead-letter redrive

@@ -127,12 +127,14 @@ async function j<T>(url: string, init?: RequestInit): Promise<T> {
   const csrfToken = csrfTokenForRequest(init);
   const response = await fetch(url, {
     credentials: "include",
+    ...init,
+    // Spread `init` first: a caller-supplied `headers` object must be merged
+    // with the CSRF token and content type, not replace them.
     headers: {
       "Content-Type": "application/json",
       ...(csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {}),
       ...(init?.headers ?? {}),
     },
-    ...init,
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -140,9 +142,11 @@ async function j<T>(url: string, init?: RequestInit): Promise<T> {
       typeof payload?.error === "string"
         ? payload.error
         : `${response.status} ${response.statusText}`,
-    ) as Error & { status?: number };
+    ) as Error & { status?: number; surfaced?: boolean };
     error.status = response.status;
     if (response.status === 401 && !url.includes("/api/auth/")) {
+      // Session expiry is announced once (throttled); callers must not re-toast it.
+      error.surfaced = true;
       const now = Date.now();
       if (now - lastAuthToastAt > 4000) {
         lastAuthToastAt = now;
@@ -153,6 +157,7 @@ async function j<T>(url: string, init?: RequestInit): Promise<T> {
         });
       }
     } else if (response.status >= 500) {
+      error.surfaced = true;
       pushExternalToast({
         tone: "error",
         title: "Server error",

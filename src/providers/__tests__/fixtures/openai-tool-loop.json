@@ -1,0 +1,233 @@
+{
+  "$comment": "Recorded Chat Completions transcripts in the shapes the openai SDK returns them, replayed by strict-openai-server.ts. tool_calls[].arguments is the raw JSON text the model produced; malformed text stands in for a garbled tool call. `chunks` turns are raw stream chunks and are only served with stream: true.",
+  "model": "gpt-4o",
+  "scenarios": {
+    "text_only": {
+      "description": "Plain answer, no tools used.",
+      "turns": [
+        {
+          "completion": {
+            "id": "chatcmpl_text_only_1",
+            "content": "Lisbon is the capital of Portugal.",
+            "finish_reason": "stop",
+            "usage": { "prompt_tokens": 140, "completion_tokens": 10 }
+          }
+        }
+      ]
+    },
+    "single_tool_call": {
+      "description": "One tool call with null content, then a final answer.",
+      "turns": [
+        {
+          "completion": {
+            "id": "chatcmpl_single_1",
+            "content": null,
+            "tool_calls": [
+              { "id": "call_A1", "name": "get_weather", "arguments": "{\"city\":\"Lisbon\"}" }
+            ],
+            "finish_reason": "tool_calls",
+            "usage": { "prompt_tokens": 205, "completion_tokens": 18 }
+          }
+        },
+        {
+          "completion": {
+            "id": "chatcmpl_single_2",
+            "content": "It is 24C and sunny in Lisbon.",
+            "finish_reason": "stop",
+            "usage": { "prompt_tokens": 260, "completion_tokens": 12 }
+          }
+        }
+      ]
+    },
+    "parallel_tool_calls": {
+      "description": "Two tool_calls in one assistant turn; each needs its own tool message.",
+      "turns": [
+        {
+          "completion": {
+            "id": "chatcmpl_parallel_1",
+            "content": null,
+            "tool_calls": [
+              { "id": "call_B1", "name": "get_weather", "arguments": "{\"city\":\"Oslo\"}" },
+              { "id": "call_B2", "name": "get_time", "arguments": "{\"zone\":\"Europe/Oslo\"}" }
+            ],
+            "finish_reason": "tool_calls",
+            "usage": { "prompt_tokens": 208, "completion_tokens": 40 }
+          }
+        },
+        {
+          "completion": {
+            "id": "chatcmpl_parallel_2",
+            "content": "Oslo: 24C and sunny, local time 09:30.",
+            "finish_reason": "stop",
+            "usage": { "prompt_tokens": 330, "completion_tokens": 16 }
+          }
+        }
+      ]
+    },
+    "malformed_then_correction": {
+      "description": "The first turn carries one garbled tool call next to a valid one; the loop must answer both ids, ask for a correction, and only execute the corrected call.",
+      "turns": [
+        {
+          "completion": {
+            "id": "chatcmpl_malformed_1",
+            "content": null,
+            "tool_calls": [
+              { "id": "call_C1", "name": "get_weather", "arguments": "{\"city\": \"Lisbon\"" },
+              { "id": "call_C2", "name": "get_time", "arguments": "{\"zone\":\"Europe/Lisbon\"}" }
+            ],
+            "finish_reason": "tool_calls",
+            "usage": { "prompt_tokens": 206, "completion_tokens": 33 }
+          }
+        },
+        {
+          "completion": {
+            "id": "chatcmpl_malformed_2",
+            "content": null,
+            "tool_calls": [
+              { "id": "call_C3", "name": "get_weather", "arguments": "{\"city\":\"Lisbon\"}" }
+            ],
+            "finish_reason": "tool_calls",
+            "usage": { "prompt_tokens": 320, "completion_tokens": 18 }
+          }
+        },
+        {
+          "completion": {
+            "id": "chatcmpl_malformed_3",
+            "content": "Lisbon is 24C and sunny.",
+            "finish_reason": "stop",
+            "usage": { "prompt_tokens": 380, "completion_tokens": 10 }
+          }
+        }
+      ]
+    },
+    "refusal": {
+      "description": "Model refused: finish_reason content_filter with a refusal message.",
+      "turns": [
+        {
+          "completion": {
+            "id": "chatcmpl_refusal_1",
+            "content": null,
+            "refusal": "I can't help with that request.",
+            "finish_reason": "content_filter",
+            "usage": { "prompt_tokens": 170, "completion_tokens": 9 }
+          }
+        }
+      ]
+    },
+    "streaming_tool_input_deltas": {
+      "description": "Recorded stream: content deltas, then a tool call whose arguments arrive in fragments; the second turn is served non-streaming after the loop replays the streamed call.",
+      "turns": [
+        {
+          "chunks": [
+            {
+              "id": "chatcmpl_stream_1",
+              "object": "chat.completion.chunk",
+              "created": 1700000100,
+              "model": "gpt-4o",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": { "role": "assistant", "content": "" },
+                  "finish_reason": null,
+                  "logprobs": null
+                }
+              ]
+            },
+            {
+              "id": "chatcmpl_stream_1",
+              "object": "chat.completion.chunk",
+              "created": 1700000100,
+              "model": "gpt-4o",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": { "content": "Checking the weather." },
+                  "finish_reason": null,
+                  "logprobs": null
+                }
+              ]
+            },
+            {
+              "id": "chatcmpl_stream_1",
+              "object": "chat.completion.chunk",
+              "created": 1700000100,
+              "model": "gpt-4o",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "tool_calls": [
+                      {
+                        "index": 0,
+                        "id": "call_S1",
+                        "type": "function",
+                        "function": { "name": "get_weather", "arguments": "" }
+                      }
+                    ]
+                  },
+                  "finish_reason": null,
+                  "logprobs": null
+                }
+              ]
+            },
+            {
+              "id": "chatcmpl_stream_1",
+              "object": "chat.completion.chunk",
+              "created": 1700000100,
+              "model": "gpt-4o",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": { "tool_calls": [{ "index": 0, "function": { "arguments": "{\"ci" } }] },
+                  "finish_reason": null,
+                  "logprobs": null
+                }
+              ]
+            },
+            {
+              "id": "chatcmpl_stream_1",
+              "object": "chat.completion.chunk",
+              "created": 1700000100,
+              "model": "gpt-4o",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "tool_calls": [{ "index": 0, "function": { "arguments": "ty\":\"Oslo\"}" } }]
+                  },
+                  "finish_reason": null,
+                  "logprobs": null
+                }
+              ]
+            },
+            {
+              "id": "chatcmpl_stream_1",
+              "object": "chat.completion.chunk",
+              "created": 1700000100,
+              "model": "gpt-4o",
+              "choices": [
+                { "index": 0, "delta": {}, "finish_reason": "tool_calls", "logprobs": null }
+              ]
+            },
+            {
+              "id": "chatcmpl_stream_1",
+              "object": "chat.completion.chunk",
+              "created": 1700000100,
+              "model": "gpt-4o",
+              "choices": [],
+              "usage": { "prompt_tokens": 205, "completion_tokens": 22, "total_tokens": 227 }
+            }
+          ]
+        },
+        {
+          "completion": {
+            "id": "chatcmpl_stream_2",
+            "content": "Oslo is 24C and sunny.",
+            "finish_reason": "stop",
+            "usage": { "prompt_tokens": 262, "completion_tokens": 9 }
+          }
+        }
+      ]
+    }
+  }
+}

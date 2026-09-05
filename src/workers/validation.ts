@@ -308,7 +308,7 @@ function validateActor(value: unknown, path: string, issues: IssueCollector): vo
     enumAt(
       actor,
       "product",
-      ["PacketADE", "PacketAgent", "PacketChat", "PacketCode", "PacketPhone"],
+      ["PacketBench", "PacketADE", "PacketAgent", "PacketChat", "PacketCode", "PacketPhone"],
       path,
       issues,
     );
@@ -329,14 +329,14 @@ function validateProvenance(value: unknown, path: string, issues: IssueCollector
   const product = enumAt(
     source,
     "product",
-    ["PacketADE", "PacketAgent", "PacketChat", "PacketCode", "PacketPhone"],
+    ["PacketBench", "PacketADE", "PacketAgent", "PacketChat", "PacketCode", "PacketPhone"],
     path,
     issues,
   );
   const kind = enumAt(
     source,
     "kind",
-    ["native", "packetade", "legacy_agent", "legacy_workflow"],
+    ["native", "packetbench", "packetade", "legacy_agent", "legacy_workflow"],
     path,
     issues,
   );
@@ -364,6 +364,22 @@ function validateProvenance(value: unknown, path: string, issues: IssueCollector
       `${path}.kind`,
       "provenance.packetade_kind",
       "must be packetade when product is PacketADE",
+    );
+  }
+  if (kind === "packetbench" && product !== "PacketBench") {
+    issue(
+      issues,
+      `${path}.product`,
+      "provenance.packetbench_product",
+      "must be PacketBench when kind is packetbench",
+    );
+  }
+  if (product === "PacketBench" && kind !== "packetbench") {
+    issue(
+      issues,
+      `${path}.kind`,
+      "provenance.packetbench_kind",
+      "must be packetbench when product is PacketBench",
     );
   }
   if ((kind === "legacy_agent" || kind === "legacy_workflow") && source.sourceId === undefined) {

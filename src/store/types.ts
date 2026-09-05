@@ -31,6 +31,7 @@ import type {
 } from "../workers/control-types.js";
 import type {
   PacketProductCredentialRecord,
+  PacketProductSigningKeyRecord,
   WorkerPackageDeploymentRecord,
   WorkerPackageReceipt,
 } from "../workers/package/trust-types.js";
@@ -877,6 +878,11 @@ export interface PacketAgentData {
   shareTokens: ShareTokenRecord[];
   workerCredentials: WorkerCredentialRecord[];
   packetProductCredentials: PacketProductCredentialRecord[];
+  /**
+   * Optional like `generatedApps` so stores and fixtures persisted before the
+   * registry existed remain valid; `normalizeStore` always materializes it.
+   */
+  packetProductSigningKeys?: PacketProductSigningKeyRecord[];
   workerPackageReceipts: WorkerPackageReceipt[];
   workerPackageDeployments: WorkerPackageDeploymentRecord[];
   packetProductEventAcknowledgements: PacketProductEventAcknowledgementRecord[];

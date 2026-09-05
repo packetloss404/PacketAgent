@@ -1496,3 +1496,46 @@ function insertLegacyActivationSignalAppRecord(
     db.close();
   }
 }
+
+test("json mutateStore does not leak a throwing mutator's changes into the cache", () => {
+  const previousStore = process.env.PACKETAGENT_STORE;
+  try {
+    delete process.env.PACKETAGENT_STORE;
+    resetStoreForTests();
+
+    assert.throws(() => {
+      mutateStore((data) => {
+        upsertRequirement(
+          data,
+          {
+            id: "req_json_rollback",
+            workspaceId: "alpha",
+            title: "Rolled back requirement",
+            detail: "Should not persist after a mutator failure.",
+            priority: "must",
+            status: "draft",
+            source: "test",
+            createdByUserId: "user_alpha",
+          },
+          "2026-02-05T00:00:00.000Z",
+        );
+        throw new Error("stop mutation");
+      });
+    }, /stop mutation/);
+
+    assert.equal(
+      loadStore().requirements.some((entry) => entry.id === "req_json_rollback"),
+      false,
+      "the shared cache must not carry the partial mutation",
+    );
+    clearStoreCacheForTests();
+    assert.equal(
+      loadStore().requirements.some((entry) => entry.id === "req_json_rollback"),
+      false,
+    );
+  } finally {
+    if (previousStore === undefined) delete process.env.PACKETAGENT_STORE;
+    else process.env.PACKETAGENT_STORE = previousStore;
+    resetStoreForTests();
+  }
+});

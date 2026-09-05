@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createSeedStore, type PacketAgentData } from "../../packetagent-store.js";
 import { createPacketProductTrustService, PacketProductTrustError } from "./trust.js";
-import { workerPackageDsseEnvelope } from "./validation.js";
+import { sealWorkerPackage, workerPackageDsseEnvelope } from "./validation.js";
 import type { WorkerPackage } from "./types.js";
 import { validateWorkerPersistence } from "../repository.js";
 
@@ -92,7 +92,7 @@ test("PacketADE credentials bind bearer authentication to workspace, actor, and 
 test("acceptPackage durably records integrity, provenance, local policy, and idempotency", async () => {
   const harness = makeHarness();
   const issued = await issueValidationCredential(harness);
-  const workerPackage = await readFixture();
+  const workerPackage = asPacketBenchPackage(await readFixture());
 
   const accepted = await harness.service.acceptPackage({
     authorization: `Bearer ${issued.token}`,
@@ -112,12 +112,16 @@ test("acceptPackage durably records integrity, provenance, local policy, and ide
   assert.equal(accepted.replayed, false);
   assert.equal(harness.data.workerPackageReceipts.length, 1);
   assert.equal(harness.data.workerDeployments.length, 0);
-  assert.equal(accepted.receipt.packageId, "packetade:flight-42:release-watcher");
+  assert.equal(accepted.receipt.packageId, "packetbench:flight-42:release-watcher");
   assert.equal(accepted.receipt.packageVersion, 1);
   assert.equal(accepted.receipt.integrity.digestVerified, true);
   assert.equal(accepted.receipt.integrity.verifiedSignatures, 0);
   assert.equal(accepted.receipt.source.flightId, "flight-42");
+  assert.equal(accepted.receipt.source.product, "PacketBench");
+  assert.equal(accepted.receipt.source.kind, "packetbench");
+  assert.equal(accepted.receipt.packageCreatedBy.product, "PacketBench");
   assert.equal(accepted.receipt.authenticatedActor.id, "packetade:flight-service");
+  assert.equal(accepted.receipt.authenticatedActor.product, "PacketADE");
   assert.deepEqual(accepted.receipt.capabilityDecision.acceptedCapabilityIds, ["release-read"]);
   assert.deepEqual(accepted.receipt.capabilityDecision.grants[0]!.resources, [
     "https://releases.example.test/stable",
@@ -333,6 +337,25 @@ async function issueValidationCredential(
 
 async function readFixture(): Promise<WorkerPackage> {
   return JSON.parse(await readFile(FIXTURE_URL, "utf8")) as WorkerPackage;
+}
+
+function asPacketBenchPackage(legacy: WorkerPackage): WorkerPackage {
+  const { integrity: _integrity, ...subject } = legacy;
+  return sealWorkerPackage({
+    ...subject,
+    packageId: legacy.packageId.replace(/^packetade:/, "packetbench:"),
+    idempotencyKey: legacy.idempotencyKey.replace(/^packetade:/, "packetbench:"),
+    createdBy: {
+      ...legacy.createdBy,
+      id: legacy.createdBy.id.replace(/^packetade:/, "packetbench:"),
+      product: "PacketBench",
+    },
+    source: {
+      ...legacy.source,
+      product: "PacketBench",
+      kind: "packetbench",
+    },
+  });
 }
 
 async function assertTrustError(

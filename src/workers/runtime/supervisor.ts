@@ -20,12 +20,15 @@ import {
 } from "./reducer.js";
 import { restoreWorkerSupervisorState, snapshotWorkerSupervisorState } from "./checkpoint.js";
 import { WorkerEffectInterruptionError, WorkerUnsafeReplayError } from "../effects.js";
+import { WorkerLifecycleError } from "../errors.js";
 import { resolveWorkerRollingBudgetPolicy } from "../budget-types.js";
 import { WorkerRollingBudgetExceededError } from "../rolling-budget.js";
 import type { ToolPolicyDecision, WorkerToolApprovalEvidence } from "../../tools/types.js";
 
 export const WORKER_SCHEDULER_SHUTDOWN_REASON = "packetagent.scheduler_shutdown";
 export const WORKER_OPERATOR_CANCEL_REASON = "packetagent.operator_cancelled";
+/** A pending operation renews its lease this many times per lease TTL. */
+const LEASE_HEARTBEATS_PER_TTL = 3;
 const WORKER_TOOL_ACTOR = {
   type: "system" as const,
   id: "packetagent.worker-supervisor",
@@ -152,6 +155,50 @@ export async function runWorkerSupervisor(
     });
   };
 
+  const leaseHeartbeatMs = (): number => {
+    const ttlMs = Date.parse(lease.expiresAt) - Date.parse(lease.renewedAt);
+    const remainingMs = Date.parse(lease.expiresAt) - ports.clock.now().getTime();
+    const basisMs = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : remainingMs;
+    return Math.max(1, Math.floor(basisMs / LEASE_HEARTBEATS_PER_TTL));
+  };
+
+  /**
+   * Keeps the execution lease alive while a single operation is pending.
+   * Renewal also carries the current usage snapshot so the run ledger advances
+   * even if the lease is genuinely lost before the next checkpoint. Resolves
+   * with "lost" only when the store affirmatively reports the lease is no
+   * longer ours, or a renewal could not be completed before expiry.
+   */
+  const keepLeaseAlive = async (guard: AbortSignal): Promise<"lost" | "released"> => {
+    for (;;) {
+      try {
+        await ports.clock.sleep(leaseHeartbeatMs(), guard);
+      } catch {
+        return "released";
+      }
+      if (guard.aborted) return "released";
+      observeElapsed();
+      const now = ports.clock.now();
+      let renewed: WorkerLease | null;
+      try {
+        renewed = await ports.leases.renew({
+          workspaceId: context.run.workspaceId,
+          workerRunId: context.run.id,
+          lease,
+          now,
+          budgetUsage: state.usage,
+        });
+      } catch {
+        if (guard.aborted) return "released";
+        if (Date.parse(lease.expiresAt) <= ports.clock.now().getTime()) return "lost";
+        continue;
+      }
+      if (guard.aborted) return "released";
+      if (!renewed) return "lost";
+      lease = renewed;
+    }
+  };
+
   const awaitBounded = async <T>(
     operation: (operationSignal: AbortSignal) => Promise<T>,
   ): Promise<T> => {
@@ -159,10 +206,8 @@ export async function runWorkerSupervisor(
     inspectSignal();
     if (state.terminal) throw new WorkerAwaitDeadlineError();
     const remainingMs = Math.max(1, limits.maxElapsedMs - state.usage.elapsedMs);
-    const leaseRemainingMs = Math.max(1, Date.parse(lease.expiresAt) - ports.clock.now().getTime());
-    const deadlineMs = Math.min(remainingMs, leaseRemainingMs);
     const operationController = new AbortController();
-    const timeoutController = new AbortController();
+    const guardController = new AbortController();
     let rejectAbort: ((error: Error) => void) | undefined;
     const onAbort = (): void => {
       operationController.abort(signal.reason);
@@ -173,21 +218,29 @@ export async function runWorkerSupervisor(
       rejectAbort = reject;
       if (signal.aborted) onAbort();
     });
-    const timeout = ports.clock.sleep(deadlineMs, timeoutController.signal).then(() => {
+    const deadline = ports.clock.sleep(remainingMs, guardController.signal).then(() => {
       operationController.abort("elapsed_time");
-      if (leaseRemainingMs <= remainingMs) {
-        state = reduceWorkerSupervisor(state, {
-          type: "cancelled",
-          reason: "lease_lost",
-        });
-        throw new WorkerRuntimeReleasedError("lease_lost");
-      }
       throw new WorkerAwaitDeadlineError();
     });
+    let rejectLeaseLost: ((error: Error) => void) | undefined;
+    const leaseLost = new Promise<never>((_resolve, reject) => {
+      rejectLeaseLost = reject;
+    });
+    void keepLeaseAlive(guardController.signal).then((outcome) => {
+      if (outcome !== "lost" || guardController.signal.aborted) return;
+      state = reduceWorkerSupervisor(state, { type: "cancelled", reason: "lease_lost" });
+      operationController.abort("lease_lost");
+      rejectLeaseLost?.(new WorkerRuntimeReleasedError("lease_lost"));
+    });
     try {
-      return await Promise.race([operation(operationController.signal), timeout, aborted]);
+      return await Promise.race([
+        operation(operationController.signal),
+        deadline,
+        leaseLost,
+        aborted,
+      ]);
     } finally {
-      timeoutController.abort();
+      guardController.abort();
       signal.removeEventListener("abort", onAbort);
       observeElapsed();
       inspectSignal();
@@ -228,6 +281,7 @@ export async function runWorkerSupervisor(
         workerRunId: context.run.id,
         lease,
         now,
+        budgetUsage: state.usage,
       }),
     );
     if (!renewed) {
@@ -788,19 +842,35 @@ export async function runWorkerSupervisor(
   if (!selected) {
     throw new Error("Worker supervisor stopped without a reducer-selected terminal outcome.");
   }
-  const run = await ports.runs.finalize({
-    context,
-    finalization: {
-      expectedRunRevision: runRevision,
-      fencingToken: lease.fencingToken,
-      status: selected.status,
-      terminalReason: selected.reason,
-      budgetUsage: state.usage,
-      ...(selected.output !== undefined ? { output: selected.output } : {}),
-      ...(selected.error !== undefined ? { error: selected.error } : {}),
-    },
-    now: ports.clock.now(),
-  });
+  let run: WorkerRun;
+  try {
+    run = await ports.runs.finalize({
+      context,
+      finalization: {
+        expectedRunRevision: runRevision,
+        fencingToken: lease.fencingToken,
+        status: selected.status,
+        terminalReason: selected.reason,
+        budgetUsage: state.usage,
+        ...(selected.output !== undefined ? { output: selected.output } : {}),
+        ...(selected.error !== undefined ? { error: selected.error } : {}),
+      },
+      now: ports.clock.now(),
+    });
+  } catch (error) {
+    // A fenced conflict at the terminal write means this supervisor no longer
+    // owns the run (lease replaced between heartbeats, or an operator moved
+    // it). Release rather than fail so the next attempt resolves it cleanly.
+    if (!(error instanceof WorkerLifecycleError) || error.code !== "conflict") throw error;
+    const control = await ports.cancellation.inspect({
+      workspaceId: context.run.workspaceId,
+      workerRunId: context.run.id,
+      workerDeploymentId: context.run.workerDeploymentId,
+    });
+    if (control.kind === "paused") throw new WorkerRuntimeReleasedError("operator_paused");
+    if (control.kind !== "active") throw new WorkerRuntimeReleasedError("operator_controlled");
+    throw new WorkerRuntimeReleasedError("lease_lost");
+  }
   await ports.leases.release({
     workspaceId: context.run.workspaceId,
     workerRunId: context.run.id,
@@ -878,7 +948,11 @@ async function callProvider(
     actualAmount: Math.max(0, result.usage.costUsd),
     now: ports.clock.now(),
   });
-  if (result.finishReason === "error" || result.finishReason === "length") {
+  if (
+    result.finishReason === "error" ||
+    result.finishReason === "length" ||
+    result.finishReason === "refusal"
+  ) {
     throw new WorkerProviderPhaseError(phase, result);
   }
   return result;

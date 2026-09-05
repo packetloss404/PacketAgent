@@ -32,6 +32,7 @@ import { WORKER_EFFECT_RECEIPT_SCHEMA_VERSION, type WorkerEffectReceipt } from "
 import { appendWorkerJournalEntry } from "./observability/journal.js";
 import {
   assertValidPacketProductCredentialRecord,
+  assertValidPacketProductSigningKeyRecord,
   assertValidWorkerPackageDeploymentRecord,
   assertValidWorkerPackageReceipt,
 } from "./package/trust-types.js";
@@ -371,6 +372,7 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
   try {
     data.workerCredentials.forEach(assertValidWorkerCredentialRecord);
     data.packetProductCredentials.forEach(assertValidPacketProductCredentialRecord);
+    (data.packetProductSigningKeys ?? []).forEach(assertValidPacketProductSigningKeyRecord);
     data.workerPackageReceipts.forEach(assertValidWorkerPackageReceipt);
     data.workerPackageDeployments.forEach(assertValidWorkerPackageDeploymentRecord);
     data.packetProductEventAcknowledgements.forEach(
@@ -393,6 +395,14 @@ export function validateWorkerPersistence(data: PacketAgentData): void {
     assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(data.workerCredentials, (record) => `${record.workspaceId}:${record.reference}`);
     assertUnique(data.packetProductCredentials, (record) => `${record.workspaceId}:${record.id}`);
+    assertUnique(
+      data.packetProductSigningKeys ?? [],
+      (record) => `${record.workspaceId}:${record.id}`,
+    );
+    assertUnique(
+      data.packetProductSigningKeys ?? [],
+      (record) => `${record.workspaceId}:${record.keyid}`,
+    );
     assertUnique(data.workerPackageReceipts, (record) => `${record.workspaceId}:${record.id}`);
     assertUnique(
       data.workerPackageReceipts,
