@@ -1,6 +1,6 @@
 # Codex project handoff
 
-Last updated: 2026-08-01.
+Last updated: 2026-09-01.
 
 This is the authoritative starting point when opening `D:\projects\PacketAgent`
 as a new project in the Codex app.
@@ -28,7 +28,9 @@ source remote.
 PacketAgent is the self-hosted, always-available runtime for autonomous
 workers in the Packet suite.
 
-- PacketADE plans, builds, and supervises development work.
+- PacketBench plans, builds, and supervises development work. PacketADE naming
+  remains only in the frozen W9 v1 compatibility identity and historical
+  records.
 - PacketCode is the terminal coding environment.
 - PacketChat is the conversational surface.
 - PacketPhone is the remote approval surface.
@@ -1132,10 +1134,12 @@ handoff, the roadmap, or the backlog.
 - `git diff --check` - passed
 - compatibility-only old-name scan - passed
 
-Known inherited quality debt:
+Current maintenance state:
 
-- full and production dependency audits each report two high package entries
-  for the same accepted, unreachable React Router RSC advisory; and
+- compatible dependency updates were refreshed on 2026-09-01; full and
+  production dependency audits report zero vulnerabilities;
+- current PacketBench and frozen PacketADE WorkerPackage v1 identity pairs are
+  both accepted without changing legacy credential or replay namespaces; and
 - ESLint is clean with zero errors and zero warnings.
 
 Do not use `npm audit fix --force` or format the entire repository as an

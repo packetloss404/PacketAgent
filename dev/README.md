@@ -4,19 +4,20 @@ Documentation for people working on PacketAgent - self-hosters running a node, c
 
 ## What's in here
 
-| Path                                                                   | Audience     | Purpose                                                                                                                      |
-| ---------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| [`../HANDOFF.md`](../HANDOFF.md)                                       | Contributors | Short, exact resume point for a new working session.                                                                         |
-| [`../BACKLOG.md`](../BACKLOG.md)                                       | Everyone     | Sole implementation ledger: completed PA0/W/R gates and explicitly decision-gated work.                                      |
-| [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md)                                 | Contributors | Detailed implementation inventory and verification history.                                                                  |
-| [`roadmap.md`](roadmap.md)                                             | Everyone     | Current state and what's next. No commitments - priority is set by issue activity.                                           |
-| [`worker-implementation-loops.md`](worker-implementation-loops.md)     | Contributors | Completed executable map for W2-W10 and R1-R8; not a second backlog.                                                         |
-| [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md) | Contributors | Versioned deployment and event contract between PacketADE and PacketAgent.                                                   |
-| [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)             | Operators    | Rename, repository, environment, and data-file compatibility notes.                                                          |
-| [`TESTING.md`](TESTING.md)                                             | Release      | Manual end-to-end smoke playbook run before tagging a release.                                                               |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md)                                   | Contributors | Onboarding: clone, run, test, conventions, PR flow.                                                                          |
-| [`deployment/`](deployment/)                                           | Self-hosters | Operator and self-host guides - `README.md`, `persistence.md`, `security.md`, `operations.md`, `email.md`, plus `examples/`. |
-| [`architecture/`](architecture/)                                       | Contributors | Design notes - `activation.md` and other subsystem write-ups.                                                                |
+| Path                                                                       | Audience     | Purpose                                                                                                                      |
+| -------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| [`../HANDOFF.md`](../HANDOFF.md)                                           | Contributors | Short, exact resume point for a new working session.                                                                         |
+| [`../BACKLOG.md`](../BACKLOG.md)                                           | Everyone     | Sole implementation ledger: completed PA0/W/R gates and explicitly decision-gated work.                                      |
+| [`CODEX-HANDOFF.md`](CODEX-HANDOFF.md)                                     | Contributors | Detailed implementation inventory and verification history.                                                                  |
+| [`roadmap.md`](roadmap.md)                                                 | Everyone     | Current state and what's next. No commitments - priority is set by issue activity.                                           |
+| [`worker-implementation-loops.md`](worker-implementation-loops.md)         | Contributors | Completed executable map for W2-W10 and R1-R8; not a second backlog.                                                         |
+| [`packetbench-packetagent-handoff.md`](packetbench-packetagent-handoff.md) | Contributors | Current PacketBench identity and additive WorkerPackage v1 compatibility rules.                                              |
+| [`packetade-packetagent-handoff.md`](packetade-packetagent-handoff.md)     | Contributors | Frozen pre-rename PacketADE deployment and event contract.                                                                   |
+| [`taskloom-to-packetagent.md`](taskloom-to-packetagent.md)                 | Operators    | Rename, repository, environment, and data-file compatibility notes.                                                          |
+| [`TESTING.md`](TESTING.md)                                                 | Release      | Manual end-to-end smoke playbook run before tagging a release.                                                               |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md)                                       | Contributors | Onboarding: clone, run, test, conventions, PR flow.                                                                          |
+| [`deployment/`](deployment/)                                               | Self-hosters | Operator and self-host guides - `README.md`, `persistence.md`, `security.md`, `operations.md`, `email.md`, plus `examples/`. |
+| [`architecture/`](architecture/)                                           | Contributors | Design notes - `activation.md` and other subsystem write-ups.                                                                |
 
 ## For self-hosters
 

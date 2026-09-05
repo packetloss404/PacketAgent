@@ -4,7 +4,7 @@
 
 PacketAgent is the self-hosted autonomous-worker runtime in the Packet suite.
 
-- PacketADE plans, builds, and supervises development work.
+- PacketBench plans, builds, and supervises development work.
 - PacketCode is the terminal coding environment.
 - PacketChat is the conversational surface.
 - PacketPhone is the mobile and remote approval surface.
@@ -43,7 +43,8 @@ Runtime branding and legacy migration constants live in `src/brand.ts`. Web bran
 - `BACKLOG.md` - master implementation ledger and loop gates.
 - `dev/worker-implementation-loops.md` - executable W2-W10 and inherited loop map.
 - `dev/worker-observability-plan.md` - W8 event, evidence, rollup, retention, API, and UI decisions.
-- `dev/packetade-packetagent-handoff.md` - PacketADE deployment contract.
+- `dev/packetbench-packetagent-handoff.md` - current PacketBench deployment contract.
+- `dev/packetade-packetagent-handoff.md` - frozen PacketADE v1 compatibility contract.
 - `dev/taskloom-to-packetagent.md` - rename and compatibility notes.
 - `CHANGELOG.md` - shipped history only.
 

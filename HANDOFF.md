@@ -1,6 +1,6 @@
 # PacketAgent handoff
 
-Updated 2026-08-01. This is the short resume document for a new working
+Updated 2026-09-01. This is the short resume document for a new working
 session. [`BACKLOG.md`](BACKLOG.md) is the sole implementation ledger;
 [`dev/CODEX-HANDOFF.md`](dev/CODEX-HANDOFF.md) retains the detailed shipped
 inventory and gate history.
@@ -19,6 +19,12 @@ independently stoppable or revocable. Use `PacketAgent`, `packetagent`, and
 ## Current status
 
 - PA0, W1-W10, and inherited R1-R8 are complete.
+- The PacketADE-to-PacketBench rename is supported additively at the W9 source
+  boundary. Current `PacketBench`/`packetbench` packages and frozen
+  `PacketADE`/`packetade` packages both validate, while legacy credentials and
+  replay namespaces remain stable.
+- Compatible dependency updates are current as of 2026-09-01; full and
+  production `npm audit` report zero vulnerabilities.
 - R7 closed the five-module ownership audit; introduced shared accessible
   async-state and tab primitives; centralized client formatting; documented a
   token-driven, incrementally migrated styling direction; and added component
@@ -46,8 +52,9 @@ Choose a new product objective only after the owner explicitly selects it.
 
 The highest-value known constraints, not automatic tasks, are:
 
-- live PacketChat and PacketPhone interoperability certification still needs
-  real external endpoints and credentials;
+- live PacketChat interoperability remains blocked because PacketChat has no
+  W10 ingestion/card endpoint or durable service credential; PacketPhone live
+  certification still needs a real external endpoint and credential;
 - hardened Worker-specific browser and SQL drivers remain unshipped and fail
   closed; and
 - hosted PacketAgent Cloud and the other items named in the decision-gated
