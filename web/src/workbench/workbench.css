@@ -1,6 +1,6 @@
 /* Workbench prototype — silver/grey/green-light system, scoped under .wb-root */
 
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap");
+@import url("../fonts.css");
 
 .wb-root.wb-root.wb-root {
   --bg: #0e1112;
