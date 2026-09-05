@@ -174,6 +174,7 @@ export function createSandboxRoutes(deps: SandboxRouteDeps = {}): Hono {
       service.events.on("exec.chunk", onChunk);
       service.events.on("exec.update", onUpdate);
       service.events.on("exec.done", onDone);
+      let finalize: ((record: SandboxExecRecord) => void) | undefined;
 
       try {
         await sse.writeSSE({ event: "status", data: JSON.stringify(initial) });
@@ -181,17 +182,21 @@ export function createSandboxRoutes(deps: SandboxRouteDeps = {}): Hono {
           await sse.writeSSE({ event: "done", data: JSON.stringify(initial) });
           return;
         }
+        // `once` would be consumed by the first exec.done for ANY exec on this
+        // process-wide emitter, leaving this stream open forever; listen with
+        // `on` and filter by id instead, and always detach in `finally`.
         await new Promise<void>((resolve) => {
-          const finalize = (record: SandboxExecRecord) => {
+          finalize = (record: SandboxExecRecord) => {
             if (record.id === id) resolve();
           };
-          service.events.once("exec.done", finalize);
+          service.events.on("exec.done", finalize);
           c.req.raw.signal.addEventListener("abort", () => resolve(), { once: true });
         });
       } finally {
         service.events.off("exec.chunk", onChunk);
         service.events.off("exec.update", onUpdate);
         service.events.off("exec.done", onDone);
+        if (finalize) service.events.off("exec.done", finalize);
       }
     });
   });

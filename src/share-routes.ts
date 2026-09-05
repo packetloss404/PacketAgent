@@ -70,13 +70,25 @@ shareRoutes.post("/", async (c) => {
         }),
       );
     }
+    if (body.expiresAt !== undefined) {
+      const expiresAtMs =
+        typeof body.expiresAt === "string" ? Date.parse(body.expiresAt) : Number.NaN;
+      if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+        return errorResponse(
+          c,
+          Object.assign(new Error("expiresAt must be an ISO-8601 timestamp in the future"), {
+            status: 400,
+          }),
+        );
+      }
+    }
     const record: ShareTokenRecord = {
       id: randomUUID(),
       workspaceId: ctx.workspace.id,
       token: generateToken(),
       scope,
       createdByUserId: ctx.user.id,
-      ...(body.expiresAt ? { expiresAt: body.expiresAt } : {}),
+      ...(body.expiresAt ? { expiresAt: new Date(Date.parse(body.expiresAt)).toISOString() } : {}),
       readCount: 0,
       createdAt: nowIso(),
     };

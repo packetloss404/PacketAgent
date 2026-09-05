@@ -192,7 +192,14 @@ test("handleAlertsDeliverJob throws when delivery fails under maxAttempts", asyn
       return true;
     },
   );
-  assert.equal(updateCalls.length, 0);
+  assert.equal(updateCalls.length, 1, "the failed attempt is persisted so retries advance");
+  assert.deepEqual(updateCalls[0].input, {
+    alertId: "evt_a",
+    delivered: false,
+    deliveryError: "http 503",
+    deadLettered: false,
+    attemptedAt: "2026-04-26T12:00:00.000Z",
+  });
 });
 
 test("handleAlertsDeliverJob dead-letters at maxAttempts without throwing", async () => {

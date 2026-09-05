@@ -146,5 +146,15 @@ export async function handleAlertsDeliverJob(
     };
   }
 
+  // Persist the failed attempt before rethrowing for retry. The attempt
+  // counter only advances through updateStatus, so without this every retry
+  // observed the same attemptNumber and the dead-letter branch was unreachable.
+  await updateStatus({
+    alertId,
+    delivered: false,
+    deliveryError,
+    deadLettered: false,
+    attemptedAt,
+  });
   throw new Error(`alert delivery attempt ${attemptNumber} failed: ${deliveryError}`);
 }

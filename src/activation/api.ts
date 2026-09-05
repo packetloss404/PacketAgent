@@ -13,7 +13,12 @@ export async function readActivationStatus(
 ): Promise<ReadActivationStatusApiResult> {
   const status = await getActivationStatus(deps, input);
   if (deps.readModel) {
-    await deps.readModel.save(status);
+    // Reads are unauthenticated and per-workspace; skip the store write when
+    // nothing changed so a read cannot be turned into a persist storm.
+    const previous = await deps.readModel.load(input.subject);
+    if (!previous || JSON.stringify(previous) !== JSON.stringify(status)) {
+      await deps.readModel.save(status);
+    }
   }
   return {
     ok: true,

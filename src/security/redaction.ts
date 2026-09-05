@@ -7,6 +7,7 @@ const TOKEN_ROUTE_PATTERNS = [
   /(\/api\/public\/share\/)[^/\s"']+/gi,
   /(\/share\/)[^/\s"']+/gi,
   /(\/api\/public\/webhooks\/agents\/)[^/\s"']+/gi,
+  /(\/api\/public\/webhooks\/workers\/)[^/\s"']+/gi,
 ];
 const SENSITIVE_QUERY_PATTERN =
   /([?&](?:token|access_token|api[_-]?key|apikey|key|secret)=)[^&\s"']+/gi;
