@@ -15,12 +15,15 @@ import { WorkerLifecycleError } from "../errors.js";
 import type {
   JsonObject,
   WorkerBudgetPolicy,
+  WorkerBudgetUsage,
   WorkerRetryPolicy,
   WorkerRun,
   WorkerSupervisorPhase,
 } from "../types.js";
 import { createSystemWorkerClock } from "./adapters.js";
+import { createVirtualWorkerClock } from "./__tests__/virtual-clock.js";
 import type {
+  WorkerClockPort,
   WorkerLease,
   WorkerRuntimeContext,
   WorkerRuntimeProviderRequest,
@@ -548,8 +551,121 @@ test("lease theft releases execution without a post-theft tool or terminal write
   assert.equal(harness.finalizations, 0);
 });
 
+test("a single operation spanning several lease TTLs completes on heartbeat renewals", async () => {
+  const clock = createVirtualWorkerClock();
+  const harness = runtimeHarness({
+    clock,
+    leaseTtlMs: 30_000,
+    budgets: { ...DEFAULT_BUDGETS, maxElapsedMs: 600_000 },
+    provider: async (request) => {
+      await clock.sleep(100_000, request.signal);
+      return request.phase === "plan"
+        ? providerResult({ content: "candidate" })
+        : providerResult({
+            content: '{"predicateId":"release-decision","matched":true,"evidence":"done"}',
+          });
+    },
+  });
+
+  const result = await runWorkerSupervisor(harness.input);
+
+  assert.equal(result.run.status, "completed");
+  assert.equal(result.run.terminalReason, "objective_satisfied");
+  assert.equal(harness.providerCalls, 2);
+  assert.equal(harness.finalizations, 1);
+  // Two 100s calls against a 30s lease: at least nine 10s heartbeats each.
+  assert.ok(harness.renewals >= 18, `expected heartbeat renewals, saw ${harness.renewals}`);
+  assert.ok(result.run.budgetUsage.elapsedMs >= 200_000);
+  assert.equal(result.run.budgetUsage.providerCostUsd, 0.02);
+  assert.ok((harness.lastRenewedUsage?.elapsedMs ?? 0) >= 100_000);
+  assert.equal(
+    harness.events.some((event) => event.data?.terminalReason === "lease_lost"),
+    false,
+  );
+});
+
+test("a genuine renewal failure releases as lease_lost with advanced usage, and the next attempt converges", async () => {
+  const clock = createVirtualWorkerClock();
+  const harness = runtimeHarness({
+    clock,
+    leaseTtlMs: 30_000,
+    loseLeaseAtMs: 25_000,
+    budgets: { ...DEFAULT_BUDGETS, maxElapsedMs: 50_000 },
+    provider: async (request) => {
+      await clock.sleep(100_000, request.signal);
+      return providerResult({ content: "candidate" });
+    },
+  });
+
+  await assert.rejects(
+    runWorkerSupervisor(harness.input),
+    (error: unknown) =>
+      error instanceof WorkerRuntimeReleasedError && error.reason === "lease_lost",
+  );
+  assert.equal(harness.providerCalls, 1);
+  assert.equal(harness.finalizations, 0);
+  // The heartbeat at 20s recorded usage before the lease was lost at 25s.
+  const recorded = harness.lastRenewedUsage;
+  assert.ok(recorded);
+  assert.ok(recorded.elapsedMs >= 20_000, `expected advanced elapsed, saw ${recorded.elapsedMs}`);
+  assert.equal(recorded.iterations, 1);
+
+  const retryClock = createVirtualWorkerClock();
+  const retry = runtimeHarness({
+    clock: retryClock,
+    leaseTtlMs: 30_000,
+    budgets: { ...DEFAULT_BUDGETS, maxElapsedMs: 50_000 },
+    budgetUsage: recorded,
+    provider: async (request) => {
+      await retryClock.sleep(100_000, request.signal);
+      return providerResult({ content: "candidate" });
+    },
+  });
+
+  const result = await runWorkerSupervisor(retry.input);
+
+  assert.equal(result.run.status, "budget_exhausted");
+  assert.equal(result.run.terminalReason, "elapsed_time");
+  assert.equal(retry.providerCalls, 1);
+  assert.ok(result.run.budgetUsage.elapsedMs >= 50_000);
+  assert.ok(retryClock.elapsedMs <= 50_000 - recorded.elapsedMs + 1);
+});
+
+test("retry backoff longer than the lease TTL is not misreported as lease_lost", async () => {
+  const clock = createVirtualWorkerClock();
+  let attempts = 0;
+  const harness = runtimeHarness({
+    clock,
+    leaseTtlMs: 30_000,
+    budgets: { ...DEFAULT_BUDGETS, maxElapsedMs: 600_000 },
+    retry: { maxAttempts: 3, initialBackoffMs: 45_000, maxBackoffMs: 45_000, backoffMultiplier: 1 },
+    provider: async (request) => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("transient provider failure");
+      return request.phase === "plan"
+        ? providerResult({ content: "candidate" })
+        : providerResult({
+            content: '{"predicateId":"release-decision","matched":true,"evidence":"done"}',
+          });
+    },
+  });
+
+  const result = await runWorkerSupervisor(harness.input);
+
+  assert.equal(result.run.status, "completed");
+  assert.equal(harness.providerCalls, 3);
+  assert.equal(harness.finalizations, 1);
+  assert.ok(clock.elapsedMs >= 45_000, `backoff should have elapsed, saw ${clock.elapsedMs}`);
+  assert.ok(result.run.budgetUsage.elapsedMs >= 45_000);
+  assert.equal(harness.events.filter((event) => event.type === "worker.phase.failed").length, 1);
+});
+
 interface RuntimeHarnessOptions {
   readonly budgets?: WorkerBudgetPolicy;
+  readonly budgetUsage?: WorkerBudgetUsage;
+  readonly clock?: WorkerClockPort;
+  readonly leaseTtlMs?: number;
+  readonly loseLeaseAtMs?: number;
   readonly retry?: WorkerRetryPolicy;
   readonly provider?: (
     request: WorkerRuntimeProviderRequest,
@@ -565,7 +681,8 @@ interface RuntimeHarnessOptions {
 }
 
 function runtimeHarness(options: RuntimeHarnessOptions = {}) {
-  const clock = createSystemWorkerClock();
+  const clock = options.clock ?? createSystemWorkerClock();
+  const leaseTtlMs = options.leaseTtlMs ?? 60_000;
   const budgets = options.budgets ?? DEFAULT_BUDGETS;
   const retry = options.retry ?? DEFAULT_RETRY;
   const baseContent = makeWorkerVersionContent();
@@ -594,9 +711,10 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
     fencingToken: 7,
     acquiredAt: now.toISOString(),
     renewedAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + 60_000).toISOString(),
+    expiresAt: new Date(now.getTime() + leaseTtlMs).toISOString(),
   };
   let currentLease = lease;
+  let lastRenewedUsage: WorkerBudgetUsage | undefined;
   let revision = 2;
   let cancelled = false;
   let providerCalls = 0;
@@ -614,6 +732,7 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
     status: "running",
     revision,
     runtimeLease: lease,
+    ...(options.budgetUsage ? { budgetUsage: options.budgetUsage } : {}),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     startedAt: now.toISOString(),
@@ -806,10 +925,17 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
         ) {
           return null;
         }
+        if (
+          options.loseLeaseAtMs !== undefined &&
+          input.now.getTime() - now.getTime() >= options.loseLeaseAtMs
+        ) {
+          return null;
+        }
+        if (input.budgetUsage) lastRenewedUsage = { ...input.budgetUsage };
         currentLease = {
           ...input.lease,
           renewedAt: input.now.toISOString(),
-          expiresAt: new Date(input.now.getTime() + 60_000).toISOString(),
+          expiresAt: new Date(input.now.getTime() + leaseTtlMs).toISOString(),
         };
         return currentLease;
       },
@@ -883,6 +1009,12 @@ function runtimeHarness(options: RuntimeHarnessOptions = {}) {
     },
     get attentionCalls() {
       return attentionCalls;
+    },
+    get renewals() {
+      return renewals;
+    },
+    get lastRenewedUsage() {
+      return lastRenewedUsage;
     },
   };
 }

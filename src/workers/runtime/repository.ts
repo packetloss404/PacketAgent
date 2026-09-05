@@ -15,6 +15,7 @@ import { validateWorkerPersistence } from "../repository.js";
 import { assertWorkerRunUpdate, isTerminalWorkerRunStatus } from "../transitions.js";
 import {
   WORKER_CONTRACT_SCHEMA_VERSION,
+  type WorkerBudgetUsage,
   type WorkerCheckpoint,
   type WorkerRun,
   type WorkerRuntimeLease,
@@ -215,7 +216,13 @@ export function createWorkerRuntimeRepository(
           renewedAt: input.now.toISOString(),
           expiresAt: new Date(input.now.getTime() + leaseDurationMs).toISOString(),
         };
-        replaceRun(data, { ...run, runtimeLease: renewed });
+        replaceRun(data, {
+          ...run,
+          runtimeLease: renewed,
+          ...(input.budgetUsage
+            ? { budgetUsage: advanceBudgetUsage(run.budgetUsage, input.budgetUsage) }
+            : {}),
+        });
         validateWorkerPersistence(data);
         return clone(renewed);
       });
@@ -534,6 +541,23 @@ export function latestValidWorkerCheckpoint(
     );
   }
   return previous;
+}
+
+/**
+ * Heartbeat usage never moves the run ledger backwards: a checkpoint is the only
+ * write that may lower a counter (for example resetting consecutive failures).
+ */
+function advanceBudgetUsage(
+  current: WorkerBudgetUsage,
+  observed: WorkerBudgetUsage,
+): WorkerBudgetUsage {
+  return {
+    elapsedMs: Math.max(current.elapsedMs, Math.floor(observed.elapsedMs)),
+    iterations: Math.max(current.iterations, observed.iterations),
+    providerCostUsd: Math.max(current.providerCostUsd, observed.providerCostUsd),
+    consecutiveFailures: Math.max(current.consecutiveFailures, observed.consecutiveFailures),
+    toolCalls: Math.max(current.toolCalls, observed.toolCalls),
+  };
 }
 
 function assertRemainingBudgetDidNotIncrease(

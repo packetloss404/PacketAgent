@@ -1,18 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createSeedStore, type JobRecord, type PacketAgentData } from "../../packetagent-store.js";
+import { JobReleasedError } from "../../jobs/scheduler.js";
 import { WorkerLifecycleError } from "../errors.js";
 import {
   makeWorkerDefinition,
   makeWorkerDeployment,
   makeWorkerRun,
   makeWorkerVersion,
+  makeWorkerVersionContent,
   TEST_NOW,
 } from "../__tests__/fixtures.js";
 import { createPermissiveWorkerBudgetPort } from "../__tests__/budget-port.js";
+import type { WorkerVersion } from "../types.js";
 import { createWorkerRuntimeRepository } from "./repository.js";
 import { createWorkerExecutionJobHandler } from "./job-handler.js";
 import { createSystemWorkerClock } from "./adapters.js";
+import { createVirtualWorkerClock } from "./__tests__/virtual-clock.js";
 
 test("runtime repository fences leases and run revisions atomically", async () => {
   const harness = repositoryHarness();
@@ -429,7 +433,203 @@ test("worker.run job handler executes the canonical supervisor and persists term
   assert.equal(harness.data.workerCheckpoints.length, 3);
 });
 
-function repositoryHarness(options: { leaseDurationMs?: number; now?: () => Date } = {}) {
+test("lease renewal advances the run ledger monotonically without a checkpoint", async () => {
+  const harness = repositoryHarness();
+  const first = await harness.repository.acquire({
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    ownerId: "owner-a",
+    now: new Date(TEST_NOW),
+  });
+  assert.equal(first.disposition, "acquired");
+  if (first.disposition !== "acquired") return;
+
+  const renewed = await harness.repository.renew({
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    lease: first.lease,
+    now: new Date("2026-07-27T12:00:05.000Z"),
+    budgetUsage: {
+      elapsedMs: 5_000,
+      iterations: 1,
+      providerCostUsd: 0.05,
+      consecutiveFailures: 1,
+      toolCalls: 0,
+    },
+  });
+  assert.ok(renewed);
+  assert.equal(harness.data.workerRuns[0].revision, first.context.run.revision);
+  assert.deepEqual(harness.data.workerRuns[0].budgetUsage, {
+    elapsedMs: 5_000,
+    iterations: 1,
+    providerCostUsd: 0.05,
+    consecutiveFailures: 1,
+    toolCalls: 0,
+  });
+
+  // A lower snapshot never regresses the ledger.
+  await harness.repository.renew({
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    lease: renewed,
+    now: new Date("2026-07-27T12:00:06.000Z"),
+    budgetUsage: {
+      elapsedMs: 1_000,
+      iterations: 0,
+      providerCostUsd: 0,
+      consecutiveFailures: 0,
+      toolCalls: 0,
+    },
+  });
+  assert.equal(harness.data.workerRuns[0].budgetUsage.elapsedMs, 5_000);
+  assert.equal(harness.data.workerRuns[0].budgetUsage.iterations, 1);
+
+  // A stale owner cannot renew or write usage.
+  const stale = await harness.repository.renew({
+    workspaceId: "workspace-1",
+    workerRunId: "run-1",
+    lease: { ...renewed, ownerId: "owner-b" },
+    now: new Date("2026-07-27T12:00:07.000Z"),
+    budgetUsage: {
+      elapsedMs: 99_000,
+      iterations: 5,
+      providerCostUsd: 1,
+      consecutiveFailures: 0,
+      toolCalls: 0,
+    },
+  });
+  assert.equal(stale, null);
+  assert.equal(harness.data.workerRuns[0].budgetUsage.elapsedMs, 5_000);
+  assert.equal(harness.data.workerCheckpoints.length, 0);
+});
+
+test("worker.run job handler converges when the lease is stolen during every long operation", async () => {
+  const clock = createVirtualWorkerClock();
+  const baseContent = makeWorkerVersionContent();
+  const harness = repositoryHarness({
+    now: () => clock.now(),
+    version: makeWorkerVersion({
+      status: "validated",
+      validatedAt: TEST_NOW,
+      content: makeWorkerVersionContent({
+        policy: {
+          ...baseContent.policy,
+          budgets: { ...baseContent.policy.budgets, maxElapsedMs: 50_000 },
+        },
+      }),
+    }),
+  });
+  let providerCalls = 0;
+  const stealLease = (): void => {
+    const run = harness.data.workerRuns[0];
+    assert.ok(run.runtimeLease);
+    const at = clock.now();
+    harness.data.workerRuns[0] = {
+      ...run,
+      runtimeFence: run.runtimeLease.fencingToken + 1,
+      runtimeLease: {
+        ownerId: "competing-supervisor",
+        fencingToken: run.runtimeLease.fencingToken + 1,
+        acquiredAt: at.toISOString(),
+        renewedAt: at.toISOString(),
+        expiresAt: new Date(at.getTime() + 1_000).toISOString(),
+      },
+    };
+  };
+  const handler = createWorkerExecutionJobHandler({
+    repository: harness.repository,
+    budgets: createPermissiveWorkerBudgetPort(),
+    ports: {
+      clock,
+      provider: {
+        async call(request) {
+          providerCalls += 1;
+          // Longer than the 30s lease: heartbeats at 10s and 20s must keep it alive.
+          await clock.sleep(25_000, request.signal);
+          stealLease();
+          await clock.sleep(75_000, request.signal);
+          return {
+            content: "ready",
+            toolCalls: [],
+            finishReason: "stop",
+            usage: { promptTokens: 1, completionTokens: 1, costUsd: 0.01 },
+            model: "test-model",
+            provider: "test-provider",
+          };
+        },
+      },
+      tools: {
+        definitions: () => [],
+        async authorize() {
+          throw new Error("no tool should authorize");
+        },
+        async execute() {
+          throw new Error("no tool should execute");
+        },
+      },
+    },
+    ownerId: () => "job-owner",
+  });
+  const timestamp = clock.now().toISOString();
+  const job: JobRecord = {
+    id: "job-worker-run",
+    workspaceId: "workspace-1",
+    type: "worker.run",
+    payload: {
+      workerRunId: "run-1",
+      workerDeploymentId: "deployment-1",
+      workerVersionId: "worker-version-1",
+    },
+    status: "running",
+    attempts: 1,
+    maxAttempts: 3,
+    scheduledAt: timestamp,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    startedAt: timestamp,
+  };
+
+  const releasedElapsed: number[] = [];
+  let outcome: { status: string; terminalReason: string } | undefined;
+  for (let attempt = 0; attempt < 10 && !outcome; attempt += 1) {
+    try {
+      outcome = (await handler.handle(job, { signal: new AbortController().signal })) as {
+        status: string;
+        terminalReason: string;
+      };
+    } catch (error) {
+      assert.ok(error instanceof JobReleasedError, String(error));
+      releasedElapsed.push(harness.data.workerRuns[0].budgetUsage.elapsedMs);
+      assert.equal(harness.data.workerRuns[0].status, "running");
+    }
+  }
+
+  assert.ok(outcome, "the run must reach a terminal outcome within a bounded number of attempts");
+  assert.equal(outcome.status, "budget_exhausted");
+  assert.equal(outcome.terminalReason, "elapsed_time");
+  assert.equal(providerCalls, 3);
+  assert.equal(releasedElapsed.length, 2);
+  // Each released attempt left the ledger further along than it found it.
+  assert.ok(releasedElapsed[0] >= 20_000, `first release recorded ${releasedElapsed[0]}`);
+  assert.ok(releasedElapsed[1] >= 40_000, `second release recorded ${releasedElapsed[1]}`);
+  assert.ok(releasedElapsed[1] > releasedElapsed[0]);
+  const run = harness.data.workerRuns[0];
+  assert.equal(run.status, "budget_exhausted");
+  assert.equal(run.runtimeLease, undefined);
+  assert.ok(run.budgetUsage.elapsedMs >= 50_000);
+  assert.equal(run.budgetUsage.iterations, 1);
+  // The resumed attempts restored an open iteration from the checkpoint rather than a fresh one.
+  assert.ok(harness.data.workerCheckpoints.length >= 1);
+  assert.equal(harness.data.workerCheckpoints[0].workingMemory.iterationOpen, true);
+  assert.ok(
+    harness.data.workerEvents.filter((event) => event.type === "worker.run.lease_acquired")
+      .length === 3,
+  );
+});
+
+function repositoryHarness(
+  options: { leaseDurationMs?: number; now?: () => Date; version?: WorkerVersion } = {},
+) {
   let data = createSeedStore();
   data.workerDefinitions.push(
     makeWorkerDefinition({
@@ -438,10 +638,11 @@ function repositoryHarness(options: { leaseDurationMs?: number; now?: () => Date
     }),
   );
   data.workerVersions.push(
-    makeWorkerVersion({
-      status: "validated",
-      validatedAt: TEST_NOW,
-    }),
+    options.version ??
+      makeWorkerVersion({
+        status: "validated",
+        validatedAt: TEST_NOW,
+      }),
   );
   data.workerDeployments.push(
     makeWorkerDeployment({

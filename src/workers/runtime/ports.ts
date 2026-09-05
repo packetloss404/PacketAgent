@@ -51,7 +51,7 @@ export interface WorkerRuntimeProviderResult {
   readonly providerCallId?: string;
   readonly content: string;
   readonly toolCalls: readonly WorkerRuntimeToolCall[];
-  readonly finishReason: "stop" | "tool_use" | "length" | "error";
+  readonly finishReason: "stop" | "tool_use" | "length" | "refusal" | "error";
   readonly usage: WorkerRuntimeProviderUsage;
   readonly model: string;
   readonly provider: string;
@@ -191,11 +191,20 @@ export interface WorkerLease {
 }
 
 export interface WorkerLeasePort {
+  /**
+   * Extends the lease held by `lease.ownerId`/`lease.fencingToken` and resolves
+   * the renewed lease, or `null` when the lease is no longer held by that owner
+   * (expired, replaced, or released). `budgetUsage` is the supervisor's current
+   * usage snapshot; implementations persist it as a monotone advance of the run
+   * ledger so bounds keep progressing even if the lease is later lost before the
+   * next checkpoint.
+   */
   renew(input: {
     readonly workspaceId: string;
     readonly workerRunId: string;
     readonly lease: WorkerLease;
     readonly now: Date;
+    readonly budgetUsage?: WorkerBudgetUsage;
   }): Promise<WorkerLease | null>;
   release(input: {
     readonly workspaceId: string;
