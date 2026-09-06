@@ -42,6 +42,11 @@ import {
 } from "./providers/router.js";
 import type { LLMProvider, ProviderCallOptions, ProviderStreamChunk } from "./providers/types.js";
 
+// Registration is invite-only by default. These cases cover the mechanics of
+// creating an account, so they opt into open mode; the gate itself is covered
+// by src/services/registration-policy.test.ts.
+process.env.PACKETAGENT_REGISTRATION_MODE = "open";
+
 type RunAgentRunResult = Extract<RunAgentResult, { run: unknown }>["run"];
 type RunAgentApprovalResult = Extract<RunAgentResult, { approval: unknown }>["approval"];
 

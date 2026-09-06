@@ -315,8 +315,12 @@ export const api = {
   },
   signIn: (body: { email: string; password: string }) =>
     j<Session>("/api/auth/login", { method: "POST", body: JSON.stringify(body) }),
-  signUp: (body: { displayName: string; email: string; password: string }) =>
-    j<Session>("/api/auth/register", { method: "POST", body: JSON.stringify(body) }),
+  signUp: (body: {
+    displayName: string;
+    email: string;
+    password: string;
+    invitationToken?: string;
+  }) => j<Session>("/api/auth/register", { method: "POST", body: JSON.stringify(body) }),
   signOut: () => j<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
   getPublicDashboard: () => j<PublicDashboardPayload>("/api/activation"),
   getBootstrap: () => j<BootstrapPayload>("/api/app/bootstrap"),

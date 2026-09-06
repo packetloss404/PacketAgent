@@ -18,6 +18,9 @@ export default function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [error, setError] = useState<string | null>(null);
 
   const next = searchParams.get("next");
+  // Invitation links carry the token, so an invited person does not have to
+  // copy it by hand; it stays editable for anyone pasting one in.
+  const [invitationToken, setInvitationToken] = useState(() => searchParams.get("invite") ?? "");
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -25,7 +28,12 @@ export default function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
     setError(null);
     try {
       if (mode === "sign-up") {
-        await signUp({ displayName: displayName.trim(), email: email.trim(), password });
+        await signUp({
+          displayName: displayName.trim(),
+          email: email.trim(),
+          password,
+          ...(invitationToken.trim() ? { invitationToken: invitationToken.trim() } : {}),
+        });
       } else {
         await signIn({ email: email.trim(), password });
       }
@@ -188,6 +196,20 @@ export default function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
                   required
                 />
               </label>
+
+              {mode === "sign-up" && (
+                <label>
+                  <span className="label">Invitation code</span>
+                  <input
+                    value={invitationToken}
+                    onChange={(e) => setInvitationToken(e.target.value)}
+                    className="field mono"
+                    placeholder="from your invitation link"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </label>
+              )}
 
               <label>
                 <span className="label">Password</span>

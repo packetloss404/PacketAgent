@@ -322,6 +322,7 @@ export function registerAuthBootstrapRoutes(app: Hono): void {
         email?: string;
         password?: string;
         displayName?: string;
+        invitationToken?: string;
       };
       // Combine IP + submitted email so one attacker can't exhaust the shared
       // login/register bucket and lock every account out (see clientKey()).
@@ -330,6 +331,7 @@ export function registerAuthBootstrapRoutes(app: Hono): void {
         email: body.email ?? "",
         password: body.password ?? "",
         displayName: body.displayName ?? "",
+        ...(body.invitationToken ? { invitationToken: body.invitationToken } : {}),
       });
       applySessionCookie(c, result.cookieValue);
       applyCsrfCookie(c, result.cookieValue);

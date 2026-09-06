@@ -29,6 +29,11 @@ import {
   type WorkspaceRole,
 } from "./packetagent-store.js";
 
+// Registration is invite-only by default. These cases cover the mechanics of
+// creating an account, so they opt into open mode; the gate itself is covered
+// by src/services/registration-policy.test.ts.
+process.env.PACKETAGENT_REGISTRATION_MODE = "open";
+
 function createTestApp() {
   const app = new Hono();
   app.use("/api/app/*", enforcePrivateAppMutationSecurity);

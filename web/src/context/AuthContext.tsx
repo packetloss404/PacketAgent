@@ -36,7 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(
-    async (body: { displayName: string; email: string; password: string }) => {
+    async (body: {
+      displayName: string;
+      email: string;
+      password: string;
+      invitationToken?: string;
+    }) => {
       const nextSession = await api.signUp(body);
       setSessionState(nextSession);
     },

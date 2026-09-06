@@ -29,6 +29,23 @@ Bucket IDs are SHA-256 hashed with `PACKETAGENT_RATE_LIMIT_KEY_SALT`, so raw cli
 
 These are app-level guardrails. Local buckets are process and store scoped; they do not coordinate across separate stores, separate disks, or separate regions. For deployments with more than one PacketAgent process, container, or region, also enable a shared limiter (next section) or enforce equivalent limits at the edge.
 
+## Self-service registration
+
+`POST /api/auth/register` is invite-only by default. An instance on a public hostname would otherwise let anyone create an account and their own workspace, since the sign-in page also offers account creation.
+
+| Env var                         | Default       | Notes                                                                         |
+| ------------------------------- | ------------- | ----------------------------------------------------------------------------- |
+| `PACKETAGENT_REGISTRATION_MODE` | `invite_only` | `invite_only` requires a valid invitation token; `open` restores self-signup. |
+
+Rules in `invite_only` mode:
+
+- **Bootstrap.** When the store has no users, the first registration is allowed and becomes the owner of a new workspace. Without this a fresh install could never be entered.
+- **Invitation required.** Every later registration must present `invitationToken` matching an invitation that is unrevoked, unaccepted, unexpired, and issued to the same email address. Workspace admins create these at `POST /api/app/invitations`; the sign-up form reads the token from an `?invite=` query parameter.
+- **Single message.** Unknown, expired, revoked, consumed, and mismatched tokens all return the same `403`, so the endpoint cannot be used to discover which addresses have been invited.
+- **Single use.** The invitation is consumed in the same transaction that creates the account, and the new account joins the inviting workspace with the invited role, so one token cannot admit two users.
+
+Registration remains rate limited in both modes (see above). Setting `open` is appropriate only on a trusted network or behind another gate.
+
 ## Distributed rate limiter
 
 When `PACKETAGENT_DISTRIBUTED_RATE_LIMIT_URL` is set, PacketAgent calls a shared HTTP limiter before updating local buckets. The local buckets remain as a backstop for restarts and edge bypass, but the cross-process counters live in the limiter you operate.

@@ -5,6 +5,12 @@ import { join } from "node:path";
 import test from "node:test";
 import { Hono, type Context } from "hono";
 
+// This suite registers users to compare store backends, so it opts into open
+// registration; the invite-only default is covered by
+// src/services/registration-policy.test.ts and
+// src/registration-invite-only-routes.test.ts.
+process.env.PACKETAGENT_REGISTRATION_MODE = "open";
+
 type RuntimeModules = Awaited<ReturnType<typeof loadRuntimeModules>>;
 
 const SESSION_COOKIE_NAME = "packetagent_session";

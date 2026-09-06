@@ -8,6 +8,7 @@ import {
   mutateStore,
   mutateStoreAsync,
   recordActivity,
+  upsertWorkspaceMembership,
 } from "../packetagent-store";
 import {
   generateId,
@@ -29,8 +30,14 @@ import {
   makeActivity,
   syncWorkspaceActivation,
 } from "./context.js";
+import { admitRegistration } from "./registration-policy.js";
 
-export function register(input: { email: string; password: string; displayName: string }) {
+export function register(input: {
+  email: string;
+  password: string;
+  displayName: string;
+  invitationToken?: string;
+}) {
   const email = normalizeEmail(input.email);
   if (!email.includes("@")) throw httpError(400, "valid email is required");
   if (input.password.length < 8) throw httpError(400, "password must be at least 8 characters");
@@ -41,6 +48,9 @@ export function register(input: { email: string; password: string; displayName: 
     if (data.users.some((user) => normalizeEmail(user.email) === email)) {
       throw httpError(409, "an account with that email already exists");
     }
+    // Same gate as registerAsync: this variant is exported, so it must not
+    // become a way around the invite-only policy.
+    admitRegistration(data, email, input.invitationToken);
 
     const timestamp = now();
     const userId = generateId();
@@ -120,6 +130,7 @@ export async function registerAsync(input: {
   email: string;
   password: string;
   displayName: string;
+  invitationToken?: string;
 }) {
   const email = normalizeEmail(input.email);
   if (!email.includes("@")) throw httpError(400, "valid email is required");
@@ -131,6 +142,9 @@ export async function registerAsync(input: {
     if (data.users.some((user) => normalizeEmail(user.email) === email)) {
       throw httpError(409, "an account with that email already exists");
     }
+    // Gate before any record is created: an invite-only instance must not be
+    // usable to enumerate addresses or to create orphaned users.
+    const admission = admitRegistration(data, email, input.invitationToken);
 
     const timestamp = now();
     const userId = generateId();
@@ -196,6 +210,36 @@ export async function registerAsync(input: {
         timestamp,
       ),
     );
+
+    if (admission.invitation) {
+      // Consume the invitation in the same transaction that creates the
+      // account, so a single token cannot register two users, and so an invited
+      // person lands in the inviting workspace without a second step.
+      const invitation = data.workspaceInvitations.find(
+        (record) => record.id === admission.invitation?.id,
+      );
+      if (invitation) {
+        upsertWorkspaceMembership(data, {
+          workspaceId: invitation.workspaceId,
+          userId,
+          role: invitation.role,
+          joinedAt: timestamp,
+        });
+        invitation.acceptedAt = timestamp;
+        invitation.acceptedByUserId = userId;
+        recordActivity(
+          data,
+          makeActivity(
+            invitation.workspaceId,
+            "workspace",
+            "workspace.invitation_accepted",
+            { type: "user", id: userId, displayName },
+            { title: `${displayName} accepted an invitation`, invitationId: invitation.id },
+            timestamp,
+          ),
+        );
+      }
+    }
 
     const session = createSessionRecord(userId, timestamp);
     data.sessions.push(session.record);
