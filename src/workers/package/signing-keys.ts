@@ -217,7 +217,7 @@ export function createPacketProductSigningKeyService(
     if (!isPacketProductName(product)) {
       throw new PacketProductSigningKeyError(
         "invalid_input",
-        "product must be PacketBench or the legacy PacketADE identity.",
+        "product must be PacketBench, PacketADE, or PacketChat.",
       );
     }
     const description = input.description?.trim();

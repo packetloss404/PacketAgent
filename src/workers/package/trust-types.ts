@@ -44,7 +44,7 @@ export interface PacketProductCredentialRecord {
   readonly schemaVersion: typeof PACKET_PRODUCT_CREDENTIAL_SCHEMA_VERSION;
   readonly id: string;
   readonly workspaceId: string;
-  readonly product: "PacketADE";
+  readonly product: PacketProductName;
   readonly subjectId: string;
   readonly displayName?: string;
   readonly tokenDigest: string;
@@ -119,7 +119,7 @@ export interface WorkerPackageReceipt {
   readonly packageCreatedBy: WorkerActorReference;
   readonly authenticatedActor: WorkerActorReference & {
     readonly type: "packet_product";
-    readonly product: "PacketADE";
+    readonly product: PacketProductName;
   };
   readonly credentialId: string;
   readonly integrity: WorkerPackageIntegrityReceipt;
@@ -141,7 +141,7 @@ export interface WorkerPackageDeploymentRecord {
   readonly operation: "deploy" | "update" | "rollback";
   readonly actor: WorkerActorReference & {
     readonly type: "packet_product";
-    readonly product: "PacketADE";
+    readonly product: PacketProductName;
   };
   readonly createdAt: string;
 }
@@ -161,7 +161,7 @@ export function assertValidPacketProductCredentialRecord(
     !isNonEmpty(record.id) ||
     record.id.includes(".") ||
     !isNonEmpty(record.workspaceId) ||
-    record.product !== "PacketADE" ||
+    !isPacketProductName(record.product) ||
     !isNonEmpty(record.subjectId) ||
     !isSha256Digest(record.tokenDigest) ||
     !Array.isArray(record.allowedOperations) ||
@@ -229,7 +229,7 @@ export function assertValidWorkerPackageReceipt(record: WorkerPackageReceipt): v
     !isPacketProductSourceIdentity(record.source.product, record.source.kind) ||
     !isWorkerActor(record.packageCreatedBy) ||
     record.authenticatedActor.type !== "packet_product" ||
-    record.authenticatedActor.product !== "PacketADE" ||
+    !isPacketProductName(record.authenticatedActor.product) ||
     !isNonEmpty(record.authenticatedActor.id) ||
     !isNonEmpty(record.credentialId) ||
     record.integrity.digestVerified !== true ||
@@ -262,7 +262,7 @@ export function assertValidWorkerPackageDeploymentRecord(
     !isNonEmpty(record.workerDeploymentId) ||
     !["deploy", "update", "rollback"].includes(record.operation) ||
     record.actor.type !== "packet_product" ||
-    record.actor.product !== "PacketADE" ||
+    !isPacketProductName(record.actor.product) ||
     !isNonEmpty(record.actor.id) ||
     !isTimestamp(record.createdAt)
   ) {

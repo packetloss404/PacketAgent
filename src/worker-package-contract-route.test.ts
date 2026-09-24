@@ -67,6 +67,7 @@ test("contract route describes schema, canonicalization, operations, and the cal
   assert.deepEqual(body.sourceIdentities, [
     { product: "PacketBench", kind: "packetbench", status: "current" },
     { product: "PacketADE", kind: "packetade", status: "legacy" },
+    { product: "PacketChat", kind: "packetchat", status: "current" },
   ]);
   assert.deepEqual(body.supportedOperations, [...PACKET_PRODUCT_OPERATIONS]);
   assert.equal(body.supportedOperations.includes("attention.list"), true);

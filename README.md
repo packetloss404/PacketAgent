@@ -434,6 +434,31 @@ the immutable Worker version and whose value follows
 `packetagent.packetchat-route/v1`; plaintext and encrypted fields are never
 returned by these routes.
 
+### Connecting PacketChat
+
+PacketChat is an accepted Packet-product identity (`PacketChat`/`packetchat`, token prefix `pkchat`) alongside PacketBench (current) and the frozen PacketADE (legacy). A PacketChat product credential authorizes PacketChat to inspect a worker deployment and activate a run through `/api/worker-deployments/*`.
+
+1. Issue a PacketChat credential (the token is printed exactly once):
+
+   ```bash
+   node --import tsx src/db/cli.ts packet-product-credential issue --workspace <workspaceId> --product PacketChat
+   ```
+
+2. In PacketChat, open the target project and create a PacketAgent connection with the workspace id, the Agent base URL, and this `pkchat...` token. PacketChat returns the ingest endpoint URL, a one-time ingest bearer token, and a `packetagent.packetchat-route/v1` route-config template.
+3. Declare that `packetchat` notification route on the immutable Worker version (kind `packetchat`, an `opaque` credential whose reference the version declares), setting `endpoint`/`bearerToken` from PacketChat plus your own `callbackBaseUrl`/`callbackSecret`. Deploy and activate the worker.
+4. Worker notifications are delivered to the PacketChat ingest endpoint; PacketChat stores one threaded run card per `worker-run:<runId>` and honors the `Idempotency-Key`, so retries and progress "replace" updates do not create duplicates.
+
+For local end-to-end certification against a PacketChat on localhost, the production Worker network client refuses loopback and private targets, so the opt-in interop probe accepts a dev-only override that does not change the production transport:
+
+```bash
+PACKETAGENT_PACKETCHAT_INTEROP_ENDPOINT=... \
+PACKETAGENT_PACKETCHAT_INTEROP_BEARER_TOKEN=... \
+PACKETAGENT_PACKETCHAT_INTEROP_CALLBACK_BASE_URL=... \
+PACKETAGENT_PACKETCHAT_INTEROP_CALLBACK_SECRET=... \
+PACKETAGENT_PACKETCHAT_INTEROP_ALLOW_LOCAL=1 \
+node --import tsx --test src/workers/packetchat.test.ts
+```
+
 ## Architecture
 
 - **Frontend.** React 19 + react-router 7 + Vite 7, mounted at `/`. Tailwind CSS, Geist fonts, a silver / grey / green-light theme. `/builder` is a full-bleed route outside the workbench Shell (chat thread, streamed prose, split preview). The rest of the workbench lives behind a four-item sidebar (Build, Projects, Runs, Admin); twelve live operator surfaces are tabbed under `/admin/:tab`.

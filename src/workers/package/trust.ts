@@ -31,7 +31,12 @@ import {
   type PacketProductOperation,
   type WorkerPackageReceipt,
 } from "./trust-types.js";
-import type { WorkerPackage, WorkerPackageSignatureVerificationInput } from "./types.js";
+import {
+  isPacketProductName,
+  type PacketProductName,
+  type WorkerPackage,
+  type WorkerPackageSignatureVerificationInput,
+} from "./types.js";
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -76,10 +81,10 @@ export class PacketProductTrustError extends Error {
 export interface PacketProductAuthContext {
   readonly workspaceId: string;
   readonly credentialId: string;
-  readonly product: "PacketADE";
+  readonly product: PacketProductName;
   readonly actor: WorkerActorReference & {
     readonly type: "packet_product";
-    readonly product: "PacketADE";
+    readonly product: PacketProductName;
   };
   readonly operation: PacketProductOperation;
   readonly requirePackageSignature: boolean;
@@ -87,6 +92,11 @@ export interface PacketProductAuthContext {
 
 export interface IssuePacketProductCredentialInput {
   readonly workspaceId: string;
+  /**
+   * Packet-product identity bound to the credential. Defaults to PacketADE for
+   * backward compatibility with pre-PacketChat callers.
+   */
+  readonly product?: PacketProductName;
   readonly subjectId: string;
   readonly displayName?: string;
   readonly allowedOperations: readonly PacketProductOperation[];
@@ -182,6 +192,10 @@ export function createPacketProductTrustService(
     requireNonEmpty(input.workspaceId, "workspaceId");
     requireNonEmpty(input.subjectId, "subjectId");
     requireActor(input.createdBy, "createdBy");
+    const product = input.product ?? "PacketADE";
+    if (!isPacketProductName(product)) {
+      throw trustError("invalid_input", "product must be a supported Packet-product identity.");
+    }
     const allowedOperations = validateOperations(input.allowedOperations);
     const timestamp = now();
     if (
@@ -204,12 +218,12 @@ export function createPacketProductTrustService(
         "Generated credential secrets must be high-entropy base64url.",
       );
     }
-    const token = packetProductToken(credentialId, secret);
+    const token = packetProductToken(product, credentialId, secret);
     const record: PacketProductCredentialRecord = {
       schemaVersion: PACKET_PRODUCT_CREDENTIAL_SCHEMA_VERSION,
       id: credentialId,
       workspaceId: input.workspaceId,
-      product: "PacketADE",
+      product,
       subjectId: input.subjectId,
       ...(input.displayName?.trim() ? { displayName: input.displayName.trim() } : {}),
       tokenDigest: digestPacketProductToken(credentialId, secret),
@@ -646,7 +660,8 @@ function authenticateCredential(
   if (
     !safeEqual(actualDigest, expectedDigest) ||
     !credential ||
-    credential.product !== "PacketADE" ||
+    !isPacketProductName(parsed.product) ||
+    credential.product !== parsed.product ||
     credential.status !== "active" ||
     (credential.expiresAt !== undefined && credential.expiresAt <= timestamp)
   ) {
@@ -743,28 +758,41 @@ function bearerToken(authorization: string | null | undefined): string {
   return match[1]!;
 }
 
+const PACKET_PRODUCT_TOKEN_PREFIXES: Readonly<Record<PacketProductName, string>> = {
+  PacketADE: "pkade",
+  PacketBench: "pkbench",
+  PacketChat: "pkchat",
+};
+
+function productForTokenPrefix(prefix: string): PacketProductName | undefined {
+  return (Object.keys(PACKET_PRODUCT_TOKEN_PREFIXES) as PacketProductName[]).find(
+    (product) => PACKET_PRODUCT_TOKEN_PREFIXES[product] === prefix,
+  );
+}
+
 function parsePacketProductToken(token: string): {
+  product: PacketProductName;
   credentialId: string;
   secret: string;
 } {
   const parts = token.split(".");
-  if (
-    parts.length !== 3 ||
-    parts[0] !== "pkade" ||
-    !parts[1] ||
-    !/^[A-Za-z0-9_-]{32,}$/.test(parts[2] ?? "")
-  ) {
+  const product = parts.length === 3 ? productForTokenPrefix(parts[0] ?? "") : undefined;
+  if (parts.length !== 3 || !product || !parts[1] || !/^[A-Za-z0-9_-]{32,}$/.test(parts[2] ?? "")) {
     throw new PacketProductTrustError(
       "unauthorized",
       "Packet-product credentials are invalid or expired.",
       401,
     );
   }
-  return { credentialId: parts[1], secret: parts[2] };
+  return { product, credentialId: parts[1], secret: parts[2] };
 }
 
-function packetProductToken(credentialId: string, secret: string): string {
-  return `pkade.${credentialId}.${secret}`;
+function packetProductToken(
+  product: PacketProductName,
+  credentialId: string,
+  secret: string,
+): string {
+  return `${PACKET_PRODUCT_TOKEN_PREFIXES[product]}.${credentialId}.${secret}`;
 }
 
 function digestPacketProductToken(credentialId: string, secret: string): string {

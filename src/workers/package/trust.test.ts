@@ -89,6 +89,85 @@ test("PacketADE credentials bind bearer authentication to workspace, actor, and 
   );
 });
 
+test("PacketChat credentials bind pkchat bearer tokens to the PacketChat actor product", async () => {
+  const harness = makeHarness();
+  const issued = await harness.service.issueCredential({
+    workspaceId: "alpha",
+    product: "PacketChat",
+    subjectId: "packetchat:room-service",
+    displayName: "PacketChat room service",
+    allowedOperations: ["package.validate", "deployment.inspect"],
+    createdBy: ADMIN,
+  });
+
+  assert.equal(issued.credential.product, "PacketChat");
+  assert.match(issued.token, /^pkchat\.credential_1\.[A-Za-z0-9_-]+$/);
+
+  const authenticated = await harness.service.authenticate({
+    authorization: `Bearer ${issued.token}`,
+    workspaceId: "alpha",
+    operation: "deployment.inspect",
+  });
+  assert.equal(authenticated.product, "PacketChat");
+  assert.deepEqual(authenticated.actor, {
+    type: "packet_product",
+    id: "packetchat:room-service",
+    displayName: "PacketChat room service",
+    product: "PacketChat",
+  });
+  assert.doesNotThrow(() => validateWorkerPersistence(harness.data));
+});
+
+test("a product-prefixed token cannot authenticate a credential issued for another product", async () => {
+  const harness = makeHarness();
+  const packetAde = await harness.service.issueCredential({
+    workspaceId: "alpha",
+    subjectId: "packetade:flight-service",
+    allowedOperations: ["package.validate"],
+    createdBy: ADMIN,
+  });
+  const packetChat = await harness.service.issueCredential({
+    workspaceId: "alpha",
+    product: "PacketChat",
+    subjectId: "packetchat:room-service",
+    allowedOperations: ["package.validate"],
+    createdBy: ADMIN,
+  });
+
+  const chatIdAsAde = packetChat.token.replace(/^pkchat\./, "pkade.");
+  await assertTrustError(
+    () =>
+      harness.service.authenticate({
+        authorization: `Bearer ${chatIdAsAde}`,
+        workspaceId: "alpha",
+        operation: "package.validate",
+      }),
+    "unauthorized",
+  );
+
+  const adeIdAsChat = packetAde.token.replace(/^pkade\./, "pkchat.");
+  await assertTrustError(
+    () =>
+      harness.service.authenticate({
+        authorization: `Bearer ${adeIdAsChat}`,
+        workspaceId: "alpha",
+        operation: "package.validate",
+      }),
+    "unauthorized",
+  );
+
+  await harness.service.authenticate({
+    authorization: `Bearer ${packetAde.token}`,
+    workspaceId: "alpha",
+    operation: "package.validate",
+  });
+  await harness.service.authenticate({
+    authorization: `Bearer ${packetChat.token}`,
+    workspaceId: "alpha",
+    operation: "package.validate",
+  });
+});
+
 test("acceptPackage durably records integrity, provenance, local policy, and idempotency", async () => {
   const harness = makeHarness();
   const issued = await issueValidationCredential(harness);

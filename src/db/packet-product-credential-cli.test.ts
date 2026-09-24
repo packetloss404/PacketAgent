@@ -42,6 +42,42 @@ test("packet-product-credential issue mints a workspace credential and returns t
   assert.equal(JSON.stringify(harness.data).includes(TEST_SECRET), false);
 });
 
+test("packet-product-credential issue mints product-specific token prefixes", async () => {
+  const harness = createHarness();
+
+  const chat = await issuePacketProductCredential(
+    { workspaceId: "alpha", product: "PacketChat" },
+    { trust: harness.trust },
+  );
+  assert.equal(chat.credential.product, "PacketChat");
+  assert.match(chat.token, /^pkchat\.credential_cli_1\.[A-Za-z0-9_-]{32,}$/);
+
+  const bench = await issuePacketProductCredential(
+    { workspaceId: "alpha", product: "PacketBench" },
+    { trust: harness.trust },
+  );
+  assert.equal(bench.credential.product, "PacketBench");
+  assert.match(bench.token, /^pkbench\.credential_cli_3\.[A-Za-z0-9_-]{32,}$/);
+
+  const legacy = await issuePacketProductCredential(
+    { workspaceId: "alpha" },
+    { trust: harness.trust },
+  );
+  assert.equal(legacy.credential.product, "PacketADE");
+  assert.match(legacy.token, /^pkade\.credential_cli_5\.[A-Za-z0-9_-]{32,}$/);
+});
+
+test("packet-product-credential issue rejects an unknown --product", () => {
+  assert.deepEqual(
+    parsePacketProductCredentialIssueArgs(["--workspace", "alpha", "--product", "PacketChat"]),
+    { workspaceId: "alpha", product: "PacketChat" },
+  );
+  assert.throws(
+    () => parsePacketProductCredentialIssueArgs(["--workspace", "alpha", "--product=PacketPhone"]),
+    /PacketADE, PacketBench, PacketChat/,
+  );
+});
+
 test("packet-product-credential issue honors an explicit operations subset and options", async () => {
   const harness = createHarness();
 

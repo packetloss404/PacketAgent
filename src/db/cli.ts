@@ -2684,6 +2684,7 @@ function activationSignalStableKey(record: ActivationSignalRecord): string | nul
 
 export interface PacketProductCredentialIssueOptions {
   readonly workspaceId: string;
+  readonly product?: PacketProductName;
   readonly operations?: readonly PacketProductOperation[];
   readonly subjectId?: string;
   readonly displayName?: string;
@@ -2712,6 +2713,7 @@ export async function issuePacketProductCredential(
   const trust = deps.trust ?? createPacketProductTrustService();
   const issued = await trust.issueCredential({
     workspaceId: options.workspaceId,
+    ...(options.product ? { product: options.product } : {}),
     subjectId: options.subjectId ?? `packetbench:${options.workspaceId}`,
     ...(options.displayName ? { displayName: options.displayName } : {}),
     allowedOperations:
@@ -2737,11 +2739,16 @@ export function parsePacketProductCredentialIssueArgs(
     throw new Error("packet-product-credential issue requires --workspace <id>.");
   }
   const operationsCsv = readFlagValue(args, "--operations");
+  const product = readFlagValue(args, "--product");
+  if (product !== undefined && !isPacketProductName(product)) {
+    throw new Error("--product must be one of: PacketADE, PacketBench, PacketChat.");
+  }
   const subjectId = readFlagValue(args, "--subject");
   const displayName = readFlagValue(args, "--display-name");
   const expiresAt = readFlagValue(args, "--expires-at");
   return {
     workspaceId,
+    ...(product ? { product } : {}),
     ...(operationsCsv ? { operations: parsePacketProductOperationsCsv(operationsCsv) } : {}),
     ...(subjectId ? { subjectId } : {}),
     ...(displayName ? { displayName } : {}),
@@ -2792,10 +2799,12 @@ function readFlagValue(args: readonly string[], flag: string): string | undefine
 function writePacketProductCredentialUsage(): void {
   console.error(
     "Usage: node --import tsx src/db/cli.ts packet-product-credential issue --workspace <id> " +
-      "[--operations <csv>] [--subject <id>] [--display-name <name>] " +
-      "[--expires-at <iso-timestamp>] [--require-signature]\n" +
+      "[--product PacketADE|PacketBench|PacketChat] [--operations <csv>] [--subject <id>] " +
+      "[--display-name <name>] [--expires-at <iso-timestamp>] [--require-signature]\n" +
       `Supported operations (default: all): ${PACKET_PRODUCT_OPERATIONS.join(",")}\n` +
-      "The pkade.<credentialId>.<secret> token is printed exactly once; PacketAgent stores only its digest.",
+      "Token prefixes: PacketADE->pkade, PacketBench->pkbench, PacketChat->pkchat. " +
+      "The <prefix>.<credentialId>.<secret> token is printed exactly once; " +
+      "PacketAgent stores only its digest.",
   );
 }
 
@@ -2927,7 +2936,7 @@ export function parsePacketProductSigningKeyAddArgs(
   }
   const product = readFlagValue(args, "--product");
   if (product !== undefined && !isPacketProductName(product)) {
-    throw new Error("--product must be PacketBench or the legacy PacketADE identity.");
+    throw new Error("--product must be PacketBench, PacketADE, or PacketChat.");
   }
   const description = readFlagValue(args, "--description");
   return {
@@ -2966,7 +2975,7 @@ export function parsePacketProductSigningKeyListArgs(
 
 function writePacketProductSigningKeyUsage(): void {
   console.error(
-    "Usage: node --import tsx src/db/cli.ts packet-product-signing-key add --workspace <id> --keyid <id> --public-key-file <spki.pem> [--product PacketBench|PacketADE] [--description <text>]\n" +
+    "Usage: node --import tsx src/db/cli.ts packet-product-signing-key add --workspace <id> --keyid <id> --public-key-file <spki.pem> [--product PacketBench|PacketADE|PacketChat] [--description <text>]\n" +
       "       node --import tsx src/db/cli.ts packet-product-signing-key revoke --workspace <id> --keyid <id>\n" +
       "       node --import tsx src/db/cli.ts packet-product-signing-key list --workspace <id> [--status active|revoked]\n" +
       "Registers Ed25519 public keys (SubjectPublicKeyInfo PEM) that verify WorkerPackage DSSE envelopes for one workspace. Private keys are never accepted or stored.",
