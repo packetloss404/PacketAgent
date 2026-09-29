@@ -274,7 +274,7 @@ function validatePacketProductSource(value: unknown, issues: WorkerContractIssue
       issues,
       "$.source",
       "package.source.identity",
-      "must use PacketBench/packetbench or the legacy PacketADE/packetade identity",
+      "must use PacketBench/packetbench, PacketChat/packetchat, or the legacy PacketADE/packetade identity",
     );
   }
 }

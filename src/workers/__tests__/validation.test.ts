@@ -253,6 +253,36 @@ test("PacketBench provenance uses the current paired product identity", () => {
   }
 });
 
+test("PacketChat provenance uses the current paired product identity", () => {
+  assert.doesNotThrow(() =>
+    assertValidWorkerVersion(
+      makeWorkerVersion({
+        source: {
+          product: "PacketChat",
+          kind: "packetchat",
+          sourceId: "room-1",
+          conversationId: "conversation-2",
+        },
+      }),
+    ),
+  );
+
+  const mismatched = validateWorkerVersion(
+    makeWorkerVersion({
+      source: {
+        product: "PacketChat",
+        kind: "packetbench",
+        sourceId: "room-1",
+      },
+    }),
+  );
+  assert.equal(mismatched.ok, false);
+  if (!mismatched.ok) {
+    assert.ok(mismatched.issues.some((issue) => issue.code === "provenance.packetchat_kind"));
+    assert.ok(mismatched.issues.some((issue) => issue.code === "provenance.packetbench_product"));
+  }
+});
+
 test("source revision requires a repository identity", () => {
   const result = validateWorkerVersion(
     makeWorkerVersion({

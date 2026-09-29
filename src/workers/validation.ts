@@ -336,7 +336,7 @@ function validateProvenance(value: unknown, path: string, issues: IssueCollector
   const kind = enumAt(
     source,
     "kind",
-    ["native", "packetbench", "packetade", "legacy_agent", "legacy_workflow"],
+    ["native", "packetbench", "packetade", "packetchat", "legacy_agent", "legacy_workflow"],
     path,
     issues,
   );
@@ -380,6 +380,22 @@ function validateProvenance(value: unknown, path: string, issues: IssueCollector
       `${path}.kind`,
       "provenance.packetbench_kind",
       "must be packetbench when product is PacketBench",
+    );
+  }
+  if (kind === "packetchat" && product !== "PacketChat") {
+    issue(
+      issues,
+      `${path}.product`,
+      "provenance.packetchat_product",
+      "must be PacketChat when kind is packetchat",
+    );
+  }
+  if (product === "PacketChat" && kind !== "packetchat") {
+    issue(
+      issues,
+      `${path}.kind`,
+      "provenance.packetchat_kind",
+      "must be packetchat when product is PacketChat",
     );
   }
   if ((kind === "legacy_agent" || kind === "legacy_workflow") && source.sourceId === undefined) {

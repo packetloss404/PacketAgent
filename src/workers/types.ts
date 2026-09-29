@@ -32,6 +32,7 @@ export type WorkerSourceKind =
   | "native"
   | "packetbench"
   | "packetade"
+  | "packetchat"
   | "legacy_agent"
   | "legacy_workflow";
 

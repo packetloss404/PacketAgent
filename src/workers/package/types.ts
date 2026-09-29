@@ -16,13 +16,14 @@ export const WORKER_PACKAGE_DSSE_PAYLOAD_TYPE =
   "application/vnd.packetagent.worker-package.v1+json" as const;
 
 /**
- * PacketBench is the current product name. PacketADE remains accepted because
- * WorkerPackage v1 fixtures, credentials, and persisted receipts were frozen
- * before the 2026-08-26 rename.
+ * PacketBench and PacketChat are current product names. PacketADE remains
+ * accepted because WorkerPackage v1 fixtures, credentials, and persisted
+ * receipts were frozen before the 2026-08-26 rename.
  */
 export const PACKET_PRODUCT_SOURCE_IDENTITIES = [
   { product: "PacketBench", kind: "packetbench", status: "current" },
   { product: "PacketADE", kind: "packetade", status: "legacy" },
+  { product: "PacketChat", kind: "packetchat", status: "current" },
 ] as const;
 
 export type PacketProductName = (typeof PACKET_PRODUCT_SOURCE_IDENTITIES)[number]["product"];
@@ -36,6 +37,10 @@ export type WorkerPackageSourceProvenance =
   | (WorkerSourceProvenance & {
       readonly product: "PacketADE";
       readonly kind: "packetade";
+    })
+  | (WorkerSourceProvenance & {
+      readonly product: "PacketChat";
+      readonly kind: "packetchat";
     });
 
 export function isPacketProductName(value: unknown): value is PacketProductName {

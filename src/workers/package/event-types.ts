@@ -1,4 +1,5 @@
 import type { JsonObject, WorkerActorReference } from "../types.js";
+import { isPacketProductName, type PacketProductName } from "./types.js";
 
 export const PACKET_PRODUCT_WORKER_EVENT_SCHEMA_VERSION =
   "packetagent.packet-product-worker-event/v1" as const;
@@ -76,7 +77,7 @@ export interface PacketProductEventAcknowledgementRecord {
   readonly appliedRevision: number;
   readonly actor: WorkerActorReference & {
     readonly type: "packet_product";
-    readonly product: "PacketADE";
+    readonly product: PacketProductName;
   };
   readonly acknowledgedAt: string;
 }
@@ -116,7 +117,7 @@ export function assertValidPacketProductEventAcknowledgementRecord(
         record.effectiveWorkspaceSequence !== record.workspaceSequence)) ||
     (record.disposition === "unchanged" && record.appliedRevision !== record.expectedRevision) ||
     record.actor.type !== "packet_product" ||
-    record.actor.product !== "PacketADE" ||
+    !isPacketProductName(record.actor.product) ||
     !nonEmpty(record.actor.id) ||
     !timestamp(record.acknowledgedAt)
   ) {

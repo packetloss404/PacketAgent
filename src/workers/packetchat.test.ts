@@ -329,6 +329,45 @@ const LIVE_PACKETCHAT_INTEROP_ENV_KEYS = [
   "PACKETAGENT_PACKETCHAT_INTEROP_CALLBACK_BASE_URL",
   "PACKETAGENT_PACKETCHAT_INTEROP_CALLBACK_SECRET",
 ] as const;
+
+/**
+ * Dev-only local self-host interop. The production Worker network client pins
+ * public DNS and refuses loopback/private targets, so a PacketChat instance on
+ * localhost cannot be reached through it. When
+ * PACKETAGENT_PACKETCHAT_INTEROP_ALLOW_LOCAL=1 this probe uses a plain fetch to
+ * the configured endpoint; it does not change the production transport.
+ */
+function localInteropNetwork(): WorkerNetworkPort {
+  return {
+    async request(input) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? 15_000);
+      input.signal.addEventListener("abort", () => controller.abort(), { once: true });
+      try {
+        const response = await fetch(input.url, {
+          method: input.method,
+          headers: input.headers,
+          ...(input.body === undefined ? {} : { body: input.body }),
+          signal: controller.signal,
+          redirect: "manual",
+        });
+        const headers: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        return {
+          status: response.status,
+          headers,
+          body: await response.text(),
+          connectedAddress: new URL(input.url).hostname,
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  };
+}
+
 const LIVE_PACKETCHAT_INTEROP_REQUESTED = LIVE_PACKETCHAT_INTEROP_ENV_KEYS.some(
   (key) => process.env[key],
 );
@@ -344,6 +383,9 @@ test(
     const harness = packetChatHarness();
     const request = harness.notification();
     const bearerToken = process.env.PACKETAGENT_PACKETCHAT_INTEROP_BEARER_TOKEN?.trim();
+    const allowLocal = ["1", "true", "yes"].includes(
+      (process.env.PACKETAGENT_PACKETCHAT_INTEROP_ALLOW_LOCAL ?? "").toLowerCase(),
+    );
     const transport = createPacketChatNotificationTransport({
       loadStore: () => harness.data,
       credentialService: configCredentialService(
@@ -357,6 +399,7 @@ test(
           callbackTtlSeconds: 60,
         }),
       ),
+      ...(allowLocal ? { network: localInteropNetwork() } : {}),
       now: () => new Date(),
     });
 
