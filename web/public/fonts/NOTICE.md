@@ -7,7 +7,7 @@ external `style-src` or `font-src` entry.
 Every subset Google Fonts publishes for these families is vendored: `latin`,
 `latin-ext`, `cyrillic`, `cyrillic-ext`, and `vietnamese`. Each `@font-face`
 carries a `unicode-range`, so a browser downloads only the files the page's
-characters actually need — a latin-only page fetches the latin files and
+characters actually need - a latin-only page fetches the latin files and
 nothing else.
 
 | Family | Weights | Upstream |
