@@ -13,11 +13,17 @@ const markdownFiles = execFileSync("git", ["ls-files", "--", "*.md"], {
   .filter(Boolean);
 const failures = [];
 
+// Third-party legal notices may carry symbols that have no faithful ASCII
+// representation (for example the copyright sign). Authored documentation stays
+// ASCII-only; only these vendored notices are exempt from the non-ASCII glyph
+// rule. Every other check below still applies to them.
+const nonAsciiExemptNotices = new Set(["web/public/fonts/NOTICE.md"]);
+
 for (const relativePath of markdownFiles) {
   const absolutePath = resolve(repositoryRoot, relativePath);
   const markdown = readFileSync(absolutePath, "utf8");
 
-  if (/[^\x00-\x7f]/u.test(markdown)) {
+  if (/[^\x00-\x7f]/u.test(markdown) && !nonAsciiExemptNotices.has(relativePath)) {
     failures.push(`${relativePath}: contains non-ASCII text`);
   }
 
