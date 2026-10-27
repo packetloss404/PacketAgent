@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Topbar } from "../Shell";
 import { useApiData } from "../useApiData";
 import { useMutation } from "../useMutation";
 import { MutationError } from "@/components/MutationError";
 import { api } from "@/lib/api";
-import type { AgentRunStatus } from "@/lib/types";
+import type { AgentRunRecord, AgentRunStatus } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/format";
 
 const STATUS_FILTERS: Array<"all" | AgentRunStatus> = [
@@ -16,9 +16,33 @@ const STATUS_FILTERS: Array<"all" | AgentRunStatus> = [
   "queued",
 ];
 
+// Hourly success/failure bins for the activity sparkline. Kept as a pure
+// module-level helper so the component carries no manual memoization the React
+// Compiler would have to preserve.
+function buildHourlyBuckets(
+  runs: AgentRunRecord[],
+  currentTime: number,
+): Array<{ ok: number; fail: number }> {
+  const buckets: Array<{ ok: number; fail: number }> = Array.from({ length: 24 }, () => ({
+    ok: 0,
+    fail: 0,
+  }));
+  for (const r of runs) {
+    const started = r.startedAt ?? r.createdAt;
+    if (!started) continue;
+    const hoursAgo = Math.floor((currentTime - new Date(started).getTime()) / (60 * 60 * 1000));
+    if (hoursAgo < 0 || hoursAgo >= 24) continue;
+    const idx = 23 - hoursAgo;
+    if (r.status === "success") buckets[idx]!.ok += 1;
+    else if (r.status === "failed") buckets[idx]!.fail += 1;
+  }
+  return buckets;
+}
+
 export function RunsView() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<(typeof STATUS_FILTERS)[number]>("all");
+  const [search, setSearch] = useState("");
   const runs = useApiData(() => api.listAgentRuns(), []);
   const usage = useApiData(() => api.getUsageSummary(), []);
   const [currentTime] = useState(Date.now);
@@ -29,7 +53,16 @@ export function RunsView() {
   );
 
   const list = runs.data ?? [];
-  const filtered = filter === "all" ? list : list.filter((r) => r.status === filter);
+  const searchTerm = search.trim().toLowerCase();
+  const filtered = list.filter((r) => {
+    if (filter !== "all" && r.status !== filter) return false;
+    if (!searchTerm) return true;
+    return (
+      r.id.toLowerCase().includes(searchTerm) ||
+      r.title.toLowerCase().includes(searchTerm) ||
+      (r.error?.toLowerCase().includes(searchTerm) ?? false)
+    );
+  });
 
   const runs24h = list.filter((r) => {
     const started = r.startedAt ?? r.createdAt;
@@ -54,22 +87,7 @@ export function RunsView() {
       : 0;
 
   // Hourly bins for sparkline
-  const buckets = useMemo(() => {
-    const arr: { ok: number; fail: number }[] = Array.from({ length: 24 }, () => ({
-      ok: 0,
-      fail: 0,
-    }));
-    for (const r of runs24h) {
-      const started = r.startedAt ?? r.createdAt;
-      if (!started) continue;
-      const hoursAgo = Math.floor((currentTime - new Date(started).getTime()) / (60 * 60 * 1000));
-      if (hoursAgo < 0 || hoursAgo >= 24) continue;
-      const idx = 23 - hoursAgo;
-      if (r.status === "success") arr[idx]!.ok += 1;
-      else if (r.status === "failed") arr[idx]!.fail += 1;
-    }
-    return arr;
-  }, [currentTime, runs24h]);
+  const buckets = buildHourlyBuckets(runs24h, currentTime);
 
   return (
     <>
@@ -182,6 +200,9 @@ export function RunsView() {
           <input
             className="field"
             placeholder="Search by run id, agent, error…"
+            aria-label="Search runs"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
             style={{ width: 280, marginLeft: "auto" }}
           />
           <button

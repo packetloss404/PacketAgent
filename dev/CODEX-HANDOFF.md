@@ -970,7 +970,7 @@ handoff, the roadmap, or the backlog.
 
 ## Last verified gates
 
-- `npm run verify:docs` - all 48 tracked Markdown files, local links,
+- `npm run verify:docs` - all 50 tracked Markdown files, local links,
   documented npm commands, authority boundaries, backlog state, and README
   screenshot assets passed
 - `npm run typecheck` - passed
@@ -979,9 +979,9 @@ handoff, the roadmap, or the backlog.
 - `npm run build:web` - passed with Vite 7.3.6 and esbuild 0.27.2
 - `npm run build:server` - passed; Node 22 ESM output, source maps, generated-app
   runtime worker, and asset manifest emitted
-- `npm run test:api` - 1,659 passed, 3 intentionally skipped live probes, 0
-  failed (1,662 total)
-- `npm run test:web` - 58 passed, 0 skipped, 0 failed
+- `npm run test:api` - 1,754 passed, 3 intentionally skipped live probes, 0
+  failed (1,757 total)
+- `npm run test:web` - 72 passed, 0 skipped, 0 failed
 - `npm run verify:release` - all 13 documentation, build, app, Worker,
   transcript, persistence, regression, backup, isolation, claim, plain-Node,
   and browser groups passed

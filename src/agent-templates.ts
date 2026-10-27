@@ -32,6 +32,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
         label: "Mailbox label",
         type: "string",
         required: true,
+        defaultValue: "INBOX",
         description: "Inbox or label to scan.",
       },
       {

@@ -11,7 +11,12 @@ export const DATA_FILE = resolve(process.cwd(), "data", "packetagent.json");
 
 let jsonTmpFileCounter = 0;
 const TRANSIENT_RENAME_CODES = new Set(["EACCES", "EBUSY", "EPERM"]);
-const RENAME_RETRY_DELAYS_MS = [5, 10, 20, 40, 80] as const;
+// Windows can transiently block rename-over an existing file while another
+// handle (antivirus, search indexer, a concurrently exiting process) is open on
+// it. The atomic write must ride out those short locks rather than fail a
+// durable mutation; the budget below waits up to ~2.3s in total before giving
+// up and surfacing the original error.
+const RENAME_RETRY_DELAYS_MS = [5, 10, 20, 40, 80, 160, 320, 640, 1000] as const;
 const renameWaitCell = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
 
 export function persistJsonStore(data: PacketAgentData): void {

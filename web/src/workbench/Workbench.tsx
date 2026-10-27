@@ -100,7 +100,7 @@ function WorkbenchInner() {
             <Route path="sandbox" element={<Navigate to="/admin/sandbox" replace />} />
             <Route path="workflows" element={<Navigate to="/admin/workflows" replace />} />
             <Route path="billing" element={<Navigate to="/admin/billing" replace />} />
-            <Route path="alerts" element={<Navigate to="/admin/alerts" replace />} />
+            <Route path="alerts" element={<Navigate to="/admin/operations" replace />} />
             <Route path="*" element={<RedirectToBuilder />} />
           </Routes>
         </div>

@@ -32,6 +32,29 @@ test("createAgentFromTemplate clones template fields and links templateId", () =
   assert.equal(agent.tools.includes("gmail"), false);
 });
 
+test("a scheduled template becomes a real schedule trigger and is cron-satisfiable", () => {
+  resetStoreForTests();
+  const auth = login({ email: "alpha@packetagent.local", password: "demo12345" });
+
+  const { agent } = createAgentFromTemplate(auth.context, "support_triage");
+  assert.equal(
+    agent.triggerKind,
+    "schedule",
+    "a template with a schedule must project a cron trigger",
+  );
+  assert.equal(agent.schedule, "*/15 * * * *");
+
+  for (const template of AGENT_TEMPLATES) {
+    if (!template.schedule) continue;
+    for (const field of template.inputSchema) {
+      assert.ok(
+        !field.required || field.defaultValue !== undefined,
+        `${template.id}.${field.key} is required but has no defaultValue, so a cron trigger can never satisfy it`,
+      );
+    }
+  }
+});
+
 test("agent templates only expose executable runtime tools or setup-required labels", () => {
   const registered = new Set(listDefaultToolSummaries().map((tool) => tool.name));
 

@@ -810,6 +810,40 @@ function validateTrigger(value: unknown, path: string, issues: IssueCollector): 
   return id;
 }
 
+/**
+ * A cron trigger never carries input values: the scheduler admits the exact
+ * configured payload (`{}`) on every occurrence. A required input field with no
+ * `defaultValue` therefore can never be satisfied, so the activation fails
+ * `invalid_input` on every tick forever. Reject that configuration up front so
+ * the failure is a visible, fail-closed validation error instead of a silent,
+ * unbounded stream of failed scheduled runs.
+ */
+function validateCronTriggerInputSatisfiability(
+  content: Record<string, unknown>,
+  path: string,
+  issues: IssueCollector,
+): void {
+  const triggers = content.triggers;
+  if (!Array.isArray(triggers)) return;
+  const schema = content.inputSchema;
+  if (!isRecord(schema) || !Array.isArray(schema.fields)) return;
+  const unsatisfiableKeys = schema.fields
+    .filter(
+      (field) => isRecord(field) && field.required === true && field.defaultValue === undefined,
+    )
+    .map((field) => (typeof field.key === "string" && field.key ? field.key : "?"));
+  if (unsatisfiableKeys.length === 0) return;
+  triggers.forEach((trigger, index) => {
+    if (!isRecord(trigger) || trigger.kind !== "cron" || trigger.enabled !== true) return;
+    issue(
+      issues,
+      `${path}.triggers[${index}]`,
+      "trigger.cron_input_unsatisfiable",
+      `a cron trigger cannot supply inputs, so every required input needs a defaultValue; missing for: ${unsatisfiableKeys.join(", ")}`,
+    );
+  });
+}
+
 function validateExitPredicates(value: unknown, path: string, issues: IssueCollector): void {
   if (!Array.isArray(value)) {
     issue(issues, path, "type.array", "must be an array");
@@ -954,6 +988,8 @@ function validateVersionContent(value: unknown, path: string, issues: IssueColle
       triggerIds.add(id);
     });
   }
+
+  validateCronTriggerInputSatisfiability(content, path, issues);
 
   validatePolicy(content.policy, capabilityIds, `${path}.policy`, issues);
   validateExitPredicates(content.exitPredicates, `${path}.exitPredicates`, issues);

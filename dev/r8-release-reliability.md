@@ -151,6 +151,6 @@ source/build gates; it is required before a production release.
 
 Gate conclusion: the release checklist, built server, actual production image,
 backup round trip, browser/app/Worker paths, and public claims describe the
-same tested self-host product. The full repository suites close at 1,662 API
-tests (1,659 passed, 3 intentionally skipped live probes, 0 failed) and 58 web
+same tested self-host product. The full repository suites close at 1,757 API
+tests (1,754 passed, 3 intentionally skipped live probes, 0 failed) and 72 web
 tests (all passed). R8 is complete.

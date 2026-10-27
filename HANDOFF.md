@@ -1,6 +1,6 @@
 # PacketAgent handoff
 
-Updated 2026-09-01. This is the short resume document for a new working
+Updated 2026-10-27. This is the short resume document for a new working
 session. [`BACKLOG.md`](BACKLOG.md) is the sole implementation ledger;
 [`dev/CODEX-HANDOFF.md`](dev/CODEX-HANDOFF.md) retains the detailed shipped
 inventory and gate history.
@@ -23,8 +23,14 @@ independently stoppable or revocable. Use `PacketAgent`, `packetagent`, and
   boundary. Current `PacketBench`/`packetbench` packages and frozen
   `PacketADE`/`packetade` packages both validate, while legacy credentials and
   replay namespaces remain stable.
-- Compatible dependency updates are current as of 2026-09-01; full and
-  production `npm audit` report zero vulnerabilities.
+- `npm audit` is not clean. As of 2026-10-27 the full audit reports 9 findings
+  (2 moderate, 5 high, 2 critical) and `npm audit --omit=dev` reports 3 (1
+  moderate, 2 high), all in transitive or exactly pinned dependencies
+  (`nodemailer`, `hono`, `vite`, `zod`, `brace-expansion`,
+  `postcss-selector-parser`, `shell-quote`, `source-map-js`).
+  [`dev/r1-dependency-advisory-audit.md`](dev/r1-dependency-advisory-audit.md)
+  owns the disposition. Earlier revisions of this file wrongly claimed a
+  zero-vulnerability audit; treat the command output as the source of truth.
 - R7 closed the five-module ownership audit; introduced shared accessible
   async-state and tab primitives; centralized client formatting; documented a
   token-driven, incrementally migrated styling direction; and added component
@@ -62,7 +68,7 @@ The highest-value known constraints, not automatic tasks, are:
 
 ## Last verified R7/R8 gates
 
-- `npm run verify:docs` - all 48 tracked Markdown files, local links,
+- `npm run verify:docs` - all 50 tracked Markdown files, local links,
   documented npm commands, authority boundaries, backlog state, and README
   screenshot assets passed.
 - `npm run verify:release` - 13 deterministic gate groups passed. This includes
@@ -75,11 +81,44 @@ The highest-value known constraints, not automatic tasks, are:
   `node --enable-source-maps dist/server.js`; non-root read-only runtime became
   ready.
 - `npm run typecheck` - passed.
-- `npm run lint` - passed with zero errors and zero warnings.
-- `npm run format:check` - passed.
-- `npm run test:api` - 1,662 total: 1,659 passed, 3 intentionally skipped
-  live-interoperability probes, 0 failed.
-- `npm run test:web` - 58 passed, 0 skipped, 0 failed.
+- `npm run lint` - passed with zero errors and zero warnings. `npm run lint`
+  now runs `eslint . --max-warnings=0`, so any new warning fails it.
+- `npm run format:check` - passed and is a hard CI gate (no longer
+  `continue-on-error`).
+- `npm run test:api` - 1,757 total: 1,754 passed, 3 intentionally skipped
+  live-interoperability probes, 0 failed. An earlier baseline run hit one
+  Windows file-handle race (`src/workflow-prompt-service.test.ts` renaming the
+  shared `data/packetagent.json`); the atomic JSON write retry budget was
+  widened to absorb it and the suite is now green.
+- `npm run test:web` - 72 passed, 0 skipped, 0 failed.
+- `npm run verify:workbench-browser` - the authenticated browser gate now also
+  covers Builder agent mode, the command palette, all twelve `/admin/:tab`
+  surfaces, legacy Admin redirects, and a zero-console-error assertion.
+
+## Known issues (2026-10-27)
+
+These are real, unfixed defects found while auditing the advertised surface.
+They are documented here rather than silently shipped:
+
+- A cron trigger never carries input values, so a scheduled Worker whose input
+  schema has a required field without a `defaultValue` used to fail admission
+  forever. Worker validation now rejects that configuration fail-closed, and
+  the seed plus templates were corrected, but a pre-existing deployment must be
+  re-validated.
+- The `jobs` table has no retention: terminal jobs accumulate without bound
+  (the production VPS held 127,500 rows). See the deploy note below.
+- In `PACKETAGENT_STORE=sqlite`, the scheduler opens a fresh SQLite connection
+  and re-applies migrations on every poll (`src/repositories/jobs-repo.ts`),
+  which is the dominant I/O cost under a large WAL.
+- The `/builder` full-bleed layout does not mount the command palette; it is
+  available in the workbench shell only.
+- The Admin Roles, SSO, and Rate-limits tabs are read-only reference/status
+  views, not editable controls.
+- The PacketAgent production container on `10.80.12.12` was found unresponsive
+  (`/api/health` never returned, ~40% CPU sustained, ~190 TB read / ~124 TB
+  written since boot) with the healthcheck failing. Restarting the container
+  clears the symptom; the jobs-retention and per-poll SQLite-connection issues
+  above are the underlying causes and remain open.
 
 See [`dev/r8-release-reliability.md`](dev/r8-release-reliability.md) for the
 requirement-to-evidence matrix and reproducible commands.

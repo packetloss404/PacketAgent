@@ -34,6 +34,7 @@ function makeAgent(overrides: Partial<AgentRecord> = {}): AgentRecord {
         label: "Release ID",
         type: "string",
         required: true,
+        defaultValue: "REL-1",
       },
     ],
     createdAt: TEST_NOW,

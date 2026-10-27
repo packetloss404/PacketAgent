@@ -794,11 +794,16 @@ complete.
   stub-provider wording.
 - Keep `npm run typecheck`, `npm test`, `npm run build:web`, and the documented
   dependency-audit policy green. R1 owns the recorded advisory exception.
+- CI now enforces `npm run lint` (`eslint . --max-warnings=0`) and
+  `npm run format:check` as hard gates, and runs the authenticated browser gate
+  in its own job.
 - Shipped in R8: regression tests cover generated workspace path traversal,
   preview route serving, publish artifact validation, and rollback.
-- `npm run verify:workbench-browser` now captures ignored Builder app and
-  canonical Worker operations screenshots while testing real sign-in and
-  keyboard tab focus. Agent authoring remains covered by the stable component
+- `npm run verify:workbench-browser` now drives the real built workbench through
+  sign-in, Builder app and agent modes, the command palette, the canonical
+  Worker operations workbench, all twelve `/admin/:tab` surfaces, legacy Admin
+  redirects, and keyboard tab focus, and asserts a clean console. Agent
+  authoring additionally remains covered by the stable component
   characterization suite.
 - Keep generated artifacts out of git and document cleanup / reset commands.
 

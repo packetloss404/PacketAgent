@@ -411,6 +411,7 @@ export function seedStore(): PacketAgentData {
           label: "Mailbox label",
           type: "string",
           required: true,
+          defaultValue: "INBOX",
           description: "Inbox or label to scan.",
         },
         {

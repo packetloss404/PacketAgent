@@ -43,7 +43,7 @@ loop or reopen a gate. Only unchecked work in [`../BACKLOG.md`](../BACKLOG.md)
 is actionable, and the sole unchecked item is the credential-dependent live
 PacketChat/PacketPhone interoperability check.
 
-The 2026-08-01 documentation audit covers all 48 tracked Markdown files. Run:
+The documentation audit covers all 50 tracked Markdown files. Run:
 
 ```bash
 npm run verify:docs

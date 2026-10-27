@@ -169,21 +169,23 @@ function RunDeepContent({ id }: { id: string }) {
                 Retry
               </button>
             )}
-            <button
-              type="button"
-              className="top-btn"
-              disabled={runAction.pending}
-              onClick={() => void runAction.run("diagnose")}
-            >
-              {actionBusy === "diagnose" ? (
-                <span className="spin">
-                  <I.refresh size={13} />
-                </span>
-              ) : (
-                <I.sparkle size={13} />
-              )}{" "}
-              Diagnose
-            </button>
+            {(status === "failed" || status === "canceled") && (
+              <button
+                type="button"
+                className="top-btn"
+                disabled={runAction.pending}
+                onClick={() => void runAction.run("diagnose")}
+              >
+                {actionBusy === "diagnose" ? (
+                  <span className="spin">
+                    <I.refresh size={13} />
+                  </span>
+                ) : (
+                  <I.sparkle size={13} />
+                )}{" "}
+                Diagnose
+              </button>
+            )}
           </>
         }
       />

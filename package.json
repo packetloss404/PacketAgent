@@ -71,7 +71,7 @@
     "jobs:snapshot-metrics": "node --import tsx src/jobs.ts snapshot-job-metrics",
     "access-log:rotate": "node --import tsx src/security/access-log-rotate-cli.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

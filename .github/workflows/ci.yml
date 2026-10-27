@@ -36,17 +36,49 @@ jobs:
       - name: Build web
         run: npm run build:web
 
-      # Lint rules for legacy patterns are configured as warnings (see
-      # eslint.config.js), so this exits 0 and does not block CI yet.
+      # The inherited warning baseline was reduced to zero, so lint is a hard
+      # gate: any new error OR warning fails the build.
       - name: Lint
         run: npm run lint
 
-      # The pre-existing codebase has not yet been run through Prettier, so
-      # format:check is non-blocking until a one-time `npm run format` lands.
-      # Remove continue-on-error once the codebase is formatted to enforce it.
+      # The repository is fully Prettier-formatted, so formatting is a hard
+      # gate. Run `npm run format` locally if this fails.
       - name: Check formatting
         run: npm run format:check
-        continue-on-error: true
+
+  browser:
+    name: Authenticated browser end-to-end gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Builds the web bundle and server, then drives the real built workbench
+      # through sign-in, Builder app + agent modes, the command palette, the
+      # canonical Worker operations workbench, all twelve Admin surfaces, and
+      # legacy Admin redirects, asserting a clean console throughout.
+      - name: Run browser gate
+        run: npm run verify:workbench-browser
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workbench-browser-evidence
+          path: tmp/release-verification/
+          if-no-files-found: ignore
 
   docker:
     name: Docker build

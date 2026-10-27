@@ -377,3 +377,45 @@ test("assertion helpers expose path-addressable validation issues", () => {
     },
   );
 });
+
+test("a cron trigger requires every required input to declare a defaultValue", () => {
+  const content = makeWorkerVersionContent({
+    triggers: [
+      { id: "cron", kind: "cron", enabled: true, expression: "*/15 * * * *", timezone: "UTC" },
+    ],
+  });
+  const unsatisfiable = validateWorkerVersion(makeWorkerVersion({ content }));
+  assert.equal(unsatisfiable.ok, false);
+  assert.ok(
+    unsatisfiable.issues.some((entry) => entry.code === "trigger.cron_input_unsatisfiable"),
+    "an unsatisfiable cron input must fail closed",
+  );
+
+  const satisfiableContent = makeWorkerVersionContent({
+    inputSchema: {
+      fields: [
+        {
+          key: "release_id",
+          label: "Release ID",
+          type: "string",
+          required: true,
+          defaultValue: "REL-1",
+        },
+      ],
+      additionalProperties: false,
+    },
+    triggers: [
+      { id: "cron", kind: "cron", enabled: true, expression: "*/15 * * * *", timezone: "UTC" },
+    ],
+  });
+  assert.equal(validateWorkerVersion(makeWorkerVersion({ content: satisfiableContent })).ok, true);
+});
+
+test("a disabled cron trigger does not require satisfiable inputs", () => {
+  const content = makeWorkerVersionContent({
+    triggers: [
+      { id: "cron", kind: "cron", enabled: false, expression: "*/15 * * * *", timezone: "UTC" },
+    ],
+  });
+  assert.equal(validateWorkerVersion(makeWorkerVersion({ content })).ok, true);
+});

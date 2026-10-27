@@ -61,7 +61,7 @@ The following implemented subsystems are exercised by tests. Most are inherited 
 - **Three explicit persistence authorities** (`src/store/`, `src/repositories/`, `src/db/`). JSON is a contributor-only whole document; SQLite stores promoted collections in dedicated tables and the remainder in `app_records` inside one transaction; managed Postgres stores one advisory-lock-protected normalized document. Staged `db:backfill-*` / `db:verify-*` commands cover SQLite promotion and managed cutover; this is not live SQLite/Postgres dual-write replication.
 - **Distributed job scheduler** (`src/jobs/`). Persisted queue with five-field cron, exponential retry, and dead-letter - plus three leader-election strategies for multi-node coordination: a file TTL lock (`scheduler-lock.ts`), an HTTP coordinator (`scheduler-http-coordinator.ts`), and a noop, selected via `scheduler-leader-selection.ts`. Registers cron, metrics-snapshot, alert evaluate/deliver, workspace-scoped Worker retention, and canonical `worker.run` job types; shutdown releases claimed work instead of reporting false success.
 - **Integration connector verifier** (`src/integration-sandbox.ts`). Deterministically pre-flights model / db / email / webhook / payment / github / browser connector readiness before preview/runtime.
-- **RBAC, webhooks, share links, activation analytics.** `rbac.ts` (viewer/member/admin/owner, server-enforced), API-key auth, inbound webhooks that trigger agent runs, outbound webhooks (alerts + invitation-email delivery) with retry/dead-letter/signing, public share links, and an onboarding/activation analytics subsystem (`src/activation/*`).
+- **RBAC, webhooks, share links, activation analytics.** `rbac.ts` (viewer/member/admin/owner, server-enforced), inbound webhooks that trigger agent runs (authenticated by a per-agent URL token), outbound webhooks (alerts + invitation-email delivery) with retry, dead-letter, and a shared-secret delivery header, public share links, and an onboarding/activation analytics subsystem (`src/activation/*`).
 
 ## How it compares
 
@@ -203,7 +203,7 @@ You can also register a new account from the sign-up page. To reset local data b
 ### Run
 
 - **Workflows.** Briefs, requirements, plans, blockers, open questions, validation evidence, and release confirmation - all editable in the workbench, all versioned.
-- **Agent runs and runs activity.** Drilldown view at `/runs/:id` with transcript, tool-call timeline, logs, and a one-click failure-diagnostic helper. Runs execute through a real provider-routed tool-use loop with per-call cost accounting.
+- **Agent runs and runs activity.** The agent-run list lives at `/activity`; each run has a drilldown at `/runs/:id` (and `/activity/:id`) with transcript, tool-call timeline, logs, and a failure-diagnostic helper shown for failed or canceled runs. When a provider is configured, runs execute through a real provider-routed tool-use loop with per-call cost accounting; without one they run the deterministic local stub, which never claims a provider executed.
 - **Multi-provider routing.** Six providers wired through `ProviderRouter`: Anthropic, OpenAI, Gemini, OpenRouter, MiniMax, and a generic local-LLM provider (Ollama / vLLM / LM Studio / llama.cpp). Switch per-agent; bring your own keys.
 - **Browser tools.** Playwright-backed `browser_goto`, screenshots, and DOM tools for agent runs - real per-run headless chromium sessions with artifacts persisted under `data/artifacts/<runId>`.
 
@@ -211,13 +211,13 @@ You can also register a new account from the sign-up page. To reset local data b
 
 - **Encrypted secrets vault** - AES-256-GCM at rest, PBKDF2 100k iterations, auth-tag validation, masking, production `MASTER_KEY` enforcement.
 - **Audit log** for workspace actions, role changes, and sensitive mutations.
-- **Webhooks in and out.** Inbound public webhooks trigger agent runs; outbound webhooks deliver alerts and invitation events with retry, dead-letter, and shared-secret signing.
+- **Webhooks in and out.** Inbound public webhooks trigger agent runs (authenticated by a per-agent URL token); outbound webhooks deliver alerts and invitation events with retry, dead-letter, and a shared-secret delivery header.
 - **Persistent jobs queue + cron + distributed leader election.** Five-field cron for any registered job type, exponential retry, dead-letter, plus three leader-election strategies (file TTL lock, HTTP coordinator, noop) for multi-process / multi-node deployments.
 - **Alert engine.** `evaluateAlerts` + a delivery pipeline with metrics snapshots, scheduled as job types.
-- **SSE run streaming** for live transcripts and tool-call output.
-- **RBAC** with viewer / member / admin / owner roles, enforced server-side, plus API-key auth.
-- **Consolidated Admin.** Twelve live operator surfaces (Roles, SSO, Secrets, Rate limits, Webhooks, Notifications, Operations, Integrations, Activation, Sandbox, Workflows, Billing) live under a single tabbed `/admin/:tab` page. The sidebar collapses to four items: Build, Projects, Runs, Admin. Back-compat redirects keep supported old per-page URLs working.
-- **Command palette** (Cmd/Ctrl-K) for fast navigation and run shortcuts.
+- **Server-sent events** for builder plan/write progress, sandbox exec logs, and the bounded, resumable canonical Worker event journal. There is no live agent-run transcript stream; the agent-run drilldown is a snapshot.
+- **RBAC** with viewer / member / admin / owner roles, enforced server-side. Interactive auth is session-cookie based; the Admin "API keys" surface stores per-workspace provider credentials in the vault rather than a separate API-key auth scheme.
+- **Consolidated Admin.** Twelve operator surfaces (Roles, SSO, Secrets, Rate limits, Webhooks, Notifications, Operations, Integrations, Activation, Sandbox, Workflows, Billing) live under a single tabbed `/admin/:tab` page. Some are read-only reference or status views (for example Roles, SSO, and Rate limits) rather than editable controls. The sidebar collapses to four items: Build, Projects, Runs, Admin. Back-compat redirects keep supported old per-page URLs working.
+- **Command palette** (Cmd/Ctrl-K) for fast navigation and run shortcuts inside the workbench shell.
 
 ### Self-host
 
@@ -255,7 +255,7 @@ Six templates ship in `src/agent-templates.ts` and appear in the workbench templ
 | **Weekly release notes**  | Comms      | `0 16 * * 5`   | Drafts customer-facing release notes from completed plan items and validation evidence.        |
 | **Research summarizer**   | Research   | _on demand_    | Reads a URL, returns a structured summary with key findings, risks, and follow-up questions.   |
 
-Every template is editable; instantiate one and tune the instructions, tools, schedule, and input schema for your workspace.
+Every template is editable; instantiate one and tune the instructions, tools, schedule, and input schema for your workspace. A cron trigger cannot supply input values, so every required input on a scheduled template ships with a `defaultValue`; Worker validation rejects any version whose cron trigger has a required input without one.
 
 ## Sandboxed code execution
 

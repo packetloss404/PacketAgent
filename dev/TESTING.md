@@ -43,9 +43,9 @@ actual production-image proof. See
 [`r8-release-reliability.md`](r8-release-reliability.md) for the evidence
 matrix.
 
-Current R8 release and documentation checks (2026-08-01):
+Current release and documentation checks (2026-10-27):
 
-- `npm run verify:docs`: all 48 tracked Markdown files, local links, documented
+- `npm run verify:docs`: all tracked Markdown files, local links, documented
   npm commands, authority boundaries, backlog state, and README screenshots
   passed.
 - `npm run verify:release`: 13 deterministic groups passed, including the
@@ -58,14 +58,20 @@ Current R8 release and documentation checks (2026-08-01):
 - `npm run verify:production-image`: built the Dockerfile, inspected the exact
   `node --enable-source-maps dist/server.js` command, and booted the image as a
   non-root process with a read-only root filesystem.
-- Browser evidence is generated under ignored `tmp/release-verification/` for
-  Builder app and canonical Worker operations modes. Arrow-key focus and
-  selected-tab state are asserted. Reviewed copies are committed under
+- Browser evidence is generated under ignored `tmp/release-verification/`. The
+  authenticated gate covers sign-in, Builder app and agent modes, the command
+  palette, the canonical Worker operations workbench, all twelve `/admin/:tab`
+  surfaces, legacy Admin redirects, arrow-key focus and selected-tab state, and
+  asserts a clean console. Reviewed copies are committed under
   `docs/assets/readme/` for the public README.
-- Typecheck, zero-warning lint, and repository formatting pass.
-- Full API suite: 1,662 total; 1,659 passed, 3 intentionally skipped live
-  probes, 0 failed.
-- Full web suite: 58 passed, 0 skipped, 0 failed.
+- Typecheck, zero-warning lint (now `eslint . --max-warnings=0`), and
+  repository formatting pass; `format:check` is a hard CI gate.
+- Full API suite: 1,757 total; 1,754 passed, 3 intentionally skipped live
+  probes, 0 failed. A Windows file-handle race in
+  `src/workflow-prompt-service.test.ts` (renaming the shared
+  `data/packetagent.json`) appeared once in a baseline run and passes in
+  isolation; the atomic JSON write retry budget was widened to absorb it.
+- Full web suite: 72 passed, 0 skipped, 0 failed.
 
 Historical W10.4 baseline (2026-07-28):
 

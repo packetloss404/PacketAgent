@@ -6,6 +6,29 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-10-27 - Worker cron input safety, jobs and browser-gate hardening
+
+- Worker version validation now fails closed when an enabled `cron` trigger's
+  input schema has a required field without a `defaultValue`. A cron trigger
+  never carries input values, so that configuration previously failed admission
+  on every tick forever (`payload.<key> is required.`). The seeded support agent
+  and the `support_triage` template now declare a default mailbox, and legacy
+  Agents that still cannot project a valid Worker are left inert with a warning
+  instead of looping.
+- Agent templates that declare a schedule now set `triggerKind: "schedule"` when
+  instantiated, so the advertised cron schedules actually run.
+- Widened the atomic JSON store's transient-rename retry budget (up to ~2.3s) to
+  ride out Windows file-handle locks.
+- Activity search now filters by run id, agent, and error; the failure
+  "Diagnose" action is shown only for failed or canceled runs; `/alerts`
+  redirects to a real Admin tab; and the Webhooks copy no longer claims
+  HMAC-SHA256 signing.
+- Extended the authenticated browser gate to cover Builder agent mode, the
+  command palette, all twelve `/admin/:tab` surfaces, legacy Admin redirects,
+  and a zero-console-error assertion, and wired it into CI as its own job.
+- CI now treats `npm run lint` (`--max-warnings=0`) and `npm run format:check`
+  as hard gates instead of documentation-only conventions.
+
 ### 2026-09-03 - WorkerPackage signature verification
 
 - Added a workspace-scoped, public-key-only Ed25519 signing-key registry

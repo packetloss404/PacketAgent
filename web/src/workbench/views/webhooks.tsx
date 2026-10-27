@@ -41,7 +41,8 @@ export function WebhooksView() {
     <div style={{ padding: "26px 28px 60px", maxWidth: 1180 }}>
       <p className="muted" style={{ fontSize: 13, marginBottom: 20 }}>
         {webhookAgents.length} agent{webhookAgents.length === 1 ? "" : "s"} listening on webhook
-        triggers · signed with HMAC-SHA256, retried with exponential backoff.
+        triggers · authenticated by a per-agent URL token; outbound deliveries retry with
+        exponential backoff.
       </p>
 
       {agents.loading && <div className="muted">Loading…</div>}
