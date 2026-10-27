@@ -30,6 +30,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - CI now treats `npm run lint` (`--max-warnings=0`) and `npm run format:check`
   as hard gates instead of documentation-only conventions.
 
+- Added bounded retention for terminal job history. An hourly reconciler drops
+  terminal (`success`/`failed`/`canceled`) jobs older than
+  `PACKETAGENT_JOB_RETENTION_DAYS` (default 7), capped per pass; queued and
+  running jobs are never pruned. This bounds the `jobs` table that SQLite mode
+  otherwise rewrites in full on every store mutation.
+
 ### 2026-09-03 - WorkerPackage signature verification
 
 - Added a workspace-scoped, public-key-only Ed25519 signing-key registry

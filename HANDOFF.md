@@ -97,29 +97,39 @@ The highest-value known constraints, not automatic tasks, are:
 
 ## Known issues (2026-10-27)
 
-These are real, unfixed defects found while auditing the advertised surface.
-They are documented here rather than silently shipped:
+Real defects found while auditing the advertised surface. Fixed ones are noted
+as such; the rest are documented rather than silently shipped.
 
-- A cron trigger never carries input values, so a scheduled Worker whose input
-  schema has a required field without a `defaultValue` used to fail admission
-  forever. Cron projection now leaves such a trigger unscheduled instead of
-  enqueuing a recurring activation that can never succeed, the seed and
-  templates were corrected, and a legacy Agent that cannot project a valid
-  Worker is left inert with a warning.
-- The `jobs` table has no retention: terminal jobs accumulate without bound
-  (the production VPS held 127,500 rows). See the deploy note below.
-- In `PACKETAGENT_STORE=sqlite`, the scheduler opens a fresh SQLite connection
-  and re-applies migrations on every poll (`src/repositories/jobs-repo.ts`),
-  which is the dominant I/O cost under a large WAL.
-- The `/builder` full-bleed layout does not mount the command palette; it is
-  available in the workbench shell only.
-- The Admin Roles, SSO, and Rate-limits tabs are read-only reference/status
-  views, not editable controls.
-- The PacketAgent production container on `10.80.12.12` was found unresponsive
-  (`/api/health` never returned, ~40% CPU sustained, ~190 TB read / ~124 TB
-  written since boot) with the healthcheck failing. Restarting the container
-  clears the symptom; the jobs-retention and per-poll SQLite-connection issues
-  above are the underlying causes and remain open.
+- Fixed: a cron trigger never carries input values, so a scheduled Worker whose
+  input schema has a required field without a `defaultValue` used to fail
+  admission forever. Cron projection now leaves such a trigger unscheduled
+  instead of enqueuing a recurring activation that can never succeed, the seed
+  and templates were corrected, and a legacy Agent that cannot project a valid
+  Worker is left inert with a warning (marking it inert can no longer crash
+  startup).
+- Fixed: terminal job history is now bounded by an hourly retention reconciler
+  (`PACKETAGENT_JOB_RETENTION_DAYS`, default 7 days, capped per pass); queued
+  and running jobs are never pruned.
+- Open: in `PACKETAGENT_STORE=sqlite`, a store mutation rewrites the whole
+  `jobs` table (`delete from jobs` + re-insert every row,
+  `src/store/dedicated-tables.ts`) and `app_records`
+  (`src/store/backends/sqlite.ts`). Cost therefore scales with table size, so a
+  large job history makes every scheduler poll progressively more expensive.
+  Retention bounds the size; incremental row persistence is still unshipped.
+- Open: the scheduler opens a fresh SQLite connection and re-applies migrations
+  on every poll (`src/repositories/jobs-repo.ts`).
+- Open: the `/builder` full-bleed layout does not mount the command palette; it
+  is available in the workbench shell only.
+- Open: the Admin Roles, SSO, and Rate-limits tabs are read-only
+  reference/status views, not editable controls.
+- Production note: the PacketAgent container on `10.80.12.12` was found
+  unresponsive (`/api/health` never returned, ~40% CPU sustained, ~190 TB read /
+  ~124 TB written since boot, healthcheck failing) after ~7 weeks with 127,500
+  unbounded terminal jobs. On 2026-10-27 it was redeployed to the fixed build
+  and its terminal-job history was pruned and the SQLite file compacted
+  (97 MB -> 14 MB); it now reports healthy with `/api/health` 200 in ~3 ms and
+  ~0.6% CPU. The two open SQLite issues above are the underlying causes and
+  remain.
 
 See [`dev/r8-release-reliability.md`](dev/r8-release-reliability.md) for the
 requirement-to-evidence matrix and reproducible commands.

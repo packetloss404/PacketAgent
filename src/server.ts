@@ -60,6 +60,7 @@ import {
   ensureWorkerRetentionJobs,
   WORKER_RETENTION_JOB_TYPE,
 } from "./jobs/worker-retention-handler.js";
+import { parseJobRetentionDays, runJobsRetention } from "./jobs/retention.js";
 import { registerDefaultProviders } from "./providers/bootstrap.js";
 import { registerDefaultTools } from "./tools/bootstrap.js";
 import { getDefaultToolRegistry } from "./tools/registry.js";
@@ -646,6 +647,15 @@ scheduler.registerReconciler({
   intervalMs: 30_000,
   async run() {
     return workerRecoveryCoordinator.recoverExpired();
+  },
+});
+scheduler.registerReconciler({
+  name: "jobs-retention",
+  intervalMs: 60 * 60 * 1_000,
+  async run() {
+    return runJobsRetention({
+      retentionDays: parseJobRetentionDays(process.env.PACKETAGENT_JOB_RETENTION_DAYS),
+    });
   },
 });
 scheduler.register({
