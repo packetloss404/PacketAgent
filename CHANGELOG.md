@@ -8,13 +8,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### 2026-10-27 - Worker cron input safety, jobs and browser-gate hardening
 
-- Worker version validation now fails closed when an enabled `cron` trigger's
+- Worker cron projection now leaves a trigger unscheduled when the Worker's
   input schema has a required field without a `defaultValue`. A cron trigger
   never carries input values, so that configuration previously failed admission
   on every tick forever (`payload.<key> is required.`). The seeded support agent
   and the `support_triage` template now declare a default mailbox, and legacy
   Agents that still cannot project a valid Worker are left inert with a warning
-  instead of looping.
+  instead of looping. Marking a legacy Agent inert is now best-effort and can
+  never crash startup.
 - Agent templates that declare a schedule now set `triggerKind: "schedule"` when
   instantiated, so the advertised cron schedules actually run.
 - Widened the atomic JSON store's transient-rename retry budget (up to ~2.3s) to

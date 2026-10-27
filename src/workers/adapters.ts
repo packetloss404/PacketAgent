@@ -348,13 +348,28 @@ function cronTargets(data: PacketAgentData): Array<
     trigger: Extract<ActiveTriggerTarget["trigger"], { kind: "cron" }>;
   }
 > {
-  return activeTriggerTargets(data, (trigger) => trigger.kind === "cron").filter(
-    (
-      target,
-    ): target is ActiveTriggerTarget & {
-      trigger: Extract<ActiveTriggerTarget["trigger"], { kind: "cron" }>;
-    } => target.trigger.kind === "cron",
-  );
+  return activeTriggerTargets(data, (trigger) => trigger.kind === "cron")
+    .filter((target) => cronInputsSatisfiable(target.version))
+    .filter(
+      (
+        target,
+      ): target is ActiveTriggerTarget & {
+        trigger: Extract<ActiveTriggerTarget["trigger"], { kind: "cron" }>;
+      } => target.trigger.kind === "cron",
+    );
+}
+
+/**
+ * A cron trigger never carries input values: the scheduler admits the exact
+ * configured payload (`{}`) on every occurrence. A required input with no
+ * `defaultValue` can therefore never be satisfied, and enqueuing a recurring
+ * activation for it would fail admission on every tick forever. Such a trigger
+ * is left unscheduled instead, so the loop cannot form.
+ */
+function cronInputsSatisfiable(version: WorkerVersion): boolean {
+  const fields = version.content.inputSchema?.fields;
+  if (!Array.isArray(fields)) return true;
+  return fields.every((field) => !field.required || field.defaultValue !== undefined);
 }
 
 function cronTargetKey(target: ActiveTriggerTarget): string {

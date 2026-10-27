@@ -255,7 +255,7 @@ Six templates ship in `src/agent-templates.ts` and appear in the workbench templ
 | **Weekly release notes**  | Comms      | `0 16 * * 5`   | Drafts customer-facing release notes from completed plan items and validation evidence.        |
 | **Research summarizer**   | Research   | _on demand_    | Reads a URL, returns a structured summary with key findings, risks, and follow-up questions.   |
 
-Every template is editable; instantiate one and tune the instructions, tools, schedule, and input schema for your workspace. A cron trigger cannot supply input values, so every required input on a scheduled template ships with a `defaultValue`; Worker validation rejects any version whose cron trigger has a required input without one.
+Every template is editable; instantiate one and tune the instructions, tools, schedule, and input schema for your workspace. A cron trigger cannot supply input values, so every required input on a scheduled template ships with a `defaultValue`; PacketAgent does not schedule a cron trigger whose required inputs cannot be satisfied, so an unsatisfiable schedule is left unscheduled instead of failing on every tick.
 
 ## Sandboxed code execution
 

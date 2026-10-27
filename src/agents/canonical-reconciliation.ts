@@ -54,10 +54,18 @@ export async function reconcileLegacyAgentWorkers(
       });
       materialized += 1;
     } catch (error) {
-      await makeLegacyAgentWorkerInert(agent, lifecycle);
+      // Marking the projection inert is best-effort: it must never crash
+      // startup, so a failure here is reported alongside the original error
+      // rather than escaping this loop.
+      let inertMessage = "";
+      try {
+        await makeLegacyAgentWorkerInert(agent, lifecycle);
+      } catch (inertError) {
+        inertMessage = ` (could not mark inert: ${redactedErrorMessage(inertError)})`;
+      }
       failures.push({
         agentId: agent.id,
-        message: redactedErrorMessage(error),
+        message: `${redactedErrorMessage(error)}${inertMessage}`,
       });
     }
   }

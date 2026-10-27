@@ -125,6 +125,34 @@ test("cron projection creates one timezone-aware durable occurrence and cancels 
   assert.equal(projection2.id, projection1.id);
 });
 
+test("cron projection skips a trigger whose required inputs cannot be satisfied", async () => {
+  const data = activeAdapterData();
+  data.workerVersions[0] = {
+    ...data.workerVersions[0],
+    content: {
+      ...data.workerVersions[0].content,
+      inputSchema: {
+        fields: [{ key: "mailbox", label: "Mailbox", type: "string", required: true }],
+        additionalProperties: false,
+      },
+    },
+  };
+  const dependencies = {
+    now: () => new Date(TEST_NOW),
+    id: () => "cron-job-unsatisfiable",
+    mutateStore: async <T>(mutator: (store: PacketAgentData) => T | Promise<T>): Promise<T> =>
+      await mutator(data),
+  };
+
+  const projection = await projectWorkerCronTriggers(dependencies);
+  assert.deepEqual(projection, { desired: 0, enqueued: 0, canceled: 0 });
+  assert.equal(
+    data.jobs.some((job) => job.type === WORKER_CRON_ACTIVATION_JOB_TYPE),
+    false,
+    "an unsatisfiable cron trigger must not enqueue a recurring activation",
+  );
+});
+
 test("every source adapter replays through the common inbox without creating another run", async () => {
   const data = activeAdapterData();
   const repository = createWorkerActivationRepository({

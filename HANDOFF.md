@@ -102,9 +102,10 @@ They are documented here rather than silently shipped:
 
 - A cron trigger never carries input values, so a scheduled Worker whose input
   schema has a required field without a `defaultValue` used to fail admission
-  forever. Worker validation now rejects that configuration fail-closed, and
-  the seed plus templates were corrected, but a pre-existing deployment must be
-  re-validated.
+  forever. Cron projection now leaves such a trigger unscheduled instead of
+  enqueuing a recurring activation that can never succeed, the seed and
+  templates were corrected, and a legacy Agent that cannot project a valid
+  Worker is left inert with a warning.
 - The `jobs` table has no retention: terminal jobs accumulate without bound
   (the production VPS held 127,500 rows). See the deploy note below.
 - In `PACKETAGENT_STORE=sqlite`, the scheduler opens a fresh SQLite connection
