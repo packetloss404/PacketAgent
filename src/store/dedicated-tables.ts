@@ -1,4 +1,4 @@
-import { type DatabaseSync } from "node:sqlite";
+import { type DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { normalizeActivationSignalRecord } from "./normalize.js";
 import type {
   WorkerCheckpoint,
@@ -534,633 +534,1040 @@ function loadDedicatedActivationSignals(db: DatabaseSync): ActivationSignalRecor
   return rows.map(activationSignalRowToRecord);
 }
 
-export function persistDedicatedRelationalRows(db: DatabaseSync, data: PacketAgentData): void {
-  persistDedicatedJobMetricSnapshots(db, data.jobMetricSnapshots ?? []);
-  persistDedicatedAlertEvents(db, data.alertEvents ?? []);
-  persistDedicatedAgentRuns(db, data.agentRuns ?? []);
-  persistDedicatedJobs(db, data.jobs ?? []);
-  persistDedicatedInvitationEmailDeliveries(db, data.invitationEmailDeliveries ?? []);
-  persistDedicatedActivities(db, data.activities ?? []);
-  persistDedicatedProviderCalls(db, data.providerCalls ?? []);
-  persistDedicatedActivationSignals(db, data.activationSignals ?? []);
-  persistDedicatedWorkerRecords(db, data);
+// ---------------------------------------------------------------------------
+// Incremental dedicated-table persistence
+//
+// The store is a whole-document read-modify-write: a mutation loads the entire
+// dataset, mutates it in memory, then persists it. Persisting by deleting and
+// re-inserting every row of every dedicated table made one mutation cost scale
+// with the total table size (the production incident: ~127k terminal jobs
+// rewrote the whole `jobs` table on every write).
+//
+// `persistDedicatedRelationalRows` now diffs the mutated dataset against the
+// snapshot captured when it was loaded and writes only rows that changed or
+// disappeared. A row's signature is its serialized record, so the comparison is
+// exact and independent of how the individual columns are stored.
+// ---------------------------------------------------------------------------
+
+/** Serialized signature of every dedicated row, keyed by table then row key. */
+export type DedicatedRowSnapshot = Map<string, Map<string, string>>;
+
+const ROW_KEY_SEPARATOR = "\u0000";
+
+interface DedicatedTableSpec<T> {
+  table: string;
+  columns: string[];
+  keyColumns: string[];
+  keyValues: (record: T) => string[];
+  values: (record: T) => SQLInputValue[];
 }
 
-function persistDedicatedWorkerRecords(db: DatabaseSync, data: PacketAgentData): void {
-  db.exec(`
-    delete from packet_product_event_acknowledgements;
-    delete from worker_package_deployments;
-    delete from worker_package_receipts;
-    delete from packet_product_credentials;
-    delete from worker_artifact_manifests;
-    delete from worker_evidence_entries;
-    delete from worker_activation_inbox;
-    delete from worker_activation_payloads;
-    delete from worker_events;
-    delete from worker_command_receipts;
-    delete from worker_deployment_rollouts;
-    delete from worker_effect_receipts;
-    delete from worker_checkpoints;
-    delete from worker_runs;
-    delete from worker_deployments;
-    delete from worker_versions;
-    delete from worker_definitions;
-  `);
-
-  const packetProductCredentialStatement = db.prepare(`
-    insert into packet_product_credentials (
-      workspace_id, id, product, subject_id, status, token_digest,
-      require_package_signature, expires_at, created_at, updated_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.packetProductCredentials ?? []) {
-    packetProductCredentialStatement.run(
-      record.workspaceId,
-      record.id,
-      record.product,
-      record.subjectId,
-      record.status,
-      record.tokenDigest,
-      record.requirePackageSignature ? 1 : 0,
-      record.expiresAt ?? null,
-      record.createdAt,
-      record.updatedAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const workerPackageReceiptStatement = db.prepare(`
-    insert into worker_package_receipts (
-      workspace_id, id, package_id, package_version, idempotency_key,
-      package_digest, request_digest, credential_id, accepted_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerPackageReceipts ?? []) {
-    workerPackageReceiptStatement.run(
-      record.workspaceId,
-      record.id,
-      record.packageId,
-      record.packageVersion,
-      record.idempotencyKey,
-      record.packageDigest,
-      record.requestDigest,
-      record.credentialId,
-      record.acceptedAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const definitionStatement = db.prepare(`
-    insert into worker_definitions (
-      workspace_id, id, status, name, current_version_id, updated_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerDefinitions ?? []) {
-    definitionStatement.run(
-      record.workspaceId,
-      record.id,
-      record.status,
-      record.name,
-      record.currentVersionId ?? null,
-      record.updatedAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const versionStatement = db.prepare(`
-    insert into worker_versions (
-      workspace_id, id, worker_definition_id, version, status,
-      content_digest, created_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerVersions ?? []) {
-    versionStatement.run(
-      record.workspaceId,
-      record.id,
-      record.workerDefinitionId,
-      record.version,
-      record.status,
-      record.contentDigest,
-      record.createdAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const deploymentStatement = db.prepare(`
-    insert into worker_deployments (
-      workspace_id, id, worker_definition_id, worker_version_id,
-      status, revision, updated_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerDeployments ?? []) {
-    deploymentStatement.run(
-      record.workspaceId,
-      record.id,
-      record.workerDefinitionId,
-      record.workerVersionId,
-      record.status,
-      record.revision,
-      record.updatedAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const workerPackageDeploymentStatement = db.prepare(`
-    insert into worker_package_deployments (
-      workspace_id, id, receipt_id, package_id, package_version, package_digest,
-      worker_definition_id, worker_version_id, worker_deployment_id,
-      operation, created_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerPackageDeployments ?? []) {
-    workerPackageDeploymentStatement.run(
-      record.workspaceId,
-      record.id,
-      record.receiptId,
-      record.packageId,
-      record.packageVersion,
-      record.packageDigest,
-      record.workerDefinitionId,
-      record.workerVersionId,
-      record.workerDeploymentId,
-      record.operation,
-      record.createdAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const runStatement = db.prepare(`
-    insert into worker_runs (
-      workspace_id, id, worker_definition_id, worker_version_id,
-      worker_deployment_id, status, attempt, updated_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerRuns ?? []) {
-    runStatement.run(
-      record.workspaceId,
-      record.id,
-      record.workerDefinitionId,
-      record.workerVersionId,
-      record.workerDeploymentId,
-      record.status,
-      record.attempt,
-      record.updatedAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const packetProductEventAcknowledgementStatement = db.prepare(`
-    insert into packet_product_event_acknowledgements (
-      workspace_id, id, credential_id, package_deployment_id,
-      worker_deployment_id, stream_kind, worker_run_id, idempotency_key,
-      request_digest, event_id, workspace_sequence, effective_event_id,
-      effective_workspace_sequence, expected_revision, disposition,
-      applied_revision, acknowledged_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.packetProductEventAcknowledgements ?? []) {
-    packetProductEventAcknowledgementStatement.run(
-      record.workspaceId,
-      record.id,
-      record.credentialId,
-      record.packageDeploymentId,
-      record.workerDeploymentId,
-      record.streamKind,
-      record.workerRunId ?? null,
-      record.idempotencyKey,
-      record.requestDigest,
-      record.eventId,
-      record.workspaceSequence,
-      record.effectiveEventId,
-      record.effectiveWorkspaceSequence,
-      record.expectedRevision,
-      record.disposition,
-      record.appliedRevision,
-      record.acknowledgedAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const activationPayloadStatement = db.prepare(`
-    insert into worker_activation_payloads (
-      workspace_id, id, reference, digest, classification,
-      byte_length, expires_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerActivationPayloads ?? []) {
-    activationPayloadStatement.run(
-      record.workspaceId,
-      record.id,
-      record.reference,
-      record.digest,
-      record.classification,
-      record.byteLength,
-      record.expiresAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const activationInboxStatement = db.prepare(`
-    insert into worker_activation_inbox (
-      workspace_id, id, worker_deployment_id, worker_version_id,
-      trigger_id, source, delivery_id, request_digest, disposition,
-      worker_run_id, execution_job_id, first_seen_at, last_seen_at,
-      duplicate_count, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerActivationInboxes ?? []) {
-    activationInboxStatement.run(
-      record.workspaceId,
-      record.id,
-      record.workerDeploymentId,
-      record.workerVersionId,
-      record.triggerId,
-      record.source,
-      record.deliveryId,
-      record.requestDigest,
-      record.disposition,
-      record.workerRunId,
-      record.executionJobId,
-      record.firstSeenAt,
-      record.lastSeenAt,
-      record.duplicateCount,
-      JSON.stringify(record),
-    );
-  }
-
-  const checkpointStatement = db.prepare(`
-    insert into worker_checkpoints (
-      workspace_id, id, worker_run_id, worker_version_id,
-      sequence, created_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerCheckpoints ?? []) {
-    checkpointStatement.run(
-      record.workspaceId,
-      record.id,
-      record.workerRunId,
-      record.workerVersionId,
-      record.sequence,
-      record.createdAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const effectReceiptStatement = db.prepare(`
-    insert into worker_effect_receipts (
-      workspace_id, id, worker_run_id, worker_version_id, worker_deployment_id,
-      effect_key, iteration, action_id, capability_id, tool_name, operation,
-      input_digest, classification, status, prepared_at, completed_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerEffectReceipts ?? []) {
-    effectReceiptStatement.run(
-      record.workspaceId,
-      record.id,
-      record.workerRunId,
-      record.workerVersionId,
-      record.workerDeploymentId,
-      record.effectKey,
-      record.iteration,
-      record.actionId,
-      record.capabilityId,
-      record.toolName,
-      record.operation,
-      record.inputDigest,
-      record.classification,
-      record.status,
-      record.preparedAt,
-      record.completedAt ?? null,
-      JSON.stringify(record),
-    );
-  }
-
-  const rolloutStatement = db.prepare(`
-    insert into worker_deployment_rollouts (
-      workspace_id, id, worker_definition_id, from_deployment_id,
-      to_deployment_id, kind, created_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerDeploymentRollouts ?? []) {
-    rolloutStatement.run(
-      record.workspaceId,
-      record.id,
-      record.workerDefinitionId,
-      record.fromDeploymentId,
-      record.toDeploymentId,
-      record.kind,
-      record.createdAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const receiptStatement = db.prepare(`
-    insert into worker_command_receipts (
-      workspace_id, id, idempotency_key, operation, target_id,
-      request_digest, created_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerCommandReceipts ?? []) {
-    receiptStatement.run(
-      record.workspaceId,
-      record.id,
-      record.idempotencyKey,
-      record.operation,
-      record.targetId ?? null,
-      record.requestDigest,
-      record.createdAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const eventStatement = db.prepare(`
-    insert into worker_events (
-      workspace_id, id, sequence, type, worker_definition_id,
-      worker_version_id, worker_deployment_id, worker_run_id, source,
-      deployment_sequence, run_sequence, evidence_id, event_digest,
-      occurred_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerEvents ?? []) {
-    const v2 = record.schemaVersion === "packetagent.worker-event/v2" ? record : undefined;
-    eventStatement.run(
-      record.workspaceId,
-      record.id,
-      record.sequence,
-      record.type,
-      record.workerDefinitionId,
-      record.workerVersionId ?? null,
-      record.workerDeploymentId ?? null,
-      v2?.workerRunId ?? null,
-      v2?.source ?? null,
-      v2?.deploymentSequence ?? null,
-      v2?.runSequence ?? null,
-      v2?.evidenceId ?? null,
-      v2?.eventDigest ?? null,
-      record.occurredAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const evidenceStatement = db.prepare(`
-    insert into worker_evidence_entries (
-      workspace_id, id, sequence, worker_definition_id, worker_version_id,
-      worker_deployment_id, worker_run_id, source_event_id, created_at, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerEvidenceEntries ?? []) {
-    evidenceStatement.run(
-      record.workspaceId,
-      record.id,
-      record.sequence,
-      record.workerDefinitionId,
-      record.workerVersionId ?? null,
-      record.workerDeploymentId ?? null,
-      record.workerRunId ?? null,
-      record.sourceEventId,
-      record.createdAt,
-      JSON.stringify(record),
-    );
-  }
-
-  const artifactManifestStatement = db.prepare(`
-    insert into worker_artifact_manifests (
-      workspace_id, id, worker_definition_id, worker_version_id,
-      worker_deployment_id, worker_run_id, created_at, expires_at,
-      manifest_digest, payload
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of data.workerArtifactManifests ?? []) {
-    artifactManifestStatement.run(
-      record.workspaceId,
-      record.id,
-      record.workerDefinitionId,
-      record.workerVersionId,
-      record.workerDeploymentId,
-      record.workerRunId,
-      record.createdAt,
-      record.expiresAt ?? null,
-      record.manifestDigest,
-      JSON.stringify(record),
-    );
-  }
+interface DedicatedTablePlan {
+  table: string;
+  columns: string[];
+  keyColumns: string[];
+  rows: Array<{
+    key: string;
+    signature: string;
+    values: SQLInputValue[];
+  }>;
 }
 
-function persistDedicatedJobMetricSnapshots(
+function buildTablePlan<T>(spec: DedicatedTableSpec<T>, records: readonly T[]): DedicatedTablePlan {
+  return {
+    table: spec.table,
+    columns: spec.columns,
+    keyColumns: spec.keyColumns,
+    rows: records.map((record) => {
+      const keyValues = spec.keyValues(record);
+      return {
+        key: keyValues.join(ROW_KEY_SEPARATOR),
+        signature: JSON.stringify(record),
+        values: spec.values(record),
+      };
+    }),
+  };
+}
+
+// Rows are deleted children-first so a removed parent never trips
+// `on delete restrict`. Upserts run in the reverse (dependency) order — the
+// order of `dedicatedTablePlans` — so a new child always follows its parent.
+const DEDICATED_TABLE_DELETE_ORDER = [
+  "packet_product_event_acknowledgements",
+  "worker_package_deployments",
+  "worker_package_receipts",
+  "packet_product_credentials",
+  "worker_artifact_manifests",
+  "worker_evidence_entries",
+  "worker_activation_inbox",
+  "worker_activation_payloads",
+  "worker_events",
+  "worker_command_receipts",
+  "worker_deployment_rollouts",
+  "worker_effect_receipts",
+  "worker_checkpoints",
+  "worker_runs",
+  "worker_deployments",
+  "worker_versions",
+  "worker_definitions",
+  "job_metric_snapshots",
+  "alert_events",
+  "agent_runs",
+  "jobs",
+  "invitation_email_deliveries",
+  "activities",
+  "provider_calls",
+  "activation_signals",
+] as const;
+
+function dedicatedTablePlans(data: PacketAgentData): DedicatedTablePlan[] {
+  return [
+    buildTablePlan<JobMetricSnapshotRecord>(
+      {
+        table: "job_metric_snapshots",
+        keyColumns: ["id"],
+        columns: [
+          "id",
+          "captured_at",
+          "type",
+          "total_runs",
+          "succeeded_runs",
+          "failed_runs",
+          "canceled_runs",
+          "last_run_started_at",
+          "last_run_finished_at",
+          "last_duration_ms",
+          "average_duration_ms",
+          "p95_duration_ms",
+        ],
+        keyValues: (record) => [record.id],
+        values: (record) => [
+          record.id,
+          record.capturedAt,
+          record.type,
+          record.totalRuns,
+          record.succeededRuns,
+          record.failedRuns,
+          record.canceledRuns,
+          record.lastRunStartedAt ?? null,
+          record.lastRunFinishedAt ?? null,
+          record.lastDurationMs ?? null,
+          record.averageDurationMs ?? null,
+          record.p95DurationMs ?? null,
+        ],
+      },
+      data.jobMetricSnapshots ?? [],
+    ),
+    buildTablePlan<AlertEventRecord>(
+      {
+        table: "alert_events",
+        keyColumns: ["id"],
+        columns: [
+          "id",
+          "rule_id",
+          "severity",
+          "title",
+          "detail",
+          "observed_at",
+          "context",
+          "delivered",
+          "delivery_error",
+          "delivery_attempts",
+          "last_delivery_attempt_at",
+          "dead_lettered",
+        ],
+        keyValues: (record) => [record.id],
+        values: (record) => [
+          record.id,
+          record.ruleId,
+          record.severity,
+          record.title,
+          record.detail,
+          record.observedAt,
+          JSON.stringify(record.context ?? {}),
+          record.delivered ? 1 : 0,
+          record.deliveryError ?? null,
+          record.deliveryAttempts ?? null,
+          record.lastDeliveryAttemptAt ?? null,
+          record.deadLettered === undefined ? null : record.deadLettered ? 1 : 0,
+        ],
+      },
+      data.alertEvents ?? [],
+    ),
+    buildTablePlan<AgentRunRecord>(
+      {
+        table: "agent_runs",
+        keyColumns: ["id"],
+        columns: [
+          "id",
+          "workspace_id",
+          "agent_id",
+          "worker_definition_id",
+          "worker_version_id",
+          "worker_deployment_id",
+          "worker_run_id",
+          "title",
+          "status",
+          "trigger_kind",
+          "started_at",
+          "completed_at",
+          "inputs",
+          "output",
+          "error",
+          "logs",
+          "tool_calls",
+          "transcript",
+          "model_used",
+          "cost_usd",
+          "evaluation",
+          "created_at",
+          "updated_at",
+        ],
+        keyValues: (record) => [record.id],
+        values: (record) => [
+          record.id,
+          record.workspaceId,
+          record.agentId ?? null,
+          record.workerDefinitionId ?? null,
+          record.workerVersionId ?? null,
+          record.workerDeploymentId ?? null,
+          record.workerRunId ?? null,
+          record.title,
+          record.status,
+          record.triggerKind ?? null,
+          record.startedAt ?? null,
+          record.completedAt ?? null,
+          record.inputs === undefined ? null : JSON.stringify(record.inputs),
+          record.output ?? null,
+          record.error ?? null,
+          JSON.stringify(record.logs ?? []),
+          record.toolCalls === undefined ? null : JSON.stringify(record.toolCalls),
+          record.transcript === undefined ? null : JSON.stringify(record.transcript),
+          record.modelUsed ?? null,
+          record.costUsd ?? null,
+          record.evaluation === undefined ? null : JSON.stringify(record.evaluation),
+          record.createdAt,
+          record.updatedAt,
+        ],
+      },
+      data.agentRuns ?? [],
+    ),
+    buildTablePlan<JobRecord>(
+      {
+        table: "jobs",
+        keyColumns: ["id"],
+        columns: [
+          "id",
+          "workspace_id",
+          "type",
+          "payload",
+          "status",
+          "attempts",
+          "max_attempts",
+          "scheduled_at",
+          "started_at",
+          "completed_at",
+          "cron",
+          "result",
+          "error",
+          "cancel_requested",
+          "created_at",
+          "updated_at",
+        ],
+        keyValues: (record) => [record.id],
+        values: (record) => [
+          record.id,
+          record.workspaceId,
+          record.type,
+          JSON.stringify(record.payload ?? {}),
+          record.status,
+          record.attempts,
+          record.maxAttempts,
+          record.scheduledAt,
+          record.startedAt ?? null,
+          record.completedAt ?? null,
+          record.cron ?? null,
+          record.result === undefined ? null : JSON.stringify(record.result),
+          record.error ?? null,
+          record.cancelRequested === undefined ? null : record.cancelRequested ? 1 : 0,
+          record.createdAt,
+          record.updatedAt,
+        ],
+      },
+      data.jobs ?? [],
+    ),
+    buildTablePlan<InvitationEmailDeliveryRecord>(
+      {
+        table: "invitation_email_deliveries",
+        keyColumns: ["id"],
+        columns: [
+          "id",
+          "workspace_id",
+          "invitation_id",
+          "recipient_email",
+          "subject",
+          "status",
+          "provider",
+          "mode",
+          "created_at",
+          "sent_at",
+          "error",
+          "provider_status",
+          "provider_delivery_id",
+          "provider_status_at",
+          "provider_error",
+        ],
+        keyValues: (record) => [record.id],
+        values: (record) => [
+          record.id,
+          record.workspaceId,
+          record.invitationId,
+          record.recipientEmail,
+          record.subject,
+          record.status,
+          record.provider,
+          record.mode,
+          record.createdAt,
+          record.sentAt ?? null,
+          record.error ?? null,
+          record.providerStatus ?? null,
+          record.providerDeliveryId ?? null,
+          record.providerStatusAt ?? null,
+          record.providerError ?? null,
+        ],
+      },
+      data.invitationEmailDeliveries ?? [],
+    ),
+    buildTablePlan<ActivityRecord>(
+      {
+        table: "activities",
+        keyColumns: ["id"],
+        columns: [
+          "id",
+          "workspace_id",
+          "occurred_at",
+          "type",
+          "payload",
+          "user_id",
+          "related_subject",
+        ],
+        keyValues: (record) => [record.id],
+        values: (record) => [
+          record.id,
+          record.workspaceId,
+          record.occurredAt,
+          record.event,
+          JSON.stringify(record),
+          record.actor.type === "user" ? record.actor.id : null,
+          null,
+        ],
+      },
+      data.activities ?? [],
+    ),
+    buildTablePlan<ProviderCallRecord>(
+      {
+        table: "provider_calls",
+        keyColumns: ["id"],
+        columns: [
+          "id",
+          "workspace_id",
+          "route_key",
+          "provider",
+          "model",
+          "prompt_tokens",
+          "completion_tokens",
+          "cost_usd",
+          "duration_ms",
+          "status",
+          "error_message",
+          "started_at",
+          "completed_at",
+        ],
+        keyValues: (record) => [record.id],
+        values: (record) => [
+          record.id,
+          record.workspaceId,
+          record.routeKey,
+          record.provider,
+          record.model,
+          record.promptTokens,
+          record.completionTokens,
+          record.costUsd,
+          record.durationMs,
+          record.status,
+          record.errorMessage ?? null,
+          record.startedAt,
+          record.completedAt,
+        ],
+      },
+      data.providerCalls ?? [],
+    ),
+    buildTablePlan<ActivationSignalRecord>(
+      {
+        table: "activation_signals",
+        keyColumns: ["id"],
+        columns: [
+          "id",
+          "workspace_id",
+          "kind",
+          "source",
+          "origin",
+          "source_id",
+          "stable_key",
+          "data",
+          "created_at",
+          "updated_at",
+        ],
+        keyValues: (record) => [record.id],
+        values: (record) => [
+          record.id,
+          record.workspaceId,
+          record.kind,
+          record.source,
+          record.origin ?? null,
+          record.sourceId ?? null,
+          record.stableKey ?? null,
+          record.data === undefined ? null : JSON.stringify(record.data),
+          record.createdAt,
+          record.updatedAt,
+        ],
+      },
+      (data.activationSignals ?? []).map(normalizeActivationSignalRecord),
+    ),
+    buildTablePlan<PacketProductCredentialRecord>(
+      {
+        table: "packet_product_credentials",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "product",
+          "subject_id",
+          "status",
+          "token_digest",
+          "require_package_signature",
+          "expires_at",
+          "created_at",
+          "updated_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.product,
+          record.subjectId,
+          record.status,
+          record.tokenDigest,
+          record.requirePackageSignature ? 1 : 0,
+          record.expiresAt ?? null,
+          record.createdAt,
+          record.updatedAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.packetProductCredentials ?? [],
+    ),
+    buildTablePlan<WorkerPackageReceipt>(
+      {
+        table: "worker_package_receipts",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "package_id",
+          "package_version",
+          "idempotency_key",
+          "package_digest",
+          "request_digest",
+          "credential_id",
+          "accepted_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.packageId,
+          record.packageVersion,
+          record.idempotencyKey,
+          record.packageDigest,
+          record.requestDigest,
+          record.credentialId,
+          record.acceptedAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerPackageReceipts ?? [],
+    ),
+    buildTablePlan<WorkerDefinition>(
+      {
+        table: "worker_definitions",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "status",
+          "name",
+          "current_version_id",
+          "updated_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.status,
+          record.name,
+          record.currentVersionId ?? null,
+          record.updatedAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerDefinitions ?? [],
+    ),
+    buildTablePlan<WorkerVersion>(
+      {
+        table: "worker_versions",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "worker_definition_id",
+          "version",
+          "status",
+          "content_digest",
+          "created_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.workerDefinitionId,
+          record.version,
+          record.status,
+          record.contentDigest,
+          record.createdAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerVersions ?? [],
+    ),
+    buildTablePlan<WorkerDeployment>(
+      {
+        table: "worker_deployments",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "worker_definition_id",
+          "worker_version_id",
+          "status",
+          "revision",
+          "updated_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.workerDefinitionId,
+          record.workerVersionId,
+          record.status,
+          record.revision,
+          record.updatedAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerDeployments ?? [],
+    ),
+    buildTablePlan<WorkerPackageDeploymentRecord>(
+      {
+        table: "worker_package_deployments",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "receipt_id",
+          "package_id",
+          "package_version",
+          "package_digest",
+          "worker_definition_id",
+          "worker_version_id",
+          "worker_deployment_id",
+          "operation",
+          "created_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.receiptId,
+          record.packageId,
+          record.packageVersion,
+          record.packageDigest,
+          record.workerDefinitionId,
+          record.workerVersionId,
+          record.workerDeploymentId,
+          record.operation,
+          record.createdAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerPackageDeployments ?? [],
+    ),
+    buildTablePlan<WorkerRun>(
+      {
+        table: "worker_runs",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "worker_definition_id",
+          "worker_version_id",
+          "worker_deployment_id",
+          "status",
+          "attempt",
+          "updated_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.workerDefinitionId,
+          record.workerVersionId,
+          record.workerDeploymentId,
+          record.status,
+          record.attempt,
+          record.updatedAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerRuns ?? [],
+    ),
+    buildTablePlan<PacketProductEventAcknowledgementRecord>(
+      {
+        table: "packet_product_event_acknowledgements",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "credential_id",
+          "package_deployment_id",
+          "worker_deployment_id",
+          "stream_kind",
+          "worker_run_id",
+          "idempotency_key",
+          "request_digest",
+          "event_id",
+          "workspace_sequence",
+          "effective_event_id",
+          "effective_workspace_sequence",
+          "expected_revision",
+          "disposition",
+          "applied_revision",
+          "acknowledged_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.credentialId,
+          record.packageDeploymentId,
+          record.workerDeploymentId,
+          record.streamKind,
+          record.workerRunId ?? null,
+          record.idempotencyKey,
+          record.requestDigest,
+          record.eventId,
+          record.workspaceSequence,
+          record.effectiveEventId,
+          record.effectiveWorkspaceSequence,
+          record.expectedRevision,
+          record.disposition,
+          record.appliedRevision,
+          record.acknowledgedAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.packetProductEventAcknowledgements ?? [],
+    ),
+    buildTablePlan<WorkerActivationPayloadRecord>(
+      {
+        table: "worker_activation_payloads",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "reference",
+          "digest",
+          "classification",
+          "byte_length",
+          "expires_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.reference,
+          record.digest,
+          record.classification,
+          record.byteLength,
+          record.expiresAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerActivationPayloads ?? [],
+    ),
+    buildTablePlan<WorkerActivationInboxRecord>(
+      {
+        table: "worker_activation_inbox",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "worker_deployment_id",
+          "worker_version_id",
+          "trigger_id",
+          "source",
+          "delivery_id",
+          "request_digest",
+          "disposition",
+          "worker_run_id",
+          "execution_job_id",
+          "first_seen_at",
+          "last_seen_at",
+          "duplicate_count",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.workerDeploymentId,
+          record.workerVersionId,
+          record.triggerId,
+          record.source,
+          record.deliveryId,
+          record.requestDigest,
+          record.disposition,
+          record.workerRunId ?? null,
+          record.executionJobId ?? null,
+          record.firstSeenAt,
+          record.lastSeenAt,
+          record.duplicateCount,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerActivationInboxes ?? [],
+    ),
+    buildTablePlan<WorkerCheckpoint>(
+      {
+        table: "worker_checkpoints",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "worker_run_id",
+          "worker_version_id",
+          "sequence",
+          "created_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.workerRunId,
+          record.workerVersionId,
+          record.sequence,
+          record.createdAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerCheckpoints ?? [],
+    ),
+    buildTablePlan<WorkerEffectReceipt>(
+      {
+        table: "worker_effect_receipts",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "worker_run_id",
+          "worker_version_id",
+          "worker_deployment_id",
+          "effect_key",
+          "iteration",
+          "action_id",
+          "capability_id",
+          "tool_name",
+          "operation",
+          "input_digest",
+          "classification",
+          "status",
+          "prepared_at",
+          "completed_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.workerRunId,
+          record.workerVersionId,
+          record.workerDeploymentId,
+          record.effectKey,
+          record.iteration,
+          record.actionId,
+          record.capabilityId,
+          record.toolName,
+          record.operation,
+          record.inputDigest,
+          record.classification,
+          record.status,
+          record.preparedAt,
+          record.completedAt ?? null,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerEffectReceipts ?? [],
+    ),
+    buildTablePlan<WorkerDeploymentRollout>(
+      {
+        table: "worker_deployment_rollouts",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "worker_definition_id",
+          "from_deployment_id",
+          "to_deployment_id",
+          "kind",
+          "created_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.workerDefinitionId,
+          record.fromDeploymentId,
+          record.toDeploymentId,
+          record.kind,
+          record.createdAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerDeploymentRollouts ?? [],
+    ),
+    buildTablePlan<WorkerLifecycleCommandReceipt>(
+      {
+        table: "worker_command_receipts",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "idempotency_key",
+          "operation",
+          "target_id",
+          "request_digest",
+          "created_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.idempotencyKey,
+          record.operation,
+          record.targetId ?? null,
+          record.requestDigest,
+          record.createdAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerCommandReceipts ?? [],
+    ),
+    buildTablePlan<WorkerEvent>(
+      {
+        table: "worker_events",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "sequence",
+          "type",
+          "worker_definition_id",
+          "worker_version_id",
+          "worker_deployment_id",
+          "worker_run_id",
+          "source",
+          "deployment_sequence",
+          "run_sequence",
+          "evidence_id",
+          "event_digest",
+          "occurred_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => {
+          const v2 = record.schemaVersion === "packetagent.worker-event/v2" ? record : undefined;
+          return [
+            record.workspaceId,
+            record.id,
+            record.sequence,
+            record.type,
+            record.workerDefinitionId,
+            record.workerVersionId ?? null,
+            record.workerDeploymentId ?? null,
+            v2?.workerRunId ?? null,
+            v2?.source ?? null,
+            v2?.deploymentSequence ?? null,
+            v2?.runSequence ?? null,
+            v2?.evidenceId ?? null,
+            v2?.eventDigest ?? null,
+            record.occurredAt,
+            JSON.stringify(record),
+          ];
+        },
+      },
+      data.workerEvents ?? [],
+    ),
+    buildTablePlan<WorkerEvidenceEntry>(
+      {
+        table: "worker_evidence_entries",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "sequence",
+          "worker_definition_id",
+          "worker_version_id",
+          "worker_deployment_id",
+          "worker_run_id",
+          "source_event_id",
+          "created_at",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.sequence,
+          record.workerDefinitionId,
+          record.workerVersionId ?? null,
+          record.workerDeploymentId ?? null,
+          record.workerRunId ?? null,
+          record.sourceEventId,
+          record.createdAt,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerEvidenceEntries ?? [],
+    ),
+    buildTablePlan<WorkerArtifactManifest>(
+      {
+        table: "worker_artifact_manifests",
+        keyColumns: ["workspace_id", "id"],
+        columns: [
+          "workspace_id",
+          "id",
+          "worker_definition_id",
+          "worker_version_id",
+          "worker_deployment_id",
+          "worker_run_id",
+          "created_at",
+          "expires_at",
+          "manifest_digest",
+          "payload",
+        ],
+        keyValues: (record) => [record.workspaceId, record.id],
+        values: (record) => [
+          record.workspaceId,
+          record.id,
+          record.workerDefinitionId,
+          record.workerVersionId,
+          record.workerDeploymentId,
+          record.workerRunId,
+          record.createdAt,
+          record.expiresAt ?? null,
+          record.manifestDigest,
+          JSON.stringify(record),
+        ],
+      },
+      data.workerArtifactManifests ?? [],
+    ),
+  ];
+}
+
+/** Capture the serialized signature of every dedicated row currently in `data`. */
+export function snapshotDedicatedRelationalRows(data: PacketAgentData): DedicatedRowSnapshot {
+  const snapshot: DedicatedRowSnapshot = new Map();
+  for (const plan of dedicatedTablePlans(data)) {
+    snapshot.set(plan.table, new Map(plan.rows.map((row) => [row.key, row.signature])));
+  }
+  return snapshot;
+}
+
+function upsertStatementSql(plan: DedicatedTablePlan): string {
+  const placeholders = plan.columns.map(() => "?").join(", ");
+  const updates = plan.columns
+    .filter((column) => !plan.keyColumns.includes(column))
+    .map((column) => `${column} = excluded.${column}`)
+    .join(", ");
+  return `insert into ${plan.table} (${plan.columns.join(", ")}) values (${placeholders}) on conflict(${plan.keyColumns.join(", ")}) do update set ${updates}`;
+}
+
+/**
+ * Persist the dedicated tables. With a `snapshot` (the signature captured when
+ * the dataset was loaded) only changed/removed rows are written; without one the
+ * tables are cleared and fully re-inserted, which is what seed/reset need.
+ */
+export function persistDedicatedRelationalRows(
   db: DatabaseSync,
-  records: JobMetricSnapshotRecord[],
+  data: PacketAgentData,
+  snapshot?: DedicatedRowSnapshot,
 ): void {
-  db.exec("delete from job_metric_snapshots");
-  const stmt = db.prepare(`
-    insert or replace into job_metric_snapshots (
-      id, captured_at, type, total_runs, succeeded_runs, failed_runs, canceled_runs,
-      last_run_started_at, last_run_finished_at, last_duration_ms, average_duration_ms, p95_duration_ms
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of records) {
-    stmt.run(
-      record.id,
-      record.capturedAt,
-      record.type,
-      record.totalRuns,
-      record.succeededRuns,
-      record.failedRuns,
-      record.canceledRuns,
-      record.lastRunStartedAt,
-      record.lastRunFinishedAt,
-      record.lastDurationMs,
-      record.averageDurationMs,
-      record.p95DurationMs,
-    );
-  }
-}
+  const plans = dedicatedTablePlans(data);
+  const plansByTable = new Map(plans.map((plan) => [plan.table, plan]));
 
-function persistDedicatedAlertEvents(db: DatabaseSync, records: AlertEventRecord[]): void {
-  db.exec("delete from alert_events");
-  const stmt = db.prepare(`
-    insert or replace into alert_events (
-      id, rule_id, severity, title, detail, observed_at, context,
-      delivered, delivery_error, delivery_attempts, last_delivery_attempt_at, dead_lettered
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of records) {
-    stmt.run(
-      record.id,
-      record.ruleId,
-      record.severity,
-      record.title,
-      record.detail,
-      record.observedAt,
-      JSON.stringify(record.context ?? {}),
-      record.delivered ? 1 : 0,
-      record.deliveryError ?? null,
-      record.deliveryAttempts ?? null,
-      record.lastDeliveryAttemptAt ?? null,
-      record.deadLettered === undefined ? null : record.deadLettered ? 1 : 0,
-    );
+  if (!snapshot) {
+    for (const table of DEDICATED_TABLE_DELETE_ORDER) {
+      db.exec(`delete from ${table}`);
+    }
+  } else {
+    for (const table of DEDICATED_TABLE_DELETE_ORDER) {
+      const plan = plansByTable.get(table);
+      const previous = snapshot.get(table);
+      if (!plan || !previous || previous.size === 0) continue;
+      const present = new Set(plan.rows.map((row) => row.key));
+      const removed = [...previous.keys()].filter((key) => !present.has(key));
+      if (removed.length === 0) continue;
+      const statement = db.prepare(
+        `delete from ${table} where ${plan.keyColumns.map((column) => `${column} = ?`).join(" and ")}`,
+      );
+      for (const key of removed) {
+        statement.run(...key.split(ROW_KEY_SEPARATOR));
+      }
+    }
   }
-}
 
-function persistDedicatedAgentRuns(db: DatabaseSync, records: AgentRunRecord[]): void {
-  db.exec("delete from agent_runs");
-  const stmt = db.prepare(`
-    insert or replace into agent_runs (
-      id, workspace_id, agent_id,
-      worker_definition_id, worker_version_id, worker_deployment_id, worker_run_id,
-      title, status, trigger_kind,
-      started_at, completed_at, inputs, output, error,
-      logs, tool_calls, transcript, model_used, cost_usd, evaluation,
-      created_at, updated_at
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of records) {
-    stmt.run(
-      record.id,
-      record.workspaceId,
-      record.agentId ?? null,
-      record.workerDefinitionId ?? null,
-      record.workerVersionId ?? null,
-      record.workerDeploymentId ?? null,
-      record.workerRunId ?? null,
-      record.title,
-      record.status,
-      record.triggerKind ?? null,
-      record.startedAt ?? null,
-      record.completedAt ?? null,
-      record.inputs === undefined ? null : JSON.stringify(record.inputs),
-      record.output ?? null,
-      record.error ?? null,
-      JSON.stringify(record.logs ?? []),
-      record.toolCalls === undefined ? null : JSON.stringify(record.toolCalls),
-      record.transcript === undefined ? null : JSON.stringify(record.transcript),
-      record.modelUsed ?? null,
-      record.costUsd ?? null,
-      record.evaluation === undefined ? null : JSON.stringify(record.evaluation),
-      record.createdAt,
-      record.updatedAt,
-    );
-  }
-}
-
-function persistDedicatedJobs(db: DatabaseSync, records: JobRecord[]): void {
-  db.exec("delete from jobs");
-  const stmt = db.prepare(`
-    insert or replace into jobs (
-      id, workspace_id, type, payload, status, attempts, max_attempts,
-      scheduled_at, started_at, completed_at, cron, result, error,
-      cancel_requested, created_at, updated_at
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of records) {
-    stmt.run(
-      record.id,
-      record.workspaceId,
-      record.type,
-      JSON.stringify(record.payload ?? {}),
-      record.status,
-      record.attempts,
-      record.maxAttempts,
-      record.scheduledAt,
-      record.startedAt ?? null,
-      record.completedAt ?? null,
-      record.cron ?? null,
-      record.result === undefined ? null : JSON.stringify(record.result),
-      record.error ?? null,
-      record.cancelRequested === undefined ? null : record.cancelRequested ? 1 : 0,
-      record.createdAt,
-      record.updatedAt,
-    );
-  }
-}
-
-function persistDedicatedInvitationEmailDeliveries(
-  db: DatabaseSync,
-  records: InvitationEmailDeliveryRecord[],
-): void {
-  db.exec("delete from invitation_email_deliveries");
-  const stmt = db.prepare(`
-    insert or replace into invitation_email_deliveries (
-      id, workspace_id, invitation_id, recipient_email, subject,
-      status, provider, mode, created_at, sent_at, error,
-      provider_status, provider_delivery_id, provider_status_at, provider_error
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of records) {
-    stmt.run(
-      record.id,
-      record.workspaceId,
-      record.invitationId,
-      record.recipientEmail,
-      record.subject,
-      record.status,
-      record.provider,
-      record.mode,
-      record.createdAt,
-      record.sentAt ?? null,
-      record.error ?? null,
-      record.providerStatus ?? null,
-      record.providerDeliveryId ?? null,
-      record.providerStatusAt ?? null,
-      record.providerError ?? null,
-    );
-  }
-}
-
-function persistDedicatedActivities(db: DatabaseSync, records: ActivityRecord[]): void {
-  db.exec("delete from activities");
-  const stmt = db.prepare(`
-    insert or replace into activities (
-      id, workspace_id, occurred_at, type, payload, user_id, related_subject
-    ) values (?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of records) {
-    stmt.run(
-      record.id,
-      record.workspaceId,
-      record.occurredAt,
-      record.event,
-      JSON.stringify(record),
-      record.actor.type === "user" ? record.actor.id : null,
-      null,
-    );
-  }
-}
-
-function persistDedicatedProviderCalls(db: DatabaseSync, records: ProviderCallRecord[]): void {
-  db.exec("delete from provider_calls");
-  const stmt = db.prepare(`
-    insert or replace into provider_calls (
-      id, workspace_id, route_key, provider, model, prompt_tokens,
-      completion_tokens, cost_usd, duration_ms, status, error_message,
-      started_at, completed_at
-    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const record of records) {
-    stmt.run(
-      record.id,
-      record.workspaceId,
-      record.routeKey,
-      record.provider,
-      record.model,
-      record.promptTokens,
-      record.completionTokens,
-      record.costUsd,
-      record.durationMs,
-      record.status,
-      record.errorMessage ?? null,
-      record.startedAt,
-      record.completedAt,
-    );
-  }
-}
-
-function persistDedicatedActivationSignals(
-  db: DatabaseSync,
-  records: ActivationSignalRecord[],
-): void {
-  db.exec("delete from activation_signals");
-  for (const record of records) {
-    upsertDedicatedActivationSignal(db, normalizeActivationSignalRecord(record));
+  for (const plan of plans) {
+    const previous = snapshot?.get(plan.table);
+    if (previous && plan.rows.every((row) => previous.get(row.key) === row.signature)) {
+      continue;
+    }
+    const statement = db.prepare(upsertStatementSql(plan));
+    for (const row of plan.rows) {
+      if (previous?.get(row.key) === row.signature) continue;
+      statement.run(...row.values);
+    }
   }
 }
 

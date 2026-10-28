@@ -6,6 +6,21 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### 2026-10-28 - SQLite write amplification
+
+- SQLite store mutations no longer rewrite every row of every table. A mutation
+  now diffs the mutated dataset against a row-signature snapshot captured when it
+  was loaded and writes only the rows that changed or disappeared
+  (`src/store/dedicated-tables.ts`, `src/store/backends/sqlite.ts`). A mutation
+  that touches nothing in `jobs` no longer touches that table at all, and
+  appending one job writes one row instead of every row. The whole-store load is
+  still O(dataset), so the remaining cost is the load, not the write.
+- Every runtime SQLite consumer now shares one cached migration runner
+  (`src/db/sqlite-database.ts`). A warm open checks `schema_migrations` instead of
+  re-reading the migrations directory and every `.sql` file, so a scheduler poll
+  no longer re-applies migrations. The eight duplicated migration runners under
+  `src/repositories/` and `src/sandbox/sandbox-store.ts` were removed.
+
 ### 2026-10-27 - Worker cron input safety, jobs and browser-gate hardening
 
 - Worker cron projection now leaves a trigger unscheduled when the Worker's

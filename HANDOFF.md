@@ -1,6 +1,6 @@
 # PacketAgent handoff
 
-Updated 2026-10-27. This is the short resume document for a new working
+Updated 2026-10-28. This is the short resume document for a new working
 session. [`BACKLOG.md`](BACKLOG.md) is the sole implementation ledger;
 [`dev/CODEX-HANDOFF.md`](dev/CODEX-HANDOFF.md) retains the detailed shipped
 inventory and gate history.
@@ -95,7 +95,7 @@ The highest-value known constraints, not automatic tasks, are:
   covers Builder agent mode, the command palette, all twelve `/admin/:tab`
   surfaces, legacy Admin redirects, and a zero-console-error assertion.
 
-## Known issues (2026-10-27)
+## Known issues (2026-10-28)
 
 Real defects found while auditing the advertised surface. Fixed ones are noted
 as such; the rest are documented rather than silently shipped.
@@ -110,14 +110,19 @@ as such; the rest are documented rather than silently shipped.
 - Fixed: terminal job history is now bounded by an hourly retention reconciler
   (`PACKETAGENT_JOB_RETENTION_DAYS`, default 7 days, capped per pass); queued
   and running jobs are never pruned.
-- Open: in `PACKETAGENT_STORE=sqlite`, a store mutation rewrites the whole
-  `jobs` table (`delete from jobs` + re-insert every row,
-  `src/store/dedicated-tables.ts`) and `app_records`
-  (`src/store/backends/sqlite.ts`). Cost therefore scales with table size, so a
-  large job history makes every scheduler poll progressively more expensive.
-  Retention bounds the size; incremental row persistence is still unshipped.
-- Open: the scheduler opens a fresh SQLite connection and re-applies migrations
-  on every poll (`src/repositories/jobs-repo.ts`).
+- Fixed: `PACKETAGENT_STORE=sqlite` no longer rewrites whole tables on every
+  mutation. A mutation now diffs the mutated dataset against a row-signature
+  snapshot taken when it was loaded and writes only the rows that changed or
+  disappeared (`src/store/dedicated-tables.ts`, `src/store/backends/sqlite.ts`).
+  A mutation that touches nothing in `jobs` no longer touches that table at all,
+  and appending one job writes one row instead of every row. The whole-store
+  _load_ is still O(dataset), so a mutation still scales with dataset size, but
+  with a much smaller constant and no SQLite page/WAL write amplification.
+- Fixed: every runtime SQLite consumer now shares one cached migration runner
+  (`src/db/sqlite-database.ts`). A warm open checks `schema_migrations` instead of
+  re-reading the migrations directory and every `.sql` file, so a scheduler poll
+  no longer re-applies migrations. The eight duplicated migration runners under
+  `src/repositories/` and `src/sandbox/sandbox-store.ts` were removed.
 - Open: the `/builder` full-bleed layout does not mount the command palette; it
   is available in the workbench shell only.
 - Open: the Admin Roles, SSO, and Rate-limits tabs are read-only
@@ -128,8 +133,8 @@ as such; the rest are documented rather than silently shipped.
   unbounded terminal jobs. On 2026-10-27 it was redeployed to the fixed build
   and its terminal-job history was pruned and the SQLite file compacted
   (97 MB -> 14 MB); it now reports healthy with `/api/health` 200 in ~3 ms and
-  ~0.6% CPU. The two open SQLite issues above are the underlying causes and
-  remain.
+  ~0.6% CPU. The two SQLite issues above were the underlying causes and are now
+  fixed; the deployment runs the fixed build.
 
 See [`dev/r8-release-reliability.md`](dev/r8-release-reliability.md) for the
 requirement-to-evidence matrix and reproducible commands.
