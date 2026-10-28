@@ -1,7 +1,6 @@
-import { mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { PACKETAGENT_MIGRATIONS_DIR } from "../db/migrations-path.js";
+import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { openSqliteDatabase } from "../db/sqlite-database.js";
 import type { JobRecord, JobStatus, PacketAgentData } from "../packetagent-store.js";
 import {
   loadStore as defaultLoadStore,
@@ -11,7 +10,6 @@ import {
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
 const DEFAULT_DB_FILE = "data/packetagent.sqlite";
-const MIGRATIONS_DIR = PACKETAGENT_MIGRATIONS_DIR;
 
 export interface ListJobsFilter {
   workspaceId: string;
@@ -297,7 +295,7 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
   const dbPath = resolveDbPath(deps.dbPath);
   return {
     list(filter) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         const sql: string[] = ["select * from jobs where workspace_id = ?"];
         const params: Array<string | number> = [filter.workspaceId];
@@ -314,7 +312,7 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
       }
     },
     find(workspaceId, id) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         const row = db
           .prepare("select * from jobs where workspace_id = ? and id = ?")
@@ -325,7 +323,7 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
       }
     },
     upsert(record) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         db.exec("begin immediate");
         try {
@@ -344,7 +342,7 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
       }
     },
     update(workspaceId, id, patch) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         db.exec("begin immediate");
         try {
@@ -372,7 +370,7 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
       }
     },
     count() {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         const row = db.prepare("select count(*) as count from jobs").get() as
           | { count: number }
@@ -383,7 +381,7 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
       }
     },
     claimNext(now) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         db.exec("begin immediate");
         try {
@@ -450,7 +448,7 @@ export function sqliteJobsRepository(deps: JobsRepositoryDeps = {}): JobsReposit
       }
     },
     sweepStaleRunning(staleAfterMs, now) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         db.exec("begin immediate");
         try {
@@ -651,41 +649,4 @@ function clampLimit(limit?: number): number {
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
   return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
-}
-
-function openDatabase(dbPath: string): DatabaseSync {
-  mkdirSync(dirname(dbPath), { recursive: true });
-  const db = new DatabaseSync(dbPath);
-  db.exec("pragma busy_timeout = 5000");
-  db.exec("pragma journal_mode = wal");
-  db.exec("pragma synchronous = normal");
-  db.exec("pragma foreign_keys = on");
-  applyMigrations(db);
-  return db;
-}
-
-function applyMigrations(db: DatabaseSync): void {
-  db.exec(
-    "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
-  );
-  const appliedRows = db
-    .prepare("select name from schema_migrations order by name")
-    .all() as Array<{ name: string }>;
-  const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR)
-    .filter((name) => name.endsWith(".sql"))
-    .sort();
-  for (const name of migrations) {
-    if (alreadyApplied.has(name)) continue;
-    const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");
-    db.exec("begin");
-    try {
-      db.exec(sql);
-      db.prepare("insert into schema_migrations (name) values (?)").run(name);
-      db.exec("commit");
-    } catch (error) {
-      db.exec("rollback");
-      throw error;
-    }
-  }
 }

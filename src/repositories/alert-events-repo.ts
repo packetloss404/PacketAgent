@@ -1,7 +1,5 @@
-import { mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { PACKETAGENT_MIGRATIONS_DIR } from "../db/migrations-path.js";
-import { DatabaseSync } from "node:sqlite";
+import { resolve } from "node:path";
+import { openSqliteDatabase } from "../db/sqlite-database.js";
 import type { AlertEventRecord, PacketAgentData } from "../packetagent-store.js";
 import {
   loadStore as defaultLoadStore,
@@ -11,7 +9,6 @@ import {
 const DEFAULT_LIST_LIMIT = 100;
 const MAX_LIST_LIMIT = 500;
 const DEFAULT_DB_FILE = "data/packetagent.sqlite";
-const MIGRATIONS_DIR = PACKETAGENT_MIGRATIONS_DIR;
 
 export interface ListAlertsFilter {
   severity?: "info" | "warning" | "critical";
@@ -281,7 +278,7 @@ export function sqliteAlertEventsRepository(
   const dbPath = resolveDbPath(deps.dbPath);
   return {
     list(filter = {}) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         const sql: string[] = ["select * from alert_events"];
         const params: Array<string | number> = [];
@@ -312,7 +309,7 @@ export function sqliteAlertEventsRepository(
     },
     insertMany(records) {
       if (records.length === 0) return;
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         db.exec("begin immediate");
         try {
@@ -348,7 +345,7 @@ export function sqliteAlertEventsRepository(
       }
     },
     updateDeliveryStatus(alertId, patch) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         const existing = db.prepare("select * from alert_events where id = ?").get(alertId) as
           | AlertEventRow
@@ -398,7 +395,7 @@ export function sqliteAlertEventsRepository(
       }
     },
     prune(retainAfterIso) {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         const result = db
           .prepare("delete from alert_events where observed_at < ?")
@@ -409,7 +406,7 @@ export function sqliteAlertEventsRepository(
       }
     },
     count() {
-      const db = openDatabase(dbPath);
+      const db = openSqliteDatabase(dbPath);
       try {
         const row = db.prepare("select count(*) as count from alert_events").get() as
           | { count: number }
@@ -494,41 +491,4 @@ function applyListFilter(
 function resolveDbPath(override?: string): string {
   if (override) return resolve(override);
   return resolve(process.cwd(), process.env.PACKETAGENT_DB_PATH ?? DEFAULT_DB_FILE);
-}
-
-function openDatabase(dbPath: string): DatabaseSync {
-  mkdirSync(dirname(dbPath), { recursive: true });
-  const db = new DatabaseSync(dbPath);
-  db.exec("pragma busy_timeout = 5000");
-  db.exec("pragma journal_mode = wal");
-  db.exec("pragma synchronous = normal");
-  db.exec("pragma foreign_keys = on");
-  applyMigrations(db);
-  return db;
-}
-
-function applyMigrations(db: DatabaseSync): void {
-  db.exec(
-    "create table if not exists schema_migrations (name text primary key, applied_at text not null default (datetime('now')))",
-  );
-  const appliedRows = db
-    .prepare("select name from schema_migrations order by name")
-    .all() as Array<{ name: string }>;
-  const alreadyApplied = new Set(appliedRows.map((row) => row.name));
-  const migrations = readdirSync(MIGRATIONS_DIR)
-    .filter((name) => name.endsWith(".sql"))
-    .sort();
-  for (const name of migrations) {
-    if (alreadyApplied.has(name)) continue;
-    const sql = readFileSync(resolve(MIGRATIONS_DIR, name), "utf8");
-    db.exec("begin");
-    try {
-      db.exec(sql);
-      db.prepare("insert into schema_migrations (name) values (?)").run(name);
-      db.exec("commit");
-    } catch (error) {
-      db.exec("rollback");
-      throw error;
-    }
-  }
 }
